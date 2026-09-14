@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { criarRepoSkill } from "./repo-fixture.js";
+import { suportaBitExecutavel } from "./fs-capacidades.js";
 
 const criados: string[] = [];
 afterEach(() => {
@@ -62,9 +63,13 @@ describe("repositório de fixture com hooks e assets", () => {
 
   it("funcional: o hook nasce executável e sem hooks nada é criado", () => {
     const comHooks = criarRepoSkill({ nome: "memox", tags: [], hooks: ["memox-injetar.sh"] });
-    const modo = statSync(join(comHooks, ".claude/hooks/memox-injetar.sh")).mode;
-    // bit de execução do dono: o README do memox manda `chmod +x`
-    expect(modo & 0o100).toBe(0o100);
+    const hook = join(comHooks, ".claude/hooks/memox-injetar.sh");
+    expect(existsSync(hook)).toBe(true);
+
+    // Em filesystem POSIX, o hook precisa preservar o bit de execução.
+    if (suportaBitExecutavel()) {
+      expect(statSync(hook).mode & 0o100).toBe(0o100);
+    }
     rmSync(comHooks, { recursive: true, force: true });
 
     const semHooks = criarRepoSkill({ nome: "sprintx", tags: [] });
