@@ -34,7 +34,22 @@ describe("binario do painel", () => {
     expect(r.saida).toContain("--no-open");
   });
 
-  it("integração: o binário roda quando invocado por symlink, como o npm instala", async () => {
+  it("integração: o binário roda como o npm o invoca na plataforma", async () => {
+    if (process.platform === "win32") {
+      const saida = await new Promise<string>((ok) => {
+        execFile(
+          process.execPath,
+          [resolve(BIN), "--ajuda"],
+          { encoding: "utf8" },
+          (_e, out, err) => ok(String(out) + String(err)),
+        );
+      });
+
+      expect(saida).toContain("--porta");
+      expect(saida).toContain("--no-open");
+      return;
+    }
+
     // Regressão: o npm cria node_modules/.bin/<nome> como symlink, então
     // process.argv[1] é o link e import.meta.url é o arquivo real. Comparar os
     // dois sem realpath faz o CLI encerrar em silêncio, com código 0 e sem
