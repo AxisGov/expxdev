@@ -71,7 +71,7 @@ function branchesLocais(raiz: string): string[] {
   if (!ehRaizDeRepositorio(raiz)) return [];
   try {
     const saida = git(raiz, "branch", "--format=%(refname:short)");
-    return saida === "" ? [] : saida.split("\n");
+    return saida === "" ? [] : saida.split(/\r?\n/);
   } catch {
     return [];
   }
@@ -87,7 +87,7 @@ function candidatosNaBranch(raiz: string, branch: string): string[] {
   try {
     const saida = git(raiz, "ls-tree", "-r", "--name-only", branch);
     if (saida === "") return [];
-    return saida.split("\n").filter((caminho) => ehCandidato(caminho));
+    return saida.split(/\r?\n/).filter((caminho) => ehCandidato(caminho));
   } catch {
     // branch inválida ou corrompida: não derruba a descoberta das demais.
     return [];
