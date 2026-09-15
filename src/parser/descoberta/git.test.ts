@@ -4,7 +4,6 @@ import { descobrirTrabalhos } from "./trabalhos.js";
 import { descobrirEmBranches, branchAtiva } from "./git.js";
 import { criarRepoMultiBranch } from "../../teste/repo-multi-branch.js";
 import { execFileSync } from "node:child_process";
-import { realpathSync } from "node:fs";
 import { relative } from "node:path";
 
 /**
