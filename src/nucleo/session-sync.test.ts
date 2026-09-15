@@ -46,14 +46,13 @@ describe("sincronização Axis no SessionStart", () => {
     const chamadas: Array<{ arquivo: string; argumentos: string[] }> = [];
     const executar = (arquivo: string, argumentos: string[]) => {
       chamadas.push({ arquivo, argumentos });
-      if (argumentos[0] === "clone") mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+      if (argumentos[0] === "clone") mkdirSync(join(argumentos.at(-1)!, "dist", "cli"), { recursive: true });
       return "";
     };
     bootstrapAxis(cache, executar);
-    expect(chamadas[0]).toEqual({
-      arquivo: "git",
-      argumentos: ["clone", "--branch", "main", "--single-branch", AXIS_REPOSITORIO, cache],
-    });
+    expect(chamadas[0]?.arquivo).toBe("git");
+    expect(chamadas[0]?.argumentos.slice(0, -1)).toEqual(["clone", "--branch", "main", "--single-branch", AXIS_REPOSITORIO]);
+    expect(chamadas[0]?.argumentos.at(-1)).toContain(`${cache}.tmp-`);
     expect(chamadas.some((c) => c.argumentos.includes("ci"))).toBe(true);
     expect(chamadas.some((c) => c.argumentos.includes("build:server"))).toBe(true);
     rmSync(raiz, { recursive: true, force: true });
@@ -66,8 +65,8 @@ describe("sincronização Axis no SessionStart", () => {
     const executar = (_arquivo: string, argumentos: string[]) => {
       if (argumentos[0] === "clone") {
         clones++;
-        mkdirSync(join(cache, ".git", "refs"), { recursive: true });
-        mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+        mkdirSync(join(argumentos.at(-1)!, ".git", "refs"), { recursive: true });
+        mkdirSync(join(argumentos.at(-1)!, "dist", "cli"), { recursive: true });
       }
       if (argumentos.includes("remote")) return AXIS_REPOSITORIO;
       if (argumentos.includes("rev-parse")) return "same\n";
@@ -96,12 +95,12 @@ describe("sincronização Axis no SessionStart", () => {
     let primeira = true;
     const executar = (_arquivo: string, argumentos: string[]) => {
       if (argumentos[0] === "clone") {
-        mkdirSync(cache, { recursive: true });
+        mkdirSync(argumentos.at(-1)!, { recursive: true });
         if (primeira) {
           primeira = false;
           throw new Error("clone interrompido");
         }
-        mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+        mkdirSync(join(argumentos.at(-1)!, "dist", "cli"), { recursive: true });
       }
       if (argumentos.includes("remote")) return AXIS_REPOSITORIO;
       return "commit\n";
@@ -112,17 +111,27 @@ describe("sincronização Axis no SessionStart", () => {
     rmSync(raiz, { recursive: true, force: true });
   });
 
-  it("funcional: cache existente sem .git é tratado como parcial", () => {
+  it("funcional: diretório arbitrário sem ownership não é apagado", () => {
     const raiz = mkdtempSync(join(tmpdir(), "expx-cache-parcial-"));
     const cache = join(raiz, "cache");
     mkdirSync(cache, { recursive: true });
     writeFileSync(join(cache, "resto.tmp"), "parcial");
+    expect(() => bootstrapAxis(cache, () => "")).toThrow("caminho de cache existente nao e um cache Axis gerenciado");
+    expect(existsSync(join(cache, "resto.tmp"))).toBe(true);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("funcional: cache parcial com ownership Axis é recuperado", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-cache-parcial-axis-"));
+    const cache = join(raiz, "cache");
+    mkdirSync(cache, { recursive: true });
+    writeFileSync(join(cache, ".axis-cache-owner"), "AxisGov/expxdev\n");
     const executar = (_arquivo: string, argumentos: string[]) => {
-      if (argumentos[0] === "clone") mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+      if (argumentos[0] === "clone") mkdirSync(join(argumentos.at(-1)!, "dist", "cli"), { recursive: true });
       return "commit\n";
     };
-    bootstrapAxis(cache, executar);
-    expect(existsSync(join(cache, "resto.tmp"))).toBe(false);
+    expect(() => bootstrapAxis(cache, executar)).not.toThrow();
+    expect(existsSync(join(cache, ".axis-cache-owner"))).toBe(true);
     rmSync(raiz, { recursive: true, force: true });
   });
 
@@ -148,7 +157,7 @@ describe("sincronização Axis no SessionStart", () => {
     const chamadas: string[][] = [];
     bootstrapAxis(cache, (_arquivo, argumentos) => {
       chamadas.push(argumentos);
-      if (argumentos[0] === "clone") mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+      if (argumentos[0] === "clone") mkdirSync(join(argumentos.at(-1)!, "dist", "cli"), { recursive: true });
       return "";
     });
     expect(chamadas[0]).toContain("clone");
@@ -182,7 +191,7 @@ describe("sincronização Axis no SessionStart", () => {
     const antigo = new Date(Date.now() - 120_000);
     utimesSync(`${cache}.lock`, antigo, antigo);
     const executar = (_arquivo: string, argumentos: string[]) => {
-      if (argumentos[0] === "clone") mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+      if (argumentos[0] === "clone") mkdirSync(join(argumentos.at(-1)!, "dist", "cli"), { recursive: true });
       return "commit\n";
     };
     expect(() => bootstrapAxis(cache, executar)).not.toThrow();

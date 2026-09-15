@@ -117,6 +117,26 @@ describe("harness Codex", () => {
     }
   });
 
+  it.each([
+    ["null", "hooks invalido"],
+    ["[]", "hooks invalido"],
+    ["\"texto\"", "hooks invalido"],
+    ["{\"SessionStart\":null}", "SessionStart invalido"],
+    ["{\"SessionStart\":\"texto\"}", "SessionStart invalido"],
+  ])("funcional: hooks estruturalmente inválido (%s) é preservado", (valor, mensagem) => {
+    const p = projetoTemporario();
+    try {
+      mkdirSync(join(p.raiz, ".codex"), { recursive: true });
+      const caminho = join(p.raiz, ".codex/hooks.json");
+      writeFileSync(caminho, `{"hooks":${valor}}\n`);
+      const antes = readFileSync(caminho);
+      expect(materializarCodex(p.raiz)).toContain(mensagem);
+      expect(readFileSync(caminho)).toEqual(antes);
+    } finally {
+      p.descartar();
+    }
+  });
+
   it("funcional: itens null, string e hook de usuário são preservados", () => {
     const p = projetoTemporario();
     try {

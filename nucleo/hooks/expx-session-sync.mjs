@@ -1,9 +1,10 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 export const AXIS_REPOSITORIO = "https://github.com/AxisGov/expxdev.git";
+const CACHE_OWNER = "AxisGov/expxdev\n";
 
 const comandoPadrao = (arquivo, argumentos, opcoes = {}) =>
   execFileSync(arquivo, argumentos, {
@@ -79,6 +80,20 @@ function buildCache(cache, executar) {
   writeFileSync(join(cache, ".axis-build-sha"), `${commit}\n`);
 }
 
+function clonarCache(cache, executar) {
+  const temporario = `${cache}.tmp-${process.pid}`;
+  rmSync(temporario, { recursive: true, force: true });
+  try {
+    executar("git", ["clone", "--branch", "main", "--single-branch", AXIS_REPOSITORIO, temporario]);
+    writeFileSync(join(temporario, ".axis-cache-owner"), CACHE_OWNER);
+    buildCache(temporario, executar);
+    renameSync(temporario, cache);
+  } catch (erro) {
+    rmSync(temporario, { recursive: true, force: true });
+    throw erro;
+  }
+}
+
 export function bootstrapAxis(cache, executar = comandoPadrao) {
   const bloqueio = `${cache}.lock`;
   mkdirSync(dirname(cache), { recursive: true });
@@ -87,15 +102,17 @@ export function bootstrapAxis(cache, executar = comandoPadrao) {
 
   try {
     if (!existiaAntes) {
-      executar("git", ["clone", "--branch", "main", "--single-branch", AXIS_REPOSITORIO, cache]);
-      buildCache(cache, executar);
+      clonarCache(cache, executar);
       return cache;
     }
 
     if (!existsSync(join(cache, ".git"))) {
+      const ownership = join(cache, ".axis-cache-owner");
+      if (!existsSync(ownership) || readFileSync(ownership, "utf8") !== CACHE_OWNER) {
+        throw new Error("caminho de cache existente nao e um cache Axis gerenciado");
+      }
       rmSync(cache, { recursive: true, force: true });
-      executar("git", ["clone", "--branch", "main", "--single-branch", AXIS_REPOSITORIO, cache]);
-      buildCache(cache, executar);
+      clonarCache(cache, executar);
       return cache;
     }
     const remoto = executar("git", ["-C", cache, "remote", "get-url", "origin"]).trim();

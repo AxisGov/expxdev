@@ -29,9 +29,16 @@ export function mesclarCodexHooks(raizProjeto: string): { criou: boolean; altero
     if (typeof atual !== "object" || atual === null || Array.isArray(atual)) {
       return { criou: false, alterou: false, erro: "Codex: .codex/hooks.json deve conter um objeto; arquivo preservado." };
     }
+    if (Object.prototype.hasOwnProperty.call(atual, "hooks") &&
+      (typeof atual.hooks !== "object" || atual.hooks === null || Array.isArray(atual.hooks))) {
+      return { criou: false, alterou: false, erro: "Codex: .codex/hooks.json possui hooks invalido; arquivo preservado." };
+    }
   }
 
   const hooks = { ...(atual.hooks ?? {}) };
+  if (Object.prototype.hasOwnProperty.call(hooks, "SessionStart") && !Array.isArray(hooks.SessionStart)) {
+    return { criou: false, alterou: false, erro: "Codex: .codex/hooks.json possui SessionStart invalido; arquivo preservado." };
+  }
   const atuais: unknown[] = Array.isArray(hooks.SessionStart) ? hooks.SessionStart : [];
   const gerenciado = {
     matcher: "startup|resume",
