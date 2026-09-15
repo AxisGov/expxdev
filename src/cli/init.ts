@@ -162,7 +162,7 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
 
     // A cópia acontece AQUI, antes do `rmSync` dos clones lá embaixo: feita
     // depois, leria pasta já apagada (decisão D-26).
-    const hooksInstalados = instalarHooks(op.raiz, montaveis);
+    const hooksInstalados = op.harness.includes("claude") ? instalarHooks(op.raiz, montaveis) : [];
 
     if (op.harness.includes("claude")) {
       const marketplace = join(op.raiz, ".expx", "marketplace");
@@ -171,8 +171,12 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     }
     if (op.harness.includes("opencode")) materializarOpenCode(op.raiz, montaveis);
     if (op.harness.includes("codex")) {
-      const aviso = materializarCodex(op.raiz);
-      if (aviso !== undefined) avisos.push(aviso);
+      try {
+        const aviso = materializarCodex(op.raiz);
+        if (aviso !== undefined) avisos.push(aviso);
+      } catch (erro) {
+        avisos.push(`Codex: nao foi possivel materializar os hooks: ${erro instanceof Error ? erro.message : "falha de filesystem"}`);
+      }
     }
   }
 

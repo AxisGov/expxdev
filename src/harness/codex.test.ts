@@ -91,6 +91,50 @@ describe("harness Codex", () => {
     }
   });
 
+  it("funcional: runtime alterado exige novo aviso mesmo com configuração igual", () => {
+    const p = projetoTemporario();
+    try {
+      materializarCodex(p.raiz);
+      writeFileSync(join(p.raiz, ".codex/hooks/expx-session-sync.mjs"), "runtime antigo\n");
+      expect(materializarCodex(p.raiz)).toContain("revise e confie");
+      expect(materializarCodex(p.raiz)).toBeUndefined();
+    } finally {
+      p.descartar();
+    }
+  });
+
+  it("funcional: raiz null é preservada sem exceção", () => {
+    const p = projetoTemporario();
+    try {
+      mkdirSync(join(p.raiz, ".codex"), { recursive: true });
+      const caminho = join(p.raiz, ".codex/hooks.json");
+      writeFileSync(caminho, "null\n");
+      const antes = readFileSync(caminho);
+      expect(materializarCodex(p.raiz)).toContain("deve conter um objeto");
+      expect(readFileSync(caminho)).toEqual(antes);
+    } finally {
+      p.descartar();
+    }
+  });
+
+  it("funcional: itens null, string e hook de usuário são preservados", () => {
+    const p = projetoTemporario();
+    try {
+      mkdirSync(join(p.raiz, ".codex"), { recursive: true });
+      writeFileSync(join(p.raiz, ".codex/hooks.json"), JSON.stringify({
+        hooks: { SessionStart: [null, "valor-customizado", { matcher: "startup", hooks: [{ type: "command", command: "user-hook" }] }] },
+      }));
+      mesclarCodexHooks(p.raiz);
+      const s = ler(p.raiz);
+      expect(s.hooks.SessionStart[0]).toBeNull();
+      expect(s.hooks.SessionStart[1]).toBe("valor-customizado");
+      expect(s.hooks.SessionStart[2].hooks[0].command).toBe("user-hook");
+      expect(s.hooks.SessionStart.filter((x: any) => JSON.stringify(x).includes(".codex/hooks/expx-session-sync.mjs"))).toHaveLength(1);
+    } finally {
+      p.descartar();
+    }
+  });
+
   it("funcional: init com codex materializa Codex e sem codex não cria .codex", async () => {
     const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
     const p = projetoTemporario();

@@ -22,6 +22,7 @@ describe("sincronização Axis no SessionStart", () => {
   it("integração: bootstrap fixa o repositório AxisGov e a branch main", () => {
     const raiz = mkdtempSync(join(tmpdir(), "expx-bootstrap-"));
     const cache = join(raiz, "cache");
+    mkdirSync(join(cache, ".git"), { recursive: true });
     const chamadas: Array<{ arquivo: string; argumentos: string[] }> = [];
     const executar = (arquivo: string, argumentos: string[]) => {
       chamadas.push({ arquivo, argumentos });
@@ -58,6 +59,26 @@ describe("sincronização Axis no SessionStart", () => {
     rmSync(raiz, { recursive: true, force: true });
   });
 
+  it("funcional: existência do cache é observada depois do lock", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-cache-lock-"));
+    const cache = join(raiz, "cache");
+    let clones = 0;
+    const executar = (_arquivo: string, argumentos: string[]) => {
+      if (argumentos[0] === "clone") {
+        clones++;
+        mkdirSync(join(cache, ".git", "refs"), { recursive: true });
+        mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+      }
+      if (argumentos.includes("remote")) return AXIS_REPOSITORIO;
+      if (argumentos.includes("rev-parse")) return "same\n";
+      return "";
+    };
+    bootstrapAxis(cache, executar);
+    bootstrapAxis(cache, executar);
+    expect(clones).toBe(1);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
   it("funcional: npm usa cmd.exe no Windows e npm direto em Unix", () => {
     expect(construirComandoNpm(["ci"], "win32", { ComSpec: "C:\\Windows\\System32\\cmd.exe" })).toEqual({
       arquivo: "C:\\Windows\\System32\\cmd.exe",
@@ -88,6 +109,34 @@ describe("sincronização Axis no SessionStart", () => {
     expect(() => bootstrapAxis(cache, executar)).toThrow("clone interrompido");
     expect(existsSync(cache)).toBe(false);
     expect(() => bootstrapAxis(cache, executar)).not.toThrow();
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("funcional: cache existente sem .git é tratado como parcial", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-cache-parcial-"));
+    const cache = join(raiz, "cache");
+    mkdirSync(cache, { recursive: true });
+    writeFileSync(join(cache, "resto.tmp"), "parcial");
+    const executar = (_arquivo: string, argumentos: string[]) => {
+      if (argumentos[0] === "clone") mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+      return "commit\n";
+    };
+    bootstrapAxis(cache, executar);
+    expect(existsSync(join(cache, "resto.tmp"))).toBe(false);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("funcional: cache com origin diferente não é apagado", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-cache-outro-"));
+    const cache = join(raiz, "cache");
+    mkdirSync(join(cache, ".git"), { recursive: true });
+    writeFileSync(join(cache, "preservar.txt"), "nao apagar");
+    const executar = (_arquivo: string, argumentos: string[]) => {
+      if (argumentos.includes("remote")) return "https://example.invalid/outro.git\n";
+      return "";
+    };
+    expect(() => bootstrapAxis(cache, executar)).toThrow("cache nao aponta para AxisGov/expxdev");
+    expect(existsSync(join(cache, "preservar.txt"))).toBe(true);
     rmSync(raiz, { recursive: true, force: true });
   });
 
@@ -145,6 +194,7 @@ describe("sincronização Axis no SessionStart", () => {
     const raiz = mkdtempSync(join(tmpdir(), "expx-build-stale-"));
     const cache = join(raiz, "cache");
     mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+    mkdirSync(join(cache, ".git"), { recursive: true });
     writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "old");
     writeFileSync(join(cache, ".axis-build-sha"), "old-commit\n");
     const executar = (arquivo: string, argumentos: string[]) => {
@@ -156,6 +206,25 @@ describe("sincronização Axis no SessionStart", () => {
     expect(() => bootstrapAxis(cache, executar)).toThrow("build interrompido");
     expect(existsSync(join(cache, ".axis-build-sha"))).toBe(true);
     expect(readFileSync(join(cache, ".axis-build-sha"), "utf8")).toBe("old-commit\n");
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("funcional: cache Axis sujo não executa reset", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-cache-sujo-"));
+    const cache = join(raiz, "cache");
+    mkdirSync(join(cache, ".git"), { recursive: true });
+    writeFileSync(join(cache, "local.txt"), "preservar");
+    const chamadas: string[][] = [];
+    const executar = (_arquivo: string, argumentos: string[]) => {
+      chamadas.push(argumentos);
+      if (argumentos.includes("remote")) return AXIS_REPOSITORIO;
+      if (argumentos.includes("rev-parse")) return "novo\n";
+      if (argumentos.includes("status")) return " M local.txt\n";
+      return "";
+    };
+    expect(() => bootstrapAxis(cache, executar)).toThrow("cache Axis possui alteracoes nao commitadas");
+    expect(chamadas.some((a) => a.includes("reset"))).toBe(false);
+    expect(existsSync(join(cache, "local.txt"))).toBe(true);
     rmSync(raiz, { recursive: true, force: true });
   });
 
@@ -177,6 +246,7 @@ describe("sincronização Axis no SessionStart", () => {
     try {
       const cache = join(raiz, "cache");
       mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+      mkdirSync(join(cache, ".git"), { recursive: true });
       writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
       writeFileSync(join(cache, ".axis-build-sha"), "same\n");
       const chamadas: string[][] = [];
@@ -200,6 +270,7 @@ describe("sincronização Axis no SessionStart", () => {
     try {
       const cache = join(raiz, "cache");
       mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+      mkdirSync(join(cache, ".git"), { recursive: true });
       writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
       writeFileSync(join(cache, ".axis-build-sha"), "same\n");
       const chamadas: string[][] = [];
@@ -225,6 +296,7 @@ describe("sincronização Axis no SessionStart", () => {
     try {
       const cache = join(raiz, "cache");
       mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+      mkdirSync(join(cache, ".git"), { recursive: true });
       writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
       writeFileSync(join(cache, ".axis-build-sha"), "same\n");
       const chamadas: string[][] = [];
@@ -334,6 +406,7 @@ describe("sincronização Axis no SessionStart", () => {
     try {
       const cache = join(raiz, "cache");
       mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+      mkdirSync(join(cache, ".git"), { recursive: true });
       writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
       const chamadas: Array<{ arquivo: string; argumentos: string[] }> = [];
       const executar = (arquivo: string, argumentos: string[]) => {

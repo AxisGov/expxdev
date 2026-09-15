@@ -81,9 +81,9 @@ function buildCache(cache, executar) {
 
 export function bootstrapAxis(cache, executar = comandoPadrao) {
   const bloqueio = `${cache}.lock`;
-  const existiaAntes = existsSync(cache);
   mkdirSync(dirname(cache), { recursive: true });
   adquirirLock(bloqueio);
+  const existiaAntes = existsSync(cache);
 
   try {
     if (!existiaAntes) {
@@ -92,6 +92,12 @@ export function bootstrapAxis(cache, executar = comandoPadrao) {
       return cache;
     }
 
+    if (!existsSync(join(cache, ".git"))) {
+      rmSync(cache, { recursive: true, force: true });
+      executar("git", ["clone", "--branch", "main", "--single-branch", AXIS_REPOSITORIO, cache]);
+      buildCache(cache, executar);
+      return cache;
+    }
     const remoto = executar("git", ["-C", cache, "remote", "get-url", "origin"]).trim();
     if (remoto !== AXIS_REPOSITORIO) throw new Error("cache nao aponta para AxisGov/expxdev");
     executar("git", ["-C", cache, "fetch", "origin", "main"]);
@@ -104,6 +110,9 @@ export function bootstrapAxis(cache, executar = comandoPadrao) {
       // marcador ausente: o cache precisa ser reconstruido
     }
     if (local !== remotoMain || marcador !== local || !existsSync(join(cache, "dist", "cli", "expx-bin.js"))) {
+      if (executar("git", ["-C", cache, "status", "--porcelain"]).trim() !== "") {
+        throw new Error("cache Axis possui alteracoes nao commitadas");
+      }
       executar("git", ["-C", cache, "reset", "--hard", "origin/main"]);
       buildCache(cache, executar);
     }

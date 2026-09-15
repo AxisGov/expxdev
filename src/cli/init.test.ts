@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
@@ -59,6 +59,32 @@ describe("init de ponta a ponta", () => {
     expect(existsSync(join(base, "skills/sprintx/SKILL.md"))).toBe(true);
     expect(existsSync(join(base, "skills/runx/SKILL.md"))).toBe(true);
     expect(existsSync(join(base, "commands/sprintx.md"))).toBe(true);
+  });
+
+  it("funcional: falha de filesystem Codex vira aviso sem abortar init", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    writeFileSync(join(p.raiz, ".codex"), "arquivo, nao pasta\n");
+    const r = await executarInit({
+      raiz: p.raiz,
+      skills: ["sprintx"],
+      harness: ["codex"],
+      origens: catalogoLocal(["sprintx"]),
+    });
+    expect(r.ok).toBe(true);
+    expect(r.avisos.join(" ")).toContain("Codex:");
+  });
+
+  it("funcional: apenas Codex não materializa hook Claude", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["codex"], origens: catalogoLocal(["sprintx"]) });
+    expect(existsSync(join(p.raiz, ".codex/hooks/expx-session-sync.mjs"))).toBe(true);
+    expect(existsSync(join(p.raiz, ".claude/hooks/expx-session-sync.mjs"))).toBe(false);
+  });
+
+  it("funcional: apenas OpenCode não materializa hook Claude", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["opencode"], origens: catalogoLocal(["sprintx"]) });
+    expect(existsSync(join(p.raiz, ".claude/hooks/expx-session-sync.mjs"))).toBe(false);
   });
 
   it("funcional: o lock registra hash por arquivo de cada skill instalada", async () => {

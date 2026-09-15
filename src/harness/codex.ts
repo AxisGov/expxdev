@@ -26,20 +26,26 @@ export function mesclarCodexHooks(raizProjeto: string): { criou: boolean; altero
     } catch {
       return { criou: false, alterou: false, erro: "Codex: .codex/hooks.json invalido; arquivo preservado." };
     }
+    if (typeof atual !== "object" || atual === null || Array.isArray(atual)) {
+      return { criou: false, alterou: false, erro: "Codex: .codex/hooks.json deve conter um objeto; arquivo preservado." };
+    }
   }
 
   const hooks = { ...(atual.hooks ?? {}) };
-  const atuais = Array.isArray(hooks.SessionStart) ? hooks.SessionStart as Array<Record<string, unknown>> : [];
+  const atuais: unknown[] = Array.isArray(hooks.SessionStart) ? hooks.SessionStart : [];
   const gerenciado = {
     matcher: "startup|resume",
     hooks: [{ type: "command", command: comandoUnix, commandWindows: comandoWindows } satisfies CodexHook],
   };
-  const isGerenciado = (item: Record<string, unknown>): boolean =>
-    Array.isArray(item.hooks) && item.hooks.some((h) => JSON.stringify(h).includes(".codex/hooks/expx-session-sync.mjs"));
-  const semGerenciado = atuais
-    .map((item) => ({ ...item, hooks: Array.isArray(item.hooks) ? item.hooks.filter((h) => !isGerenciado({ hooks: [h] })) : item.hooks }))
-    .filter((item) => !Array.isArray(item.hooks) || item.hooks.length > 0);
-  const jaAtual = atuais.some((item) => item.matcher === gerenciado.matcher && JSON.stringify(item.hooks) === JSON.stringify(gerenciado.hooks));
+  const isGerenciado = (hook: unknown): boolean =>
+    typeof hook === "object" && hook !== null && JSON.stringify(hook).includes(".codex/hooks/expx-session-sync.mjs");
+  const semGerenciado = atuais.flatMap((item) => {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) return [item];
+    const registro = item as Record<string, unknown>;
+    if (!Array.isArray(registro.hooks)) return [item];
+    const hooksRestantes = registro.hooks.filter((hook) => !isGerenciado(hook));
+    return hooksRestantes.length > 0 ? [{ ...registro, hooks: hooksRestantes }] : [];
+  });
   hooks.SessionStart = [...semGerenciado, gerenciado];
   const alterou = !existia || JSON.stringify(atuais) !== JSON.stringify(hooks.SessionStart);
   writeFileSync(caminho, `${JSON.stringify({ ...atual, hooks }, null, 2)}\n`);
@@ -49,8 +55,16 @@ export function mesclarCodexHooks(raizProjeto: string): { criou: boolean; altero
 export function materializarCodex(raizProjeto: string): string | undefined {
   const origem = fileURLToPath(new URL("../../nucleo/hooks/expx-session-sync.mjs", import.meta.url));
   const destinoDir = join(raizProjeto, ".codex", "hooks");
+  const destino = join(destinoDir, "expx-session-sync.mjs");
+  const novoRuntime = readFileSync(origem);
+  let runtimeAlterado = true;
+  try {
+    runtimeAlterado = !readFileSync(destino).equals(novoRuntime);
+  } catch {
+    // runtime ausente: será materializado abaixo
+  }
   mkdirSync(destinoDir, { recursive: true });
-  writeFileSync(join(destinoDir, "expx-session-sync.mjs"), readFileSync(origem));
+  writeFileSync(destino, novoRuntime);
   const r = mesclarCodexHooks(raizProjeto);
-  return r.erro ?? (r.alterou ? "Codex: revise e confie os hooks locais com /hooks antes do primeiro uso." : undefined);
+  return r.erro ?? (r.alterou || runtimeAlterado ? "Codex: revise e confie os hooks locais com /hooks antes do primeiro uso." : undefined);
 }
