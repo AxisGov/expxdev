@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
@@ -91,11 +91,26 @@ describe("init de ponta a ponta", () => {
   it("funcional: cleanup remove temporário quando materialização posterior falha", async () => {
     p = projetoTemporario("fixtures/cli/projeto-limpo");
     writeFileSync(join(p.raiz, ".opencode"), "arquivo, nao pasta\n");
-    const repo = catalogoLocal(["sprintx"])["sprintx"]!;
-    const antes = readdirSync(tmpdir()).filter((nome) => nome.startsWith("expx-busca-sprintx-"));
-    await expect(executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["opencode"], origens: { sprintx: repo } })).rejects.toThrow();
-    const depois = readdirSync(tmpdir()).filter((nome) => nome.startsWith("expx-busca-sprintx-"));
-    expect(depois).toEqual(antes);
+    const temporarioDoTeste = mkdtempSync(join(tmpdir(), "expx-init-cleanup-"));
+    const anteriores = {
+      TMPDIR: process.env.TMPDIR,
+      TEMP: process.env.TEMP,
+      TMP: process.env.TMP,
+    };
+    try {
+      process.env.TMPDIR = temporarioDoTeste;
+      process.env.TEMP = temporarioDoTeste;
+      process.env.TMP = temporarioDoTeste;
+      const repo = catalogoLocal(["sprintx"]) ["sprintx"]!;
+      await expect(executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["opencode"], origens: { sprintx: repo } })).rejects.toThrow();
+      expect(readdirSync(temporarioDoTeste).filter((nome) => nome.startsWith("expx-busca-sprintx-"))).toEqual([]);
+    } finally {
+      for (const [nome, valor] of Object.entries(anteriores)) {
+        if (valor === undefined) delete process.env[nome];
+        else process.env[nome] = valor;
+      }
+      rmSync(temporarioDoTeste, { recursive: true, force: true });
+    }
   });
 
   it("funcional: o lock registra hash por arquivo de cada skill instalada", async () => {
