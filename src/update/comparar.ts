@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buscarNoCatalogo } from "../nucleo/catalogo.js";
+import { resolverOrigem } from "../nucleo/catalogo.js";
 import { lerLock } from "../nucleo/lock.js";
 import { resolverAlvo } from "../nucleo/versao.js";
 
@@ -44,7 +44,7 @@ export type OpcoesComparar = {
 };
 
 function origemDe(nome: string, lockRepo: string, origens?: Record<string, string>): string {
-  return origens?.[nome] ?? lockRepo ?? buscarNoCatalogo(nome)?.repositorio ?? "";
+  return resolverOrigem(nome, lockRepo, origens?.[nome]) ?? "";
 }
 
 /**

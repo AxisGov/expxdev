@@ -1,4 +1,5 @@
 import { lerLock } from "../nucleo/lock.js";
+import { resolverOrigem } from "../nucleo/catalogo.js";
 import { executarInit } from "../cli/init.js";
 import { compararComRemoto, type ItemComparacao } from "./comparar.js";
 import { verificarModificacaoLocal } from "./modificacao.js";
@@ -97,10 +98,15 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   }
 
   const referencias = op.to !== undefined && op.skills?.[0] !== undefined ? { [op.skills[0]]: op.to } : undefined;
+  const origens: Record<string, string> = {};
+  for (const [nome, travada] of Object.entries(l.lock.skills)) {
+    const origem = resolverOrigem(nome, travada.repositorio, op.origens?.[nome]);
+    if (origem !== undefined) origens[nome] = origem;
+  }
   const comparacao = await compararComRemoto({
     raiz: op.raiz,
     ...(op.skills !== undefined ? { somente: op.skills } : {}),
-    ...(op.origens !== undefined ? { origens: op.origens } : {}),
+    origens,
     ...(referencias !== undefined ? { referencias } : {}),
   });
   if (!comparacao.ok) {
@@ -157,7 +163,7 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
     skills: selecao,
     harness: l.lock.harness,
     referencias: alvos,
-    ...(op.origens !== undefined ? { origens: op.origens } : {}),
+    origens,
   });
 
   mensagens.push(AVISO_ROLLBACK);

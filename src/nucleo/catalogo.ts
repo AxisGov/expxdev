@@ -19,6 +19,7 @@ import { join } from "node:path";
 export type Skill = {
   nome: string;
   repositorio: string;
+  origensLegadas?: readonly string[];
   papel: string;
   camada: boolean;
 };
@@ -26,7 +27,8 @@ export type Skill = {
 export const CATALOGO: readonly Skill[] = [
   {
     nome: "sprintx",
-    repositorio: "https://github.com/bittencourtthulio/sprintx",
+    repositorio: "https://github.com/AxisGov/sprintx",
+    origensLegadas: ["https://github.com/bittencourtthulio/sprintx"],
     papel: "planeja e executa features novas",
     camada: false,
   },
@@ -50,7 +52,8 @@ export const CATALOGO: readonly Skill[] = [
   },
   {
     nome: "mergex",
-    repositorio: "https://github.com/bittencourtthulio/mergex",
+    repositorio: "https://github.com/AxisGov/mergex",
+    origensLegadas: ["https://github.com/bittencourtthulio/mergex"],
     papel: "versionamento, entrega e revisao de pull requests",
     camada: false,
   },
@@ -68,7 +71,8 @@ export const CATALOGO: readonly Skill[] = [
   },
   {
     nome: "buildx",
-    repositorio: "https://github.com/bittencourtthulio/buildx",
+    repositorio: "https://github.com/AxisGov/buildx",
+    origensLegadas: ["https://github.com/bittencourtthulio/buildx"],
     papel: "orquestra um projeto inteiro, da descricao ao sistema pronto",
     camada: false,
   },
@@ -116,38 +120,49 @@ function raizLocal(): string | undefined {
   return v === undefined || v.trim() === "" ? undefined : v.trim();
 }
 
-export function buscarNoCatalogo(nome: string): Skill | undefined {
-  const s = CATALOGO.find((x) => x.nome === nome);
-  if (s === undefined) return undefined;
-
+function origemDoCatalogo(skill: Skill): string {
   const raiz = raizLocal();
-  if (raiz === undefined) return s;
+  if (raiz === undefined) return skill.repositorio;
 
-  // A pasta é procurada na LISTAGEM, e não com `statSync` em cada candidata:
-  // no macOS, que não diferencia maiúscula de minúscula, `statSync("runx")`
-  // encontra a pasta `RunX` e devolveria um caminho com a grafia errada — que
-  // funciona no mac e quebra no Linux, o pior dos dois mundos.
   let entradas: string[];
   try {
     entradas = readdirSync(raiz);
   } catch {
-    return s; // raiz local inexistente: segue pelo GitHub
+    return skill.repositorio;
   }
-
-  // Pasta ausente cai de volta para o GitHub em vez de falhar: a raiz local
-  // costuma ter só as skills em que se está mexendo, e uma origem inexistente
-  // produziria erro de clone — que se leria como falha de rede, escondendo a
-  // causa real.
-  for (const c of candidatasLocais(nome)) {
+  for (const c of candidatasLocais(skill.nome)) {
     if (!entradas.includes(c)) continue;
     const caminho = join(raiz, c);
     try {
-      if (statSync(caminho).isDirectory()) return { ...s, repositorio: caminho };
+      if (statSync(caminho).isDirectory()) return caminho;
     } catch {
       continue;
     }
   }
-  return s;
+  return skill.repositorio;
+}
+
+/** Resolve a origem sem trocar uma customizacao por uma origem gerenciada. */
+export function resolverOrigem(
+  nome: string,
+  origemAtual?: string,
+  origemExplicita?: string,
+): string | undefined {
+  if (origemExplicita !== undefined) return origemExplicita;
+  const skill = CATALOGO.find((x) => x.nome === nome);
+  if (skill === undefined) return origemAtual;
+  if (
+    origemAtual !== undefined &&
+    origemAtual !== skill.repositorio &&
+    !(skill.origensLegadas ?? []).includes(origemAtual)
+  ) return origemAtual;
+  return origemDoCatalogo(skill);
+}
+
+export function buscarNoCatalogo(nome: string): Skill | undefined {
+  const s = CATALOGO.find((x) => x.nome === nome);
+  if (s === undefined) return undefined;
+  return { ...s, repositorio: origemDoCatalogo(s) };
 }
 
 /** Camada é skill que sozinha não faz nada: precisa de sprintx ou runx junto. */
