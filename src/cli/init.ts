@@ -1,6 +1,6 @@
 import { rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { buscarNoCatalogo } from "../nucleo/catalogo.js";
+import { resolverOrigem } from "../nucleo/catalogo.js";
 import { resolverAlvo } from "../nucleo/versao.js";
 import { buscarSkill } from "../nucleo/busca.js";
 import { detectarLayout } from "../nucleo/layout.js";
@@ -64,7 +64,7 @@ function ehCaminhoLocal(origem: string): boolean {
 }
 
 function origemDe(nome: string, origens?: Record<string, string>): string | undefined {
-  return origens?.[nome] ?? buscarNoCatalogo(nome)?.repositorio;
+  return resolverOrigem(nome, undefined, origens?.[nome]);
 }
 
 export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {

@@ -83,4 +83,21 @@ describe("flags do update", () => {
     expect(r.aplicou).toBe(false);
     expect(r.mensagens.join(" ")).toContain("nada foi aplicado");
   });
+
+  it("funcional: update preserva origem customizada ao aplicar", async () => {
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    repos.push(repo);
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: repo } });
+
+    novaTag(repo, "v1.1.0");
+    const r = await executarUpdate({ raiz: p.raiz, sim: true });
+
+    expect(r.aplicou).toBe(true);
+    expect(r.atualizadas).toEqual(["sprintx"]);
+    const lock = JSON.parse(readFileSync(join(p.raiz, ".expx/expx-lock.json"), "utf8")) as {
+      skills: { sprintx: { repositorio: string } };
+    };
+    expect(lock.skills.sprintx.repositorio).toBe(repo);
+  });
 });

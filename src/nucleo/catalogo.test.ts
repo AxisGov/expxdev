@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CATALOGO, buscarNoCatalogo, ehCamada, NOMES } from "./catalogo.js";
+import { CATALOGO, buscarNoCatalogo, ehCamada, NOMES, resolverOrigem } from "./catalogo.js";
 
 describe("catálogo das skills", () => {
   it("integração: tem as nove skills do catalogo e nenhuma URL repetida", () => {
@@ -52,9 +52,35 @@ describe("catálogo das skills", () => {
     // comportamento delas, que é o que define uma camada. Sem elas ela não roda,
     // e é a própria skill que avisa: o `init` não modela dependência entre skills.
     expect(buscarNoCatalogo("buildx")?.repositorio).toBe(
-      "https://github.com/bittencourtthulio/buildx",
+      "https://github.com/AxisGov/buildx",
     );
     expect(ehCamada("buildx")).toBe(false);
+  });
+
+  it("funcional: sprintx e mergex apontam para AxisGov", () => {
+    expect(buscarNoCatalogo("sprintx")?.repositorio).toBe("https://github.com/AxisGov/sprintx");
+    expect(buscarNoCatalogo("mergex")?.repositorio).toBe("https://github.com/AxisGov/mergex");
+  });
+
+  it("funcional: runx continua apontando para bittencourtthulio", () => {
+    expect(buscarNoCatalogo("runx")?.repositorio).toBe("https://github.com/bittencourtthulio/runx");
+  });
+
+  it("funcional: origem legada migra para AxisGov e customizada permanece", () => {
+    expect(resolverOrigem("sprintx", "https://github.com/bittencourtthulio/sprintx")).toBe(
+      "https://github.com/AxisGov/sprintx",
+    );
+    expect(resolverOrigem("sprintx", "https://git.example/sprintx")).toBe("https://git.example/sprintx");
+  });
+
+  it("funcional: origem explícita vence a origem gerenciada", () => {
+    expect(
+      resolverOrigem(
+        "sprintx",
+        "https://github.com/bittencourtthulio/sprintx",
+        "https://git.example/sprintx",
+      ),
+    ).toBe("https://git.example/sprintx");
   });
 
   it("funcional: designx aponta para o repositório do designx e é camada", () => {
@@ -64,6 +90,15 @@ describe("catálogo das skills", () => {
       "https://github.com/bittencourtthulio/designx",
     );
     expect(ehCamada("designx")).toBe(true);
+  });
+
+  it("funcional: skill fora do catálogo preserva a origem já gravada no lock", () => {
+    expect(
+      resolverOrigem(
+        "skill-antiga",
+        "https://github.com/exemplo/skill-antiga",
+      ),
+    ).toBe("https://github.com/exemplo/skill-antiga");
   });
 });
 
@@ -115,7 +150,7 @@ describe("origem local das skills", () => {
     process.env["EXPX_SKILLS_LOCAIS"] = raiz;
     // mexendo só na runx: a sprintx não está na raiz local
     expect(buscarNoCatalogo("sprintx")?.repositorio).toBe(
-      "https://github.com/bittencourtthulio/sprintx",
+      "https://github.com/AxisGov/sprintx",
     );
   });
 
