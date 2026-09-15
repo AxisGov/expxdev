@@ -7,6 +7,7 @@ import { projetoTemporario } from "../teste/projeto-temporario.js";
 import { detectarLayout } from "../nucleo/layout.js";
 import { instalarHooks } from "./hooks.js";
 import { executarInit } from "../cli/init.js";
+import { suportaBitExecutavel } from "../teste/fs-capacidades.js";
 
 const criados: string[] = [];
 afterEach(() => {
@@ -59,7 +60,12 @@ describe("instalação dos hooks pelo init", () => {
     criados.push(comHook);
     const raiz = projeto();
     await executarInit({ raiz, skills: ["memox"], harness: ["claude"], origens: { memox: comHook } });
-    expect(statSync(join(raiz, ".claude/hooks/memox-injetar.sh")).mode & 0o100).toBe(0o100);
+    const hook = join(raiz, ".claude/hooks/memox-injetar.sh");
+    expect(existsSync(hook)).toBe(true);
+
+    if (suportaBitExecutavel()) {
+      expect(statSync(hook).mode & 0o100).toBe(0o100);
+    }
 
     const semHook = criarRepoSkill({ nome: "sprintx", tags: [] });
     criados.push(semHook);

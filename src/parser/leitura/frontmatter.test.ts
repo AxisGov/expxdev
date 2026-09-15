@@ -44,4 +44,18 @@ describe("leitura de frontmatter com posicao", () => {
     if (r.ok) return;
     expect(r.tipo).toBe("sem_frontmatter");
   });
+  it("regressão: aceita frontmatter com quebra de linha CRLF do Windows", () => {
+    const conteudo = [
+      "---",
+      "kind: orquestrador",
+      "caminho_critico: [F-01.1, T-01.03]",
+      "---",
+      "",
+      "# Corpo",
+    ].join("\r\n");
+
+    const r = lerFrontmatter(conteudo);
+
+    expect(r.ok).toBe(true);
+  });
 });

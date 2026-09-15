@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { lerEstado } from "../../servidor/estado.js";
+import { join } from "node:path";
 
 const HOJE = new Date("2026-08-29T12:00:00Z");
 const ler = (raiz: string) => lerEstado({ raiz, diasBloqueio: 7 }, HOJE);
@@ -45,7 +46,7 @@ describe("compatibilidade entre layouts de pasta", () => {
     const novo = ler("fixtures/projeto-novo-layout");
     const f = novo.trabalhos.find((t) => t.expx_tool === "sprintx");
     const o = novo.trabalhos.find((t) => t.expx_tool === "runx");
-    expect(f?.pasta).toContain("sprintx/features/");
-    expect(o?.pasta).toContain("runx/ocorrencias/");
+    expect(f?.pasta).toContain(join("sprintx", "features"));
+    expect(o?.pasta).toContain(join("runx", "ocorrencias"));
   });
 });

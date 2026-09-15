@@ -4,6 +4,9 @@ import { mkdtempSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+const TSC = join(process.cwd(), "node_modules", "typescript", "bin", "tsc");
+const VITEST = join(process.cwd(), "node_modules", "vitest", "vitest.mjs");
+
 /**
  * T-01.01 — o andaime só serve se o strict estiver realmente ligado.
  * Um build que não compila nada também sai com código 0, então o teste
@@ -28,7 +31,7 @@ describe("andaime do pacote", () => {
       let falhou = false;
       let saida = "";
       try {
-        execFileSync("npx", ["tsc", "-p", join(dir, "tsconfig.json"), "--noEmit"], {
+        execFileSync(process.execPath, [TSC, "-p", join(dir, "tsconfig.json"), "--noEmit"], {
           encoding: "utf8",
           stdio: "pipe",
         });
@@ -69,8 +72,8 @@ describe("configuracao do vitest", () => {
         "import { it, expect } from 'vitest';\nit('soma', () => { expect(1 + 1).toBe(2); });\n",
       );
       const saida = execFileSync(
-        "npx",
-        ["vitest", "run", "--root", dir, "--reporter=default", "temp.test.ts"],
+        process.execPath,
+        [VITEST, "run", "--root", dir, "--reporter=default", "temp.test.ts"],
         { encoding: "utf8", stdio: "pipe" },
       );
       expect(saida).toMatch(/1 passed|passed \(1\)/);

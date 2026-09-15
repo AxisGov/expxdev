@@ -34,7 +34,11 @@ describe("rotas de leitura", () => {
   });
 
   it("funcional: o projeto servido traz os dois trabalhos da fixture", async () => {
-    servidor = await criarServidor({ raiz: "fixtures/projeto-ok", porta: 0 });
+    servidor = await criarServidor({
+      raiz: "fixtures/projeto-ok",
+      porta: 0,
+      diasBloqueio: Number.MAX_SAFE_INTEGER,
+    });
     const r = await fetch(`${servidor.url()}/api/projeto`);
     const corpo = (await r.json()) as { trabalhos: unknown[]; violacoes: unknown[] };
     expect(corpo.trabalhos).toHaveLength(2);

@@ -38,7 +38,7 @@ function extrairBloco(conteudo: string): { yaml: string; corpo: string; offset: 
   if (fim === -1) return null;
   const depois = texto.indexOf("\n", fim + 1);
   return {
-    yaml: texto.slice(inicio, fim),
+    yaml: texto.slice(inicio, fim).replace(/\r$/, ""),
     corpo: depois === -1 ? "" : texto.slice(depois + 1).replace(/^\s*\n/, ""),
     offset: 1,
   };
