@@ -13,6 +13,7 @@ import { materializarOpenCode } from "../harness/opencode.js";
 import { mesclarSettings } from "../harness/settings.js";
 import { instalarHooks } from "../harness/hooks.js";
 import { ORIGEM_DO_PLUGIN } from "../plugin/manifestos.js";
+import { materializarCodex } from "../harness/codex.js";
 
 /**
  * O fluxo do `init`: busca, monta, configura e trava.
@@ -76,6 +77,7 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
   const travadas: Record<string, SkillTravada> = {};
   const temporarios: string[] = [];
 
+  try {
   for (const nome of op.skills) {
     const repositorio = origemDe(nome, op.origens);
     if (repositorio === undefined) {
@@ -161,7 +163,7 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
 
     // A cópia acontece AQUI, antes do `rmSync` dos clones lá embaixo: feita
     // depois, leria pasta já apagada (decisão D-26).
-    const hooksInstalados = instalarHooks(op.raiz, montaveis);
+    const hooksInstalados = op.harness.includes("claude") ? instalarHooks(op.raiz, montaveis) : [];
 
     if (op.harness.includes("claude")) {
       const marketplace = join(op.raiz, ".expx", "marketplace");
@@ -169,9 +171,15 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
       if (!r.ok) avisos.push(r.erro);
     }
     if (op.harness.includes("opencode")) materializarOpenCode(op.raiz, montaveis);
+    if (op.harness.includes("codex")) {
+      try {
+        const aviso = materializarCodex(op.raiz);
+        if (aviso !== undefined) avisos.push(aviso);
+      } catch (erro) {
+        avisos.push(`Codex: nao foi possivel materializar os hooks: ${erro instanceof Error ? erro.message : "falha de filesystem"}`);
+      }
+    }
   }
-
-  for (const t of temporarios) rmSync(t, { recursive: true, force: true });
 
   // Skill sem tag NÃO vira aviso na instalação. Hoje nenhum dos seis
   // repositórios publica tag, então o aviso disparava para todas, em toda
@@ -183,6 +191,9 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
   // no lock, e o achado `skill-nao-travada` do `doctor`. Some o ruído da
   // instalação, não a informação.
   return { ok: instaladas.length > 0, instaladas, falhas, naoTravadas, avisos };
+  } finally {
+    for (const t of temporarios) rmSync(t, { recursive: true, force: true });
+  }
 }
 
 export { ORIGEM_DO_PLUGIN };

@@ -3,11 +3,11 @@ import { interpretarFlagsInit } from "./init-flags.js";
 
 describe("flags do init", () => {
   it("integração: toda pergunta do init tem equivalente por flag", () => {
-    const r = interpretarFlagsInit(["--skills", "sprintx,runx", "--harness", "claude,opencode", "--painel", "--yes"]);
+    const r = interpretarFlagsInit(["--skills", "sprintx,runx", "--harness", "claude,opencode,codex", "--painel", "--yes"]);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.opcoes.skills).toEqual(["sprintx", "runx"]);
-    expect(r.opcoes.harness).toEqual(["claude", "opencode"]);
+    expect(r.opcoes.harness).toEqual(["claude", "opencode", "codex"]);
     expect(r.opcoes.painel).toBe(true);
     expect(r.opcoes.sim).toBe(true);
   });

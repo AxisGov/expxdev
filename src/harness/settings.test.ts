@@ -108,6 +108,31 @@ describe("registro dos hooks no settings", () => {
     expect(d["hooks"]["Stop"]).toHaveLength(1);
     expect(JSON.stringify(d)).toBe(primeira);
   });
+
+  it.each([null, [], "texto"])("funcional: hooks raiz inválido (%s) preserva settings", (valor) => {
+    p = projetoTemporario();
+    const caminho = caminhoDoSettings(p.raiz);
+    mkdirSync(join(p.raiz, ".claude"), { recursive: true });
+    const original = JSON.stringify({ hooks: valor, custom: true });
+    writeFileSync(caminho, original);
+    const r = mesclarSettings(p.raiz, "/tmp/mkt", [
+      { skill: "expx", relativo: ".claude/hooks/expx-session-sync.mjs" },
+    ]);
+    expect(r.ok).toBe(false);
+    expect(readFileSync(caminho, "utf8")).toBe(original);
+  });
+
+  it("funcional: grupos malformados de SessionStart são preservados", () => {
+    p = projetoTemporario();
+    const caminho = caminhoDoSettings(p.raiz);
+    mkdirSync(join(p.raiz, ".claude"), { recursive: true });
+    writeFileSync(caminho, JSON.stringify({ hooks: { SessionStart: [null, "custom", { matcher: "x" }] } }));
+    expect(mesclarSettings(p.raiz, "/tmp/mkt", [
+      { skill: "expx", relativo: ".claude/hooks/expx-session-sync.mjs" },
+    ]).ok).toBe(true);
+    const d = settings(p.raiz) as any;
+    expect(d.hooks.SessionStart.slice(0, 3)).toEqual([null, "custom", { matcher: "x" }]);
+  });
 });
 
 /**
@@ -131,6 +156,25 @@ describe("hook de lembrete das skills", () => {
         g.hooks.map((h) => h.command),
       );
       expect(cmds.some((c) => c.includes("expx-lembrete.sh"))).toBe(true);
+    } finally {
+      p.descartar();
+    }
+  });
+
+  it("funcional: expx-session-sync é registrado em SessionStart sem duplicar", () => {
+    const p = projetoTemporario();
+    try {
+      const hook = { skill: "expx", relativo: ".claude/hooks/expx-session-sync.mjs" };
+      mesclarSettings(p.raiz, "/tmp/mkt", [hook]);
+      mesclarSettings(p.raiz, "/tmp/mkt", [hook]);
+      const s = JSON.parse(readFileSync(caminhoDoSettings(p.raiz), "utf8")) as {
+        hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>>;
+      };
+      expect(s.hooks["SessionStart"]).toHaveLength(1);
+      expect(s.hooks["SessionStart"][0]?.hooks[0]?.command).toBe("node");
+      expect(s.hooks["SessionStart"][0]?.hooks[0]?.args).toEqual([
+        "${CLAUDE_PROJECT_DIR}/.claude/hooks/expx-session-sync.mjs",
+      ]);
     } finally {
       p.descartar();
     }

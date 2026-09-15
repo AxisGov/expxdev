@@ -50,7 +50,7 @@ describe("instalação dos hooks pelo init", () => {
     expect(existsSync(join(raiz, ".claude/skills/memox/assets/memox.py"))).toBe(true);
   });
 
-  it("funcional: o hook fica executável e skill sem hook não cria a pasta", async () => {
+  it("funcional: o hook fica executável e o hook de núcleo existe sem skill com hook", async () => {
     const comHook = criarRepoSkill({
       nome: "memox",
       tags: [],
@@ -71,7 +71,7 @@ describe("instalação dos hooks pelo init", () => {
     criados.push(semHook);
     const outra = projeto();
     await executarInit({ raiz: outra, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: semHook } });
-    expect(existsSync(join(outra, ".claude/hooks"))).toBe(false);
+    expect(existsSync(join(outra, ".claude/hooks/expx-session-sync.mjs"))).toBe(true);
   });
 });
 

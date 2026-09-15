@@ -108,6 +108,7 @@ describe("wizard do init", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.opcoes.harness).toEqual(["claude", "opencode"]);
+    expect(q.escrito()).toContain("combine opcoes com virgula");
   });
 
   it("funcional: o que veio por flag não é perguntado de novo", async () => {
