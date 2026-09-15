@@ -41,7 +41,12 @@ describe("difusao por websocket", () => {
   it("funcional: a mensagem traz o projeto inteiro, não um delta", async () => {
     dir = mkdtempSync(join(tmpdir(), "expx-ws2-"));
     cpSync("fixtures/projeto-ok", dir, { recursive: true });
-    painel = await iniciarPainel({ raiz: dir, porta: 0, debounceMs: 80 });
+    painel = await iniciarPainel({
+      raiz: dir,
+      porta: 0,
+      debounceMs: 80,
+      diasBloqueio: Number.MAX_SAFE_INTEGER,
+    });
 
     const ws = new WebSocket(painel.urlWebsocket());
     const recebida = await new Promise<{ tipo: string; estado: { trabalhos: unknown[]; violacoes: unknown[] } }>(
