@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { realpathSync } from "node:fs";
+import { relative } from "node:path";
 import { ehCandidato } from "./varredura.js";
 import { classificar } from "../leitura/rejeicao.js";
 import type { Aceito, Rejeicao } from "../leitura/rejeicao.js";
@@ -60,7 +61,7 @@ function ehRaizDeRepositorio(raiz: string): boolean {
   const topo = topoDoRepositorio(raiz);
   if (topo === null) return false;
   try {
-    return topo === realpathSync(raiz);
+    return relative(topo, realpathSync(raiz)) === "";
   } catch {
     return false;
   }
