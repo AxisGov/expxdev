@@ -1,6 +1,5 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { realpathSync } from "node:fs";
 import { ehCandidato } from "./varredura.js";
 import { classificar } from "../leitura/rejeicao.js";
 import type { Aceito, Rejeicao } from "../leitura/rejeicao.js";
@@ -30,40 +29,31 @@ function git(raiz: string, ...args: readonly string[]): string {
  * encontrar `.git` em um ancestral e passa a operar sobre o repositório
  * inteiro do usuário (ex.: `fixtures/projeto-ok` dentro do próprio
  * repositório Expx), lendo branches e arquivos completamente alheios ao que
- * `raiz` pediu. Comparar com `git rev-parse --show-toplevel`: só é a raiz
- * quando os dois caminhos resolvidos coincidem.
+ * `raiz` pediu. `git rev-parse --show-prefix` evita comparar strings de caminho:
+ * na raiz devolve vazio; em subpastas, devolve o prefixo relativo ao topo.
  *
  * Cacheada por `raiz`: `descobrirTrabalhos` roda a cada releitura do painel
  * (potencialmente centenas de vezes por sessão de watch), e cada chamada não
  * cacheada custa 2-3 processos `git` síncronos só para decidir "não é repo" —
  * caro o bastante para estourar timeout de teste sob carga concorrente.
  */
-const CACHE_TOPO = new Map<string, string | null>();
-
-function topoDoRepositorio(raiz: string): string | null {
-  const cache = CACHE_TOPO.get(raiz);
-  if (cache !== undefined) return cache;
-  let topo: string | null;
-  try {
-    // `realpathSync` resolve symlinks (ex.: /var -> /private/var no macOS),
-    // que git e o Node podem normalizar de formas diferentes — comparar os
-    // caminhos crus faria um repositório real ser lido como "não é a raiz".
-    topo = realpathSync(git(raiz, "rev-parse", "--show-toplevel"));
-  } catch {
-    topo = null;
-  }
-  CACHE_TOPO.set(raiz, topo);
-  return topo;
-}
+const CACHE_RAIZ = new Map<string, boolean>();
 
 function ehRaizDeRepositorio(raiz: string): boolean {
-  const topo = topoDoRepositorio(raiz);
-  if (topo === null) return false;
+  const cache = CACHE_RAIZ.get(raiz);
+  if (cache !== undefined) return cache;
+
+  let ehRaiz = false;
   try {
-    return topo === realpathSync(raiz);
+    // Na raiz do repositório, --show-prefix devolve vazio.
+    // Em uma subpasta, devolve algo como "fixtures/projeto-ok/".
+    ehRaiz = git(raiz, "rev-parse", "--show-prefix") === "";
   } catch {
-    return false;
+    ehRaiz = false;
   }
+
+  CACHE_RAIZ.set(raiz, ehRaiz);
+  return ehRaiz;
 }
 
 /** As branches locais, na ordem que o git as lista. `[]` se não for a raiz de um repo git. */
@@ -71,15 +61,15 @@ function branchesLocais(raiz: string): string[] {
   if (!ehRaizDeRepositorio(raiz)) return [];
   try {
     const saida = git(raiz, "branch", "--format=%(refname:short)");
-    return saida === "" ? [] : saida.split("\n");
+    return saida === "" ? [] : saida.split(/\r?\n/);
   } catch {
     return [];
   }
 }
 
-/** Limpa o cache de topo de repositório — só para teste, entre `mkdtempSync` reaproveitando caminhos. */
+/** Limpa o cache de detecção da raiz do repositório — só para teste, entre `mkdtempSync` reaproveitando caminhos. */
 export function limparCacheGit(): void {
-  CACHE_TOPO.clear();
+  CACHE_RAIZ.clear();
 }
 
 /** Os arquivos candidatos de uma branch, pelo mesmo filtro de nome da varredura de filesystem. */
@@ -87,7 +77,7 @@ function candidatosNaBranch(raiz: string, branch: string): string[] {
   try {
     const saida = git(raiz, "ls-tree", "-r", "--name-only", branch);
     if (saida === "") return [];
-    return saida.split("\n").filter((caminho) => ehCandidato(caminho));
+    return saida.split(/\r?\n/).filter((caminho) => ehCandidato(caminho));
   } catch {
     // branch inválida ou corrompida: não derruba a descoberta das demais.
     return [];
