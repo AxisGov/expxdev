@@ -61,7 +61,7 @@ export function mesclarCodexHooks(raizProjeto: string): { criou: boolean; altero
     const hooksRestantes = registro.hooks.filter((hook) => !isGerenciado(hook));
     if (inserido) return hooksRestantes.length > 0 ? [{ ...registro, hooks: hooksRestantes }] : [];
     inserido = true;
-    return [{ ...registro, hooks: [...hooksRestantes, gerenciado.hooks[0]] }];
+    return [{ ...registro, matcher: gerenciado.matcher, hooks: [...hooksRestantes, gerenciado.hooks[0]] }];
   });
   hooks.SessionStart = inserido ? mesclados : [...mesclados, gerenciado];
   const alterou = !existia || JSON.stringify(atuais) !== JSON.stringify(hooks.SessionStart);

@@ -139,6 +139,15 @@ export function bootstrapAxis(cache, executar = comandoPadrao) {
       if (cacheEstaSujo(cache, executar)) {
         throw new Error("cache Axis possui alteracoes nao commitadas");
       }
+      const branch = executar("git", ["-C", cache, "branch", "--show-current"]).trim();
+      if (branch !== "main") throw new Error("cache Axis nao esta na branch main");
+      if (local !== remotoMain) {
+        try {
+          executar("git", ["-C", cache, "merge-base", "--is-ancestor", local, remotoMain]);
+        } catch {
+          throw new Error("cache Axis possui commits locais");
+        }
+      }
       executar("git", ["-C", cache, "reset", "--hard", "origin/main"]);
       buildCache(cache, executar);
     }

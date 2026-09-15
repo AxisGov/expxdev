@@ -70,6 +70,8 @@ describe("sincronização Axis no SessionStart", () => {
       }
       if (argumentos.includes("remote")) return AXIS_REPOSITORIO;
       if (argumentos.includes("rev-parse")) return "same\n";
+      if (argumentos.includes("branch")) return "main\n";
+      if (argumentos.includes("merge-base")) return "";
       return "";
     };
     bootstrapAxis(cache, executar);
@@ -209,6 +211,7 @@ describe("sincronização Axis no SessionStart", () => {
     const executar = (arquivo: string, argumentos: string[]) => {
       if (argumentos.includes("remote")) return AXIS_REPOSITORIO;
       if (argumentos.includes("rev-parse")) return "new-commit\n";
+      if (argumentos.includes("branch")) return "main\n";
       if (argumentos.includes("ci") || argumentos.includes("build:server")) throw new Error("build interrompido");
       return "";
     };
@@ -250,10 +253,52 @@ describe("sincronização Axis no SessionStart", () => {
       if (argumentos.includes("remote")) return AXIS_REPOSITORIO;
       if (argumentos.includes("rev-parse")) return "new\n";
       if (argumentos.includes("status")) return "?? .axis-cache-owner\n?? .axis-build-sha\n";
+      if (argumentos.includes("branch")) return "main\n";
+      if (argumentos.includes("merge-base")) return "";
       return "";
     };
     expect(() => bootstrapAxis(cache, executar)).not.toThrow();
     expect(chamadas.some((a) => a.includes("reset"))).toBe(true);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("funcional: cache em branch diferente não executa reset", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-cache-branch-"));
+    const cache = join(raiz, "cache");
+    mkdirSync(join(cache, ".git"), { recursive: true });
+    mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+    writeFileSync(join(cache, ".axis-build-sha"), "old\n");
+    const chamadas: string[][] = [];
+    const executar = (_arquivo: string, argumentos: string[]) => {
+      chamadas.push(argumentos);
+      if (argumentos.includes("remote")) return AXIS_REPOSITORIO;
+      if (argumentos.includes("rev-parse")) return "new\n";
+      if (argumentos.includes("branch")) return "feature\n";
+      return "";
+    };
+    expect(() => bootstrapAxis(cache, executar)).toThrow("cache Axis nao esta na branch main");
+    expect(chamadas.some((a) => a.includes("reset"))).toBe(false);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("funcional: commits locais divergentes não executam reset", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-cache-commit-local-"));
+    const cache = join(raiz, "cache");
+    mkdirSync(join(cache, ".git"), { recursive: true });
+    mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+    writeFileSync(join(cache, ".axis-build-sha"), "old\n");
+    const chamadas: string[][] = [];
+    const executar = (_arquivo: string, argumentos: string[]) => {
+      chamadas.push(argumentos);
+      if (argumentos.includes("remote")) return AXIS_REPOSITORIO;
+      if (argumentos.includes("origin/main")) return "remote-commit\n";
+      if (argumentos.includes("rev-parse")) return "local-commit\n";
+      if (argumentos.includes("branch")) return "main\n";
+      if (argumentos.includes("merge-base")) throw new Error("divergente");
+      return "";
+    };
+    expect(() => bootstrapAxis(cache, executar)).toThrow("cache Axis possui commits locais");
+    expect(chamadas.some((a) => a.includes("reset"))).toBe(false);
     rmSync(raiz, { recursive: true, force: true });
   });
 
@@ -444,6 +489,8 @@ describe("sincronização Axis no SessionStart", () => {
         if (argumentos.includes("status")) return "";
         if (argumentos.includes("remote")) return `${AXIS_REPOSITORIO}\n`;
         if (argumentos.includes("rev-parse")) return "mesmo\n";
+        if (argumentos.includes("branch")) return "main\n";
+        if (argumentos.includes("merge-base")) return "";
         if (argumentos.some((argumento) => argumento.endsWith("expx-bin.js"))) return "sprintx: main → novo\npara desfazer esta atualizacao, reverta\n";
         return "";
       };

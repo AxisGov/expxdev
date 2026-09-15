@@ -61,7 +61,7 @@ describe("harness Codex", () => {
         hooks: {
           SessionStart: [
             { matcher: "startup|resume", hooks: [{ type: "command", command: "user" }] },
-            { matcher: "startup|resume", hooks: [{ type: "command", command: "node old/.codex/hooks/expx-session-sync.mjs" }] },
+            { matcher: "startup", hooks: [{ type: "command", command: "node old/.codex/hooks/expx-session-sync.mjs" }] },
           ],
         },
       }));
@@ -69,6 +69,7 @@ describe("harness Codex", () => {
       const s = ler(p.raiz);
       expect(s.hooks.SessionStart).toHaveLength(2);
       expect(s.hooks.SessionStart[0].hooks[0].command).toBe("user");
+      expect(s.hooks.SessionStart[1].matcher).toBe("startup|resume");
       expect(s.hooks.SessionStart.filter((x: any) => JSON.stringify(x).includes(".codex/hooks/expx-session-sync.mjs"))).toHaveLength(1);
       expect(s.hooks.SessionStart[1].hooks[0].commandWindows).toContain("powershell.exe -NoProfile");
     } finally {
