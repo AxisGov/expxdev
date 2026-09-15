@@ -29,7 +29,7 @@ export type ResultadoMerge =
 export type Habilitados = Record<string, boolean>;
 
 /** Um evento de hook do Claude Code: uma lista de grupos, cada um com comandos. */
-type GrupoHook = { hooks?: Array<{ type?: string; command?: string }> };
+type GrupoHook = { hooks?: Array<{ type?: string; command?: string; args?: string[] }> };
 
 /**
  * Mescla um evento de hook SEM duplicar.
@@ -38,15 +38,16 @@ type GrupoHook = { hooks?: Array<{ type?: string; command?: string }> };
  * roda de novo a cada atualização, e uma entrada duplicada faria o memox rodar
  * duas vezes por prompt — dobrando o custo e o ruído (decisão D-16).
  */
-function mesclarEvento(atual: unknown, comando: string): GrupoHook[] {
+function mesclarEvento(atual: unknown, hook: { command: string; args?: string[] }): GrupoHook[] {
   const grupos: GrupoHook[] = Array.isArray(atual) ? (atual as GrupoHook[]) : [];
-  const jaTem = grupos.some((g) => g.hooks?.some((h) => h.command === comando) ?? false);
+  const jaTem = grupos.some((g) => g.hooks?.some((h) => h.command === hook.command && JSON.stringify(h.args) === JSON.stringify(hook.args)) ?? false);
   if (jaTem) return grupos;
-  return [...grupos, { hooks: [{ type: "command", command: comando }] }];
+  return [...grupos, { hooks: [{ type: "command", ...hook }] }];
 }
 
 /** O evento de cada hook, deduzido do nome do arquivo. */
-function eventoDoHook(relativo: string): "UserPromptSubmit" | "Stop" | null {
+function eventoDoHook(relativo: string): "UserPromptSubmit" | "Stop" | "SessionStart" | null {
+  if (relativo.includes("expx-session-sync")) return "SessionStart";
   if (relativo.includes("injetar")) return "UserPromptSubmit";
   // O lembrete de skill: `UserPromptSubmit` é o único evento que roda ANTES
   // da primeira ação do modelo, e é disso que ele depende — o problema que ele
@@ -132,7 +133,10 @@ export function mesclarSettings(
     for (const h of hooks) {
       const evento = eventoDoHook(h.relativo);
       if (evento === null) continue;
-      eventos[evento] = mesclarEvento(eventos[evento], `$CLAUDE_PROJECT_DIR/${h.relativo}`);
+      const hook = h.relativo.endsWith("expx-session-sync.mjs")
+        ? { command: "node", args: [`\${CLAUDE_PROJECT_DIR}/${h.relativo}`] }
+        : { command: `$CLAUDE_PROJECT_DIR/${h.relativo}` };
+      eventos[evento] = mesclarEvento(eventos[evento], hook);
     }
     novo["hooks"] = eventos;
   }

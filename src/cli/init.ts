@@ -13,6 +13,7 @@ import { materializarOpenCode } from "../harness/opencode.js";
 import { mesclarSettings } from "../harness/settings.js";
 import { instalarHooks } from "../harness/hooks.js";
 import { ORIGEM_DO_PLUGIN } from "../plugin/manifestos.js";
+import { materializarCodex } from "../harness/codex.js";
 
 /**
  * O fluxo do `init`: busca, monta, configura e trava.
@@ -169,6 +170,10 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
       if (!r.ok) avisos.push(r.erro);
     }
     if (op.harness.includes("opencode")) materializarOpenCode(op.raiz, montaveis);
+    if (op.harness.includes("codex")) {
+      const aviso = materializarCodex(op.raiz);
+      if (aviso !== undefined) avisos.push(aviso);
+    }
   }
 
   for (const t of temporarios) rmSync(t, { recursive: true, force: true });

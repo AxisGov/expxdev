@@ -135,4 +135,23 @@ describe("hook de lembrete das skills", () => {
       p.descartar();
     }
   });
+
+  it("funcional: expx-session-sync é registrado em SessionStart sem duplicar", () => {
+    const p = projetoTemporario();
+    try {
+      const hook = { skill: "expx", relativo: ".claude/hooks/expx-session-sync.mjs" };
+      mesclarSettings(p.raiz, "/tmp/mkt", [hook]);
+      mesclarSettings(p.raiz, "/tmp/mkt", [hook]);
+      const s = JSON.parse(readFileSync(caminhoDoSettings(p.raiz), "utf8")) as {
+        hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>>;
+      };
+      expect(s.hooks["SessionStart"]).toHaveLength(1);
+      expect(s.hooks["SessionStart"][0]?.hooks[0]?.command).toBe("node");
+      expect(s.hooks["SessionStart"][0]?.hooks[0]?.args).toEqual([
+        "${CLAUDE_PROJECT_DIR}/.claude/hooks/expx-session-sync.mjs",
+      ]);
+    } finally {
+      p.descartar();
+    }
+  });
 });

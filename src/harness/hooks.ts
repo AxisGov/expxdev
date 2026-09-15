@@ -68,18 +68,29 @@ function instalarLembrete(dirHooks: string): HookInstalado | null {
   return { skill: "expx", relativo: ".claude/hooks/expx-lembrete.sh" };
 }
 
+function instalarSync(dirHooks: string): HookInstalado | null {
+  const pasta = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "nucleo", "hooks");
+  const auxiliar = join(pasta, "expx-session-sync.mjs");
+  if (!existsSync(auxiliar)) return null;
+  cpSync(auxiliar, join(dirHooks, "expx-session-sync.mjs"));
+  return { skill: "expx", relativo: ".claude/hooks/expx-session-sync.mjs" };
+}
+
 export function instalarHooks(raizProjeto: string, skills: readonly SkillMontavel[]): HookInstalado[] {
   const alvos = comHooks(skills);
-  if (alvos.length === 0) return [];
 
   const dirHooks = join(raizProjeto, ".claude", "hooks");
   const dirSkills = join(raizProjeto, ".claude", "skills");
   mkdirSync(dirHooks, { recursive: true });
-  mkdirSync(dirSkills, { recursive: true });
+  if (alvos.length > 0) mkdirSync(dirSkills, { recursive: true });
 
   const instalados: HookInstalado[] = [];
-  const lembrete = instalarLembrete(dirHooks);
-  if (lembrete !== null) instalados.push(lembrete);
+  const sync = instalarSync(dirHooks);
+  if (sync !== null) instalados.push(sync);
+  if (alvos.length > 0) {
+    const lembrete = instalarLembrete(dirHooks);
+    if (lembrete !== null) instalados.push(lembrete);
+  }
   for (const s of alvos) {
     // a skill vai junto: é o que o hook procura ao lado de si mesmo
     cpSync(s.raizSkill, join(dirSkills, s.nome), { recursive: true });

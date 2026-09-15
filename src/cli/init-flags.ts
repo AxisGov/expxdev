@@ -7,7 +7,7 @@
  * aplicar — nunca assume a resposta que não recebeu.
  */
 
-export const HARNESS_VALIDOS = ["claude", "opencode"] as const;
+export const HARNESS_VALIDOS = ["claude", "opencode", "codex"] as const;
 export type Harness = (typeof HARNESS_VALIDOS)[number];
 
 export type OpcoesInitCli = {
@@ -59,7 +59,7 @@ export function interpretarFlagsInit(argv: readonly string[]): ResultadoFlags {
       }
       case "--harness": {
         const v = proximo();
-        if (v === undefined || v === "") return { ok: false, erro: "--harness exige claude, opencode ou os dois" };
+        if (v === undefined || v === "") return { ok: false, erro: "--harness exige claude, opencode, codex ou uma combinacao" };
         const lidos: string[] = [];
         acumular(lidos, v);
         for (const h of lidos) {

@@ -106,6 +106,7 @@ async function marcarHarness(p: Perguntador): Promise<Harness[] | undefined> {
   const descricao: Record<Harness, string> = {
     claude: "Claude Code",
     opencode: "OpenCode",
+    codex: "Codex",
   };
 
   if (p.marcar !== undefined) {
@@ -137,7 +138,7 @@ async function marcarHarness(p: Perguntador): Promise<Harness[] | undefined> {
 
     const indices = interpretarEscolhaMultipla(resposta, HARNESS_VALIDOS.length);
     if (indices === undefined || indices.length === 0) {
-      p.escrever("responda 1, 2 ou 1,2\n");
+      p.escrever(`responda entre 1 e ${String(HARNESS_VALIDOS.length)}\n`);
       continue;
     }
     return indices.map((i) => HARNESS_VALIDOS[i] ?? "claude");
