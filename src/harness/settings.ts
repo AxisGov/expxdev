@@ -39,10 +39,19 @@ type GrupoHook = { hooks?: Array<{ type?: string; command?: string; args?: strin
  * duas vezes por prompt — dobrando o custo e o ruído (decisão D-16).
  */
 function mesclarEvento(atual: unknown, hook: { command: string; args?: string[] }): GrupoHook[] {
-  const grupos: GrupoHook[] = Array.isArray(atual) ? (atual as GrupoHook[]) : [];
-  const jaTem = grupos.some((g) => g.hooks?.some((h) => h.command === hook.command && JSON.stringify(h.args) === JSON.stringify(hook.args)) ?? false);
-  if (jaTem) return grupos;
-  return [...grupos, { hooks: [{ type: "command", ...hook }] }];
+  const grupos: unknown[] = Array.isArray(atual) ? atual : [];
+  const jaTem = grupos.some((grupo) => {
+    if (typeof grupo !== "object" || grupo === null || Array.isArray(grupo)) return false;
+    const hooks = (grupo as { hooks?: unknown }).hooks;
+    if (!Array.isArray(hooks)) return false;
+    return hooks.some((item) => {
+      if (typeof item !== "object" || item === null || Array.isArray(item)) return false;
+      const h = item as { command?: unknown; args?: unknown };
+      return h.command === hook.command && JSON.stringify(h.args) === JSON.stringify(hook.args);
+    });
+  });
+  if (jaTem) return grupos as GrupoHook[];
+  return [...grupos, { hooks: [{ type: "command", ...hook }] }] as GrupoHook[];
 }
 
 /** O evento de cada hook, deduzido do nome do arquivo. */
@@ -107,6 +116,10 @@ export function mesclarSettings(
     }
     if (typeof atual !== "object" || atual === null || Array.isArray(atual)) {
       return { ok: false, erro: `${caminho} nao contem um objeto JSON` };
+    }
+    if (Object.prototype.hasOwnProperty.call(atual, "hooks") &&
+      (typeof atual["hooks"] !== "object" || atual["hooks"] === null || Array.isArray(atual["hooks"]))) {
+      return { ok: false, erro: `${caminho} contem hooks invalido` };
     }
     backup = fazerBackup(caminho);
   }

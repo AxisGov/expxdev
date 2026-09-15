@@ -155,6 +155,61 @@ describe("harness Codex", () => {
     }
   });
 
+  it("funcional: referência em metadata não identifica hook do usuário", () => {
+    const p = projetoTemporario();
+    try {
+      mkdirSync(join(p.raiz, ".codex"), { recursive: true });
+      writeFileSync(join(p.raiz, ".codex/hooks.json"), JSON.stringify({ hooks: {
+        SessionStart: [{ description: ".codex/hooks/expx-session-sync.mjs", hooks: [{ type: "command", command: "meu-hook" }] }],
+      } }));
+      mesclarCodexHooks(p.raiz);
+      const s = ler(p.raiz);
+      expect(s.hooks.SessionStart[0].hooks[0].command).toBe("meu-hook");
+      expect(s.hooks.SessionStart).toHaveLength(2);
+    } finally {
+      p.descartar();
+    }
+  });
+
+  it("funcional: command e commandWindows antigos identificam hook gerenciado", () => {
+    for (const campo of ["command", "commandWindows"]) {
+      const p = projetoTemporario();
+      try {
+        mkdirSync(join(p.raiz, ".codex"), { recursive: true });
+        writeFileSync(join(p.raiz, ".codex/hooks.json"), JSON.stringify({ hooks: {
+          SessionStart: [{ matcher: "startup|resume", hooks: [{ type: "command", [campo]: `node antigo/.codex/hooks/expx-session-sync.mjs` }] }],
+        } }));
+        mesclarCodexHooks(p.raiz);
+        const s = ler(p.raiz);
+        expect(s.hooks.SessionStart).toHaveLength(1);
+        expect(JSON.stringify(s.hooks.SessionStart[0])).toContain("powershell.exe -NoProfile");
+      } finally {
+        p.descartar();
+      }
+    }
+  });
+
+  it("funcional: registration gerenciada preserva campos desconhecidos e hooks do usuário", () => {
+    const p = projetoTemporario();
+    try {
+      mkdirSync(join(p.raiz, ".codex"), { recursive: true });
+      writeFileSync(join(p.raiz, ".codex/hooks.json"), JSON.stringify({ hooks: { SessionStart: [
+        { matcher: "startup|resume", customFutureField: "valor", hooks: [
+          { type: "command", command: "node antigo/.codex/hooks/expx-session-sync.mjs" },
+          { type: "command", command: "user-hook" },
+        ] },
+      ] } }));
+      mesclarCodexHooks(p.raiz);
+      const s = ler(p.raiz);
+      expect(s.hooks.SessionStart).toHaveLength(1);
+      expect(s.hooks.SessionStart[0].customFutureField).toBe("valor");
+      expect(s.hooks.SessionStart[0].hooks.map((h: any) => h.command)).toContain("user-hook");
+      expect(s.hooks.SessionStart[0].hooks.some((h: any) => h.command === "gitRoot=$(git rev-parse --show-toplevel) && node \"$gitRoot/.codex/hooks/expx-session-sync.mjs\" --codex")).toBe(true);
+    } finally {
+      p.descartar();
+    }
+  });
+
   it("funcional: init com codex materializa Codex e sem codex não cria .codex", async () => {
     const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
     const p = projetoTemporario();

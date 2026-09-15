@@ -42,6 +42,15 @@ function processoVivo(pid) {
 }
 
 const LOCK_STALE_MS = 60_000;
+const CACHE_METADATA = new Set([".axis-cache-owner", ".axis-build-sha"]);
+
+function cacheEstaSujo(cache, executar) {
+  const status = executar("git", ["-C", cache, "status", "--porcelain"]);
+  return status.split("\n").some((linha) => {
+    if (linha.trim() === "") return false;
+    return !CACHE_METADATA.has(linha.slice(3).trim());
+  });
+}
 
 function adquirirLock(bloqueio) {
   for (let tentativa = 0; tentativa < 2; tentativa++) {
@@ -127,7 +136,7 @@ export function bootstrapAxis(cache, executar = comandoPadrao) {
       // marcador ausente: o cache precisa ser reconstruido
     }
     if (local !== remotoMain || marcador !== local || !existsSync(join(cache, "dist", "cli", "expx-bin.js"))) {
-      if (executar("git", ["-C", cache, "status", "--porcelain"]).trim() !== "") {
+      if (cacheEstaSujo(cache, executar)) {
         throw new Error("cache Axis possui alteracoes nao commitadas");
       }
       executar("git", ["-C", cache, "reset", "--hard", "origin/main"]);

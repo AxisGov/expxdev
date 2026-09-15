@@ -77,6 +77,7 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
   const travadas: Record<string, SkillTravada> = {};
   const temporarios: string[] = [];
 
+  try {
   for (const nome of op.skills) {
     const repositorio = origemDe(nome, op.origens);
     if (repositorio === undefined) {
@@ -180,8 +181,6 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     }
   }
 
-  for (const t of temporarios) rmSync(t, { recursive: true, force: true });
-
   // Skill sem tag NÃO vira aviso na instalação. Hoje nenhum dos seis
   // repositórios publica tag, então o aviso disparava para todas, em toda
   // instalação — e um aviso que aparece sempre deixa de ser lido, levando
@@ -192,6 +191,9 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
   // no lock, e o achado `skill-nao-travada` do `doctor`. Some o ruído da
   // instalação, não a informação.
   return { ok: instaladas.length > 0, instaladas, falhas, naoTravadas, avisos };
+  } finally {
+    for (const t of temporarios) rmSync(t, { recursive: true, force: true });
+  }
 }
 
 export { ORIGEM_DO_PLUGIN };

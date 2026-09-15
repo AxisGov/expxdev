@@ -44,16 +44,26 @@ export function mesclarCodexHooks(raizProjeto: string): { criou: boolean; altero
     matcher: "startup|resume",
     hooks: [{ type: "command", command: comandoUnix, commandWindows: comandoWindows } satisfies CodexHook],
   };
-  const isGerenciado = (hook: unknown): boolean =>
-    typeof hook === "object" && hook !== null && JSON.stringify(hook).includes(".codex/hooks/expx-session-sync.mjs");
-  const semGerenciado = atuais.flatMap((item) => {
+  const isGerenciado = (hook: unknown): boolean => {
+    if (typeof hook !== "object" || hook === null || Array.isArray(hook)) return false;
+    const registro = hook as Record<string, unknown>;
+    return [registro.command, registro.commandWindows].some(
+      (valor) => typeof valor === "string" && valor.includes(".codex/hooks/expx-session-sync.mjs"),
+    );
+  };
+  let inserido = false;
+  const mesclados = atuais.flatMap((item) => {
     if (typeof item !== "object" || item === null || Array.isArray(item)) return [item];
     const registro = item as Record<string, unknown>;
     if (!Array.isArray(registro.hooks)) return [item];
+    const temGerenciado = registro.hooks.some(isGerenciado);
+    if (!temGerenciado) return [item];
     const hooksRestantes = registro.hooks.filter((hook) => !isGerenciado(hook));
-    return hooksRestantes.length > 0 ? [{ ...registro, hooks: hooksRestantes }] : [];
+    if (inserido) return hooksRestantes.length > 0 ? [{ ...registro, hooks: hooksRestantes }] : [];
+    inserido = true;
+    return [{ ...registro, hooks: [...hooksRestantes, gerenciado.hooks[0]] }];
   });
-  hooks.SessionStart = [...semGerenciado, gerenciado];
+  hooks.SessionStart = inserido ? mesclados : [...mesclados, gerenciado];
   const alterou = !existia || JSON.stringify(atuais) !== JSON.stringify(hooks.SessionStart);
   writeFileSync(caminho, `${JSON.stringify({ ...atual, hooks }, null, 2)}\n`);
   return { criou: !existia, alterou };

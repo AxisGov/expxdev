@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
@@ -85,6 +86,16 @@ describe("init de ponta a ponta", () => {
     p = projetoTemporario("fixtures/cli/projeto-limpo");
     await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["opencode"], origens: catalogoLocal(["sprintx"]) });
     expect(existsSync(join(p.raiz, ".claude/hooks/expx-session-sync.mjs"))).toBe(false);
+  });
+
+  it("funcional: cleanup remove temporário quando materialização posterior falha", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    writeFileSync(join(p.raiz, ".opencode"), "arquivo, nao pasta\n");
+    const repo = catalogoLocal(["sprintx"])["sprintx"]!;
+    const antes = readdirSync(tmpdir()).filter((nome) => nome.startsWith("expx-busca-sprintx-"));
+    await expect(executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["opencode"], origens: { sprintx: repo } })).rejects.toThrow();
+    const depois = readdirSync(tmpdir()).filter((nome) => nome.startsWith("expx-busca-sprintx-"));
+    expect(depois).toEqual(antes);
   });
 
   it("funcional: o lock registra hash por arquivo de cada skill instalada", async () => {

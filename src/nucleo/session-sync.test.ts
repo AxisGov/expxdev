@@ -237,6 +237,26 @@ describe("sincronização Axis no SessionStart", () => {
     rmSync(raiz, { recursive: true, force: true });
   });
 
+  it("funcional: somente metadata Axis deixa o cache limpo", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-cache-meta-"));
+    const cache = join(raiz, "cache");
+    mkdirSync(join(cache, ".git"), { recursive: true });
+    mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+    writeFileSync(join(cache, ".axis-cache-owner"), "AxisGov/expxdev\n");
+    writeFileSync(join(cache, ".axis-build-sha"), "old\n");
+    const chamadas: string[][] = [];
+    const executar = (_arquivo: string, argumentos: string[]) => {
+      chamadas.push(argumentos);
+      if (argumentos.includes("remote")) return AXIS_REPOSITORIO;
+      if (argumentos.includes("rev-parse")) return "new\n";
+      if (argumentos.includes("status")) return "?? .axis-cache-owner\n?? .axis-build-sha\n";
+      return "";
+    };
+    expect(() => bootstrapAxis(cache, executar)).not.toThrow();
+    expect(chamadas.some((a) => a.includes("reset"))).toBe(true);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
   it("funcional: clear e compact não tentam sincronizar", () => {
     const raiz = projeto();
     try {
