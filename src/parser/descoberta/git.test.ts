@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { realpathSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
 import { descobrirTrabalhos } from "./trabalhos.js";
 import { descobrirEmBranches, branchAtiva } from "./git.js";
 import { criarRepoMultiBranch } from "../../teste/repo-multi-branch.js";
-import { execFileSync } from "node:child_process";
-import { relative } from "node:path";
 
 /**
  * Descoberta multi-branch (OC-2026-002 / T-01.04, T-01.05).
@@ -22,35 +20,6 @@ let raiz: string;
 
 beforeAll(() => {
   raiz = criarRepoMultiBranch();
-  if (process.platform === "win32") {
-    const git = (...args: string[]) =>
-      execFileSync("git", args, { cwd: raiz, encoding: "utf8" }).trim();
-
-    const topo = git("rev-parse", "--show-toplevel");
-
-    console.error(
-      "DIAG_GIT",
-      JSON.stringify(
-        {
-          raiz,
-          realRaiz: realpathSync(raiz),
-          topo,
-          realTopo: realpathSync(topo),
-          relative: relative(realpathSync(topo), realpathSync(raiz)),
-          branchAtiva: branchAtiva(raiz),
-          branches: git("branch", "--format=%(refname:short)").split(/\r?\n/),
-          treeFeatureX: git("ls-tree", "-r", "--name-only", "feature/x").split(/\r?\n/),
-          descoberta: descobrirEmBranches(raiz, branchAtiva(raiz)).aceitos.map((a) => ({
-            arquivo: a.arquivo,
-            branch: a.branch,
-            kind: a.kind,
-          })),
-        },
-        null,
-        2,
-      ),
-    );
-  }
 }, 30000); // ~10 processos git síncronos; sob concorrência passa do hookTimeout padrão de 10s
 
 afterAll(() => {
