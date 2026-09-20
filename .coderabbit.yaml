@@ -1,8 +1,8 @@
 # CodeRabbit — configuração de review (expxdev)
 # Schema: https://docs.coderabbit.ai/reference/configuration
 #
-# Mesmo modelo dos outros repositórios do AxisGov: a review da nuvem roda sozinha
-# só uma vez, quando o PR é aberto; depois disso, só por disparo manual.
+# Revisão automática DESLIGADA desde 2026-09-20 (ver reviews.auto_review): a
+# review da nuvem só roda por disparo manual (`@coderabbitai review`).
 language: 'pt-BR'
 early_access: false
 
@@ -24,7 +24,17 @@ reviews:
   # Cota compartilhada do AxisGov: 1 revisão automática por hora para a organização
   # inteira. Se dois PRs abrirem na mesma hora, o segundo pode precisar do manual.
   auto_review:
-    enabled: true
+    # DESLIGADO em 2026-09-20, decisão do Flávio. Motivo medido no painel
+    # (app.coderabbit.ai/dashboard/review-capacity), últimos 7 dias: 400 eventos
+    # de revisão, 318 BLOQUEADOS por limite, 67 entregues. A cota é de 1 revisão
+    # por hora para a organização AxisGov INTEIRA (14 repositórios na mesma fila),
+    # e revisão bloqueada é perdida, não fica na fila. Com o disparo na abertura,
+    # a revisão caía no PR ainda vazio. Agora a revisão é pedida à mão com
+    # `@coderabbitai review`, só em PR que vale a cota (critério no PR que
+    # desligou). Check verde do CodeRabbit sem pedido = "nada foi pedido", não
+    # "foi lido e nada achou". Não religue sem nova medição do painel.
+    # As chaves abaixo ficam como registro; só têm efeito com enabled: true.
+    enabled: false
     auto_incremental_review: false
     drafts: false
     ignore_title_keywords:
