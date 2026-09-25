@@ -79,7 +79,7 @@ export function jsonCanonico(valor: unknown): string {
   return JSON.stringify(valor) ?? "null";
 }
 
-export function hashDeBytes(bytes: Buffer): string {
+export function hashDeBytes(bytes: Buffer | string): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
@@ -193,6 +193,37 @@ export function consolidar(artefatos: readonly Artefato[]): Consolidacao {
   }
   unicos.sort((x, y) => (x.destino < y.destino ? -1 : x.destino > y.destino ? 1 : 0));
   return { ok: true, artefatos: unicos };
+}
+
+/**
+ * Os destinos podem ser escritos? Um ancestral que já existe como ARQUIVO (um
+ * `.opencode` que não é pasta), ou um destino que já existe como PASTA, faria a
+ * escrita falhar no meio — com parte do projeto já alterada. É previsível, então
+ * é verificado antes. Devolve a lista de problemas; vazia = pode aplicar.
+ */
+export function verificarDestinos(raiz: string, destinos: readonly string[]): string[] {
+  const problemas = new Set<string>();
+  const vistos = new Map<string, boolean>();
+  const ehPasta = (rel: string): boolean | undefined => {
+    if (vistos.has(rel)) return vistos.get(rel);
+    let r: boolean | undefined;
+    try {
+      r = statSync(join(raiz, ...rel.split("/"))).isDirectory();
+    } catch {
+      r = undefined;
+    }
+    vistos.set(rel, r as boolean);
+    return r;
+  };
+  for (const d of destinos) {
+    const partes = d.split("/");
+    for (let i = 1; i < partes.length; i++) {
+      const anc = partes.slice(0, i).join("/");
+      if (ehPasta(anc) === false) problemas.add(`${anc} existe e nao e pasta (necessario para ${d})`);
+    }
+    if (ehPasta(d) === true) problemas.add(`${d} existe como pasta e precisa ser arquivo`);
+  }
+  return [...problemas].sort();
 }
 
 /** A mensagem de uma colisão: destino, skills envolvidas e o hash de cada fonte. */

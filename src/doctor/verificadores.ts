@@ -1,6 +1,15 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { lerLock } from "../nucleo/lock.js";
+import { lerLock, type InstalacaoTravada } from "../nucleo/lock.js";
+import { hashDoArquivo } from "../nucleo/integridade.js";
+import { jsonCanonico } from "../plugin/plano.js";
+import {
+  descreverEntrada,
+  entradasDivergentes,
+  hashDasEntradas,
+  type DefinicaoHook,
+  type EntradaGerenciada,
+} from "../harness/composicao.js";
 import { validarRastro } from "../parser/esquema/evento.js";
 import { verificarCaminhos } from "../nucleo/caminhos.js";
 import { expxNoGitignore } from "../cli/projeto.js";
@@ -190,10 +199,128 @@ export function diagnosticar(raiz: string): Diagnostico {
     }
   }
 
+  if (l.lock.instalacao !== undefined) verificarInstalacao(raiz, l.lock.instalacao, push);
   verificarHooks(raiz, push);
   verificarRastro(raiz, push);
 
   return { saudavel: achados.filter((a) => a.severidade === "erro").length === 0, achados };
+}
+
+function amostra(lista: readonly string[]): string {
+  const resto = lista.length - 5;
+  return `${lista.slice(0, 5).join(", ")}${resto > 0 ? ` e mais ${String(resto)}` : ""}`;
+}
+
+/**
+ * O estado instalado ainda é o que o lock travou?
+ *
+ * O lock cobria só a cópia das skills dentro do plugin; os hooks instalados
+ * em `.claude/hooks/`, os helpers que eles chamam (como o
+ * `catalogo-de-metodo.sh` da mergex) e o settings composto podiam mudar sem
+ * que nada acusasse — e um hook de segurança editado à mão é exatamente o que
+ * precisa aparecer. Aqui cada arquivo é conferido pelo hash, cada hook
+ * gerenciado precisa estar no settings com a definição exata, e o
+ * `.expx/hooks.json` precisa ser o que foi escrito.
+ *
+ * Mudar só o `modo` de um id é decisão legítima da pessoa: vira aviso, não
+ * erro. Qualquer outra divergência é erro.
+ */
+function verificarInstalacao(raiz: string, inst: InstalacaoTravada, push: (a: Achado) => void): void {
+  const ausentes: string[] = [];
+  const alterados: string[] = [];
+  const copiaDoPlugin = `.expx/marketplace/${ORIGEM_DO_PLUGIN.replace(/^\.\//, "")}/skills/`;
+  for (const [rel, hash] of Object.entries(inst.arquivos)) {
+    // A cópia da skill dentro do plugin já é conferida por `modificacao-local`,
+    // com a semântica que o `update` usa (aviso: decidir manter ou substituir).
+    if (rel.startsWith(copiaDoPlugin)) continue;
+    const caminho = join(raiz, ...rel.split("/"));
+    if (!existsSync(caminho)) ausentes.push(rel);
+    else if (hashDoArquivo(caminho) !== hash) alterados.push(rel);
+  }
+  if (ausentes.length > 0) {
+    push({
+      id: "artefato-ausente",
+      severidade: "erro",
+      problema: `arquivo instalado removido: ${amostra(ausentes)}`,
+      correcao: "rode `expx init` para reinstalar; hook ou helper ausente desliga a protecao em silencio",
+    });
+  }
+  if (alterados.length > 0) {
+    push({
+      id: "artefato-alterado",
+      severidade: "erro",
+      problema: `arquivo instalado difere do lock: ${amostra(alterados)}`,
+      correcao: "a alteracao manual nao e a versao travada: corrija na origem da skill e rode `expx init`",
+    });
+  }
+
+  if (inst.settings !== undefined) {
+    const entradas: EntradaGerenciada[] = inst.settings.entradas.map((e) => ({
+      evento: e.evento,
+      ...(e.matcher !== undefined ? { matcher: e.matcher } : {}),
+      hook: e.hook as DefinicaoHook,
+    }));
+    if (hashDasEntradas(entradas) !== inst.settings.hash) {
+      push({
+        id: "lock-adulterado",
+        severidade: "erro",
+        problema: "as entradas de settings do lock nao batem com o hash registrado",
+        correcao: "rode `expx init` para reconstruir o lock",
+      });
+    }
+    const faltam = entradasDivergentes(lerJson(caminhoDoSettings(raiz)), entradas);
+    if (faltam.length > 0) {
+      push({
+        id: "settings-divergente",
+        severidade: "erro",
+        problema: `hook gerenciado ausente ou alterado no .claude/settings.json: ${amostra(faltam.map(descreverEntrada))}`,
+        correcao: "rode `expx init` para recompor o settings; as entradas que sao suas ficam onde estao",
+      });
+    }
+  }
+
+  if (inst.modos !== undefined) {
+    const caminho = join(raiz, ".expx", "hooks.json");
+    if (!existsSync(caminho)) {
+      push({
+        id: "modos-ausente",
+        severidade: "erro",
+        problema: ".expx/hooks.json ausente: os hooks caem no modo padrao de cada um",
+        correcao: "rode `expx init` para recompor o manifesto de modos",
+      });
+    } else if (hashDoArquivo(caminho) !== inst.modos.hash) {
+      const atual = lerJson(caminho) as { hooks?: Record<string, unknown> } | undefined;
+      const hooks = atual?.hooks;
+      const estruturais: string[] = [];
+      const deModo: string[] = [];
+      for (const [id, cfg] of Object.entries(inst.modos.publicados)) {
+        const noArquivo = hooks?.[id];
+        if (typeof noArquivo !== "object" || noArquivo === null) {
+          estruturais.push(id);
+          continue;
+        }
+        const { modo: _m1, ...resto } = noArquivo as Record<string, unknown>;
+        const { modo: _m2, ...restoPublicado } = cfg;
+        if (jsonCanonico(resto) !== jsonCanonico(restoPublicado)) estruturais.push(id);
+        else if ((noArquivo as Record<string, unknown>)["modo"] !== cfg["modo"]) deModo.push(id);
+      }
+      if (atual === undefined || estruturais.length > 0) {
+        push({
+          id: "modos-divergente",
+          severidade: "erro",
+          problema: `.expx/hooks.json difere do composto travado${estruturais.length > 0 ? `: ${amostra(estruturais)}` : " (arquivo ilegivel)"}`,
+          correcao: "rode `expx init` para recompor; o modo que voce escolheu para cada id e preservado",
+        });
+      } else {
+        push({
+          id: "modo-alterado",
+          severidade: "aviso",
+          problema: `modo alterado localmente em .expx/hooks.json: ${amostra(deModo.length > 0 ? deModo : ["(ids fora das skills)"])}`,
+          correcao: "se foi de proposito, rode `expx init` para travar o arquivo com a sua escolha",
+        });
+      }
+    }
+  }
 }
 
 /**
@@ -276,12 +403,14 @@ function verificarHooks(raiz: string, push: (a: Achado) => void): void {
     return;
   }
 
-  // uma entrada por skill dona de hook, para não repetir o achado por arquivo
+  // uma entrada por skill dona de hook, para não repetir o achado por arquivo.
+  // Só conta o hook solto `<skill>-<nome>.sh`: `doctor.sh`/`teste.sh` são
+  // ferramentas da árvore de hooks, e `expx-*` é o núcleo, que não tem motor.
   const skills = new Set(
     arquivos
-      .filter((a) => a.endsWith(".sh"))
+      .filter((a) => a.endsWith(".sh") && a.includes("-"))
       .map((a) => a.split("-")[0] ?? "")
-      .filter((n) => n !== ""),
+      .filter((n) => n !== "" && n !== "expx"),
   );
 
   for (const skill of skills) {

@@ -88,7 +88,9 @@ describe("init de ponta a ponta", () => {
     expect(existsSync(join(p.raiz, ".claude/hooks/expx-session-sync.mjs"))).toBe(false);
   });
 
-  it("funcional: cleanup remove temporário quando materialização posterior falha", async () => {
+  it("funcional: destino bloqueado falha no plano, sem escrita e sem temporário", async () => {
+    // `.opencode` como ARQUIVO torna `.opencode/commands/` impossível: é
+    // previsível, então o init recusa antes de tocar o projeto.
     p = projetoTemporario("fixtures/cli/projeto-limpo");
     writeFileSync(join(p.raiz, ".opencode"), "arquivo, nao pasta\n");
     const temporarioDoTeste = mkdtempSync(join(tmpdir(), "expx-init-cleanup-"));
@@ -102,7 +104,11 @@ describe("init de ponta a ponta", () => {
       process.env.TEMP = temporarioDoTeste;
       process.env.TMP = temporarioDoTeste;
       const repo = catalogoLocal(["sprintx"]) ["sprintx"]!;
-      await expect(executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["opencode"], origens: { sprintx: repo } })).rejects.toThrow();
+      const r = await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["opencode"], origens: { sprintx: repo } });
+      expect(r.ok).toBe(false);
+      expect(r.erros.join("\n")).toContain(".opencode existe e nao e pasta");
+      expect(existsSync(join(p.raiz, ".expx"))).toBe(false);
+      expect(existsSync(join(p.raiz, ".claude"))).toBe(false);
       expect(readdirSync(temporarioDoTeste).filter((nome) => nome.startsWith("expx-busca-sprintx-"))).toEqual([]);
     } finally {
       for (const [nome, valor] of Object.entries(anteriores)) {
@@ -129,7 +135,9 @@ describe("init de ponta a ponta", () => {
     expect(arquivos["SKILL.md"]).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it("funcional: skill inacessível não aborta as demais e é reportada", async () => {
+  it("funcional: skill inacessível recusa a instalação inteira, sem escrever nada", async () => {
+    // Contrato expx-instalacao: sem instalação parcial. Instalar sprintx sem a
+    // skill que falhou parece funcionar e não funciona.
     p = projetoTemporario("fixtures/cli/projeto-limpo");
     const origens = catalogoLocal(["sprintx"]);
     origens["fantasma"] = "/caminho/que/nao/existe.git";
@@ -141,12 +149,11 @@ describe("init de ponta a ponta", () => {
       origens,
     });
 
-    expect(r.ok).toBe(true);
+    expect(r.ok).toBe(false);
     expect(r.falhas.map((f) => f.nome)).toEqual(["fantasma"]);
-    const l = lerLock(p.raiz);
-    expect(l.ok).toBe(true);
-    if (!l.ok) return;
-    expect(Object.keys(l.lock.skills)).toEqual(["sprintx"]);
+    expect(r.instaladas).toEqual([]);
+    expect(existsSync(join(p.raiz, ".expx"))).toBe(false);
+    expect(existsSync(join(p.raiz, ".claude"))).toBe(false);
   });
 
   it("funcional: com opencode escolhido, as skills vão para .claude/skills e os comandos para .opencode/commands", async () => {

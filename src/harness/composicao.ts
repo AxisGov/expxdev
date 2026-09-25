@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { compararSkills, jsonCanonico } from "../plugin/plano.js";
 
@@ -209,6 +210,35 @@ function presentes(hooks: Record<string, unknown>): Map<string, { matcher?: stri
     }
   }
   return m;
+}
+
+/** Hash das entradas gerenciadas, na forma que vai para o lock. */
+export function hashDasEntradas(entradas: readonly EntradaGerenciada[]): string {
+  return createHash("sha256").update(jsonCanonico(entradas)).digest("hex");
+}
+
+/**
+ * As entradas gerenciadas que NÃO estão no settings com a definição exata —
+ * ausentes, ou com timeout/command/matcher alterados. É o que o doctor acusa.
+ */
+export function entradasDivergentes(settings: unknown, entradas: readonly EntradaGerenciada[]): EntradaGerenciada[] {
+  const hooks = ehObjeto(settings) && ehObjeto(settings["hooks"]) ? settings["hooks"] : {};
+  const achadas = new Set<string>();
+  for (const [evento, grupos] of Object.entries(hooks)) {
+    if (!Array.isArray(grupos)) continue;
+    for (const g of grupos) {
+      if (!ehObjeto(g) || !Array.isArray(g["hooks"])) continue;
+      const matcher = typeof g["matcher"] === "string" ? g["matcher"] : undefined;
+      for (const h of g["hooks"] as unknown[]) {
+        if (ehObjeto(h)) achadas.add(`${identidade(evento, matcher, h)}|${definicao(matcher, h)}`);
+      }
+    }
+  }
+  return entradas.filter((e) => !achadas.has(`${identidade(e.evento, e.matcher, e.hook)}|${definicao(e.matcher, e.hook)}`));
+}
+
+export function descreverEntrada(e: EntradaGerenciada): string {
+  return descrever(e);
 }
 
 function gerenciada(e: EntradaHook): EntradaGerenciada {

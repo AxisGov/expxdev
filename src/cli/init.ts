@@ -6,14 +6,39 @@ import { buscarSkill } from "../nucleo/busca.js";
 import { detectarLayout } from "../nucleo/layout.js";
 import { verificarCaminhos } from "../nucleo/caminhos.js";
 import { hashearPasta } from "../nucleo/integridade.js";
-import { caminhoDoLock, versaoDoCli, VERSAO_LOCK, type Lock, type SkillTravada } from "../nucleo/lock.js";
+import {
+  caminhoDoLock,
+  lerLock,
+  versaoDoCli,
+  VERSAO_LOCK,
+  type InstalacaoTravada,
+  type Lock,
+  type SkillTravada,
+} from "../nucleo/lock.js";
+import { verificarRuntime } from "../nucleo/runtime.js";
 import { escreverArquivoAtomico, prepararTroca } from "../plugin/atomico.js";
 import { montarMarketplace, planejarPlugin, type SkillMontavel } from "../plugin/montagem.js";
-import { aplicarArtefatos, compararSkills, consolidar, descreverColisoes, type Artefato } from "../plugin/plano.js";
+import {
+  aplicarArtefatos,
+  compararSkills,
+  consolidar,
+  descreverColisoes,
+  hashDeBytes,
+  SKILL_DO_NUCLEO,
+  verificarDestinos,
+  type Artefato,
+} from "../plugin/plano.js";
 import { artefatosOpenCode } from "../harness/opencode.js";
 import { entradaPorNome, gravarSettings, planejarSettings, type PlanoSettings } from "../harness/settings.js";
 import { artefatosDeHooks, comHooks, hooksPorNome } from "../harness/hooks.js";
-import { caminhosReferenciados, lerHooksDaSkill, type EntradaHook } from "../harness/composicao.js";
+import {
+  caminhosReferenciados,
+  hashDasEntradas,
+  lerHooksDaSkill,
+  type DefinicaoHook,
+  type EntradaGerenciada,
+  type EntradaHook,
+} from "../harness/composicao.js";
 import { comporModos, consolidarModos, lerModosDaSkill, type ModosPublicados } from "../harness/modos.js";
 import { ORIGEM_DO_PLUGIN } from "../plugin/manifestos.js";
 import { materializarCodex } from "../harness/codex.js";
@@ -30,6 +55,11 @@ import { materializarCodex } from "../harness/codex.js";
  *
  * A ordem em que as skills são pedidas não muda nada: tudo é processado em
  * ordem canônica (ver `plano.ts`).
+ *
+ * Tudo que é previsível falha antes da primeira escrita: skill que não chegou,
+ * colisão, conflito, manifesto inválido, destino bloqueado, e `git`/`jq`
+ * ausentes do PATH deste processo quando há hook de skill a registrar. O lock
+ * é gravado por último e cobre o estado instalado inteiro.
  *
  * O `install.sh` que algumas skills trazem NÃO é executado: ele é o instalador
  * manual/legado de UMA skill, e roda `rm -rf` em pastas que outras skills
@@ -49,6 +79,11 @@ export type OpcoesInit = {
   origens?: Record<string, string>;
   /** Referência fixa por skill, quando o usuário pediu uma específica. */
   referencias?: Record<string, string>;
+  /**
+   * O ambiente em que as dependências de runtime são provadas. Padrão: o do
+   * próprio processo, que é o que importa — ver `nucleo/runtime.ts`.
+   */
+  ambiente?: NodeJS.ProcessEnv;
 };
 
 export type Falha = { nome: string; erro: string };
@@ -87,10 +122,47 @@ function origemDe(nome: string, origens?: Record<string, string>): string | unde
 /** O que a fase de plano decidiu. Nada disto foi escrito ainda. */
 type Plano = {
   projeto: Artefato[];
+  /** Os arquivos do plugin, relativos a `.expx/marketplace/plugins/expx/`. */
+  plugin: Artefato[];
   settings?: PlanoSettings;
   /** Conteúdo final de `.expx/hooks.json`, quando alguma skill publica modos. */
   modos?: { texto: string; publicados: ModosPublicados };
+  /** Os hooks registrados vêm de alguma skill: exigem git e jq no runtime. */
+  hooksDeSkill: boolean;
 };
+
+/** O que a instalação anterior gerenciava, segundo o lock dela. */
+function anterioresDoLock(raiz: string): { settings: EntradaGerenciada[]; modos?: ModosPublicados } {
+  const l = lerLock(raiz);
+  if (!l.ok || l.lock.instalacao === undefined) return { settings: [] };
+  const inst = l.lock.instalacao;
+  const settings = (inst.settings?.entradas ?? []).map((e) => ({
+    evento: e.evento,
+    ...(e.matcher !== undefined ? { matcher: e.matcher } : {}),
+    hook: e.hook as DefinicaoHook,
+  }));
+  return inst.modos !== undefined ? { settings, modos: inst.modos.publicados } : { settings };
+}
+
+const PREFIXO_DO_PLUGIN = `.expx/marketplace/${ORIGEM_DO_PLUGIN.replace(/^\.\//, "")}`;
+
+/** O bloco `instalacao` do lock, em ordem canônica e sem data. */
+function instalacaoTravada(plano: Plano): InstalacaoTravada {
+  const arquivos: Record<string, string> = {};
+  const todos = [
+    ...plano.projeto.map((a) => [a.destino, a.hash] as const),
+    ...plano.plugin.map((a) => [`${PREFIXO_DO_PLUGIN}/${a.destino}`, a.hash] as const),
+  ].sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0));
+  for (const [d, h] of todos) arquivos[d] = h;
+  const inst: InstalacaoTravada = { arquivos };
+  if (plano.settings !== undefined) {
+    inst.settings = { hash: hashDasEntradas(plano.settings.gerenciadas), entradas: plano.settings.gerenciadas };
+  }
+  if (plano.modos !== undefined) {
+    inst.modos = { hash: hashDeBytes(plano.modos.texto), publicados: plano.modos.publicados };
+  }
+  return inst;
+}
 
 function lerModosDoProjeto(raiz: string): { ok: true; conteudo?: Record<string, unknown> } | { ok: false; erro: string } {
   const caminho = join(raiz, ".expx", "hooks.json");
@@ -122,8 +194,18 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
     erros.push(descreverColisoes(c.colisoes));
     return { ok: false, erros };
   }
-  const plano: Plano = { projeto: c.artefatos };
+  const plano: Plano = { projeto: c.artefatos, plugin: plugin.ok ? plugin.artefatos : [], hooksDeSkill: false };
+
+  // Destino bloqueado (arquivo onde precisa haver pasta) é previsível: falha aqui.
+  const bloqueados = verificarDestinos(op.raiz, [
+    ...c.artefatos.map((a) => a.destino),
+    ".expx/marketplace/x",
+    ".expx/expx-lock.json",
+    ...(claude ? [".claude/settings.json", ".expx/hooks.json"] : []),
+  ]);
+  if (bloqueados.length > 0) erros.push(`destino impossivel de escrever (nada foi escrito):\n  ${bloqueados.join("\n  ")}`);
   if (!claude) return erros.length > 0 ? { ok: false, erros } : { ok: true, plano };
+  const anteriores = anterioresDoLock(op.raiz);
 
   // 2. Registros de hook: núcleo e hooks soltos por nome; skills pelo manifesto.
   const destinos = new Set(c.artefatos.map((a) => a.destino));
@@ -147,8 +229,9 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
     }
     entradas.push(...lidos.entradas);
   }
+  plano.hooksDeSkill = entradas.some((e) => e.skill !== SKILL_DO_NUCLEO);
 
-  const s = planejarSettings(op.raiz, join(op.raiz, ".expx", "marketplace"), entradas);
+  const s = planejarSettings(op.raiz, join(op.raiz, ".expx", "marketplace"), entradas, anteriores.settings);
   if (!s.ok) erros.push(s.erro);
   else plano.settings = s.plano;
 
@@ -166,7 +249,7 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
     if (!pub.ok) erros.push(pub.erro);
     else if (!existente.ok) erros.push(existente.erro);
     else {
-      const final = comporModos(pub.publicados, existente.conteudo, undefined);
+      const final = comporModos(pub.publicados, existente.conteudo, anteriores.modos);
       if (!final.ok) erros.push(final.erro);
       else plano.modos = { texto: `${JSON.stringify(final.conteudo, null, 2)}\n`, publicados: pub.publicados };
     }
@@ -255,14 +338,23 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     instaladas.push(nome);
   }
 
-  if (montaveis.length === 0) {
-    return { ok: false, instaladas, falhas, erros: [], naoTravadas, avisos };
+  // Skill que não chegou inteira (fora do catálogo, repositório inacessível,
+  // layout inválido) recusa a instalação TODA, antes de qualquer escrita. Antes
+  // o `init` seguia com as outras; mas instalar sprintx sem a mergex que ela
+  // aciona é exatamente a instalação parcial que parece funcionar e não
+  // funciona. Declarar a falha e não mexer no projeto é o que dá para confiar.
+  if (falhas.length > 0 || montaveis.length === 0) {
+    return { ok: false, instaladas: [], falhas, erros: [], naoTravadas, avisos };
   }
 
   // PLANEJAR e VALIDAR: nenhuma escrita no projeto até aqui.
   const p = planejar(op, montaveis);
   if (!p.ok) {
     return { ok: false, instaladas: [], falhas, erros: p.erros, naoTravadas, avisos };
+  }
+  if (p.plano.hooksDeSkill) {
+    const rt = await verificarRuntime(["git", "jq"], op.ambiente ?? process.env);
+    if (!rt.ok) return { ok: false, instaladas: [], falhas, erros: [rt.erro], naoTravadas, avisos };
   }
 
   // APLICAR e TRAVAR.
@@ -271,6 +363,7 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     cli_version: versaoDoCli(),
     harness: [...op.harness],
     skills: travadas,
+    instalacao: instalacaoTravada(p.plano),
   };
   const troca = prepararTroca(join(op.raiz, ".expx", "marketplace"), (tmp) => {
     montarMarketplace(tmp, montaveis, versaoDoCli());

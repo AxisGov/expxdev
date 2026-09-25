@@ -14,7 +14,12 @@ import { z } from "zod";
  * modificação local e recusar sobrescrever trabalho manual (ver `integridade.ts`).
  */
 
-export const VERSAO_LOCK = 1;
+/**
+ * 2: ganhou `instalacao` — o estado instalado FORA do plugin (hooks, cópias
+ * das skills, settings composto, `.expx/hooks.json`). Lock 1 continua legível:
+ * `instalacao` é opcional, e o doctor só confere o que o lock declara.
+ */
+export const VERSAO_LOCK = 2;
 
 export const SkillTravada = z.object({
   repositorio: z.string().min(1),
@@ -27,11 +32,43 @@ export const SkillTravada = z.object({
 });
 export type SkillTravada = z.infer<typeof SkillTravada>;
 
+/** Um hook gerenciado no `.claude/settings.json`, exatamente como foi escrito. */
+export const EntradaTravada = z.object({
+  evento: z.string().min(1),
+  matcher: z.string().optional(),
+  hook: z.record(z.string(), z.unknown()),
+});
+export type EntradaTravada = z.infer<typeof EntradaTravada>;
+
+/**
+ * O estado instalado que o `init` gerencia fora de `skills[].arquivos`.
+ *
+ * - `arquivos`: destino (relativo à raiz do projeto) → sha256, de TODO arquivo
+ *   que o plano escreveu — `.claude/hooks/**` (hooks e helpers de cada skill),
+ *   `.claude/skills/**` (inclusive scripts como `catalogo-de-metodo.sh`),
+ *   comandos, e o plugin em `.expx/marketplace/`.
+ * - `settings`: as entradas de hook que o ExpxDev gerencia no
+ *   `.claude/settings.json`, e o hash delas. Entrada da pessoa não entra: o
+ *   ExpxDev não a gerencia.
+ * - `modos`: o que as skills publicaram para `.expx/hooks.json` e o hash do
+ *   arquivo composto que foi escrito.
+ *
+ * Tudo em ordem canônica e sem data: duas instalações das mesmas skills, em
+ * qualquer ordem, produzem o mesmo bloco.
+ */
+export const InstalacaoTravada = z.object({
+  arquivos: z.record(z.string(), z.string()),
+  settings: z.object({ hash: z.string(), entradas: z.array(EntradaTravada) }).optional(),
+  modos: z.object({ hash: z.string(), publicados: z.record(z.string(), z.record(z.string(), z.unknown())) }).optional(),
+});
+export type InstalacaoTravada = z.infer<typeof InstalacaoTravada>;
+
 export const Lock = z.object({
   lock_version: z.number().int(),
   cli_version: z.string().min(1),
   harness: z.array(z.string()),
   skills: z.record(z.string(), SkillTravada),
+  instalacao: InstalacaoTravada.optional(),
 });
 export type Lock = z.infer<typeof Lock>;
 
