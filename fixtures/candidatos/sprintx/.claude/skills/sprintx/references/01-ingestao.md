@@ -1,0 +1,278 @@
+# F1 — INGESTÃO
+
+Você está na F1. Seu único objetivo é construir a base de conhecimento antes de qualquer plano. Nesta fase você não pergunta nada ao usuário, não planeja nada e não escreve nenhum código de implementação.
+
+## Pré-requisitos verificáveis
+
+- O slug da feature está definido (derive-o pelas regras do SKILL.md; se ambíguo, proponha e siga).
+- `docs/sprintx/features/<slug>/base/` não existe, ou existe incompleta (reexecução para complementar).
+
+Se `docs/sprintx/features/<slug>/base/` já existe completa e `00-DECISOES.md` também existe, a F1 já passou: anuncie a fase real detectada pela máquina de estados e execute-a em vez desta.
+
+## Passo 0 — Uma feature por árvore e abrir a área de trabalho (regra 21)
+
+Antes do scaffold: verifique se `docs/sprintx/features/` já tem outra pasta com
+`ORQUESTRADOR.md` sem `concluido_em` preenchido (ou, antes da F4, uma pasta sem
+`ORQUESTRADOR.md` mas mais recente que a atual). Isso é outra feature aberta na mesma árvore.
+
+- **Com git:** siga adiante neste passo — o worktree resolve a colisão isolando esta feature.
+- **Sem git:** anuncie qual feature está aberta e pergunte se é para continuar nela ou
+  encerrá-la antes. É a única pergunta legítima aqui, porque sem worktree não há como isolar.
+
+**Abrir a área de trabalho** só se aplica com git (`git rev-parse --is-inside-work-tree`
+responde `true`). Sem git, ou com "sem worktree" explícito no pedido: `worktree: null` (será
+copiado ao `ORQUESTRADOR.md` na F4) e nada muda no restante desta fase.
+
+Onde esta fase diz `CONVENCOES.md`, o arquivo é localizado pela regra única de
+`references/00-schema.md` ("Como localizar o `CONVENCOES.md`"), que reconhece o caminho
+canônico `docs/stack/CONVENCOES.md`.
+
+1. **Nome da branch e base**: `feature/<slug>`. Base, nesta ordem: `CONVENCOES.md` (seção de
+   versionamento, se marcada e não `PROPOSTA`) → `git symbolic-ref refs/remotes/origin/HEAD`
+   → a branch atual, se `main`/`master`/`develop` ou equivalente detectada.
+2. **Criar ou retomar**: `git worktree list` já lista essa branch → retome nele. Senão:
+   `git worktree add -b feature/<slug> ../<repo>--<slug> <base>`, onde `<repo>` é o nome do
+   diretório do checkout principal. Branch já existente sem worktree: `git worktree add
+   ../<repo>--<slug> feature/<slug>`.
+3. **Herdar do checkout principal** — só o que existir lá, nunca lendo o conteúdo:
+   `.expx/hooks.json` (+ `estado.json` do objeto padrão de `references/09-estado.md`),
+   `.claude/settings.json` (sem ele os hooks não rodam no worktree), `.env`, `.env.local`,
+   `.env.*.local`.
+4. **Instalar dependências**, para esta fase conseguir rodar comando no worktree novo.
+   Comando do `CONVENCOES.md` quando existir; senão pelo lockfile encontrado:
+
+   | Lockfile | Comando |
+   |---|---|
+   | `package-lock.json` | `npm ci` |
+   | `pnpm-lock.yaml` | `pnpm install --frozen-lockfile` |
+   | `yarn.lock` | `yarn install --frozen-lockfile` |
+   | `bun.lock` / `bun.lockb` | `bun install` |
+   | `requirements.txt` | `pip install -r requirements.txt` |
+   | `poetry.lock` | `poetry install` |
+   | `go.mod` | `go mod download` |
+   | `Cargo.lock` | `cargo fetch` |
+   | `Gemfile.lock` | `bundle install` |
+   | `composer.lock` | `composer install` |
+
+   Nenhum lockfile reconhecido: registre a lacuna em `base/00-LACUNAS.md` e siga.
+5. **Gravar** o caminho (`../<repo>--<slug>`) para uso na F4, quando o `ORQUESTRADOR.md`
+   grava a chave `worktree` (`references/00-schema.md`).
+6. **Entrar na área de trabalho.** Se o harness oferecer uma ferramenta de troca para
+   worktree, use-a apontando para o diretório criado. Caso contrário — e sempre no OpenCode
+   — anuncie "Área de trabalho: `../<repo>--<slug>`. Continue de dentro desse diretório" e
+   encerre a fase aqui; o próximo comando, rodado de lá, retoma pela máquina de estados
+   normalmente.
+
+Todo o scaffold do Passo 1 em diante vive dentro do worktree a partir daqui; nada dele é
+gravado no checkout principal.
+
+## Passo 1 — Scaffold
+
+Crie, se ainda não existirem (os diretórios intermediários `docs/sprintx/` e `docs/sprintx/features/` fazem parte da criação e nascem junto):
+
+```
+docs/sprintx/features/<slug>/
+  00-BLOQUEIOS.md      apenas o título "# Bloqueios" e a linha "Nenhum bloqueio registrado." — será preenchido na execução
+  base/
+    00-INDICE.md       título + lista (vazia por enquanto) dos arquivos da base
+    00-LACUNAS.md      título + "Nenhuma lacuna registrada."
+```
+
+**Frontmatter (obrigatório).** `00-BLOQUEIOS.md` (`kind: bloqueios`, com `bloqueios: []`) e
+`base/00-INDICE.md` (`kind: base_indice`) são arquivos de estado: grave-os já com o
+frontmatter do contrato expx-schema v1. O formato exato de cada um está em
+`references/00-schema.md` — leia-o antes de gravar. `base/00-LACUNAS.md` e os arquivos de
+recurso da base NÃO levam frontmatter.
+Use `assets/TEMPLATE-BLOQUEIOS.md` e `assets/TEMPLATE-base-indice.md` (caminhos relativos à
+raiz da skill) como ponto de partida desses dois arquivos.
+
+**O estado durável do planejamento nasce aqui.** Crie `00-PLANEJAMENTO.md` (`kind: planejamento`,
+`references/00-schema.md`) sempre pelo script, nunca à mão:
+
+```bash
+bash <raiz-da-skill>/scripts/planejamento.sh criar <slug> [max_reprovacoes_f5] [orcamento_declarado_por] [max_replanejamentos_f6]
+```
+
+**O orçamento pertence a quem acionou a `sprintx`, nunca a ela.** Leia do pedido (o briefing do
+caller) as três chaves `max_reprovacoes_f5`, `orcamento_declarado_por` e `max_replanejamentos_f6`
+e repasse cada uma, na posição dela, exatamente como veio. Chave que o pedido não declara vai como
+`null` — nunca como um valor que você escolheu; `null` ao fim da linha pode ser omitido. A
+`sprintx` não tem teto padrão: não arredonde, não complete e não invente nenhum dos três.
+
+| O pedido declara | Comando |
+|---|---|
+| nada | `criar <slug>` |
+| `max_reprovacoes_f5: 3`, `orcamento_declarado_por: buildx` | `criar <slug> 3 buildx` |
+| `max_reprovacoes_f5: 3`, `orcamento_declarado_por: buildx`, `max_replanejamentos_f6: 1` | `criar <slug> 3 buildx 1` |
+
+- **A `sprintx` sozinha** — ninguém declarou orçamento: rode só `criar <slug>`. O arquivo nasce
+  com `max_reprovacoes_f5: null`, `orcamento_declarado_por: null` e `max_replanejamentos_f6: null`:
+  o laço F3 ↔ F5 não tem teto e o retorno da F6 ao planejamento não abre.
+- **Um caller declarou orçamento** — a `buildx`, por exemplo, declara `max_reprovacoes_f5: 3`,
+  `orcamento_declarado_por: buildx` e `max_replanejamentos_f6: 1`: repasse os três,
+  `criar <slug> 3 buildx 1`. O arquivo nasce com `max_replanejamentos_f6: 1` e
+  `replanejamentos_f6: 0`. Um pedido que declara só o teto da F5 e o dono (um caller anterior ao
+  eixo da F6) vira `criar <slug> 3 buildx`: o teto da F6 fica `null` — o `1` do BuildX não é
+  presumido.
+- **Orçamento inválido** — zero, negativo, texto, teto sem dono ou dono sem teto: o script sai
+  com código `4` (erro de contrato) e não grava nada. Isso não é bloqueio a contornar: devolva o
+  erro a quem pediu, e não siga com um teto que ninguém declarou.
+- Numa retomada o arquivo já existe: `criar` com o mesmo orçamento é no-op; com orçamento
+  diferente é erro de contrato — o teto não muda em silêncio no meio do trabalho. Planejamento
+  legado (anterior ao eixo da F6, sem `max_replanejamentos_f6`) não ganha teto numa retomada:
+  repita só o que ele já registra; pedir o teto da F6 a ele é erro de contrato (código `4`).
+
+O arquivo nasce com `estado: null`: o planejamento só ganha estado ao fim da F2. A F1 **não** faz
+checkpoint.
+
+**O rastro e o estado ficam fora do versionador — sem tocar no `.gitignore`.** O rastro de
+eventos (`references/08-rastro.md`) e o `.expx/estado.json` (`references/09-estado.md`) são
+**estado local da máquina** de quem executou: crescem rápido, são reescritos a cada transição,
+o painel roda local, e versioná-los traz conflito de merge em arquivo que ninguém lê à mão. Mas
+eles não são produto nem decisão do projeto — e a F1 **não suja uma branch de feature com uma
+alteração global de `.gitignore` antes de o plano existir**.
+
+Com Git, garanta isso pelo mecanismo **local** do repositório: ele não aparece em `git status`
+e não entra em commit nenhum. Para cada um dos padrões `docs/eventos/` e `.expx/estado.json`:
+
+1. **Confira se já é ignorado** pela configuração existente — `git check-ignore -q <padrão>`
+   responde isso e cobre `.gitignore` versionado, excludes globais e o que mais o repositório já
+   tenha. Já ignorado: **não faça nada**.
+2. **Não sendo ignorado**, acrescente a linha ao arquivo que o próprio Git indicar:
+
+   ```bash
+   git rev-parse --git-path info/exclude
+   ```
+
+   **Resolva o caminho com esse comando, sempre.** Nunca escreva `.git/info/exclude` na mão: num
+   linked worktree o `.git` é um arquivo, não um diretório, e o exclude real vive no repositório
+   principal — o caminho fixo gravaria no lugar errado, ou em lugar nenhum. O comando devolve o
+   caminho certo nos dois casos.
+3. **Acrescente idempotentemente**: se a linha já está lá, não duplique. Crie o arquivo, e o
+   diretório dele, se não existirem.
+
+Se `.expx/` não existe no projeto, não crie nada e não acrescente a regra do `estado.json`: não
+há o que ignorar. **Sem Git** não existe `info/exclude` — siga sem erro e sem aviso.
+
+**A `sprintx` nunca modifica o `.gitignore` por conta própria.** Um time que queira política
+compartilhada versiona essas entradas por fora da F1 — e aí o passo 1 já as respeita, e a F1
+não faz nada.
+
+**O estado da barra — abertura do trabalho.** Com o scaffold no disco, grave `.expx/estado.json`
+com `trabalho: <slug>`, `ferramenta: sprintx`, `titulo_curto` (a feature em até 30 caracteres),
+`fase: f1`, `task: null`, `tasks_concluidas: 0`, `tasks_total: 0` e `bloqueios: 0`, seguindo
+`references/09-estado.md` — leitura e gravação atômica, preservando os campos dos outros donos.
+Se `.expx/` não existir, siga sem gravar, sem erro e sem aviso.
+
+## Passo 1.1 — Ler densidade e forma de construção sugeridas (quando vem do prodx)
+
+Se a feature nasceu de um `BRIEFING.md` do prodx, ele traz `densidade_sugerida`
+(`mvp` | `padrao` | `completo` | `profundo`) e `modo_construcao_sugerido`
+(`entrevista` | `autonomo`) no frontmatter. Leia os dois agora e leve-os para a
+F2 — é lá que são confirmados ou ajustados, nunca aqui: a F1 não pergunta nada
+(ver cabeçalho desta fase).
+
+Sem `BRIEFING.md`, ou sem esses campos nele: os dois ficam `NÃO SUGERIDO`, e a
+F2 pergunta do zero, sem viés de sugestão nenhuma.
+
+## Passo 2 — Detectar o modo
+
+Decida pelo que o usuário descreveu:
+
+- **Modo EXTERNO** — a feature integra ferramenta, API, SDK ou serviço de terceiro (o usuário nomeou um produto externo, ou a feature é inviável sem um). Ingerir a documentação oficial dessa ferramenta.
+- **Modo INTERNO** — a feature é do próprio sistema. Ingerir o código existente.
+
+Se genuinamente ambíguo, trate como os dois: ingira a documentação externa E as áreas internas tocadas. No modo EXTERNO, ingira também o mínimo interno necessário (os pontos do sistema que a integração vai tocar) — uma integração nunca é só o lado de fora.
+
+## Passo 2.1 — Delegar ao agente `investigador`, ou ler direto
+
+O agente existe para não gastar o contexto do planejamento com a leitura da base. Mas ele
+tem custo de partida: relê do zero o que a sessão principal já tem em contexto. Numa feature
+que toca um ou dois arquivos, esse custo é maior que a leitura que ele evita.
+
+O corte é mecânico, e sai de um dado que a própria F1 produz — **quantos arquivos ou páginas
+candidatos a ingestão a varredura inicial encontrou**:
+
+| Candidatos à base | O que fazer |
+|---|---|
+| **3 ou mais** | delegue ao agente `investigador`, quando ele existir neste harness |
+| 1 ou 2 | **leia direto**, você mesma, na sessão principal — o método é idêntico |
+
+Faça a varredura primeiro, conte, e só então decida. Decidir antes de varrer é palpite, e é
+o que este corte existe para evitar. Na dúvida entre os dois lados — documentação externa
+extensa, cadeia de dependências que já se mostrou longa —, delegue: o custo de delegar demais
+é uma leitura repetida, e o de delegar de menos é o contexto do plano gasto antes de planejar.
+
+Este corte vale **só para o `investigador`**. Os outros agentes não têm corte por tamanho: o
+`auditor-plano` é a verificação independente da F5, e o `revisor-testes` responde uma pergunta
+só e é barato mesmo na feature mínima.
+
+## Passo 3 — Ingerir
+
+**Modo EXTERNO:**
+1. Localize a documentação oficial da ferramenta. Verifique primeiro se ela publica um índice para LLMs (`llms.txt` ou `llms-full.txt` na raiz do domínio de docs) ou versões `.md` das páginas (muitos docs servem `.md` ao trocar a extensão da URL). Se publicar, use isso como fonte primária.
+2. Leia as páginas relevantes para a feature: autenticação, recursos/endpoints usados, limites, erros, webhooks/eventos se aplicável.
+3. Um arquivo por recurso/área estudada em `base/`, no formato do Passo 4.
+
+**Modo INTERNO:**
+1. Mapeie as áreas do código que a feature vai tocar: módulos, contratos entre camadas, schema de banco, padrões de teste existentes (framework, comandos, onde ficam as fixtures), configuração e variáveis de ambiente.
+2. Leia esses arquivos de verdade — não descreva de memória.
+3. Um arquivo por recurso/área estudada em `base/`, no formato do Passo 4.
+
+## Passo 3.1 — Consultar o `memox` (quando instalado)
+
+Se o `memox` estiver instalado no projeto, consulte-o sobre os arquivos e as áreas que a
+ingestão identificou como tocados pela feature. Ele responde "quem já mexeu neste arquivo e por
+quê" a partir dos artefatos de trabalhos anteriores — features fechadas pela sprintx
+(`FECHAMENTO.md`) e ocorrências fechadas pela runx (relatório técnico).
+
+O que ele devolver **entra na base como contexto histórico**, em arquivo próprio de `base/`, no
+formato do Passo 4, com a **proveniência preservada**: cada afirmação diz de qual trabalho veio
+(`trabalho_id`) e de qual artefato, e a seção "Fonte" aponta para o artefato, não para o
+`memox`. Isso vale como fonte documentada para a regra de "nada de invenção": é registro de
+outro trabalho, não memória sua.
+
+Um risco residual registrado por um trabalho anterior sobre um arquivo que esta feature vai
+tocar é exatamente o tipo de coisa que a base existe para trazer à tona antes do plano.
+
+**A ausência do `memox` nunca bloqueia.** Não instalado, sem resposta, ou sem nada sobre estes
+arquivos: siga para o Passo 4 sem registrar nada. A F1 nunca falha por falta dele, e a falta
+dele não é lacuna — não vai para `00-LACUNAS.md`, porque lacuna é o que a skill procurou na
+fonte e não achou, não uma ferramenta opcional que o projeto não instalou.
+
+## Passo 4 — Formato de cada arquivo da base
+
+Use `assets/TEMPLATE-base-recurso.md` (caminho relativo à raiz da skill). Todo arquivo tem exatamente estas seções:
+
+1. **Contrato de entrada** — o que o recurso recebe (parâmetros, payloads, tipos, obrigatoriedade).
+2. **Contrato de saída** — o que devolve (formato, campos, códigos).
+3. **Limites e cotas** — rate limits, tamanhos máximos, timeouts, paginação.
+4. **Erros conhecidos e tratamento** — códigos de erro, causas, o que a fonte manda fazer.
+5. **Riscos para a nossa implementação** — o que daqui pode quebrar o nosso caso de uso.
+6. **Fonte** — URL ou caminho de arquivo + data de acesso.
+
+## Regras duras desta fase
+
+- **Nada de invenção.** Se a fonte não afirma, escreva literalmente `NÃO DOCUMENTADO` no campo.
+- **Todo número vem com a referência que o afirma** (URL ou arquivo:linha ao lado do número).
+- **Proibido escrever código de implementação.** Trechos citados da fonte ou do código existente são permitidos; código novo, não.
+- O que você procurou e não encontrou vai para `base/00-LACUNAS.md`, uma linha por lacuna, com onde procurou.
+- Cada arquivo criado entra em `base/00-INDICE.md` com uma linha de resumo.
+- Ao atualizar `base/00-INDICE.md`, reescreva também a lista `areas:` do frontmatter (uma entrada por arquivo da base, com `lacunas` contando as lacunas daquela área) e o campo `atualizado_em`. Formato em `references/00-schema.md`.
+
+## Critério de saída da fase
+
+- [ ] Todos os recursos/áreas que a feature toca têm arquivo em `base/` no template fixo.
+- [ ] `00-INDICE.md` lista todos os arquivos da base.
+- [ ] `00-LACUNAS.md` registra tudo que não foi encontrado (ou declara que não há lacunas).
+- [ ] Nenhum campo inventado; todo número referenciado.
+- [ ] `00-BLOQUEIOS.md` e `base/00-INDICE.md` têm frontmatter válido conforme `references/00-schema.md`.
+- [ ] `00-PLANEJAMENTO.md` existe, criado por `scripts/planejamento.sh criar`, com os três tetos que o caller declarou (`max_reprovacoes_f5`, `orcamento_declarado_por`, `max_replanejamentos_f6`) — e `null` em cada um que ele não declarou.
+
+## Quando o critério não é atendido
+
+Continue ingerindo até atender. Se uma fonte externa está inacessível (docs fora do ar, paywall), registre em `00-LACUNAS.md` com a URL tentada e siga — a lacuna vira pergunta obrigatória na F2.
+
+## Ao terminar
+
+Anuncie: "F1 concluída. Base de conhecimento em `docs/sprintx/features/<slug>/base/` (N arquivos, M lacunas). Próxima fase: F2 DESCOBERTA — vou te entrevistar em blocos de até 5 perguntas." Grave `fase: f2` em `.expx/estado.json` (`references/09-estado.md`). Em seguida, se a sessão continuar, entre na F2 lendo `references/02-descoberta.md`.
