@@ -1,4 +1,4 @@
-import { rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { resolverOrigem } from "../nucleo/catalogo.js";
 import { resolverAlvo } from "../nucleo/versao.js";
@@ -6,25 +6,39 @@ import { buscarSkill } from "../nucleo/busca.js";
 import { detectarLayout } from "../nucleo/layout.js";
 import { verificarCaminhos } from "../nucleo/caminhos.js";
 import { hashearPasta } from "../nucleo/integridade.js";
-import { versaoDoCli, VERSAO_LOCK, type Lock, type SkillTravada } from "../nucleo/lock.js";
-import { escreverAtomico } from "../plugin/atomico.js";
-import { montarMarketplace, type SkillMontavel } from "../plugin/montagem.js";
-import { materializarOpenCode } from "../harness/opencode.js";
-import { mesclarSettings } from "../harness/settings.js";
-import { instalarHooks } from "../harness/hooks.js";
+import { caminhoDoLock, versaoDoCli, VERSAO_LOCK, type Lock, type SkillTravada } from "../nucleo/lock.js";
+import { escreverArquivoAtomico, prepararTroca } from "../plugin/atomico.js";
+import { montarMarketplace, planejarPlugin, type SkillMontavel } from "../plugin/montagem.js";
+import { aplicarArtefatos, compararSkills, consolidar, descreverColisoes, type Artefato } from "../plugin/plano.js";
+import { artefatosOpenCode } from "../harness/opencode.js";
+import { entradaPorNome, gravarSettings, planejarSettings, type PlanoSettings } from "../harness/settings.js";
+import { artefatosDeHooks, comHooks, hooksPorNome } from "../harness/hooks.js";
+import { caminhosReferenciados, lerHooksDaSkill, type EntradaHook } from "../harness/composicao.js";
+import { comporModos, consolidarModos, lerModosDaSkill, type ModosPublicados } from "../harness/modos.js";
 import { ORIGEM_DO_PLUGIN } from "../plugin/manifestos.js";
 import { materializarCodex } from "../harness/codex.js";
 
 /**
- * O fluxo do `init`: busca, monta, configura e trava.
+ * O fluxo do `init`: busca, PLANEJA, VALIDA, aplica e trava.
  *
- * Uma skill inacessível NUNCA aborta as outras — é reportada em `falhas` e a
- * instalação segue com as que deram certo, porque perder a instalação inteira
- * por causa de um repositório fora do ar é pior que uma instalação parcial
- * declarada.
+ * O `init` é o dono da composição das skills no projeto. Nenhum arquivo do
+ * projeto é escrito enquanto ainda há o que descobrir: primeiro todas as
+ * skills são buscadas para pasta temporária, depois o plano inteiro é montado
+ * em memória — cada arquivo com skill de origem, destino e hash; o
+ * `.claude/settings.json` composto; o `.expx/hooks.json` composto — e só
+ * então, sem nenhuma colisão nem conflito, o projeto é tocado.
  *
- * A montagem inteira acontece dentro de `escreverAtomico`: ou o `.expx/` novo
- * aparece completo, ou o anterior permanece intocado.
+ * A ordem em que as skills são pedidas não muda nada: tudo é processado em
+ * ordem canônica (ver `plano.ts`).
+ *
+ * O `install.sh` que algumas skills trazem NÃO é executado: ele é o instalador
+ * manual/legado de UMA skill, e roda `rm -rf` em pastas que outras skills
+ * também ocupam. A instalação multi-skill é declarativa e feita só aqui
+ * (contrato em `docs/contrato/CONTRATO-expx-instalacao.md`).
+ *
+ * `.expx/marketplace/` é trocada de uma vez (`prepararTroca`): ou aparece
+ * completa, ou a anterior permanece. O resto de `.expx/` não é do `init` e
+ * não é apagado.
  */
 
 export type OpcoesInit = {
@@ -43,6 +57,8 @@ export type ResultadoInit = {
   ok: boolean;
   instaladas: string[];
   falhas: Falha[];
+  /** Erros de plano (colisão, conflito, manifesto inválido): nada foi escrito. */
+  erros: string[];
   naoTravadas: string[];
   avisos: string[];
 };
@@ -68,6 +84,97 @@ function origemDe(nome: string, origens?: Record<string, string>): string | unde
   return resolverOrigem(nome, undefined, origens?.[nome]);
 }
 
+/** O que a fase de plano decidiu. Nada disto foi escrito ainda. */
+type Plano = {
+  projeto: Artefato[];
+  settings?: PlanoSettings;
+  /** Conteúdo final de `.expx/hooks.json`, quando alguma skill publica modos. */
+  modos?: { texto: string; publicados: ModosPublicados };
+};
+
+function lerModosDoProjeto(raiz: string): { ok: true; conteudo?: Record<string, unknown> } | { ok: false; erro: string } {
+  const caminho = join(raiz, ".expx", "hooks.json");
+  if (!existsSync(caminho)) return { ok: true };
+  try {
+    const v = JSON.parse(readFileSync(caminho, "utf8")) as unknown;
+    if (typeof v !== "object" || v === null || Array.isArray(v)) {
+      return { ok: false, erro: `${caminho} nao contem um objeto JSON e nao sera alterado` };
+    }
+    return { ok: true, conteudo: v as Record<string, unknown> };
+  } catch (e: unknown) {
+    return { ok: false, erro: `${caminho} nao e JSON valido e nao sera alterado: ${String(e)}` };
+  }
+}
+
+function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: true; plano: Plano } | { ok: false; erros: string[] } {
+  const erros: string[] = [];
+  const claude = op.harness.includes("claude");
+
+  // 1. Arquivos: plugin e projeto. Colisão aqui é colisão de verdade entre skills.
+  const plugin = planejarPlugin(montaveis);
+  if (!plugin.ok) erros.push(plugin.erro);
+
+  const candidatos: Artefato[] = [];
+  if (claude) candidatos.push(...artefatosDeHooks(montaveis));
+  if (op.harness.includes("opencode")) candidatos.push(...artefatosOpenCode(montaveis));
+  const c = consolidar(candidatos);
+  if (!c.ok) {
+    erros.push(descreverColisoes(c.colisoes));
+    return { ok: false, erros };
+  }
+  const plano: Plano = { projeto: c.artefatos };
+  if (!claude) return erros.length > 0 ? { ok: false, erros } : { ok: true, plano };
+
+  // 2. Registros de hook: núcleo e hooks soltos por nome; skills pelo manifesto.
+  const destinos = new Set(c.artefatos.map((a) => a.destino));
+  const entradas: EntradaHook[] = [];
+  for (const h of hooksPorNome(c.artefatos, montaveis)) {
+    const e = entradaPorNome(h);
+    if (e !== null) entradas.push(e);
+  }
+  const comHook = comHooks(montaveis);
+  for (const s of comHook) {
+    if (s.settings === undefined) continue;
+    const lidos = lerHooksDaSkill(s.nome, s.settings);
+    if (!lidos.ok) {
+      erros.push(lidos.erro);
+      continue;
+    }
+    for (const e of lidos.entradas) {
+      for (const ref of caminhosReferenciados(e.hook)) {
+        if (!destinos.has(ref)) erros.push(`skill incompleta: ${s.nome} registra ${ref}, que ela nao publica`);
+      }
+    }
+    entradas.push(...lidos.entradas);
+  }
+
+  const s = planejarSettings(op.raiz, join(op.raiz, ".expx", "marketplace"), entradas);
+  if (!s.ok) erros.push(s.erro);
+  else plano.settings = s.plano;
+
+  // 3. Modos: composição dos `.expx/hooks.json` das skills com o do projeto.
+  const publicadosPorSkill: Array<{ skill: string; modos: ModosPublicados }> = [];
+  for (const sk of comHook) {
+    if (sk.modos === undefined) continue;
+    const m = lerModosDaSkill(sk.nome, sk.modos);
+    if (!m.ok) erros.push(m.erro);
+    else publicadosPorSkill.push({ skill: sk.nome, modos: m.modos });
+  }
+  if (publicadosPorSkill.length > 0) {
+    const pub = consolidarModos(publicadosPorSkill);
+    const existente = lerModosDoProjeto(op.raiz);
+    if (!pub.ok) erros.push(pub.erro);
+    else if (!existente.ok) erros.push(existente.erro);
+    else {
+      const final = comporModos(pub.publicados, existente.conteudo, undefined);
+      if (!final.ok) erros.push(final.erro);
+      else plano.modos = { texto: `${JSON.stringify(final.conteudo, null, 2)}\n`, publicados: pub.publicados };
+    }
+  }
+
+  return erros.length > 0 ? { ok: false, erros } : { ok: true, plano };
+}
+
 export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
   const instaladas: string[] = [];
   const falhas: Falha[] = [];
@@ -76,9 +183,10 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
   const montaveis: SkillMontavel[] = [];
   const travadas: Record<string, SkillTravada> = {};
   const temporarios: string[] = [];
+  const pedidas = [...new Set(op.skills)].sort(compararSkills);
 
   try {
-  for (const nome of op.skills) {
+  for (const nome of pedidas) {
     const repositorio = origemDe(nome, op.origens);
     if (repositorio === undefined) {
       falhas.push({ nome, erro: "skill fora do catalogo" });
@@ -133,6 +241,8 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
       // A árvore inteira: é ela que leva os hooks de verdade para o plugin,
       // e sem ela o rastro nunca é escrito (ver `montarHooks`).
       ...(layout.arvoreHooks !== undefined ? { arvoreHooks: layout.arvoreHooks } : {}),
+      ...(layout.settings !== undefined ? { settings: layout.settings } : {}),
+      ...(layout.modos !== undefined ? { modos: layout.modos } : {}),
     });
     travadas[nome] = {
       repositorio,
@@ -145,32 +255,29 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     instaladas.push(nome);
   }
 
-  if (montaveis.length > 0) {
-    const lock: Lock = {
-      lock_version: VERSAO_LOCK,
-      cli_version: versaoDoCli(),
-      harness: [...op.harness],
-      skills: travadas,
-    };
+  if (montaveis.length === 0) {
+    return { ok: false, instaladas, falhas, erros: [], naoTravadas, avisos };
+  }
 
-    escreverAtomico(op.raiz, (tmp) => {
-      montarMarketplace(join(tmp, "marketplace"), montaveis, versaoDoCli());
-      // `tmp` JÁ é o futuro `.expx/`, então o lock vai direto nele — passar por
-      // `escreverLock`, que acrescenta `.expx/` ao caminho, gravaria fora da
-      // pasta temporária e o arquivo se perderia na troca atômica.
-      writeFileSync(join(tmp, "expx-lock.json"), `${JSON.stringify(lock, null, 2)}\n`);
-    });
+  // PLANEJAR e VALIDAR: nenhuma escrita no projeto até aqui.
+  const p = planejar(op, montaveis);
+  if (!p.ok) {
+    return { ok: false, instaladas: [], falhas, erros: p.erros, naoTravadas, avisos };
+  }
 
-    // A cópia acontece AQUI, antes do `rmSync` dos clones lá embaixo: feita
-    // depois, leria pasta já apagada (decisão D-26).
-    const hooksInstalados = op.harness.includes("claude") ? instalarHooks(op.raiz, montaveis) : [];
-
-    if (op.harness.includes("claude")) {
-      const marketplace = join(op.raiz, ".expx", "marketplace");
-      const r = mesclarSettings(op.raiz, marketplace, hooksInstalados);
-      if (!r.ok) avisos.push(r.erro);
-    }
-    if (op.harness.includes("opencode")) materializarOpenCode(op.raiz, montaveis);
+  // APLICAR e TRAVAR.
+  const lock: Lock = {
+    lock_version: VERSAO_LOCK,
+    cli_version: versaoDoCli(),
+    harness: [...op.harness],
+    skills: travadas,
+  };
+  const troca = prepararTroca(join(op.raiz, ".expx", "marketplace"), (tmp) => {
+    montarMarketplace(tmp, montaveis, versaoDoCli());
+  });
+  try {
+    aplicarArtefatos(op.raiz, p.plano.projeto);
+    if (p.plano.settings !== undefined) gravarSettings(p.plano.settings);
     if (op.harness.includes("codex")) {
       try {
         const aviso = materializarCodex(op.raiz);
@@ -179,7 +286,14 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
         avisos.push(`Codex: nao foi possivel materializar os hooks: ${erro instanceof Error ? erro.message : "falha de filesystem"}`);
       }
     }
+    if (p.plano.modos !== undefined) escreverArquivoAtomico(join(op.raiz, ".expx", "hooks.json"), p.plano.modos.texto);
+    troca.publicar();
+  } catch (e: unknown) {
+    troca.descartar();
+    throw e;
   }
+  // O lock por último: ele é a afirmação de que a instalação está completa.
+  escreverArquivoAtomico(caminhoDoLock(op.raiz), `${JSON.stringify(lock, null, 2)}\n`);
 
   // Skill sem tag NÃO vira aviso na instalação. Hoje nenhum dos seis
   // repositórios publica tag, então o aviso disparava para todas, em toda
@@ -190,7 +304,7 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
   // O fato continua registrado onde é procurado de propósito: `travado: false`
   // no lock, e o achado `skill-nao-travada` do `doctor`. Some o ruído da
   // instalação, não a informação.
-  return { ok: instaladas.length > 0, instaladas, falhas, naoTravadas, avisos };
+  return { ok: true, instaladas, falhas, erros: [], naoTravadas, avisos };
   } finally {
     for (const t of temporarios) rmSync(t, { recursive: true, force: true });
   }

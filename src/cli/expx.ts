@@ -110,6 +110,7 @@ const EXECUTORES: Partial<Record<Subcomando, Executor>> = {
     const r = await executarInit({ raiz: process.cwd(), skills: opcoes.skills, harness });
     for (const a of r.avisos) saida.escrever(`aviso: ${a}\n`);
     for (const x of r.falhas) saida.escreverErro(`falhou ${x.nome}: ${x.erro}\n`);
+    for (const e of r.erros) saida.escreverErro(`erro: ${e}\n`);
     if (!r.ok) return 1;
 
     const fecho = [`instaladas: ${r.instaladas.join(", ")}`];

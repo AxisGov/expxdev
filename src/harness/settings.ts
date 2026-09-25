@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { NOME_DO_MARKETPLACE, NOME_DO_PLUGIN } from "../plugin/manifestos.js";
 import { fazerBackup } from "./backup.js";
 import type { HookInstalado } from "./hooks.js";
+import { comporSettings, type EntradaGerenciada, type EntradaHook } from "./composicao.js";
 
 /**
  * Merge do `.claude/settings.json` — o ponto mais fácil de errar.
@@ -17,6 +18,12 @@ import type { HookInstalado } from "./hooks.js";
  * `docs/expx-cli/base/09-validacao-marketplace-local.md`. Ler as duas e
  * escrever a segunda evita corromper o arquivo do usuário.
  *
+ * Os hooks são COMPOSTOS (ver `composicao.ts`): núcleo, skills e o que já
+ * estava no arquivo. A composição acontece em memória, no `planejarSettings`,
+ * antes de qualquer escrita no projeto; o `gravarSettings` só escreve o que o
+ * plano decidiu, e só se o conteúdo mudou — um `init` repetido não reescreve o
+ * arquivo nem cria backup novo.
+ *
  * ATENÇÃO: escrever estas chaves NÃO instala o plugin. Foi testado: cinco
  * sintaxes em `settings.json` de projeto e nenhuma carregou. A instalação de
  * fato é feita pelo `claude plugin install` (ver `src/harness/instalar.ts`).
@@ -28,33 +35,7 @@ export type ResultadoMerge =
 
 export type Habilitados = Record<string, boolean>;
 
-/** Um evento de hook do Claude Code: uma lista de grupos, cada um com comandos. */
-type GrupoHook = { hooks?: Array<{ type?: string; command?: string; args?: string[] }> };
-
-/**
- * Mescla um evento de hook SEM duplicar.
- *
- * A comparação é pelo `command`, e a idempotência não é elegância: o `init`
- * roda de novo a cada atualização, e uma entrada duplicada faria o memox rodar
- * duas vezes por prompt — dobrando o custo e o ruído (decisão D-16).
- */
-function mesclarEvento(atual: unknown, hook: { command: string; args?: string[] }): GrupoHook[] {
-  const grupos: unknown[] = Array.isArray(atual) ? atual : [];
-  const jaTem = grupos.some((grupo) => {
-    if (typeof grupo !== "object" || grupo === null || Array.isArray(grupo)) return false;
-    const hooks = (grupo as { hooks?: unknown }).hooks;
-    if (!Array.isArray(hooks)) return false;
-    return hooks.some((item) => {
-      if (typeof item !== "object" || item === null || Array.isArray(item)) return false;
-      const h = item as { command?: unknown; args?: unknown };
-      return h.command === hook.command && JSON.stringify(h.args) === JSON.stringify(hook.args);
-    });
-  });
-  if (jaTem) return grupos as GrupoHook[];
-  return [...grupos, { hooks: [{ type: "command", ...hook }] }] as GrupoHook[];
-}
-
-/** O evento de cada hook, deduzido do nome do arquivo. */
+/** O evento de cada hook do núcleo ou de skill sem manifesto, deduzido do nome do arquivo. */
 function eventoDoHook(relativo: string): "UserPromptSubmit" | "Stop" | "SessionStart" | null {
   if (relativo.includes("expx-session-sync")) return "SessionStart";
   if (relativo.includes("injetar")) return "UserPromptSubmit";
@@ -65,6 +46,21 @@ function eventoDoHook(relativo: string): "UserPromptSubmit" | "Stop" | "SessionS
   if (relativo.includes("lembrete")) return "UserPromptSubmit";
   if (relativo.includes("reindexar")) return "Stop";
   return null;
+}
+
+/**
+ * A entrada de um hook do núcleo, ou de skill que não publica
+ * `.claude/settings.json` (o memox, com hooks soltos `memox-*.sh`): o evento
+ * sai do nome do arquivo. A forma do comando é a de sempre, para que uma
+ * instalação anterior seja reconhecida como a mesma entrada e não duplique.
+ */
+export function entradaPorNome(h: HookInstalado): EntradaHook | null {
+  const evento = eventoDoHook(h.relativo);
+  if (evento === null) return null;
+  const hook = h.relativo.endsWith("expx-session-sync.mjs")
+    ? { type: "command", command: "node", args: [`\${CLAUDE_PROJECT_DIR}/${h.relativo}`] }
+    : { type: "command", command: `$CLAUDE_PROJECT_DIR/${h.relativo}` };
+  return { skill: h.skill, evento, hook };
 }
 
 /** Aceita array (documentado) ou objeto (real). Qualquer outra coisa vira `{}`. */
@@ -88,41 +84,47 @@ export function caminhoDoSettings(raizProjeto: string): string {
   return join(raizProjeto, ".claude", "settings.json");
 }
 
+export type PlanoSettings = {
+  caminho: string;
+  existia: boolean;
+  /** O texto final; igual ao atual quando nada muda. */
+  texto: string;
+  mudou: boolean;
+  gerenciadas: EntradaGerenciada[];
+};
+
 /**
- * Acrescenta o marketplace local e habilita o plugin, preservando o resto.
+ * Compõe o settings em memória. Não escreve nada.
  *
  * `caminhoMarketplace` é absoluto de propósito: é o que o `claude plugin
  * marketplace add` grava, e um caminho relativo não é resolvido aqui.
  */
-export function mesclarSettings(
+export function planejarSettings(
   raizProjeto: string,
   caminhoMarketplace: string,
-  hooks: readonly HookInstalado[] = [],
-): ResultadoMerge {
+  entradas: readonly EntradaHook[],
+  anteriores: readonly EntradaGerenciada[] = [],
+): { ok: true; plano: PlanoSettings } | { ok: false; erro: string } {
   const caminho = caminhoDoSettings(raizProjeto);
-  const existe = existsSync(caminho);
-
+  const existia = existsSync(caminho);
+  let bruto = "";
   let atual: Record<string, unknown> = {};
-  let backup: string | undefined;
-
-  if (existe) {
+  if (existia) {
+    bruto = readFileSync(caminho, "utf8");
+    let lido: unknown;
     try {
-      atual = JSON.parse(readFileSync(caminho, "utf8")) as Record<string, unknown>;
+      lido = JSON.parse(bruto);
     } catch (e: unknown) {
-      return {
-        ok: false,
-        erro: `${caminho} nao e JSON valido e nao sera alterado: ${String(e)}`,
-      };
+      return { ok: false, erro: `${caminho} nao e JSON valido e nao sera alterado: ${String(e)}` };
     }
-    if (typeof atual !== "object" || atual === null || Array.isArray(atual)) {
+    if (typeof lido !== "object" || lido === null || Array.isArray(lido)) {
       return { ok: false, erro: `${caminho} nao contem um objeto JSON` };
     }
-    if (Object.prototype.hasOwnProperty.call(atual, "hooks") &&
-      (typeof atual["hooks"] !== "object" || atual["hooks"] === null || Array.isArray(atual["hooks"]))) {
-      return { ok: false, erro: `${caminho} contem hooks invalido` };
-    }
-    backup = fazerBackup(caminho);
+    atual = lido as Record<string, unknown>;
   }
+
+  const c = comporSettings(atual, entradas, anteriores);
+  if (!c.ok) return { ok: false, erro: `${caminho}: ${c.erro}` };
 
   const marketplaces = {
     ...((atual["extraKnownMarketplaces"] as Record<string, unknown> | undefined) ?? {}),
@@ -132,29 +134,42 @@ export function mesclarSettings(
     ...lerPluginsHabilitados(atual["enabledPlugins"]),
     [`${NOME_DO_PLUGIN}@${NOME_DO_MARKETPLACE}`]: true,
   };
-
   const novo: Record<string, unknown> = {
-    ...atual,
+    ...c.conteudo,
     extraKnownMarketplaces: marketplaces,
     enabledPlugins: habilitados,
   };
-
-  // Sem hooks a registrar, o arquivo NÃO ganha a chave: um projeto que não
-  // instalou skill com hook não deve passar a ter `hooks: {}` do nada (D-23).
-  if (hooks.length > 0) {
-    const eventos = { ...((atual["hooks"] as Record<string, unknown> | undefined) ?? {}) };
-    for (const h of hooks) {
-      const evento = eventoDoHook(h.relativo);
-      if (evento === null) continue;
-      const hook = h.relativo.endsWith("expx-session-sync.mjs")
-        ? { command: "node", args: [`\${CLAUDE_PROJECT_DIR}/${h.relativo}`] }
-        : { command: `$CLAUDE_PROJECT_DIR/${h.relativo}` };
-      eventos[evento] = mesclarEvento(eventos[evento], hook);
-    }
-    novo["hooks"] = eventos;
+  // `hooks` depois das duas chaves do ExpxDev, como sempre foi — salvo quando
+  // o arquivo já o tinha, e então fica onde a pessoa o pôs.
+  if (!Object.prototype.hasOwnProperty.call(atual, "hooks") && "hooks" in novo) {
+    const h = novo["hooks"];
+    delete novo["hooks"];
+    novo["hooks"] = h;
   }
-  mkdirSync(join(caminho, ".."), { recursive: true });
-  writeFileSync(caminho, `${JSON.stringify(novo, null, 2)}\n`);
+  const texto = `${JSON.stringify(novo, null, 2)}\n`;
+  return { ok: true, plano: { caminho, existia, texto, mudou: texto !== bruto, gerenciadas: c.gerenciadas } };
+}
 
-  return backup === undefined ? { ok: true, criado: !existe } : { ok: true, criado: !existe, backup };
+/** Escreve o que o plano decidiu. Backup só quando um arquivo existente muda. */
+export function gravarSettings(plano: PlanoSettings): ResultadoMerge {
+  if (!plano.mudou) return { ok: true, criado: false };
+  const backup = plano.existia ? fazerBackup(plano.caminho) : undefined;
+  mkdirSync(join(plano.caminho, ".."), { recursive: true });
+  writeFileSync(plano.caminho, plano.texto);
+  return backup === undefined ? { ok: true, criado: !plano.existia } : { ok: true, criado: !plano.existia, backup };
+}
+
+/**
+ * Acrescenta o marketplace local, habilita o plugin e registra hooks por nome
+ * de arquivo, preservando o resto. Planeja e grava de uma vez.
+ */
+export function mesclarSettings(
+  raizProjeto: string,
+  caminhoMarketplace: string,
+  hooks: readonly HookInstalado[] = [],
+): ResultadoMerge {
+  const entradas = hooks.map(entradaPorNome).filter((e): e is EntradaHook => e !== null);
+  const p = planejarSettings(raizProjeto, caminhoMarketplace, entradas);
+  if (!p.ok) return p;
+  return gravarSettings(p.plano);
 }
