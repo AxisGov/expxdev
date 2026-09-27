@@ -189,3 +189,33 @@ O `expx doctor` confere o lock contra o disco: arquivo ausente ou alterado,
 hook gerenciado ausente ou alterado no settings, `.expx/hooks.json` diferente
 do composto — erro. Só o `modo` de um id alterado é aviso: é decisão da
 pessoa, e rodar o `init` de novo trava o arquivo com a escolha dela.
+
+## 10. SessionStart e instalação com origem local (D-03)
+
+O hook do núcleo `expx-session-sync` roda no `startup`/`resume` e, numa
+instalação comum com árvore limpa, sincroniza a distribuição com o ExpxDev da
+AxisGov (`bootstrap` do cache a partir de `main` e `expx update --latest
+--yes`). Essa sincronização é **conveniência**, e não pode romper uma
+instalação congelada.
+
+**SessionStart não aplica atualização automática a instalações que contenham
+origem local (`commit *-local`). O lock congelado vence a conveniência de
+sincronização. Atualização dessas instalações exige ação explícita.**
+
+- **Sinal:** qualquer `skills.<nome>.commit` terminado em `-local` — o que
+  `EXPX_SKILLS_LOCAIS` grava (`<sha>-local`; `local` quando a fonte não tem
+  git). O caminho em `repositorio` não decide nada. Uma única skill local
+  basta: local + remota congela a instalação inteira.
+- **Ordem:** o hook lê o lock do disco, sem rede e sem o CLI Axis, logo depois
+  de achar a raiz Git — antes de `git status`, do cache Axis, de `clone`,
+  `fetch`, `npm` e do `update`. Quem decide se o projeto está congelado é o
+  próprio projeto, nunca um executável vindo de `main`.
+- **Congelado:** nada de cache, rede ou update; o projeto (lock, settings,
+  skills, marketplace) fica intocado. O hook devolve só contexto informativo.
+- **Lock inválido** (JSON ilegível, sem mapa `skills`, skill sem `commit`
+  legível): falha fechado quanto à atualização — sincronização adiada, zero
+  mutação. O hook continua fail-open quanto à sessão: nunca impede o harness
+  de iniciar.
+- **Lock sem origem local:** comportamento anterior, inclusive a precedência da
+  árvore suja (sincronização adiada).
+- **`expx update` explícito:** inalterado, inclusive em instalação local.

@@ -3,7 +3,7 @@ expx_schema: 1
 expx_tool: sprintx
 kind: decisoes
 trabalho_id: expx-cli
-atualizado_em: 2026-08-29
+atualizado_em: 2026-09-27
 decisoes:
   - id: D-01
     decisao: Renomear o pacote para @expx/cli com bin expx, mantendo tambem o bin expx-painel
@@ -113,6 +113,12 @@ decisoes:
     motivo: O usuario instruiu rodar ate o fim sem perguntar nada e instrucao do usuario tem precedencia
     status: fechada
     bloqueante: false
+  - id: D-19
+    decisao: SessionStart nao aplica atualizacao automatica a instalacoes que contenham origem local (commit terminado em -local); o lock congelado vence a conveniencia de sincronizacao e atualizar essas instalacoes exige acao explicita
+    alternativa_descartada: Deixar o expx update vindo de AxisGov main decidir, confiando que o comparador trata sha-local como nao comparavel por commit
+    motivo: A decisao de congelar tem de ser do proprio projeto e versionada no ExpxDev, e nao depender de um executavel de main fora do freeze; e a decisao P0.2 D-03
+    status: fechada
+    bloqueante: false
 ---
 
 # Decisões — expx-cli
@@ -142,6 +148,7 @@ D-15 | Framework de CLI escrito à mão, sem dependência nova | Adotar commande
 D-16 | Escrita atômica: montar em .expx/.tmp-<pid>/ e trocar por rename ao final | Escrever direto no destino final | promptcli2.md:93-94 exige que .expx/ nunca fique inconsistente se falhar no meio
 D-18 | O pacote publicado chama-se `expxdev`, com o binário `expx` | `expx` não-escopado, e `@expx/cli` | O npm recusou `expx` com 403 por similaridade com `expo`/`exit`/`cpx`, e o escopo `@expx` não existe no registry (404 em todo PUT). Revê o D-01: o nome do pacote mudou, o binário `expx` não
 D-17 | Todas as decisões desta F2 foram tomadas pela IA, a pedido explícito do usuário | Entrevistar o usuário em blocos de 5 perguntas, como a F2 manda | O usuário instruiu "roda tudo ate o final implementa sem me perguntar nada"; instrução do usuário tem precedência sobre a skill
+D-19 | SessionStart não aplica atualização automática a instalações que contenham origem local (`commit *-local`). O lock congelado vence a conveniência de sincronização. Atualização dessas instalações exige ação explícita | Deixar o `expx update` vindo de AxisGov/main decidir, confiando no comparador tratar `<sha>-local` como não comparável por commit | Decisão P0.2 D-03: congelar é decisão do próprio projeto, lida do lock antes de qualquer rede, e não de um executável de `main` fora do freeze. Regra em `docs/contrato/CONTRATO-expx-instalacao.md` §10
 ```
 
 ## Pendências

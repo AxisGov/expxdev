@@ -177,6 +177,44 @@ function raizGit(cwd, executar) {
   return executar("git", ["-C", cwd, "rev-parse", "--show-toplevel"]).trim();
 }
 
+/**
+ * Origem local no lock: o sinal durável que `copiarLocal` grava no commit —
+ * `<sha>-local`, ou `local` quando a fonte não tem git. O caminho do
+ * repositório não decide nada.
+ */
+export function origemLocal(commit) {
+  return commit === "local" || commit.endsWith("-local");
+}
+
+/**
+ * Lê do disco, sem rede e sem o CLI Axis, o que o lock diz sobre a origem de
+ * cada skill (D-03). Quem decide se o projeto está congelado é o próprio
+ * projeto — nunca um executável vindo de AxisGov/main.
+ *
+ * Nunca lança: um lock que não prova, skill por skill, um commit legível é
+ * inválido, e inválido não autoriza atualização automática.
+ */
+export function lerOrigemDoLock(caminho) {
+  const invalido = (motivo) => ({ ok: false, motivo });
+  let lock;
+  try {
+    lock = JSON.parse(readFileSync(caminho, "utf8"));
+  } catch {
+    return invalido("lock ilegivel");
+  }
+  const skills = lock?.skills;
+  if (skills === null || typeof skills !== "object" || Array.isArray(skills)) {
+    return invalido("lock sem mapa de skills");
+  }
+  const locais = [];
+  for (const [nome, skill] of Object.entries(skills)) {
+    const commit = skill?.commit;
+    if (typeof commit !== "string" || commit === "") return invalido(`lock sem commit legivel para ${nome}`);
+    if (origemLocal(commit)) locais.push(nome);
+  }
+  return { ok: true, locais };
+}
+
 function houveAtualizacao(saida) {
   return saida.includes("para desfazer esta atualizacao");
 }
@@ -198,7 +236,19 @@ export function sincronizarSessao({ entrada, plataforma = "claude", raiz, cwd, a
       } catch {
         return "";
       }
-    if (!existsSync(join(projeto, ".expx", "expx-lock.json"))) return "";
+    const caminhoLock = join(projeto, ".expx", "expx-lock.json");
+    if (!existsSync(caminhoLock)) return "";
+    // D-03: o lock é lido antes de status, cache Axis, rede ou update. Lock
+    // inválido ou com origem local encerra aqui, sem tocar o projeto.
+    const origem = lerOrigemDoLock(caminhoLock);
+    if (!origem.ok) {
+      return resposta(`[Expx/Axis] Sincronizacao adiada: ${origem.motivo}; nenhuma atualizacao automatica aplicada.`);
+    }
+    if (origem.locais.length > 0) {
+      return resposta(
+        `[Expx/Axis] Sincronizacao automatica nao aplicada: instalacao contem origem local travada pelo lock (${origem.locais.join(", ")}). Use \`expx update\` explicitamente para alterar a distribuicao.`,
+      );
+    }
     if (arvoreSuja(projeto, executar)) {
       return resposta("[Expx/Axis] Atualizacao automatica adiada porque o working tree possui alteracoes nao commitadas.");
     }
