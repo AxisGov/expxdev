@@ -1,0 +1,513 @@
+{
+  "lock_version": 2,
+  "cli_version": "0.7.0",
+  "harness": [
+    "claude"
+  ],
+  "skills": {
+    "mergex": {
+      "repositorio": "/opt/p02-bootstrap-d02/fontes/mergex",
+      "referencia": "main",
+      "travado": false,
+      "commit": "d3ca3aa687bd-local",
+      "resolvido_em": "2026-09-27",
+      "arquivos": {
+        "DECISOES-DA-SKILL.md": "e01feb4397bd72b8514ce451af6bb16f7f4084a1c81b85fe2952ce8f902f1cb1",
+        "SKILL.md": "429d71f878192d060e45d0d450013da78d85410e02c02f6618254eff93bcfe02",
+        "assets/TEMPLATE-ENTREGA.md": "762fcc8568e27e224ee07319804bfb66e8db4e4fb0d3af11b136d4fcc83de252",
+        "assets/TEMPLATE-PR.md": "08c4ec09876ad1f049f780900bef2741c42beb3b194e54b4e4baa464a79545bb",
+        "assets/TEMPLATE-QA-PACOTE.md": "6654a13cad89aab861c49a4e114be29c3e68f11ba86dab32abe40f53e40c340e",
+        "assets/TEMPLATE-atencao.md": "37f2fa7402b28535de36ec524a5d8d1189c2a7bc9e8c1566aa84395062aa6904",
+        "assets/TEMPLATE-prontidao.md": "68b4fb9fa1be2c92f2b38c9fad6c076857615ea3e093f87d4656f18ae0edcc62",
+        "assets/TEMPLATE-revisao.md": "fad750877594ef318980518ebb3719de3de68bbdc03bee3aec34488e49ef2d2a",
+        "references/00-abertura.md": "7fb3f92ccd8d4209aeb5c1412b0f1fcbdbbab3e7d2a99a5e1c8913fdea3abbf7",
+        "references/00-schema.md": "8144e9e390019b653f9d6a0d185400f06beed3017419c3834331449ba1184970",
+        "references/01-commits.md": "62efc205824ee3441d60697684f08923dda748d85116c19ccc82d509e7a89ef1",
+        "references/02-prontidao.md": "1e274de35a522d9592a95968f2b55ac5f77b183d18a2bd672c274a9797df792a",
+        "references/03-atencao-humana.md": "6334419f0927ccb5f2680863ceb006f3efab7eaeb2da581fe5ea040df820b09f",
+        "references/04-descricao-pr.md": "7e30562defa61af67e0818b806b180e6ab653938ffeaa7011b4886958c177b8a",
+        "references/05-pacote-qa.md": "901ffcc8cb9b318dea84cf16ac1bf0c46127fd8cbfc5b11c0911d725fa43c800",
+        "references/06-push.md": "8fa666c7bebb57e2de1b352fcc5190a21b035f460a529c3d146af78bee9c3685",
+        "references/07-abertura-pr.md": "e74d58922f7ae6af8025e97d18498c9192f91b789e8bbc7980444fa2a5e67a50",
+        "references/08-registro.md": "17bad600145897f68bdfea58df9ec71ddafa04c7ba1b1f7a06d279bd3ffe7ee4",
+        "references/09-revisao.md": "18f1c6cddb6f84a5684845cc613ff0369e6c387b5e2336644088b8ce555fa4b5",
+        "references/10-estado.md": "332da5cd999da51e32b5e7449e9e7de349b19fd2a08b86683ea30e64b054afe1",
+        "references/integracao/legadox.md": "6dee353d85030e0162a5d28631796e3966983d5f4b20257f4dd964c1e8283e3d",
+        "references/integracao/memox.md": "f989166d9f1bceef50374649e9d154c32c90431a9595f97066d1ca33cb040180",
+        "references/integracao/runx.md": "19ca8d5d492f49c1cb2cb7ec74c8f0842eca9c8ff20ef35e1249ad84445205b2",
+        "references/integracao/sprintx.md": "e44818977e1257fad2c39b14ce51b5aa3ea807348e899c1783493869954f9c52",
+        "references/integracao/stackx.md": "4e49d081c67e9f98f2e0712424a57fd6ac9462154336b6239c150002c0576cb1",
+        "scripts/catalogo-de-metodo.sh": "e51c70655a053eb5731cea195c16ef2ff2a680a9a3f2cac9331f3dbf22960754",
+        "scripts/causa-do-portao.sh": "d71b6f0084d6921ea5252a3a7c28b2bc84ca657aa10f66aacd11e7e87a4b308a",
+        "scripts/classificar-atencao.sh": "2cfe56e8abfe470b1539bcc80ed610e870bee76b4bb5077af3ff4b0b2c38be52",
+        "scripts/contrato-de-commit.sh": "2302818b0c5aa305a63249b2c15975bd6574c9da78f35a265001a4428670a895",
+        "scripts/fechamento-do-e1.sh": "c73d8b69898ea720591f62e99a6d6b787d6577a9680a869f2ca58a4869e0af70",
+        "scripts/ownership-da-task.sh": "115aa1e918485df340a356db0cc12f993d1b46870b3391d097aaa6689ea91def",
+        "scripts/persistir-metodo.sh": "d97a74a520b881b5e00283ac20eba951a6c2660d6bbdc9b0cbe5eb3e75abba1b",
+        "scripts/prova-de-commit.sh": "9c4aeb8a56ebf30b4572c9bacff8607290603e91da56341a9ae009d2753a5d87",
+        "scripts/sequencia-de-commits.sh": "2d4c1de20cf48595a26c87445780c99a1a9234d084e68b4b3810eb324fd1bf0f",
+        "scripts/trava-do-e1.sh": "b08895e64d52147b8fb8e531b1e5531e9a4cf3587b8e61b2d97b694566887aa4"
+      }
+    },
+    "sprintx": {
+      "repositorio": "/opt/p02-bootstrap-d02/fontes/sprintx",
+      "referencia": "main",
+      "travado": false,
+      "commit": "4e1f7b88d85f-local",
+      "resolvido_em": "2026-09-27",
+      "arquivos": {
+        "DECISOES-DA-SKILL.md": "ef3d316cb3a63848941579bd9cadfa999e6d7f522df0f69982df099b852f0e8a",
+        "SKILL.md": "bcc9790e4412aad4699b325d7c4f64fa50b3f599a81f07f058f50b615920eb46",
+        "assets/TEMPLATE-BLOQUEIOS.md": "aef9986cb028e81c5d7a36c64ad082dbb7decc1b97c843a4bf80aab68da24c16",
+        "assets/TEMPLATE-DECISOES.md": "87e9ed363f1a083e60fc37d2c48cb3315513a3a47950858dd445d8d5bc780de3",
+        "assets/TEMPLATE-ESTIMATIVA.md": "52fa01eee49bb3e30c92dbb1097cfb96bab3fc7dd205b860e37d1c3417db8422",
+        "assets/TEMPLATE-FECHAMENTO.md": "cf9bd5a9ff03d9d133552f264aedb2b68032b48eedea7ef4683f6730ddf64db5",
+        "assets/TEMPLATE-HISTORICO.md": "2d24904d7daf9f469bce3332407ad09a3fe1102458c9dd644a5da58ddfccbaa3",
+        "assets/TEMPLATE-ORQUESTRADOR.md": "4d1b8d402ecb890a520bc5bd0a1291b1c6aa2e91ee52ea3b3f8f8957b1317b88",
+        "assets/TEMPLATE-PLANEJAMENTO.md": "c1af3b9b48891e300847c8176d4265e84566d6430229be723870760b879b7e12",
+        "assets/TEMPLATE-base-indice.md": "b3215d145af19fe70c7667d997628343793a99396a194c0bc65a959d36ae896e",
+        "assets/TEMPLATE-base-recurso.md": "ac3084e6f5f53fc19f53874467f4dcce3ccf9e8e0bac836bb1aa714acc5463f6",
+        "assets/TEMPLATE-fases.md": "0762f4d437b6289b93e854f2a35a9bc72a509edf83da40265ed57229565e5e12",
+        "assets/TEMPLATE-plano-condensado.md": "0e76c1eadd89bfe82d194e323743148d658e16de91ec162d30cbc8db44a95f39",
+        "assets/TEMPLATE-sprint.md": "58441bf8592e438606a38876aee861f0873f4fe802db61bbe0a1279c532d9d0a",
+        "assets/TEMPLATE-tasks.md": "4db575c8ae17011a2868eae1b7aceb32b247b9eb7db37b51b847bce981a0817d",
+        "references/00-schema.md": "8f424611337c08768e6482979f64e9a779f6cf78dec633411a677df8cc2cc440",
+        "references/01-ingestao.md": "5143123285df2642ad8b62b258ab87ffae00e347a7bfec1438928fd7482d761c",
+        "references/02-descoberta.md": "a4102c98bdd79bd6adb347ae31550e2c3f159a116dfe877650d19953fb6833e0",
+        "references/03-plano.md": "e7d56ee1506ab08264e19b9feb2787a09bd0adb5958f66ff89f639db617ba5f7",
+        "references/04-orquestrador.md": "81fc160be05bde218ab4e187eba2f84f9c565ff4de1126749ac041bd4ea1ca2e",
+        "references/05-auditoria.md": "0640c63d7923569689f9b8f8ea68f468725b028319cbbbeeba17afb861e2c3ee",
+        "references/06-execucao.md": "9c88a21a2caf34fb37050b50bf9216ec66109b70d77c9a8eceb29aec767f6a35",
+        "references/07-estimativa.md": "892672f16a1d9643f2feb9f4bbd7cfbca92fe0aa14074c7b9d8f78569d6a28e2",
+        "references/08-rastro.md": "de6bfe024796dd08d1da9c34920e3089c009b1de89a4f73a15f312fe70625e49",
+        "references/09-diagrama.md": "c4267a0df409dfc4f06c668640c7e135cdf7237ebbea0c8d88278ac792ec9129",
+        "references/09-estado.md": "ddad9ed6cc45e9ddb885698d7f49cf45898c21deb70f6686993fc85f47982040",
+        "scripts/bloqueios.sh": "005ab46866a819c83a2c19acdd5a2459e13141dbc0f0148a644c591efda7af07",
+        "scripts/caminho-git.sh": "a85f685e523ba0324e1956eff60486005afb7904943036b97faa1ff01c24ad54",
+        "scripts/planejamento.sh": "890b5396d05536feb23af015131dc89f871538876924ba86fa010030c6e9679d",
+        "scripts/rastro.sh": "66f784e352c9b925c2e926a4e75a9cbfead0077a5da09c3a5aa714265e170645"
+      }
+    }
+  },
+  "instalacao": {
+    "arquivos": {
+      ".claude/hooks/README.md": "d7e3527935f5459cc0cc9843583603db72fae9eceb9c6acc3495b5d6f8ccae62",
+      ".claude/hooks/comum/base.sh": "a7105f9c8a837d2d92a7f0aed29f3d6e2c2a2d000e679ed4681fde1ce0d6df63",
+      ".claude/hooks/comum/branch-limpa.sh": "19098add0368cd2ca92746b91effb96820ee177edc821c895cc1c32cb00c4188",
+      ".claude/hooks/comum/rastro-post.sh": "f576fcfb23beb181e036564d8128271aa7c9943010fc32131621b60d22cd0671",
+      ".claude/hooks/comum/rastro-subagente.sh": "dbaa5068a1f8aefafbc9c7843b52c4882d6a03069f1a9cdaf4c17198bad5e92c",
+      ".claude/hooks/comum/rastro.sh": "8436185f2ce49a20073d015ed48333f1bd0bac1c7b24cde978a2f9849d5c2af2",
+      ".claude/hooks/comum/segredo.sh": "fbc8a0a0794b8b52067b40d6545b4ec602787305646673451884d2d45abbe6ee",
+      ".claude/hooks/comum/sem-segredo.sh": "75435780e23ead00d46598c3b321208e42d10b5ae3b8b43f4c3a9b36f84f6ae7",
+      ".claude/hooks/doctor.sh": "e5661e490ce5d19212ae3b9eeb6c6456509ff7f4fb037e42b5c99182b62a4470",
+      ".claude/hooks/expx-lembrete.sh": "76cbe374038cc748bfcc4c2c4321e3e650b8d5301a8b0c559d640c83e0f5258c",
+      ".claude/hooks/expx-session-sync.mjs": "e4e446d5d3b8158426c495401a4e62315e23196e3ea0eff21a99dc9c999b8c8b",
+      ".claude/hooks/mergex/arquivo-fora-do-plano.sh": "1a629e49d4e1fa2b85d221bcc5bc8e4aa0e61886942c02d9aabdde8457f272bd",
+      ".claude/hooks/mergex/commit-por-task.sh": "5291ae0d911a2afab4250a388a3c91692bfe482655a004ec4a4a363c1dd1c0f4",
+      ".claude/hooks/mergex/git-perigoso.sh": "928a0b6111a142987b681bf1b06ebb673afe04f7959cdb16ef0b007b6e540745",
+      ".claude/hooks/mergex/pr-so-com-portao.sh": "d530377bf4a0470bb660ed1ccafe40be5a565fd5002c8c3aabdd1f318cb9ab8a",
+      ".claude/hooks/sprintx/arvore-limpa-antes-da-suite.sh": "0282ecaf7a56b48c8689671ef34cf2831e1ea2a49d1d33618345ca7cd6fc12a3",
+      ".claude/hooks/sprintx/escopo-da-task.sh": "b21c66441ae67be4e6f1c2b4a6bd81abc0c4ce4a5d7b8920c63b21ea89678344",
+      ".claude/hooks/sprintx/git-perigoso.sh": "af8642903f504cb832d59576686c23d374a982c27c7c20f119aa4eded7419703",
+      ".claude/hooks/sprintx/sem-placeholder-no-plano.sh": "6c26a794a50f9fdd87b68e1c9587f4889cf96af34345189e498edfa844a41eea",
+      ".claude/hooks/sprintx/task-reivindicada.sh": "783e4d4d28b31e875ac039d1b54ee761dddbb6cc5132618d200fc689423dd66e",
+      ".claude/hooks/sprintx/task-so-fecha-verde.sh": "5bb2e6bdc53159876b260434dd6e385c5f3f184f56cf941ef2fd5c22016b01c4",
+      ".claude/hooks/sprintx/tdd-teste-antes.sh": "b1323d31872393330339d3f09f46a5f0d7cfa4a880dc54a52be9d2863befb1f3",
+      ".claude/hooks/teste.sh": "72c4f21085e8d16a7d7db3d84402cde27e13052bc1a696f88b27929d882f931f",
+      ".claude/hooks/testes/agente-real-rastro.sh": "4949783f599d20478870a7654f863935e2a29d0a6bf73cb183b22f56ca0de93c",
+      ".claude/hooks/testes/bancada.sh": "0b858b3d65393cf710cd52f2358229524f4eaa700d094a7d551f9267e5ac6549",
+      ".claude/hooks/testes/transcrito-agente.sh": "ff6939c070132d0cf1c436f6e3db8ebdddc43b29c23c9af4a6e417e9f3a7eaae",
+      ".claude/skills/mergex/DECISOES-DA-SKILL.md": "e01feb4397bd72b8514ce451af6bb16f7f4084a1c81b85fe2952ce8f902f1cb1",
+      ".claude/skills/mergex/SKILL.md": "429d71f878192d060e45d0d450013da78d85410e02c02f6618254eff93bcfe02",
+      ".claude/skills/mergex/assets/TEMPLATE-ENTREGA.md": "762fcc8568e27e224ee07319804bfb66e8db4e4fb0d3af11b136d4fcc83de252",
+      ".claude/skills/mergex/assets/TEMPLATE-PR.md": "08c4ec09876ad1f049f780900bef2741c42beb3b194e54b4e4baa464a79545bb",
+      ".claude/skills/mergex/assets/TEMPLATE-QA-PACOTE.md": "6654a13cad89aab861c49a4e114be29c3e68f11ba86dab32abe40f53e40c340e",
+      ".claude/skills/mergex/assets/TEMPLATE-atencao.md": "37f2fa7402b28535de36ec524a5d8d1189c2a7bc9e8c1566aa84395062aa6904",
+      ".claude/skills/mergex/assets/TEMPLATE-prontidao.md": "68b4fb9fa1be2c92f2b38c9fad6c076857615ea3e093f87d4656f18ae0edcc62",
+      ".claude/skills/mergex/assets/TEMPLATE-revisao.md": "fad750877594ef318980518ebb3719de3de68bbdc03bee3aec34488e49ef2d2a",
+      ".claude/skills/mergex/references/00-abertura.md": "7fb3f92ccd8d4209aeb5c1412b0f1fcbdbbab3e7d2a99a5e1c8913fdea3abbf7",
+      ".claude/skills/mergex/references/00-schema.md": "8144e9e390019b653f9d6a0d185400f06beed3017419c3834331449ba1184970",
+      ".claude/skills/mergex/references/01-commits.md": "62efc205824ee3441d60697684f08923dda748d85116c19ccc82d509e7a89ef1",
+      ".claude/skills/mergex/references/02-prontidao.md": "1e274de35a522d9592a95968f2b55ac5f77b183d18a2bd672c274a9797df792a",
+      ".claude/skills/mergex/references/03-atencao-humana.md": "6334419f0927ccb5f2680863ceb006f3efab7eaeb2da581fe5ea040df820b09f",
+      ".claude/skills/mergex/references/04-descricao-pr.md": "7e30562defa61af67e0818b806b180e6ab653938ffeaa7011b4886958c177b8a",
+      ".claude/skills/mergex/references/05-pacote-qa.md": "901ffcc8cb9b318dea84cf16ac1bf0c46127fd8cbfc5b11c0911d725fa43c800",
+      ".claude/skills/mergex/references/06-push.md": "8fa666c7bebb57e2de1b352fcc5190a21b035f460a529c3d146af78bee9c3685",
+      ".claude/skills/mergex/references/07-abertura-pr.md": "e74d58922f7ae6af8025e97d18498c9192f91b789e8bbc7980444fa2a5e67a50",
+      ".claude/skills/mergex/references/08-registro.md": "17bad600145897f68bdfea58df9ec71ddafa04c7ba1b1f7a06d279bd3ffe7ee4",
+      ".claude/skills/mergex/references/09-revisao.md": "18f1c6cddb6f84a5684845cc613ff0369e6c387b5e2336644088b8ce555fa4b5",
+      ".claude/skills/mergex/references/10-estado.md": "332da5cd999da51e32b5e7449e9e7de349b19fd2a08b86683ea30e64b054afe1",
+      ".claude/skills/mergex/references/integracao/legadox.md": "6dee353d85030e0162a5d28631796e3966983d5f4b20257f4dd964c1e8283e3d",
+      ".claude/skills/mergex/references/integracao/memox.md": "f989166d9f1bceef50374649e9d154c32c90431a9595f97066d1ca33cb040180",
+      ".claude/skills/mergex/references/integracao/runx.md": "19ca8d5d492f49c1cb2cb7ec74c8f0842eca9c8ff20ef35e1249ad84445205b2",
+      ".claude/skills/mergex/references/integracao/sprintx.md": "e44818977e1257fad2c39b14ce51b5aa3ea807348e899c1783493869954f9c52",
+      ".claude/skills/mergex/references/integracao/stackx.md": "4e49d081c67e9f98f2e0712424a57fd6ac9462154336b6239c150002c0576cb1",
+      ".claude/skills/mergex/scripts/catalogo-de-metodo.sh": "e51c70655a053eb5731cea195c16ef2ff2a680a9a3f2cac9331f3dbf22960754",
+      ".claude/skills/mergex/scripts/causa-do-portao.sh": "d71b6f0084d6921ea5252a3a7c28b2bc84ca657aa10f66aacd11e7e87a4b308a",
+      ".claude/skills/mergex/scripts/classificar-atencao.sh": "2cfe56e8abfe470b1539bcc80ed610e870bee76b4bb5077af3ff4b0b2c38be52",
+      ".claude/skills/mergex/scripts/contrato-de-commit.sh": "2302818b0c5aa305a63249b2c15975bd6574c9da78f35a265001a4428670a895",
+      ".claude/skills/mergex/scripts/fechamento-do-e1.sh": "c73d8b69898ea720591f62e99a6d6b787d6577a9680a869f2ca58a4869e0af70",
+      ".claude/skills/mergex/scripts/ownership-da-task.sh": "115aa1e918485df340a356db0cc12f993d1b46870b3391d097aaa6689ea91def",
+      ".claude/skills/mergex/scripts/persistir-metodo.sh": "d97a74a520b881b5e00283ac20eba951a6c2660d6bbdc9b0cbe5eb3e75abba1b",
+      ".claude/skills/mergex/scripts/prova-de-commit.sh": "9c4aeb8a56ebf30b4572c9bacff8607290603e91da56341a9ae009d2753a5d87",
+      ".claude/skills/mergex/scripts/sequencia-de-commits.sh": "2d4c1de20cf48595a26c87445780c99a1a9234d084e68b4b3810eb324fd1bf0f",
+      ".claude/skills/mergex/scripts/trava-do-e1.sh": "b08895e64d52147b8fb8e531b1e5531e9a4cf3587b8e61b2d97b694566887aa4",
+      ".claude/skills/sprintx/DECISOES-DA-SKILL.md": "ef3d316cb3a63848941579bd9cadfa999e6d7f522df0f69982df099b852f0e8a",
+      ".claude/skills/sprintx/SKILL.md": "bcc9790e4412aad4699b325d7c4f64fa50b3f599a81f07f058f50b615920eb46",
+      ".claude/skills/sprintx/assets/TEMPLATE-BLOQUEIOS.md": "aef9986cb028e81c5d7a36c64ad082dbb7decc1b97c843a4bf80aab68da24c16",
+      ".claude/skills/sprintx/assets/TEMPLATE-DECISOES.md": "87e9ed363f1a083e60fc37d2c48cb3315513a3a47950858dd445d8d5bc780de3",
+      ".claude/skills/sprintx/assets/TEMPLATE-ESTIMATIVA.md": "52fa01eee49bb3e30c92dbb1097cfb96bab3fc7dd205b860e37d1c3417db8422",
+      ".claude/skills/sprintx/assets/TEMPLATE-FECHAMENTO.md": "cf9bd5a9ff03d9d133552f264aedb2b68032b48eedea7ef4683f6730ddf64db5",
+      ".claude/skills/sprintx/assets/TEMPLATE-HISTORICO.md": "2d24904d7daf9f469bce3332407ad09a3fe1102458c9dd644a5da58ddfccbaa3",
+      ".claude/skills/sprintx/assets/TEMPLATE-ORQUESTRADOR.md": "4d1b8d402ecb890a520bc5bd0a1291b1c6aa2e91ee52ea3b3f8f8957b1317b88",
+      ".claude/skills/sprintx/assets/TEMPLATE-PLANEJAMENTO.md": "c1af3b9b48891e300847c8176d4265e84566d6430229be723870760b879b7e12",
+      ".claude/skills/sprintx/assets/TEMPLATE-base-indice.md": "b3215d145af19fe70c7667d997628343793a99396a194c0bc65a959d36ae896e",
+      ".claude/skills/sprintx/assets/TEMPLATE-base-recurso.md": "ac3084e6f5f53fc19f53874467f4dcce3ccf9e8e0bac836bb1aa714acc5463f6",
+      ".claude/skills/sprintx/assets/TEMPLATE-fases.md": "0762f4d437b6289b93e854f2a35a9bc72a509edf83da40265ed57229565e5e12",
+      ".claude/skills/sprintx/assets/TEMPLATE-plano-condensado.md": "0e76c1eadd89bfe82d194e323743148d658e16de91ec162d30cbc8db44a95f39",
+      ".claude/skills/sprintx/assets/TEMPLATE-sprint.md": "58441bf8592e438606a38876aee861f0873f4fe802db61bbe0a1279c532d9d0a",
+      ".claude/skills/sprintx/assets/TEMPLATE-tasks.md": "4db575c8ae17011a2868eae1b7aceb32b247b9eb7db37b51b847bce981a0817d",
+      ".claude/skills/sprintx/references/00-schema.md": "8f424611337c08768e6482979f64e9a779f6cf78dec633411a677df8cc2cc440",
+      ".claude/skills/sprintx/references/01-ingestao.md": "5143123285df2642ad8b62b258ab87ffae00e347a7bfec1438928fd7482d761c",
+      ".claude/skills/sprintx/references/02-descoberta.md": "a4102c98bdd79bd6adb347ae31550e2c3f159a116dfe877650d19953fb6833e0",
+      ".claude/skills/sprintx/references/03-plano.md": "e7d56ee1506ab08264e19b9feb2787a09bd0adb5958f66ff89f639db617ba5f7",
+      ".claude/skills/sprintx/references/04-orquestrador.md": "81fc160be05bde218ab4e187eba2f84f9c565ff4de1126749ac041bd4ea1ca2e",
+      ".claude/skills/sprintx/references/05-auditoria.md": "0640c63d7923569689f9b8f8ea68f468725b028319cbbbeeba17afb861e2c3ee",
+      ".claude/skills/sprintx/references/06-execucao.md": "9c88a21a2caf34fb37050b50bf9216ec66109b70d77c9a8eceb29aec767f6a35",
+      ".claude/skills/sprintx/references/07-estimativa.md": "892672f16a1d9643f2feb9f4bbd7cfbca92fe0aa14074c7b9d8f78569d6a28e2",
+      ".claude/skills/sprintx/references/08-rastro.md": "de6bfe024796dd08d1da9c34920e3089c009b1de89a4f73a15f312fe70625e49",
+      ".claude/skills/sprintx/references/09-diagrama.md": "c4267a0df409dfc4f06c668640c7e135cdf7237ebbea0c8d88278ac792ec9129",
+      ".claude/skills/sprintx/references/09-estado.md": "ddad9ed6cc45e9ddb885698d7f49cf45898c21deb70f6686993fc85f47982040",
+      ".claude/skills/sprintx/scripts/bloqueios.sh": "005ab46866a819c83a2c19acdd5a2459e13141dbc0f0148a644c591efda7af07",
+      ".claude/skills/sprintx/scripts/caminho-git.sh": "a85f685e523ba0324e1956eff60486005afb7904943036b97faa1ff01c24ad54",
+      ".claude/skills/sprintx/scripts/planejamento.sh": "890b5396d05536feb23af015131dc89f871538876924ba86fa010030c6e9679d",
+      ".claude/skills/sprintx/scripts/rastro.sh": "66f784e352c9b925c2e926a4e75a9cbfead0077a5da09c3a5aa714265e170645",
+      ".expx/marketplace/plugins/expx/commands/mergex-abrir.md": "6f21b698aa6cbdfc737adb46d9546569261b4983e011889da2fe7f1de58e6d36",
+      ".expx/marketplace/plugins/expx/commands/mergex-atencao.md": "c9ff0f99f9c7121c3ecfefbec5cdec5f6dcf6a7fb7f2abefc1ee0c8f2b3d6eec",
+      ".expx/marketplace/plugins/expx/commands/mergex-check.md": "a9f281fab66643f4372b69dc8f38f57ff9480ebb0f8e10cd94f41916ef061e1b",
+      ".expx/marketplace/plugins/expx/commands/mergex-pr.md": "0eaefb05d9d75237903ad145d0ae2babbf267ec55578f9f156f602635cc6cffc",
+      ".expx/marketplace/plugins/expx/commands/mergex-qa.md": "0e3f4fab88b3b4ec733b579b576431014b720322c8846bca5114c813e3cab777",
+      ".expx/marketplace/plugins/expx/commands/mergex-revisar.md": "64b3df1fa06b6ca8aaeea6f4a2029dd61a8e4c7591e0e8e86c91ecdbdae4021f",
+      ".expx/marketplace/plugins/expx/commands/mergex.md": "97976a6a4660b5942675b4e016e54ac6d2268eefc7f61a8c791e82407e696df1",
+      ".expx/marketplace/plugins/expx/commands/sprintx-auditoria.md": "1250eb67c0298c63995176bb59a77a918925551cda15efc8d6def79672dce277",
+      ".expx/marketplace/plugins/expx/commands/sprintx-base.md": "8e82cc1b4e90e790b047a1e64f5d790fd92511f5453438c0fe99715c0d65a9a0",
+      ".expx/marketplace/plugins/expx/commands/sprintx-descoberta.md": "aa6d3a43b55a56ce5e217e5a87d7e8cb88e9f1deb0fd30849dd0e88004854fe2",
+      ".expx/marketplace/plugins/expx/commands/sprintx-estimar.md": "5eb32c3daa47af18b57b896948bcb4617c9e66dbacb463f2a9790ca857acdb9c",
+      ".expx/marketplace/plugins/expx/commands/sprintx-executar.md": "eeab97890b1073abf92d737352539b91120b040070f0c3d1c287ac87f05edf65",
+      ".expx/marketplace/plugins/expx/commands/sprintx-orquestrador.md": "cfdcd7db33ccd9c31d45d4a79e714b1af93e23db410e1eb7e5cb2aaac3484685",
+      ".expx/marketplace/plugins/expx/commands/sprintx-sprints.md": "fcfde3bb2782b961aacb22b337c445cac654655f01c20ff6d51b7666c1756298",
+      ".expx/marketplace/plugins/expx/commands/sprintx.md": "1aafd41d2fe7a6b9d638d254ec24597c162cbbb70c3eda4a268b4d470eb39205",
+      ".expx/marketplace/plugins/expx/hooks/README.md": "d7e3527935f5459cc0cc9843583603db72fae9eceb9c6acc3495b5d6f8ccae62",
+      ".expx/marketplace/plugins/expx/hooks/comum/base.sh": "a7105f9c8a837d2d92a7f0aed29f3d6e2c2a2d000e679ed4681fde1ce0d6df63",
+      ".expx/marketplace/plugins/expx/hooks/comum/branch-limpa.sh": "19098add0368cd2ca92746b91effb96820ee177edc821c895cc1c32cb00c4188",
+      ".expx/marketplace/plugins/expx/hooks/comum/rastro-post.sh": "f576fcfb23beb181e036564d8128271aa7c9943010fc32131621b60d22cd0671",
+      ".expx/marketplace/plugins/expx/hooks/comum/rastro-subagente.sh": "dbaa5068a1f8aefafbc9c7843b52c4882d6a03069f1a9cdaf4c17198bad5e92c",
+      ".expx/marketplace/plugins/expx/hooks/comum/rastro.sh": "8436185f2ce49a20073d015ed48333f1bd0bac1c7b24cde978a2f9849d5c2af2",
+      ".expx/marketplace/plugins/expx/hooks/comum/segredo.sh": "fbc8a0a0794b8b52067b40d6545b4ec602787305646673451884d2d45abbe6ee",
+      ".expx/marketplace/plugins/expx/hooks/comum/sem-segredo.sh": "75435780e23ead00d46598c3b321208e42d10b5ae3b8b43f4c3a9b36f84f6ae7",
+      ".expx/marketplace/plugins/expx/hooks/doctor.sh": "e5661e490ce5d19212ae3b9eeb6c6456509ff7f4fb037e42b5c99182b62a4470",
+      ".expx/marketplace/plugins/expx/hooks/mergex/arquivo-fora-do-plano.sh": "1a629e49d4e1fa2b85d221bcc5bc8e4aa0e61886942c02d9aabdde8457f272bd",
+      ".expx/marketplace/plugins/expx/hooks/mergex/commit-por-task.sh": "5291ae0d911a2afab4250a388a3c91692bfe482655a004ec4a4a363c1dd1c0f4",
+      ".expx/marketplace/plugins/expx/hooks/mergex/git-perigoso.sh": "928a0b6111a142987b681bf1b06ebb673afe04f7959cdb16ef0b007b6e540745",
+      ".expx/marketplace/plugins/expx/hooks/mergex/pr-so-com-portao.sh": "d530377bf4a0470bb660ed1ccafe40be5a565fd5002c8c3aabdd1f318cb9ab8a",
+      ".expx/marketplace/plugins/expx/hooks/sprintx/arvore-limpa-antes-da-suite.sh": "0282ecaf7a56b48c8689671ef34cf2831e1ea2a49d1d33618345ca7cd6fc12a3",
+      ".expx/marketplace/plugins/expx/hooks/sprintx/escopo-da-task.sh": "b21c66441ae67be4e6f1c2b4a6bd81abc0c4ce4a5d7b8920c63b21ea89678344",
+      ".expx/marketplace/plugins/expx/hooks/sprintx/git-perigoso.sh": "af8642903f504cb832d59576686c23d374a982c27c7c20f119aa4eded7419703",
+      ".expx/marketplace/plugins/expx/hooks/sprintx/sem-placeholder-no-plano.sh": "6c26a794a50f9fdd87b68e1c9587f4889cf96af34345189e498edfa844a41eea",
+      ".expx/marketplace/plugins/expx/hooks/sprintx/task-reivindicada.sh": "783e4d4d28b31e875ac039d1b54ee761dddbb6cc5132618d200fc689423dd66e",
+      ".expx/marketplace/plugins/expx/hooks/sprintx/task-so-fecha-verde.sh": "5bb2e6bdc53159876b260434dd6e385c5f3f184f56cf941ef2fd5c22016b01c4",
+      ".expx/marketplace/plugins/expx/hooks/sprintx/tdd-teste-antes.sh": "b1323d31872393330339d3f09f46a5f0d7cfa4a880dc54a52be9d2863befb1f3",
+      ".expx/marketplace/plugins/expx/hooks/teste.sh": "72c4f21085e8d16a7d7db3d84402cde27e13052bc1a696f88b27929d882f931f",
+      ".expx/marketplace/plugins/expx/hooks/testes/agente-real-rastro.sh": "4949783f599d20478870a7654f863935e2a29d0a6bf73cb183b22f56ca0de93c",
+      ".expx/marketplace/plugins/expx/hooks/testes/bancada.sh": "0b858b3d65393cf710cd52f2358229524f4eaa700d094a7d551f9267e5ac6549",
+      ".expx/marketplace/plugins/expx/hooks/testes/transcrito-agente.sh": "ff6939c070132d0cf1c436f6e3db8ebdddc43b29c23c9af4a6e417e9f3a7eaae",
+      ".expx/marketplace/plugins/expx/skills/mergex/DECISOES-DA-SKILL.md": "e01feb4397bd72b8514ce451af6bb16f7f4084a1c81b85fe2952ce8f902f1cb1",
+      ".expx/marketplace/plugins/expx/skills/mergex/SKILL.md": "429d71f878192d060e45d0d450013da78d85410e02c02f6618254eff93bcfe02",
+      ".expx/marketplace/plugins/expx/skills/mergex/assets/TEMPLATE-ENTREGA.md": "762fcc8568e27e224ee07319804bfb66e8db4e4fb0d3af11b136d4fcc83de252",
+      ".expx/marketplace/plugins/expx/skills/mergex/assets/TEMPLATE-PR.md": "08c4ec09876ad1f049f780900bef2741c42beb3b194e54b4e4baa464a79545bb",
+      ".expx/marketplace/plugins/expx/skills/mergex/assets/TEMPLATE-QA-PACOTE.md": "6654a13cad89aab861c49a4e114be29c3e68f11ba86dab32abe40f53e40c340e",
+      ".expx/marketplace/plugins/expx/skills/mergex/assets/TEMPLATE-atencao.md": "37f2fa7402b28535de36ec524a5d8d1189c2a7bc9e8c1566aa84395062aa6904",
+      ".expx/marketplace/plugins/expx/skills/mergex/assets/TEMPLATE-prontidao.md": "68b4fb9fa1be2c92f2b38c9fad6c076857615ea3e093f87d4656f18ae0edcc62",
+      ".expx/marketplace/plugins/expx/skills/mergex/assets/TEMPLATE-revisao.md": "fad750877594ef318980518ebb3719de3de68bbdc03bee3aec34488e49ef2d2a",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/00-abertura.md": "7fb3f92ccd8d4209aeb5c1412b0f1fcbdbbab3e7d2a99a5e1c8913fdea3abbf7",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/00-schema.md": "8144e9e390019b653f9d6a0d185400f06beed3017419c3834331449ba1184970",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/01-commits.md": "62efc205824ee3441d60697684f08923dda748d85116c19ccc82d509e7a89ef1",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/02-prontidao.md": "1e274de35a522d9592a95968f2b55ac5f77b183d18a2bd672c274a9797df792a",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/03-atencao-humana.md": "6334419f0927ccb5f2680863ceb006f3efab7eaeb2da581fe5ea040df820b09f",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/04-descricao-pr.md": "7e30562defa61af67e0818b806b180e6ab653938ffeaa7011b4886958c177b8a",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/05-pacote-qa.md": "901ffcc8cb9b318dea84cf16ac1bf0c46127fd8cbfc5b11c0911d725fa43c800",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/06-push.md": "8fa666c7bebb57e2de1b352fcc5190a21b035f460a529c3d146af78bee9c3685",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/07-abertura-pr.md": "e74d58922f7ae6af8025e97d18498c9192f91b789e8bbc7980444fa2a5e67a50",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/08-registro.md": "17bad600145897f68bdfea58df9ec71ddafa04c7ba1b1f7a06d279bd3ffe7ee4",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/09-revisao.md": "18f1c6cddb6f84a5684845cc613ff0369e6c387b5e2336644088b8ce555fa4b5",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/10-estado.md": "332da5cd999da51e32b5e7449e9e7de349b19fd2a08b86683ea30e64b054afe1",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/integracao/legadox.md": "6dee353d85030e0162a5d28631796e3966983d5f4b20257f4dd964c1e8283e3d",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/integracao/memox.md": "f989166d9f1bceef50374649e9d154c32c90431a9595f97066d1ca33cb040180",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/integracao/runx.md": "19ca8d5d492f49c1cb2cb7ec74c8f0842eca9c8ff20ef35e1249ad84445205b2",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/integracao/sprintx.md": "e44818977e1257fad2c39b14ce51b5aa3ea807348e899c1783493869954f9c52",
+      ".expx/marketplace/plugins/expx/skills/mergex/references/integracao/stackx.md": "4e49d081c67e9f98f2e0712424a57fd6ac9462154336b6239c150002c0576cb1",
+      ".expx/marketplace/plugins/expx/skills/mergex/scripts/catalogo-de-metodo.sh": "e51c70655a053eb5731cea195c16ef2ff2a680a9a3f2cac9331f3dbf22960754",
+      ".expx/marketplace/plugins/expx/skills/mergex/scripts/causa-do-portao.sh": "d71b6f0084d6921ea5252a3a7c28b2bc84ca657aa10f66aacd11e7e87a4b308a",
+      ".expx/marketplace/plugins/expx/skills/mergex/scripts/classificar-atencao.sh": "2cfe56e8abfe470b1539bcc80ed610e870bee76b4bb5077af3ff4b0b2c38be52",
+      ".expx/marketplace/plugins/expx/skills/mergex/scripts/contrato-de-commit.sh": "2302818b0c5aa305a63249b2c15975bd6574c9da78f35a265001a4428670a895",
+      ".expx/marketplace/plugins/expx/skills/mergex/scripts/fechamento-do-e1.sh": "c73d8b69898ea720591f62e99a6d6b787d6577a9680a869f2ca58a4869e0af70",
+      ".expx/marketplace/plugins/expx/skills/mergex/scripts/ownership-da-task.sh": "115aa1e918485df340a356db0cc12f993d1b46870b3391d097aaa6689ea91def",
+      ".expx/marketplace/plugins/expx/skills/mergex/scripts/persistir-metodo.sh": "d97a74a520b881b5e00283ac20eba951a6c2660d6bbdc9b0cbe5eb3e75abba1b",
+      ".expx/marketplace/plugins/expx/skills/mergex/scripts/prova-de-commit.sh": "9c4aeb8a56ebf30b4572c9bacff8607290603e91da56341a9ae009d2753a5d87",
+      ".expx/marketplace/plugins/expx/skills/mergex/scripts/sequencia-de-commits.sh": "2d4c1de20cf48595a26c87445780c99a1a9234d084e68b4b3810eb324fd1bf0f",
+      ".expx/marketplace/plugins/expx/skills/mergex/scripts/trava-do-e1.sh": "b08895e64d52147b8fb8e531b1e5531e9a4cf3587b8e61b2d97b694566887aa4",
+      ".expx/marketplace/plugins/expx/skills/sprintx/DECISOES-DA-SKILL.md": "ef3d316cb3a63848941579bd9cadfa999e6d7f522df0f69982df099b852f0e8a",
+      ".expx/marketplace/plugins/expx/skills/sprintx/SKILL.md": "bcc9790e4412aad4699b325d7c4f64fa50b3f599a81f07f058f50b615920eb46",
+      ".expx/marketplace/plugins/expx/skills/sprintx/assets/TEMPLATE-BLOQUEIOS.md": "aef9986cb028e81c5d7a36c64ad082dbb7decc1b97c843a4bf80aab68da24c16",
+      ".expx/marketplace/plugins/expx/skills/sprintx/assets/TEMPLATE-DECISOES.md": "87e9ed363f1a083e60fc37d2c48cb3315513a3a47950858dd445d8d5bc780de3",
+      ".expx/marketplace/plugins/expx/skills/sprintx/assets/TEMPLATE-ESTIMATIVA.md": "52fa01eee49bb3e30c92dbb1097cfb96bab3fc7dd205b860e37d1c3417db8422",
+      ".expx/marketplace/plugins/expx/skills/sprintx/assets/TEMPLATE-FECHAMENTO.md": "cf9bd5a9ff03d9d133552f264aedb2b68032b48eedea7ef4683f6730ddf64db5",
+      ".expx/marketplace/plugins/expx/skills/sprintx/assets/TEMPLATE-HISTORICO.md": "2d24904d7daf9f469bce3332407ad09a3fe1102458c9dd644a5da58ddfccbaa3",
+      ".expx/marketplace/plugins/expx/skills/sprintx/assets/TEMPLATE-ORQUESTRADOR.md": "4d1b8d402ecb890a520bc5bd0a1291b1c6aa2e91ee52ea3b3f8f8957b1317b88",
+      ".expx/marketplace/plugins/expx/skills/sprintx/assets/TEMPLATE-PLANEJAMENTO.md": "c1af3b9b48891e300847c8176d4265e84566d6430229be723870760b879b7e12",
+      ".expx/marketplace/plugins/expx/skills/sprintx/assets/TEMPLATE-base-indice.md": "b3215d145af19fe70c7667d997628343793a99396a194c0bc65a959d36ae896e",
+      ".expx/marketplace/plugins/expx/skills/sprintx/assets/TEMPLATE-base-recurso.md": "ac3084e6f5f53fc19f53874467f4dcce3ccf9e8e0bac836bb1aa714acc5463f6",
+      ".expx/marketplace/plugins/expx/skills/sprintx/assets/TEMPLATE-fases.md": "0762f4d437b6289b93e854f2a35a9bc72a509edf83da40265ed57229565e5e12",
+      ".expx/marketplace/plugins/expx/skills/sprintx/assets/TEMPLATE-plano-condensado.md": "0e76c1eadd89bfe82d194e323743148d658e16de91ec162d30cbc8db44a95f39",
+      ".expx/marketplace/plugins/expx/skills/sprintx/assets/TEMPLATE-sprint.md": "58441bf8592e438606a38876aee861f0873f4fe802db61bbe0a1279c532d9d0a",
+      ".expx/marketplace/plugins/expx/skills/sprintx/assets/TEMPLATE-tasks.md": "4db575c8ae17011a2868eae1b7aceb32b247b9eb7db37b51b847bce981a0817d",
+      ".expx/marketplace/plugins/expx/skills/sprintx/references/00-schema.md": "8f424611337c08768e6482979f64e9a779f6cf78dec633411a677df8cc2cc440",
+      ".expx/marketplace/plugins/expx/skills/sprintx/references/01-ingestao.md": "5143123285df2642ad8b62b258ab87ffae00e347a7bfec1438928fd7482d761c",
+      ".expx/marketplace/plugins/expx/skills/sprintx/references/02-descoberta.md": "a4102c98bdd79bd6adb347ae31550e2c3f159a116dfe877650d19953fb6833e0",
+      ".expx/marketplace/plugins/expx/skills/sprintx/references/03-plano.md": "e7d56ee1506ab08264e19b9feb2787a09bd0adb5958f66ff89f639db617ba5f7",
+      ".expx/marketplace/plugins/expx/skills/sprintx/references/04-orquestrador.md": "81fc160be05bde218ab4e187eba2f84f9c565ff4de1126749ac041bd4ea1ca2e",
+      ".expx/marketplace/plugins/expx/skills/sprintx/references/05-auditoria.md": "0640c63d7923569689f9b8f8ea68f468725b028319cbbbeeba17afb861e2c3ee",
+      ".expx/marketplace/plugins/expx/skills/sprintx/references/06-execucao.md": "9c88a21a2caf34fb37050b50bf9216ec66109b70d77c9a8eceb29aec767f6a35",
+      ".expx/marketplace/plugins/expx/skills/sprintx/references/07-estimativa.md": "892672f16a1d9643f2feb9f4bbd7cfbca92fe0aa14074c7b9d8f78569d6a28e2",
+      ".expx/marketplace/plugins/expx/skills/sprintx/references/08-rastro.md": "de6bfe024796dd08d1da9c34920e3089c009b1de89a4f73a15f312fe70625e49",
+      ".expx/marketplace/plugins/expx/skills/sprintx/references/09-diagrama.md": "c4267a0df409dfc4f06c668640c7e135cdf7237ebbea0c8d88278ac792ec9129",
+      ".expx/marketplace/plugins/expx/skills/sprintx/references/09-estado.md": "ddad9ed6cc45e9ddb885698d7f49cf45898c21deb70f6686993fc85f47982040",
+      ".expx/marketplace/plugins/expx/skills/sprintx/scripts/bloqueios.sh": "005ab46866a819c83a2c19acdd5a2459e13141dbc0f0148a644c591efda7af07",
+      ".expx/marketplace/plugins/expx/skills/sprintx/scripts/caminho-git.sh": "a85f685e523ba0324e1956eff60486005afb7904943036b97faa1ff01c24ad54",
+      ".expx/marketplace/plugins/expx/skills/sprintx/scripts/planejamento.sh": "890b5396d05536feb23af015131dc89f871538876924ba86fa010030c6e9679d",
+      ".expx/marketplace/plugins/expx/skills/sprintx/scripts/rastro.sh": "66f784e352c9b925c2e926a4e75a9cbfead0077a5da09c3a5aa714265e170645"
+    },
+    "settings": {
+      "hash": "f5d7f822f31767afefb5e84b9b9232ffdaacc403cec684e492028e3d22a7bbc9",
+      "entradas": [
+        {
+          "evento": "PostToolUse",
+          "matcher": "Write|Edit|MultiEdit",
+          "hook": {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/sprintx/sem-placeholder-no-plano.sh",
+            "timeout": 10
+          }
+        },
+        {
+          "evento": "PostToolUse",
+          "matcher": "Write|Edit|MultiEdit",
+          "hook": {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/sprintx/tdd-teste-antes.sh",
+            "timeout": 10
+          }
+        },
+        {
+          "evento": "PostToolUse",
+          "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash",
+          "hook": {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/comum/rastro-post.sh",
+            "timeout": 10
+          }
+        },
+        {
+          "evento": "PreToolUse",
+          "matcher": "Bash",
+          "hook": {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/sprintx/arvore-limpa-antes-da-suite.sh",
+            "timeout": 10
+          }
+        },
+        {
+          "evento": "PreToolUse",
+          "matcher": "Bash",
+          "hook": {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/sprintx/git-perigoso.sh",
+            "timeout": 30
+          }
+        },
+        {
+          "evento": "PreToolUse",
+          "matcher": "Bash",
+          "hook": {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/comum/branch-limpa.sh\"",
+            "timeout": 10
+          }
+        },
+        {
+          "evento": "PreToolUse",
+          "matcher": "Bash",
+          "hook": {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/comum/sem-segredo.sh\"",
+            "timeout": 10
+          }
+        },
+        {
+          "evento": "PreToolUse",
+          "matcher": "Bash",
+          "hook": {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/mergex/arquivo-fora-do-plano.sh\"",
+            "timeout": 10
+          }
+        },
+        {
+          "evento": "PreToolUse",
+          "matcher": "Bash",
+          "hook": {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/mergex/commit-por-task.sh\"",
+            "timeout": 10
+          }
+        },
+        {
+          "evento": "PreToolUse",
+          "matcher": "Bash",
+          "hook": {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/mergex/git-perigoso.sh\"",
+            "timeout": 30
+          }
+        },
+        {
+          "evento": "PreToolUse",
+          "matcher": "Bash",
+          "hook": {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/mergex/pr-so-com-portao.sh\"",
+            "timeout": 10
+          }
+        },
+        {
+          "evento": "PreToolUse",
+          "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+          "hook": {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/comum/segredo.sh",
+            "timeout": 30
+          }
+        },
+        {
+          "evento": "PreToolUse",
+          "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+          "hook": {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/sprintx/escopo-da-task.sh",
+            "timeout": 30
+          }
+        },
+        {
+          "evento": "PreToolUse",
+          "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+          "hook": {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/sprintx/task-reivindicada.sh",
+            "timeout": 10
+          }
+        },
+        {
+          "evento": "PreToolUse",
+          "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+          "hook": {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/sprintx/task-so-fecha-verde.sh",
+            "timeout": 10
+          }
+        },
+        {
+          "evento": "PreToolUse",
+          "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+          "hook": {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/comum/sem-segredo.sh\"",
+            "timeout": 10
+          }
+        },
+        {
+          "evento": "SessionStart",
+          "hook": {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/expx-session-sync.mjs"
+            ]
+          }
+        },
+        {
+          "evento": "SubagentStop",
+          "matcher": "",
+          "hook": {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/comum/rastro-subagente.sh",
+            "timeout": 10
+          }
+        },
+        {
+          "evento": "UserPromptSubmit",
+          "hook": {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/expx-lembrete.sh"
+          }
+        }
+      ]
+    },
+    "modos": {
+      "hash": "c69ec56485e02dc384fc320e02609d07463077075ccc143b7878ee8c8c39c78e",
+      "publicados": {
+        "arquivo-fora-do-plano": {
+          "modo": "aviso"
+        },
+        "branch-limpa": {
+          "modo": "bloqueio"
+        },
+        "commit-por-task": {
+          "modo": "aviso"
+        },
+        "escopo-da-task": {
+          "modo": "aviso",
+          "tipo": "metodo"
+        },
+        "mergex/git-perigoso": {
+          "modo": "bloqueio"
+        },
+        "pr-so-com-portao": {
+          "modo": "aviso"
+        },
+        "segredo": {
+          "modo": "bloqueio",
+          "tipo": "seguranca"
+        },
+        "sem-placeholder-no-plano": {
+          "modo": "aviso",
+          "tipo": "metodo"
+        },
+        "sem-segredo": {
+          "modo": "bloqueio"
+        },
+        "sprintx/git-perigoso": {
+          "modo": "bloqueio",
+          "tipo": "seguranca"
+        },
+        "task-so-fecha-verde": {
+          "modo": "aviso",
+          "tipo": "metodo"
+        },
+        "tdd-teste-antes": {
+          "modo": "aviso",
+          "tipo": "metodo"
+        }
+      }
+    }
+  }
+}
