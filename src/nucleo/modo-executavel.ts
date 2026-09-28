@@ -76,11 +76,36 @@ function git(raiz: string, args: readonly string[], ambiente?: NodeJS.ProcessEnv
 }
 
 /**
+ * Todo caminho é NOME DE ARQUIVO, nunca padrão.
+ *
+ * Os destinos vêm do lock, e um destino é um caminho literal. Sem isto o git
+ * trata cada um como pathspec: `x*.sh` casa também `x.sh` e `xy.sh` (e o modo
+ * lido passa a ser o de outro arquivo), `q?.sh` arrasta `qa.sh`, `a[b].sh` vira
+ * classe de caractere, e um nome que começa por `:` é lido como magia de
+ * pathspec — aí o git RECUSA a consulta inteira e o caminho errado passa como
+ * "não rastreado". `--literal-pathspecs` é global e precisa vir antes do
+ * subcomando; é preferido à variável `GIT_LITERAL_PATHSPECS` porque o ambiente
+ * do processo é do chamador (o `init` passa o dele) e não é nosso para mexer.
+ */
+const LITERAL = "--literal-pathspecs";
+
+/** No `git ls-files --stage`, o estágio sem conflito: o que o commit grava. */
+const ESTAGIO_SEM_CONFLITO = "0";
+
+/**
  * O modo de cada caminho NO ÍNDICE, para os que o git rastreia.
  *
- * O índice, e não o `HEAD`: é ele que o próximo commit grava, e é nele que o
- * `update-index` opera. Caminho não rastreado simplesmente não aparece —
- * ausência não é defeito, porque não há modo versionado errado ainda.
+ * O índice, e não o `HEAD`: é nele que o `update-index` opera, e é ele que o
+ * próximo commit grava. Caminho não rastreado simplesmente não aparece —
+ * ausência não é defeito, porque não há modo versionado errado ainda. Para o
+ * que já foi COMMITADO, ver `modosNoHead`: o índice sozinho deixa passar o
+ * `update-index` feito e não commitado.
+ *
+ * Durante um merge conflitado o índice não tem estágio 0 e traz 1/2/3 (base,
+ * nosso, deles), que podem divergir no modo. Nenhum deles é o modo do próximo
+ * commit, então o caminho conta como ausente: um conflito aberto é situação
+ * legítima e transitória, e acusar modo no meio dele seria acusar um modo que
+ * ninguém escolheu ainda.
  *
  * Os caminhos são relativos à `raiz` e o `git` roda com `cwd` nela, então a
  * chave devolvida é exatamente a que entrou (e a que vai para o comando de
@@ -95,15 +120,19 @@ export function modosNoIndice(
   if (caminhos.length === 0) return saida;
   let bruto: string;
   try {
-    bruto = git(raiz, ["ls-files", "--stage", "-z", "--", ...caminhos], ambiente);
+    bruto = git(raiz, [LITERAL, "ls-files", "--stage", "-z", "--", ...caminhos], ambiente);
   } catch {
-    return saida; // sem git, fora de repositório, ou pathspec impossível
+    return saida; // sem git, ou fora de repositório
   }
   for (const registro of bruto.split("\0")) {
     if (registro === "") continue;
     const tab = registro.indexOf("\t");
     if (tab < 0) continue;
-    saida.set(registro.slice(tab + 1), registro.slice(0, 6));
+    // `<modo> <objeto> <estagio>\t<caminho>`
+    const campos = registro.slice(0, tab).split(" ");
+    if (campos.length !== 3) continue;
+    if (campos[2] !== ESTAGIO_SEM_CONFLITO) continue;
+    saida.set(registro.slice(tab + 1), campos[0] as string);
   }
   return saida;
 }
