@@ -120,6 +120,59 @@ rastro_json_escape_em() { # rastro_json_escape_em <var> <texto>
 }
 rastro_json_escape() { local _e; rastro_json_escape_em _e "$1"; printf '%s' "$_e"; }
 
+# rastro_corta_utf8_em <var> <texto> [bytes] — o texto em ate <bytes> bytes (padrao
+# 120, o limite de `detalhe` no contrato), SEM deixar sequencia UTF-8 multibyte
+# partida no fim.
+#
+# Por que nao `cut -c1-120`, que estava aqui antes: dois defeitos, nao um.
+#
+#   1. `cut` e orientado a LINHA. Num comando de varias linhas (um heredoc, por
+#      exemplo) ele corta CADA linha em 120 e devolve todas — o `detalhe` passa
+#      longe do limite em vez de respeita-lo.
+#   2. O `-c` do `cut` e byte no GNU coreutils (que nunca implementou multibyte) e
+#      caractere em outras implementacoes. No corte por byte, o fim do texto pode
+#      ficar com o byte-lider de um caractere multibyte (0xC3, no defeito
+#      observado) sem os bytes de continuacao (0x80-0xBF) que ele anuncia. Isso e
+#      byte UTF-8 invalido, e UM deles torna a linha — e o arquivo — indecodificavel
+#      para quem le o jsonl como UTF-8, que e o que o contrato expx-eventos exige.
+#
+# O corte aqui e sempre por BYTE, porque byte e a unidade do limite do contrato, e
+# a sequencia incompleta que sobrar no fim sai INTEIRA. Um `detalhe` mais curto que
+# o limite e informacao preservada; um byte invalido e o arquivo inteiro perdido.
+#
+# Custo (DS-157): zero processo, ao contrario de um corte a base de head/wc/od. O
+# `LC_ALL=C` poe o proprio bash em modo byte — e assim `${_s:0:_n}` corta bytes e
+# `${#_s}` conta bytes seja qual for o locale de quem chama —, e volta ao valor de
+# antes na saida. A atribuicao e SOLTA, nunca `local`: `local` nao reconfigura
+# locale no Git Bash, o mesmo motivo que impede `local TZ` em _rastro_linha.
+rastro_corta_utf8_em() {
+  local _s="$2" _n="${3:-120}" _t _i=0 _b _w
+  local _lc_tinha="${LC_ALL+x}" _lc="${LC_ALL-}"
+  LC_ALL=C
+  _s="${_s:0:_n}"
+  _t=${#_s}
+  # So os ate 4 bytes finais interessam: uma sequencia UTF-8 tem no maximo 4 bytes.
+  while [ "$_i" -lt 4 ] && [ "$_i" -lt "$_t" ]; do
+    _i=$((_i+1))
+    printf -v _b '%d' "'${_s:_t-_i:1}" 2>/dev/null || _b=0
+    if [ "$_b" -lt 128 ]; then
+      break                                     # ASCII: nada pendurado
+    elif [ "$_b" -ge 192 ]; then                 # byte-lider: quantos bytes ele anuncia?
+      if   [ "$_b" -ge 240 ]; then _w=4
+      elif [ "$_b" -ge 224 ]; then _w=3
+      else                          _w=2
+      fi
+      # Anuncia mais bytes do que os que sobraram: a sequencia esta incompleta.
+      [ "$_w" -gt "$_i" ] && _s="${_s:0:_t-_i}"
+      break
+    fi
+    # 0x80-0xBF: byte de continuacao. O byte-lider esta mais atras.
+  done
+  if [ -n "$_lc_tinha" ]; then LC_ALL="$_lc"; else unset LC_ALL; fi
+  printf -v "$1" '%s' "$_s"
+}
+rastro_corta_utf8() { local _c; rastro_corta_utf8_em _c "$1" "${2:-120}"; printf '%s' "$_c"; }
+
 # rastro_le_entrada_em <var> — o stdin inteiro do hook (o payload JSON). `mapfile -d ''`
 # (bash >= 4.4) le em blocos e sem processo; `read -d ''` leria um byte por chamada num
 # pipe, e `$(cat)` custa um processo. Bash mais antigo (macOS): `cat`, como sempre.
