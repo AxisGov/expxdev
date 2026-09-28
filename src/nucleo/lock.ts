@@ -47,6 +47,10 @@ export type EntradaTravada = z.infer<typeof EntradaTravada>;
  *   que o plano escreveu — `.claude/hooks/**` (hooks e helpers de cada skill),
  *   `.claude/skills/**` (inclusive scripts como `catalogo-de-metodo.sh`),
  *   comandos, e o plugin em `.expx/marketplace/`.
+ * - `executaveis`: dos destinos acima, os que o plano marcou como executáveis
+ *   — a fonte de verdade do que precisa do bit de execução, em disco e
+ *   VERSIONADO. Opcional: lock antigo continua válido e cai no fallback dos
+ *   `.sh` (ver `nucleo/modo-executavel.ts`), que é a regra que o plano aplica.
  * - `settings`: as entradas de hook que o ExpxDev gerencia no
  *   `.claude/settings.json`, e o hash delas. Entrada da pessoa não entra: o
  *   ExpxDev não a gerencia.
@@ -58,6 +62,7 @@ export type EntradaTravada = z.infer<typeof EntradaTravada>;
  */
 export const InstalacaoTravada = z.object({
   arquivos: z.record(z.string(), z.string()),
+  executaveis: z.array(z.string()).optional(),
   settings: z.object({ hash: z.string(), entradas: z.array(EntradaTravada) }).optional(),
   modos: z.object({ hash: z.string(), publicados: z.record(z.string(), z.record(z.string(), z.unknown())) }).optional(),
 });

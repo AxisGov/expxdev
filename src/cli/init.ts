@@ -16,6 +16,7 @@ import {
   type SkillTravada,
 } from "../nucleo/lock.js";
 import { verificarRuntime } from "../nucleo/runtime.js";
+import { avisoDeFilemode } from "../nucleo/modo-executavel.js";
 import { escreverArquivoAtomico, prepararTroca } from "../plugin/atomico.js";
 import { montarMarketplace, planejarPlugin, type SkillMontavel } from "../plugin/montagem.js";
 import {
@@ -146,6 +147,14 @@ function anterioresDoLock(raiz: string): { settings: EntradaGerenciada[]; modos?
 
 const PREFIXO_DO_PLUGIN = `.expx/marketplace/${ORIGEM_DO_PLUGIN.replace(/^\.\//, "")}`;
 
+/** Os destinos executáveis do plano, em ordem canônica. */
+function executaveisDoPlano(plano: Plano): string[] {
+  return [
+    ...plano.projeto.filter((a) => a.executavel).map((a) => a.destino),
+    ...plano.plugin.filter((a) => a.executavel).map((a) => `${PREFIXO_DO_PLUGIN}/${a.destino}`),
+  ].sort();
+}
+
 /** O bloco `instalacao` do lock, em ordem canônica e sem data. */
 function instalacaoTravada(plano: Plano): InstalacaoTravada {
   const arquivos: Record<string, string> = {};
@@ -154,7 +163,10 @@ function instalacaoTravada(plano: Plano): InstalacaoTravada {
     ...plano.plugin.map((a) => [`${PREFIXO_DO_PLUGIN}/${a.destino}`, a.hash] as const),
   ].sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0));
   for (const [d, h] of todos) arquivos[d] = h;
-  const inst: InstalacaoTravada = { arquivos };
+  // Quem precisa do bit de execução é decisão do PLANO, não da extensão do
+  // arquivo: travar a lista aqui é o que permite ao `doctor` conferir o modo
+  // versionado sem reinventar a regra (ver `nucleo/modo-executavel.ts`).
+  const inst: InstalacaoTravada = { arquivos, executaveis: executaveisDoPlano(plano) };
   if (plano.settings !== undefined) {
     inst.settings = { hash: hashDasEntradas(plano.settings.gerenciadas), entradas: plano.settings.gerenciadas };
   }
@@ -387,6 +399,14 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
   }
   // O lock por último: ele é a afirmação de que a instalação está completa.
   escreverArquivoAtomico(caminhoDoLock(op.raiz), `${JSON.stringify(lock, null, 2)}\n`);
+
+  // O bit de execução foi gravado em disco, mas num repositório com
+  // `core.filemode=false` o git NÃO vai versioná-lo — e o próximo clone ou
+  // worktree recebe 0644, em que o hook por execução direta morre com 126.
+  // O `init` avisa e entrega o comando pronto; o índice é da pessoa, e ele não
+  // encosta nele (ver `nucleo/modo-executavel.ts`).
+  const aviso = avisoDeFilemode(op.raiz, lock.instalacao?.executaveis ?? [], op.ambiente ?? process.env);
+  if (aviso !== undefined) avisos.push(aviso);
 
   // Skill sem tag NÃO vira aviso na instalação. Hoje nenhum dos seis
   // repositórios publica tag, então o aviso disparava para todas, em toda

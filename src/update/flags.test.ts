@@ -72,6 +72,26 @@ describe("flags do update", () => {
     expect(AVISO_ROLLBACK.toLowerCase()).toContain("versionador");
   });
 
+  it("funcional: o aviso de core.filemode=false do init chega à saída do update", async () => {
+    // com hook, a instalação tem executável — sem executável não há o que avisar
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"], hooks: ["sprintx-gancho.sh"] });
+    repos.push(repo);
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    // o produto é um repositório que ignora o bit de execução: é o caso que
+    // versiona 100644 e quebra o hook no primeiro clone
+    const env = { ...process.env, GIT_AUTHOR_NAME: "e", GIT_AUTHOR_EMAIL: "e@e.invalid", GIT_COMMITTER_NAME: "e", GIT_COMMITTER_EMAIL: "e@e.invalid" };
+    execFileSync("git", ["init", "-q", "-b", "main"], { cwd: p.raiz, env });
+    execFileSync("git", ["config", "core.filemode", "false"], { cwd: p.raiz, env });
+    await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: repo } });
+
+    novaTag(repo, "v1.1.0");
+    const r = await executarUpdate({ raiz: p.raiz, sim: true, origens: { sprintx: repo } });
+    expect(r.aplicou).toBe(true);
+    const saida = r.mensagens.join("\n");
+    expect(saida).toContain("core.filemode=false");
+    expect(saida).toContain("git update-index --chmod=+x -- ");
+  });
+
   it("funcional: sem interatividade e sem --yes, mostra o que faria e não aplica", async () => {
     const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
     repos.push(repo);

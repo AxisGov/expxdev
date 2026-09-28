@@ -2,6 +2,14 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { lerLock, type InstalacaoTravada } from "../nucleo/lock.js";
 import { hashDoArquivo } from "../nucleo/integridade.js";
+import {
+  comandoDeReparo,
+  executaveisDoLock,
+  modosNoIndice,
+  MODO_SEM_EXECUCAO,
+  raizPreservaBitExecutavel,
+  semBitNoDisco,
+} from "../nucleo/modo-executavel.js";
 import { jsonCanonico } from "../plugin/plano.js";
 import {
   descreverEntrada,
@@ -199,7 +207,10 @@ export function diagnosticar(raiz: string): Diagnostico {
     }
   }
 
-  if (l.lock.instalacao !== undefined) verificarInstalacao(raiz, l.lock.instalacao, push);
+  if (l.lock.instalacao !== undefined) {
+    verificarInstalacao(raiz, l.lock.instalacao, push);
+    verificarModoExecutavel(raiz, executaveisDoLock(l.lock.instalacao), push);
+  }
   verificarHooks(raiz, push);
   verificarRastro(raiz, push);
 
@@ -320,6 +331,85 @@ function verificarInstalacao(raiz: string, inst: InstalacaoTravada, push: (a: Ac
         });
       }
     }
+  }
+}
+
+/**
+ * As sondas que o portão de modo executável usa.
+ *
+ * Injetáveis porque o ramo "a raiz não distingue executável de não executável"
+ * (Windows nativo, WSL/DrvFs) não é reproduzível no filesystem de quem roda os
+ * testes, e um teste que dependesse dele seria não determinista.
+ */
+export type SondasDeModo = {
+  modosNoIndice: (raiz: string, caminhos: readonly string[]) => Map<string, string>;
+  preservaBit: (raiz: string) => boolean;
+};
+
+const SONDAS: SondasDeModo = {
+  modosNoIndice: (raiz, caminhos) => modosNoIndice(raiz, caminhos),
+  preservaBit: raizPreservaBitExecutavel,
+};
+
+/**
+ * O bit de execução dos artefatos gerenciados — em disco e, principalmente,
+ * VERSIONADO.
+ *
+ * O caso que o lock e o resto do `doctor` não pegavam: eles conferem BYTES.
+ * Num produto com `core.filemode=false`, os `.sh` ficam 0755 em disco e o git
+ * registra 100644; hash, settings e modos batem, o `doctor` fica verde, e é a
+ * primeira worktree ou clone novo que materializa 0644 e mata o hook com 126
+ * (Permission denied). Um verde que só vale na máquina onde a instalação foi
+ * feita é pior que um vermelho.
+ *
+ * São dois achados independentes, porque os reparos são diferentes:
+ *
+ * - modo versionado errado → `git update-index --chmod=+x`, feito pela pessoa,
+ *   com commit explícito. O `expx init` NÃO resolve isto, e a mensagem diz.
+ * - bit ausente no disco → `expx init`, que regrava 0755.
+ *
+ * O ExpxDev nunca executa o `update-index`: ver `nucleo/modo-executavel.ts`.
+ */
+export function verificarModoExecutavel(
+  raiz: string,
+  executaveis: readonly string[],
+  push: (a: Achado) => void,
+  sondas: SondasDeModo = SONDAS,
+): void {
+  if (executaveis.length === 0) return;
+
+  const modos = sondas.modosNoIndice(raiz, executaveis);
+  const naoVersionados = executaveis.filter((c) => modos.get(c) === MODO_SEM_EXECUCAO);
+  if (naoVersionados.length > 0) {
+    push({
+      id: "modo-executavel-nao-versionado",
+      severidade: "erro",
+      problema:
+        `executavel gerenciado rastreado como ${MODO_SEM_EXECUCAO} no indice do git ` +
+        `(o bit de execucao nao esta versionado): ${amostra(naoVersionados)}`,
+      // O comando fica na ÚLTIMA linha, sozinho: é o que se copia e cola. Prosa
+      // depois dele na mesma linha vira argumento colado sem ninguém notar.
+      correcao:
+        "`expx init` conserta o bit no disco, mas NAO o modo versionado: um clone ou worktree novo " +
+        "materializa 0644 e o hook registrado por execucao direta falha com 126 (Permission denied). " +
+        "O ExpxDev nunca executa este comando nem prepara o indice por voce — rode exatamente isto na " +
+        `raiz do projeto e commite o resultado:\n  ${comandoDeReparo(naoVersionados)}`,
+    });
+  }
+
+  // O disco só é cobrado onde a resposta é confiável: num filesystem que não
+  // distingue os dois modos, "sem bit" não quer dizer nada.
+  if (!sondas.preservaBit(raiz)) return;
+  const semBit = semBitNoDisco(raiz, executaveis);
+  if (semBit.length > 0) {
+    push({
+      id: "modo-executavel-sem-bit",
+      severidade: "erro",
+      problema: `executavel gerenciado sem o bit de execucao no disco: ${amostra(semBit)}`,
+      correcao:
+        "rode `expx init` para regravar o bit (este filesystem preserva o bit POSIX); se o modo tambem nao " +
+        "estiver versionado, o achado modo-executavel-nao-versionado diz como versiona-lo",
+    });
   }
 }
 
