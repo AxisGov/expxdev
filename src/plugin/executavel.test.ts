@@ -123,7 +123,6 @@ describe.skipIf(!BIT_NO_DISCO)("artefatosDaArvore — origem local com o modo de
   it("integração: SKILL.md em 0755 por umask ou cópia de FAT também não entra", () => {
     expect(executaveis(skillDeOrigem(0o755))).not.toContain(".claude/skills/sprintx/SKILL.md");
   });
-
 });
 
 describe("artefatosDaArvore — o caso sem bit, que vale em toda plataforma", () => {

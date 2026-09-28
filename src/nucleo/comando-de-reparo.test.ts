@@ -91,7 +91,22 @@ describe("comandoDeReparo — citação", () => {
   });
 
   it("funcional: metacaractere de shell nunca sai cru", () => {
-    for (const c of ["h/$HOME.sh", "h/$(touch x).sh", "h/`x`.sh", "h/g*.sh", "h/a;b.sh", "h/n l.sh", "-h.sh"]) {
+    // `"` e newline entram aqui de propósito: o disco do Windows não hospeda
+    // esses nomes, então é esta asserção — pura, que não toca no disco — que
+    // sustenta a afirmação de `SO_POSIX` de que eles seguem cobertos em TODA
+    // plataforma. Sem eles na lista, a justificativa não se verificava lá.
+    const casos = [
+      "h/$HOME.sh",
+      "h/$(touch x).sh",
+      "h/`x`.sh",
+      "h/g*.sh",
+      "h/a;b.sh",
+      "h/n l.sh",
+      "-h.sh",
+      'h/aspas"duplas.sh',
+      "h/nova\nlinha.sh",
+    ];
+    for (const c of casos) {
       const cmd = comandoDeReparo([c]);
       const argumento = cmd.slice("git update-index --chmod=+x -- ".length);
       expect(argumento.startsWith("'"), `${c} saiu como ${argumento}`).toBe(true);
