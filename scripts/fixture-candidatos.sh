@@ -10,6 +10,11 @@
 # .claude/, .expx/, install.sh, README.md, LICENSE, AGENTS.md. Os bytes saem
 # do objeto Git (core.autocrlf=false), e cada arquivo é conferido contra o blob
 # do commit antes de entrar no MANIFESTO.sha256.
+#
+# ATENÇÃO — o snapshot pode ter correção propagada POR CIMA do commit. Rodar isto
+# extrai só o commit e DESFAZ essa propagação, e o MANIFESTO regerado não acusa
+# nada: ele passa a descrever o snapshot revertido. O que está propagado está em
+# fixtures/candidatos/<nome>.PROPAGACOES.md, e é `npm test` que fica vermelho.
 set -euo pipefail
 
 REPO="$1"; SHA="$2"; NOME="$3"
@@ -38,3 +43,9 @@ printf '%s\n' "$SHA" > "$DEST.sha"
     printf '%s  %s\n' "$(sha256sum "$f" | cut -d' ' -f1)" "$f"
   done ) > "$DEST.MANIFESTO.sha256"
 echo "ok: $NOME @ $SHA ($(wc -l < "$DEST.MANIFESTO.sha256") arquivos)"
+
+# Reextrair desfaz a propagação em silêncio: quem rodou isto tem de saber.
+if [ -f "$DEST.PROPAGACOES.md" ]; then
+  echo "AVISO: $NOME tinha propagação por cima de $SHA e ela ACABOU DE SER DESFEITA." >&2
+  echo "       Reaplique o que está em fixtures/candidatos/$NOME.PROPAGACOES.md e regere o manifesto." >&2
+fi

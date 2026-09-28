@@ -17,6 +17,10 @@ import { fileURLToPath } from "node:url";
 export const RAIZ_DO_REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const BINARIO = join(RAIZ_DO_REPO, "dist", "cli", "expx-bin.js");
 
+/**
+ * As candidatas fixadas. `sha` é o commit BASE do snapshot — a SprintX tem correção
+ * propagada por cima dele, registrada em `fixtures/candidatos/sprintx.PROPAGACOES.md`.
+ */
 export const CANDIDATOS = {
   sprintx: { pasta: "SprintX", sha: "253b59233e6d7a225a05f011cf52668b708e448b" },
   mergex: { pasta: "MergeX", sha: "25d479725b0d91d7b794899c9e25e214bb55fb04" },
@@ -52,8 +56,13 @@ export function arvore(raiz: string, ignorar: (rel: string) => boolean = () => f
 }
 
 /**
- * O snapshot ainda é o do commit candidato? Confere o SHA declarado e cada
- * arquivo contra o manifesto gerado por `scripts/fixture-candidatos.sh`.
+ * O snapshot está coerente consigo? Confere o commit BASE declarado e cada arquivo
+ * contra o manifesto gerado por `scripts/fixture-candidatos.sh`.
+ *
+ * Coerência, não procedência: o snapshot pode ter correção propagada por cima da
+ * base (`fixtures/candidatos/<nome>.PROPAGACOES.md`), e nada aqui vai à SprintX
+ * conferir bytes — a bancada não usa rede. Quem prova que a propagação continua no
+ * snapshot é teste de comportamento sobre o hook instalado, não este manifesto.
  */
 export function conferirSnapshot(nome: NomeCandidato): void {
   const base = snapshot(nome);
@@ -226,19 +235,27 @@ export function comandoRegistrado(produto: string, script: string): string {
   return unicos[0] as string;
 }
 
-/** Roda um hook instalado, pelo comando registrado, com o payload do Claude Code no stdin. */
+/**
+ * Roda um hook instalado, pelo comando registrado, com um payload do Claude Code
+ * no stdin. O payload vai em UTF-8, que é o que o harness entrega: hook que corta
+ * texto precisa receber os mesmos bytes que receberia em uso.
+ */
+export function rodarHookComPayload(produto: string, script: string, payload: unknown): SpawnSyncReturns<string> {
+  return spawnSync(bashDosHooks(), ["-c", comandoRegistrado(produto, script)], {
+    cwd: produto,
+    input: Buffer.from(JSON.stringify(payload), "utf8"),
+    encoding: "utf8",
+    env: ambienteCom(pathDosHooks(), { CLAUDE_PROJECT_DIR: produto }),
+    timeout: 60000,
+  });
+}
+
+/** Roda um hook instalado, pelo comando registrado, com o payload PreToolUse de um comando Bash. */
 export function rodarHook(produto: string, script: string, comando: string): SpawnSyncReturns<string> {
-  const payload = JSON.stringify({
+  return rodarHookComPayload(produto, script, {
     hook_event_name: "PreToolUse",
     tool_name: "Bash",
     tool_input: { command: comando },
     cwd: produto,
-  });
-  return spawnSync(bashDosHooks(), ["-c", comandoRegistrado(produto, script)], {
-    cwd: produto,
-    input: payload,
-    encoding: "utf8",
-    env: ambienteCom(pathDosHooks(), { CLAUDE_PROJECT_DIR: produto }),
-    timeout: 60000,
   });
 }

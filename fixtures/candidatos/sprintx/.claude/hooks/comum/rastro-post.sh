@@ -47,7 +47,11 @@ case "$FERRAMENTA" in
         elif printf '%s' "$SAIDA" | grep -qE '(^|[[:space:]])(FAILED|FAIL)([[:space:]]|$)'; then
           RES="falha"
         fi
-        rastro_grava "$RAIZ" suite_executada hook "$RES" "$(printf '%s' "$CMD" | cut -c1-120)" '[]'
+        # 120 bytes, sem partir caractere multibyte no fim: o jsonl tem de continuar
+        # UTF-8 valido (contrato expx-eventos), e `cut -c` nao garante nem uma coisa
+        # nem a outra. Sem subshell, que e um processo a menos no caminho do hook.
+        rastro_corta_utf8_em DETALHE "$CMD" 120
+        rastro_grava "$RAIZ" suite_executada hook "$RES" "$DETALHE" '[]'
         ;;
     esac
     ;;

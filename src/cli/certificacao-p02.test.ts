@@ -14,6 +14,7 @@ import {
   pathDosHooks,
   rodarExpx,
   rodarHook,
+  rodarHookComPayload,
   sha256,
   snapshot,
 } from "../teste/candidatos.js";
@@ -24,6 +25,9 @@ import {
  * snapshots fixados em `fixtures/candidatos/`. Nenhum arquivo é copiado,
  * nenhum settings ou hooks.json é montado à mão: o que está no produto é o que
  * o `init` escreveu.
+ *
+ * `253b592` é o commit BASE do snapshot da SprintX: o que está propagado por cima
+ * dele está em `fixtures/candidatos/sprintx.PROPAGACOES.md`.
  */
 
 type Json = Record<string, any>;
@@ -299,6 +303,107 @@ describe("P0.2 — provas funcionais com os hooks instalados", () => {
     } finally {
       modo("mergex/git-perigoso", undefined);
     }
+  });
+});
+
+describe("P0.2 — o rastro do hook instalado é UTF-8 válido no corte do detalhe", () => {
+  /**
+   * O `rastro-post.sh` instalado corta `suite_executada.detalhe` em 120 BYTES —
+   * o limite que o contrato `expx-eventos` impõe ao campo. Cortar por byte é o
+   * único corte estável (o `-c` do `cut` é byte no GNU coreutils e caractere em
+   * outras implementações), e por isso o corte tem de APARAR a sequência UTF-8
+   * multibyte que ficar incompleta no fim: um byte-líder sem os bytes de
+   * continuação que ele anuncia é byte inválido, e um único deles torna a linha
+   * — e o arquivo — indecodificável para o painel, que lê o jsonl como UTF-8.
+   *
+   * A tabela roda o HOOK REAL, pelo comando registrado no `settings.json` que o
+   * `init` escreveu, uma vez por fronteira: o corte de 120 cai exatamente depois
+   * de `k` bytes do primeiro caractere de `largura` bytes.
+   *
+   *   k <  largura → sequência incompleta no fim: tem de sumir inteira
+   *   k == largura → sequência completa no fim: tem de ser preservada
+   *
+   * A regressão observada em campo é `largura=2, k=1`: byte-líder `0xc3` de um
+   * `ã` pendurado sozinho no fim do `detalhe`.
+   */
+  const RASTRO = "docs/eventos/sem-trabalho.jsonl";
+  let P = "";
+
+  beforeAll(() => {
+    P = produto();
+    expect(init(P, "sprintx,mergex").status).toBe(0);
+  }, 300000);
+
+  /** O prefixo ASCII que faz o corte de 120 bytes cair depois de `k` bytes do caractere seguinte. */
+  function prefixoDe(k: number): string {
+    // `npm test -- ` tem 12 bytes e é o que faz o hook reconhecer uma suíte.
+    return `npm test -- ${"x".repeat(120 - k - 12)}`;
+  }
+
+  /** Entrega ao hook real o PostToolUse de um comando de suíte e devolve o `detalhe` gravado. */
+  function detalheDaSuite(comando: string): string {
+    rmSync(join(P, RASTRO), { force: true });
+    const r = rodarHookComPayload(P, "rastro-post.sh", {
+      hook_event_name: "PostToolUse",
+      tool_name: "Bash",
+      tool_input: { command: comando },
+      tool_response: "Test Files  1 passed (1)",
+      cwd: P,
+    });
+    expect(r.status, r.stderr).toBe(0);
+    // Leitura em UTF-8 ESTRITO: byte inválido no jsonl lança aqui, como lança no painel.
+    const texto = new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(join(P, RASTRO)));
+    const linhas = texto.split("\n").filter((l) => l.trim() !== "");
+    expect(linhas).toHaveLength(1);
+    const evento = JSON.parse(linhas[0] as string) as Json;
+    expect(evento["evento"]).toBe("suite_executada");
+    return evento["detalhe"] as string;
+  }
+
+  /** Uma fronteira da tabela: corte depois de `k` bytes de um caractere de `largura` bytes. */
+  function fronteira(char: string, largura: number, k: number): void {
+    const prefixo = prefixoDe(k);
+    const esperado = k === largura ? `${prefixo}${char}` : prefixo;
+    const detalhe = detalheDaSuite(`${prefixo}${char.repeat(3)}`);
+    expect(detalhe).toBe(esperado);
+    expect(Buffer.byteLength(detalhe, "utf8")).toBeLessThanOrEqual(120);
+  }
+
+  const LARGURAS: Array<[string, string, number]> = [
+    ["2 bytes (á)", "á", 2],
+    ["3 bytes (€)", "€", 3],
+    ["4 bytes (🚀)", "🚀", 4],
+  ];
+
+  it("integração: o hook registrado grava o evento de suíte e o jsonl decodifica como UTF-8", () => {
+    expect(detalheDaSuite("npm test -- --run")).toBe("npm test -- --run");
+  });
+
+  for (const [nome, char, largura] of LARGURAS) {
+    for (let k = 1; k < largura; k++) {
+      it(`funcional: sequência de ${nome} cortada depois de ${String(k)} byte(s) desaparece inteira`, () => {
+        fronteira(char, largura, k);
+      });
+    }
+    it(`funcional: sequência de ${nome} que termina no byte 120 é preservada`, () => {
+      fronteira(char, largura, largura);
+    });
+  }
+
+  it("funcional: ASCII no byte 120 continua cortado em 120 — o corte não apara a mais", () => {
+    fronteira("Z", 1, 1);
+  });
+
+  it("funcional: comando de várias linhas é cortado como um texto só, não linha por linha", () => {
+    // O `cut -c1-120` do defeito era orientado a LINHA: num comando multilinha ele
+    // cortava cada linha em 120 e devolvia todas, e o `detalhe` passava longe do
+    // limite. É a forma exata do registro corrompido observado em campo, onde o
+    // corte caiu no meio de um `ã` na 64ª linha de um heredoc.
+    const prefixo = `npm test -- \n${"x".repeat(106)}`;
+    expect(Buffer.byteLength(prefixo, "utf8")).toBe(119);
+    const detalhe = detalheDaSuite(`${prefixo}${"á".repeat(3)}`);
+    expect(detalhe).toBe(prefixo);
+    expect(Buffer.byteLength(detalhe, "utf8")).toBe(119);
   });
 });
 
