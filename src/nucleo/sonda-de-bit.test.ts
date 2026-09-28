@@ -76,9 +76,14 @@ describe("decidirPreservaBit — os modos que cada plataforma devolve", () => {
   });
 });
 
-describe("raizPreservaBitExecutavel — a sonda real", () => {
-  it("integração: em filesystem POSIX responde true e não deixa resíduo", () => {
-    expect(suportaBitExecutavel()).toBe(true); // a bancada precisa ser ext4/APFS
+/**
+ * A sonda completa só pode ser medida onde o filesystem preserva o bit — em
+ * Windows e em `/mnt/c` ela responde `false` por desenho, e exigir `true` ali
+ * seria reprovar a bancada, não o código. Esses ramos são cobertos pela função
+ * pura acima, com os modos reais de cada plataforma.
+ */
+describe.skipIf(!suportaBitExecutavel())("raizPreservaBitExecutavel — a sonda real, em filesystem POSIX", () => {
+  it("integração: responde true e não deixa resíduo", () => {
     const raiz = temporario();
     expect(raizPreservaBitExecutavel(raiz)).toBe(true);
     expect(residuos(raiz)).toEqual([]);
@@ -96,6 +101,14 @@ describe("raizPreservaBitExecutavel — a sonda real", () => {
     expect(readdirSync(join(raiz, ".expx"))).toEqual(["expx-lock.json"]);
   });
 
+  it("integração: chamadas repetidas não acumulam nada", () => {
+    const raiz = temporario();
+    for (let i = 0; i < 5; i++) expect(raizPreservaBitExecutavel(raiz)).toBe(true);
+    expect(readdirSync(raiz)).toEqual([]);
+  });
+});
+
+describe("raizPreservaBitExecutavel — sem prova, sem achado", () => {
   it("integração: raiz sem permissão de escrita responde false, sem lançar e sem resíduo", () => {
     if (process.getuid?.() === 0) return; // root escreve em qualquer lugar
     const raiz = temporario();
@@ -107,11 +120,5 @@ describe("raizPreservaBitExecutavel — a sonda real", () => {
 
   it("integração: raiz que não existe responde false, sem lançar", () => {
     expect(raizPreservaBitExecutavel(join(temporario(), "nao", "existe"))).toBe(false);
-  });
-
-  it("integração: chamadas repetidas não acumulam nada", () => {
-    const raiz = temporario();
-    for (let i = 0; i < 5; i++) expect(raizPreservaBitExecutavel(raiz)).toBe(true);
-    expect(readdirSync(raiz)).toEqual([]);
   });
 });
