@@ -144,12 +144,20 @@ describe("avisoDeFilemode — misto", () => {
     gitEm(p, "checkout", "-q", "main");
     writeFileSync(join(p, ...A.split("/")), "#!/usr/bin/env bash\necho main\n");
     gitEm(p, "commit", "-q", "-a", "-m", "main");
+    // A flag e a asserção ficam FORA do catch: um `throw` dentro do `try` é
+    // engolido pelo `catch` do próprio bloco, e a guarda deixa de guardar — um
+    // merge que não conflitasse passaria batido e o teste ficaria verde sem
+    // nunca ter chegado ao estado que ele afirma testar.
+    let conflitou = false;
     try {
       gitEm(p, "merge", "--no-edit", "outro");
-      throw new Error("o merge precisava conflitar");
     } catch {
-      // conflito: é o estado que o teste quer
+      conflitou = true;
     }
+    expect(conflitou, "o merge precisava conflitar para este teste valer").toBe(true);
+    // e a premissa de verdade não é "o git falhou", é "não há estágio 0": é isso
+    // que faz o caminho contar como ausente do índice
+    expect(modosNoIndice(p, [A]).has(A), "o conflito precisava tirar o estagio 0 do indice").toBe(false);
 
     const aviso = avisoDeFilemode(p, [A]);
     expect(comandoDoAviso(aviso)).toBeUndefined();
