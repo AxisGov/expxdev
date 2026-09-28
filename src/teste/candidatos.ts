@@ -204,6 +204,27 @@ export function pathControlado(comJq: boolean): string {
   return bin;
 }
 
+/**
+ * Como o `jq` dos hooks MATERIALIZA, no stdout, o `\n` de dentro de uma string
+ * JSON: `\r\n` no Windows — onde o stdout do jq abre em modo texto e a CRT
+ * traduz cada LF — e `\n` em POSIX.
+ *
+ * Quem corta o `detalhe` não vê o payload: vê o comando já decodificado pelo jq.
+ * É aqui, e não no hook, que a representação da quebra de linha é decidida — por
+ * isso a medição é feita no próprio jq. Um teste que perguntasse ao hook qual
+ * quebra esperar seria o hook se auditando.
+ */
+export function novaLinhaDoJq(): string {
+  const r = spawnSync(obrigatorio("jq"), ["-r", ".n"], {
+    input: Buffer.from(JSON.stringify({ n: "a\nb" }), "utf8"),
+    encoding: "utf8",
+    timeout: 60000,
+  });
+  const m = /^a(\r?\n)b/.exec(r.stdout ?? "");
+  if (m === null) throw new Error(`jq nao devolveu 'a<quebra>b': ${JSON.stringify(r.stdout)}`);
+  return m[1] as string;
+}
+
 /** O PATH em que os hooks instalados rodam: o do processo, com jq garantido. */
 export function pathDosHooks(): string {
   const jq = obrigatorio("jq");

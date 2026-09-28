@@ -9,6 +9,7 @@ import {
   CANDIDATOS,
   fontesCandidatas,
   gitEm,
+  novaLinhaDoJq,
   novoProduto,
   pathControlado,
   pathDosHooks,
@@ -313,8 +314,9 @@ describe("P0.2 — o rastro do hook instalado é UTF-8 válido no corte do detal
    * único corte estável (o `-c` do `cut` é byte no GNU coreutils e caractere em
    * outras implementações), e por isso o corte tem de APARAR a sequência UTF-8
    * multibyte que ficar incompleta no fim: um byte-líder sem os bytes de
-   * continuação que ele anuncia é byte inválido, e um único deles torna a linha
-   * — e o arquivo — indecodificável para o painel, que lê o jsonl como UTF-8.
+   * continuação que ele anuncia é byte inválido, e um único deles corrompe a
+   * linha — e o arquivo — para quem lê o jsonl como UTF-8: o leitor do painel
+   * hoje é tolerante e troca por U+FFFD, e um consumidor estrito lança.
    *
    * A tabela roda o HOOK REAL, pelo comando registrado no `settings.json` que o
    * `init` escreveu, uma vez por fronteira: o corte de 120 cai exatamente depois
@@ -351,7 +353,8 @@ describe("P0.2 — o rastro do hook instalado é UTF-8 válido no corte do detal
       cwd: P,
     });
     expect(r.status, r.stderr).toBe(0);
-    // Leitura em UTF-8 ESTRITO: byte inválido no jsonl lança aqui, como lança no painel.
+    // Leitura em UTF-8 ESTRITO: byte inválido no jsonl lança aqui, como lança em
+    // consumidores estritos. O painel atual não lança — ele troca por U+FFFD.
     const texto = new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(join(P, RASTRO)));
     const linhas = texto.split("\n").filter((l) => l.trim() !== "");
     expect(linhas).toHaveLength(1);
@@ -399,10 +402,24 @@ describe("P0.2 — o rastro do hook instalado é UTF-8 válido no corte do detal
     // cortava cada linha em 120 e devolvia todas, e o `detalhe` passava longe do
     // limite. É a forma exata do registro corrompido observado em campo, onde o
     // corte caiu no meio de um `ã` na 64ª linha de um heredoc.
-    const prefixo = `npm test -- \n${"x".repeat(106)}`;
-    expect(Buffer.byteLength(prefixo, "utf8")).toBe(119);
-    const detalhe = detalheDaSuite(`${prefixo}${"á".repeat(3)}`);
-    expect(detalhe).toBe(prefixo);
+    //
+    // O comando ENTRA com LF, que é o que o agente escreve e o que o harness
+    // entrega. O que o hook corta é o que o jq devolveu, e o jq materializa esse
+    // LF conforme a plataforma: CRLF no Windows, LF em POSIX. O contrato do
+    // `detalhe` é byte (120) e UTF-8 válido; ele não escolhe representação de
+    // quebra de linha, e fixar LF no esperado reprovaria o Windows por uma regra
+    // que o contrato não tem. Por isso o esperado nasce da medição do jq — nunca
+    // do que o hook devolveu — e a comparação segue exata, byte a byte.
+    const nl = novaLinhaDoJq();
+    const enchimento = "x".repeat(120 - "npm test -- ".length - nl.length - 1);
+    const comando = `npm test -- \n${enchimento}`;
+    const esperado = `npm test -- ${nl}${enchimento}`;
+    // 119 bytes nas duas plataformas: o byte 120 é o byte-líder do `á` seguinte,
+    // e a sequência incompleta sai inteira. Um corte por LINHA devolveria as duas
+    // linhas — os 125 bytes do comando — e morreria aqui.
+    expect(Buffer.byteLength(esperado, "utf8")).toBe(119);
+    const detalhe = detalheDaSuite(`${comando}${"á".repeat(3)}`);
+    expect(detalhe).toBe(esperado);
     expect(Buffer.byteLength(detalhe, "utf8")).toBe(119);
   });
 });
