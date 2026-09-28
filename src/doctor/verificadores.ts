@@ -338,11 +338,16 @@ function verificarInstalacao(raiz: string, inst: InstalacaoTravada, push: (a: Ac
 }
 
 /**
- * As sondas que o portão de modo executável usa.
+ * As três sondas que o portão de modo executável usa: o índice, o `HEAD`, e a
+ * capacidade do filesystem.
  *
- * Injetáveis porque o ramo "a raiz não distingue executável de não executável"
- * (Windows nativo, WSL/DrvFs) não é reproduzível no filesystem de quem roda os
- * testes, e um teste que dependesse dele seria não determinista.
+ * Injetáveis porque dois estados que importam não são reproduzíveis na bancada:
+ * "a raiz não distingue executável de não executável" (Windows nativo,
+ * WSL/DrvFs) e "a consulta ao `HEAD` falhou por motivo inesperado". Um teste que
+ * dependesse deles seria não determinista — ou não rodaria nunca. As consultas
+ * reais ao git são medidas contra o git de verdade em
+ * `nucleo/modo-executavel-git.test.ts`, e a sonda real em
+ * `nucleo/sonda-de-bit.test.ts`.
  */
 export type SondasDeModo = {
   modosNoIndice: (raiz: string, caminhos: readonly string[]) => Map<string, string>;
