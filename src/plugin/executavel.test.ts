@@ -3,6 +3,20 @@ import { chmodSync, cpSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileS
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { artefatosDaArvore, decidirExecutavel } from "./plano.js";
+import { suportaBitExecutavel } from "../teste/fs-capacidades.js";
+
+/**
+ * O disco expressa o bit de execução? No Windows não — medido em NTFS:
+ * `chmodSync` não altera `stat().mode`, que fica 0666 para qualquer modo pedido,
+ * 0777 inclusive, e `cpSync` não transporta nada. Lá o defeito do DrvFs não é
+ * alcançável, e a degradação é segura: sem bit expressável, `decidirExecutavel`
+ * só classifica `.sh` — que é o que o Windows precisa, porque lá quem decide
+ * execução é o Git Bash, pelo shebang, e não o modo do arquivo.
+ *
+ * A MATRIZ da decisão continua rodando em toda plataforma: ela é pura e recebe o
+ * modo como número, então não depende do que o disco consegue guardar.
+ */
+const BIT_NO_DISCO = suportaBitExecutavel();
 
 /**
  * Quem ganha o bit de execução, e por que o modo da origem não basta.
@@ -90,7 +104,7 @@ describe("decidirExecutavel — o modo da origem é sinal ruidoso", () => {
   });
 });
 
-describe("artefatosDaArvore — origem local com o modo de DrvFs", () => {
+describe.skipIf(!BIT_NO_DISCO)("artefatosDaArvore — origem local com o modo de DrvFs", () => {
   it("integração: cpSync transporta o 0777 da origem para a cópia em ext4", () => {
     const origem = skillDeOrigem(0o777);
     const destino = join(temporario("expx-exec-copia-"), "copia");
@@ -110,7 +124,18 @@ describe("artefatosDaArvore — origem local com o modo de DrvFs", () => {
     expect(executaveis(skillDeOrigem(0o755))).not.toContain(".claude/skills/sprintx/SKILL.md");
   });
 
-  it("integração: árvore 0644, o caso normal, não muda de comportamento", () => {
+});
+
+describe("artefatosDaArvore — o caso sem bit, que vale em toda plataforma", () => {
+  it("integração: árvore 0644, o caso normal, declara executável só o .sh", () => {
     expect(executaveis(skillDeOrigem(0o644))).toEqual([".claude/skills/sprintx/hooks/git-perigoso.sh"]);
+  });
+
+  // No Windows este é o cenário real de QUALQUER árvore, 0777 inclusive: é a
+  // degradação segura, e é o que mantém a instalação de lá funcionando — o bit
+  // não é o que faz o hook rodar no Git Bash. `skipIf` e não `return`, para o
+  // relatório dizer "pulado" em vez de "passou" onde ele não foi verificado.
+  it.skipIf(BIT_NO_DISCO)("integração: onde o disco não expressa o bit, a degradação é só o .sh", () => {
+    expect(executaveis(skillDeOrigem(0o777))).toEqual([".claude/skills/sprintx/hooks/git-perigoso.sh"]);
   });
 });

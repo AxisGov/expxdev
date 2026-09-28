@@ -38,6 +38,28 @@ let indiceAposCommit = "";
 
 const SPRINTX = ".claude/hooks/sprintx/git-perigoso.sh";
 
+/**
+ * O filesystem da bancada expressa o bit de execução?
+ *
+ * Metade deste defeito é POSIX por natureza, e a outra metade é portável. O que
+ * vale em toda plataforma é dado do GIT: o índice registrar `100644`, o `doctor`
+ * acusar, o `update-index` da pessoa corrigir o índice, o commit levar ao `HEAD`,
+ * e o diagnóstico ficar verde só aí. Isso continua certificado no Windows.
+ *
+ * O que NÃO é alcançável no Windows, medido em NTFS: `chmodSync` não altera
+ * `stat().mode` (fica 0666 sempre), então não existe "0644 materializado"; e o
+ * hook não morre com 126, porque quem o executa é o Git Bash, que decide por
+ * shebang e não pelo modo — ele BLOQUEIA com 2 mesmo sem bit. A proteção lá não
+ * depende do bit, e é por isso que só as asserções de bit e de 126 ficam
+ * condicionadas, uma a uma, e nunca o arquivo inteiro.
+ */
+const BIT_NO_DISCO = suportaBitExecutavel();
+
+/** Asserção que só existe onde o filesystem expressa o bit de execução. */
+function soComBitNoDisco(f: () => void): void {
+  if (BIT_NO_DISCO) f();
+}
+
 function temporario(prefixo: string): string {
   const d = mkdtempSync(join(tmpdir(), prefixo));
   criados.push(d);
@@ -104,11 +126,12 @@ afterAll(() => {
 });
 
 describe("modo executável — o defeito, medido", () => {
-  it("integração: o init grava 0755 no disco e o git registra 100644", () => {
-    expect(suportaBitExecutavel()).toBe(true); // a bancada precisa de filesystem POSIX
-    expect(statSync(join(A, SPRINTX)).mode & 0o111).not.toBe(0);
+  it("integração: o git registra 100644, e em POSIX o disco fica 0755", () => {
     expect(modoNoIndice(A, SPRINTX)).toBe("100644");
     expect(gitEm(A, "status", "--porcelain")).toBe("");
+    soComBitNoDisco(() => {
+      expect(statSync(join(A, SPRINTX)).mode & 0o111).not.toBe(0);
+    });
   });
 
   it("funcional: o doctor falha nomeando o modo versionado, com o comando exato e sem executá-lo", () => {
@@ -125,15 +148,17 @@ describe("modo executável — o defeito, medido", () => {
     expect(indice(A)).toBe(indiceAposCommit);
   });
 
-  it("funcional: checkout novo materializa 0644, o hook direto morre com 126 e o doctor acusa", () => {
+  it("funcional: checkout novo acusa no doctor, e em POSIX materializa 0644 com o hook em 126", () => {
     const nova = join(temporario("expx-modo-wt-"), "checkout");
     gitEm(A, "worktree", "add", "-q", "-b", "checkout-quebrado", nova);
     criados.push(nova);
 
-    expect(statSync(join(nova, SPRINTX)).mode & 0o111).toBe(0);
-    const hook = rodarHook(nova, SPRINTX, "git branch -D velha");
-    expect(hook.status).toBe(126);
-    expect(`${hook.stdout}${hook.stderr}`).toMatch(/[Pp]ermission denied|permissão/);
+    soComBitNoDisco(() => {
+      expect(statSync(join(nova, SPRINTX)).mode & 0o111).toBe(0);
+      const hook = rodarHook(nova, SPRINTX, "git branch -D velha");
+      expect(hook.status).toBe(126);
+      expect(`${hook.stdout}${hook.stderr}`).toMatch(/[Pp]ermission denied|permissão/);
+    });
 
     const r = doctor(nova);
     expect(r.status, r.stdout).toBe(1);
@@ -192,8 +217,10 @@ describe("modo executável — o reparo explícito", () => {
     const nova = join(temporario("expx-modo-wt-indice-"), "checkout");
     gitEm(A, "worktree", "add", "-q", "-b", "checkout-so-indice", nova);
     criados.push(nova);
-    expect(statSync(join(nova, SPRINTX)).mode & 0o111).toBe(0);
-    expect(rodarHook(nova, SPRINTX, "git branch -D velha").status).toBe(126);
+    soComBitNoDisco(() => {
+      expect(statSync(join(nova, SPRINTX)).mode & 0o111).toBe(0);
+      expect(rodarHook(nova, SPRINTX, "git branch -D velha").status).toBe(126);
+    });
   });
 
   it("funcional: commitado o modo, a worktree nova bloqueia e o doctor fica verde", () => {
@@ -209,7 +236,11 @@ describe("modo executável — o reparo explícito", () => {
     gitEm(A, "worktree", "add", "-q", "-b", "checkout-reparado", nova);
     criados.push(nova);
 
-    expect(statSync(join(nova, SPRINTX)).mode & 0o111).not.toBe(0);
+    soComBitNoDisco(() => {
+      expect(statSync(join(nova, SPRINTX)).mode & 0o111).not.toBe(0);
+    });
+    // O bloqueio, esse é portável: em POSIX porque o bit chegou pelo commit, no
+    // Windows porque o Git Bash executa pelo shebang.
     const bloqueio = rodarHook(nova, SPRINTX, "git branch -D velha");
     expect(bloqueio.status, `${bloqueio.stdout}${bloqueio.stderr}`).toBe(2);
     expect(bloqueio.stderr).toContain("sprintx/git-perigoso");

@@ -12,6 +12,7 @@ import {
 import { verificarModoExecutavel, type Achado } from "./verificadores.js";
 import type { ConsultaAoHead } from "../nucleo/modo-executavel.js";
 import { gitEm, novoProduto } from "../teste/candidatos.js";
+import { suportaBitExecutavel } from "../teste/fs-capacidades.js";
 
 /**
  * O portão do modo executável, na unidade.
@@ -24,6 +25,11 @@ import { gitEm, novoProduto } from "../teste/candidatos.js";
  * As sondas são injetadas de propósito: o ramo "a raiz não preserva o bit"
  * (Windows nativo, WSL/DrvFs) não é reproduzível no filesystem da bancada, e
  * um teste que dependesse dele seria não determinista.
+ *
+ * Fronteira de plataforma: a classificação em achados é dado do GIT (índice e
+ * `HEAD`) e vale igual em toda plataforma — por isso os testes dela não criam
+ * arquivo em disco, para não acoplar a um bit que o Windows não expressa. Só o
+ * caso cujo assunto É o bit presente fica condicionado, e um por um.
  */
 
 const criados: string[] = [];
@@ -108,9 +114,10 @@ describe("comandoDeReparo", () => {
 
 describe("verificarModoExecutavel", () => {
   it("funcional: executável rastreado como 100644 é erro, com o comando pronto e sem executá-lo", () => {
+    // Sem arquivo em disco de propósito: o assunto aqui é o ÍNDICE, e um
+    // executável declarado e ausente não gera achado de modo (coberto adiante).
+    // Criá-lo com 0755 acoplaria o teste a um bit que o Windows não expressa.
     const raiz = temporario();
-    arquivo(raiz, ".claude/hooks/sprintx/git-perigoso.sh", 0o755);
-    arquivo(raiz, ".claude/hooks/comum/base.sh", 0o755);
     const r = achados(
       raiz,
       [".claude/hooks/comum/base.sh", ".claude/hooks/sprintx/git-perigoso.sh"],
@@ -131,9 +138,7 @@ describe("verificarModoExecutavel", () => {
   });
 
   it("funcional: executável ainda não rastreado não é erro: não há modo versionado errado", () => {
-    const raiz = temporario();
-    arquivo(raiz, ".claude/hooks/a.sh", 0o755);
-    expect(achados(raiz, [".claude/hooks/a.sh"], {}, true)).toEqual([]);
+    expect(achados(temporario(), [".claude/hooks/a.sh"], {}, true)).toEqual([]);
   });
 
   it("funcional: sem o bit no disco, com raiz que preserva o bit, o reparo é o expx init", () => {
@@ -190,9 +195,18 @@ describe("verificarModoExecutavel — a sonda escreve, então só sonda se preci
     return vezes;
   }
 
-  it("funcional: com o bit presente em todos, a sonda não é chamada e nada é escrito na raiz", () => {
-    expect(sondagens(temporario(), 0o755, { [A]: "100755" })).toBe(0);
-  });
+  // O único caso deste arquivo que precisa de um arquivo COM o bit no disco. No
+  // Windows isso não é expressável: medido em NTFS, `chmodSync` não altera
+  // `stat().mode`, que fica 0666 para qualquer modo pedido — inclusive 0777. Lá
+  // todo executável conta como candidato, e é por isso que a sonda real
+  // (`raizPreservaBitExecutavel`) devolve `false` de saída no win32 e o disco
+  // nunca é cobrado. Condicionado a UM teste, e não ao arquivo.
+  it.skipIf(!suportaBitExecutavel())(
+    "funcional: com o bit presente em todos, a sonda não é chamada e nada é escrito na raiz",
+    () => {
+      expect(sondagens(temporario(), 0o755, { [A]: "100755" })).toBe(0);
+    },
+  );
 
   it("funcional: sem candidato porque o arquivo nem existe, a sonda não é chamada", () => {
     const raiz = temporario();
@@ -221,10 +235,11 @@ describe("verificarModoExecutavel — a sonda escreve, então só sonda se preci
 describe("verificarModoExecutavel — indice preparado x HEAD commitado", () => {
   const A = ".claude/hooks/a.sh";
 
+  // Nenhum teste deste bloco cria arquivo em disco: o assunto é a comparação
+  // entre índice e HEAD, que é dado do git e igual em toda plataforma.
+
   it("funcional: 100755 no indice e 100644 no HEAD é erro: o commit ainda não aconteceu", () => {
-    const raiz = temporario();
-    arquivo(raiz, A, 0o755);
-    const r = achados(raiz, [A], { [A]: "100755" }, true, noHead({ [A]: "100644" }));
+    const r = achados(temporario(), [A], { [A]: "100755" }, true, noHead({ [A]: "100644" }));
     expect(r).toHaveLength(1);
     const a = r[0] as Achado;
     expect(a.id).toBe("modo-executavel-nao-commitado");
@@ -237,16 +252,12 @@ describe("verificarModoExecutavel — indice preparado x HEAD commitado", () => 
   });
 
   it("funcional: 100755 no indice e caminho ausente do HEAD é o mesmo erro", () => {
-    const raiz = temporario();
-    arquivo(raiz, A, 0o755);
-    const r = achados(raiz, [A], { [A]: "100755" }, true, noHead({}));
+    const r = achados(temporario(), [A], { [A]: "100755" }, true, noHead({}));
     expect(r.map((a) => a.id)).toEqual(["modo-executavel-nao-commitado"]);
   });
 
   it("funcional: repositório sem nenhum commit acusa e diz que não há HEAD", () => {
-    const raiz = temporario();
-    arquivo(raiz, A, 0o755);
-    const r = achados(raiz, [A], { [A]: "100755" }, true, { tipo: "sem-head" });
+    const r = achados(temporario(), [A], { [A]: "100755" }, true, { tipo: "sem-head" });
     expect(r).toHaveLength(1);
     const a = r[0] as Achado;
     expect(a.id).toBe("modo-executavel-nao-commitado");
@@ -254,16 +265,12 @@ describe("verificarModoExecutavel — indice preparado x HEAD commitado", () => 
   });
 
   it("funcional: 100644 no indice não vira os dois achados — o reparo é um só", () => {
-    const raiz = temporario();
-    arquivo(raiz, A, 0o755);
-    const r = achados(raiz, [A], { [A]: "100644" }, true, noHead({ [A]: "100644" }));
+    const r = achados(temporario(), [A], { [A]: "100644" }, true, noHead({ [A]: "100644" }));
     expect(r.map((a) => a.id)).toEqual(["modo-executavel-nao-versionado"]);
   });
 
   it("funcional: consulta ao HEAD inconclusiva vira aviso, e nunca acusação", () => {
-    const raiz = temporario();
-    arquivo(raiz, A, 0o755);
-    const r = achados(raiz, [A], { [A]: "100755" }, true, { tipo: "indisponivel", motivo: "git explodiu" });
+    const r = achados(temporario(), [A], { [A]: "100755" }, true, { tipo: "indisponivel", motivo: "git explodiu" });
     expect(r).toHaveLength(1);
     const a = r[0] as Achado;
     expect(a.id).toBe("modo-executavel-head-indisponivel");
@@ -272,9 +279,7 @@ describe("verificarModoExecutavel — indice preparado x HEAD commitado", () => 
   });
 
   it("funcional: fora de repositório o índice vem vazio e o HEAD nem é consultado", () => {
-    const raiz = temporario();
-    arquivo(raiz, A, 0o755);
-    expect(achados(raiz, [A], {}, true, { tipo: "indisponivel", motivo: "nao e repositorio" })).toEqual([]);
+    expect(achados(temporario(), [A], {}, true, { tipo: "indisponivel", motivo: "nao e repositorio" })).toEqual([]);
   });
 });
 
