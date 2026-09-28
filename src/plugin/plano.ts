@@ -102,24 +102,63 @@ export function listarArquivos(raiz: string): string[] {
   return saida.sort();
 }
 
-function ehExecutavel(origem: string, rel: string): boolean {
+/** O arquivo começa com `#!`? O sinal de "isto é feito para ser executado". */
+function temShebang(bytes: Buffer): boolean {
+  return bytes.length >= 2 && bytes[0] === 0x23 && bytes[1] === 0x21;
+}
+
+/**
+ * Quem recebe o bit de execução, decidido sem tocar no disco.
+ *
+ * `.sh` é executável pela extensão, sempre: é o que os hooks registram, e não
+ * depende de como a origem chegou.
+ *
+ * Para o resto, o bit da ORIGEM é **necessário mas não suficiente**, porque ele
+ * é sinal ruidoso. `EXPX_SKILLS_LOCAIS` não clona — `copiarLocal` usa `cpSync`,
+ * que PRESERVA o modo. Numa origem hospedada em DrvFs (`/mnt/c`, quem edita a
+ * skill no Windows e roda no WSL) todo arquivo aparece 0777, e o `cpSync` grava
+ * 0777 de verdade na cópia; daí em diante não é mais artefato de filesystem, é o
+ * modo real do arquivo. Sem esta guarda, `SKILL.md` e `.json` entravam em
+ * `instalacao.executaveis` e o `doctor` exigia `git update-index --chmod=+x`
+ * para a instalação inteira, documentação incluída, como erro. O mesmo acontecia
+ * com uma origem cujo `SKILL.md` ficou 0755 por umask ou por cópia de FAT.
+ *
+ * O shebang é o segundo sinal, e é de CONTEÚDO: nenhum filesystem o fabrica. Um
+ * `.md` 0777 não tem `#!`; um `motor.py` que a skill quer executar tem.
+ *
+ * Preço aceito: um executável compilado (sem shebang e sem `.sh`) deixaria de
+ * ser marcado, e o plano o gravaria 0644. Nenhuma skill do catálogo traz binário
+ * — os 35 executáveis de hoje são `.sh`, todos com shebang, e o único `.mjs`
+ * roda por `node` e já é declarado não executável em `harness/hooks.ts`. Se um
+ * dia houver binário, é aqui que a regra precisa crescer.
+ */
+export function decidirExecutavel(rel: string, modo: number, shebang: boolean): boolean {
   if (rel.endsWith(".sh")) return true;
+  if ((modo & 0o111) === 0) return false;
+  return shebang;
+}
+
+function ehExecutavel(origem: string, rel: string, bytes: Buffer): boolean {
+  let modo = 0;
   try {
-    return (statSync(origem).mode & 0o111) !== 0;
+    modo = statSync(origem).mode;
   } catch {
-    return false;
+    modo = 0; // sem stat, sem bit: `.sh` ainda decide pela extensão
   }
+  return decidirExecutavel(rel, modo, temShebang(bytes));
 }
 
 /** Um arquivo como artefato. */
 export function artefato(origem: string, destino: string, skill: string, tipo: TipoArtefato): Artefato {
+  // Os bytes são lidos UMA vez: o hash e a decisão do bit usam os mesmos.
+  const bytes = readFileSync(origem);
   return {
     destino,
     origem,
     skill,
-    hash: hashDeBytes(readFileSync(origem)),
+    hash: hashDeBytes(bytes),
     tipo,
-    executavel: ehExecutavel(origem, destino),
+    executavel: ehExecutavel(origem, destino, bytes),
   };
 }
 

@@ -41,11 +41,11 @@ export const MODO_SEM_EXECUCAO = "100644";
  * Os destinos que o plano marcou como executáveis, em ordem canônica.
  *
  * Lock novo: `instalacao.executaveis` é a fonte de verdade — inclui o que é
- * executável por bit de origem, e não só por extensão. Lock antigo (sem o
- * campo) continua válido e cai no fallback da regra que o plano aplica hoje:
- * todo `.sh` é executável (`ehExecutavel` em `plano.ts`). O fallback é seguro
- * porque erra só para menos: um executável sem `.sh` fica de fora da
- * verificação, e nunca vira achado falso.
+ * executável por bit de origem COM shebang, e não só por extensão (a regra vive
+ * em `decidirExecutavel`, em `plugin/plano.ts`). Lock antigo (sem o campo)
+ * continua válido e cai no fallback da primeira metade dessa regra: todo `.sh` é
+ * executável. O fallback é seguro porque erra só para menos — um executável sem
+ * `.sh` fica de fora da verificação, e nunca vira achado falso.
  */
 export function executaveisDoLock(inst: InstalacaoTravada): string[] {
   if (inst.executaveis !== undefined) return [...inst.executaveis].sort();

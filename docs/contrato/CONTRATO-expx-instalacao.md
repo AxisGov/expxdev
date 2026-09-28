@@ -286,6 +286,33 @@ explícito. O que o ExpxDev faz:
   WSL/DrvFs (todo arquivo aparece 0777) reprovam a sonda e o disco não é
   cobrado — é assim que o falso positivo é evitado.
 
+### Quem ganha o bit de execução
+
+O `init` grava 0755 apenas nos artefatos que o plano marcou como executáveis, e
+essa marca é o que o lock trava em `instalacao.executaveis`. A regra:
+
+- **`.sh` é executável pela extensão, sempre.** É o que os hooks registram, e não
+  depende de como a origem chegou à máquina.
+- **Para o resto, o bit da origem é necessário mas NÃO suficiente:** é preciso
+  também que o arquivo comece com `#!`.
+
+O segundo sinal existe porque o primeiro é ruidoso, e de forma que atravessa
+filesystem. `EXPX_SKILLS_LOCAIS` **não clona** — a origem local é copiada com
+`cpSync`, que **preserva o modo**. Numa origem hospedada em DrvFs (`/mnt/c`, o
+caso de quem edita a skill no Windows e roda no WSL) todo arquivo aparece 0777, e
+a cópia recebe 0777 de verdade: a partir dali o 0777 não é mais artefato de
+filesystem, é o modo real do arquivo que o plano vai medir. Sem a guarda,
+`SKILL.md` e `.json` entravam em `executaveis` e o `doctor` exigia
+`git update-index --chmod=+x` para a instalação **inteira**, documentação
+incluída, como erro que derruba o diagnóstico. O mesmo acontecia com uma origem
+cujo `SKILL.md` ficou 0755 por umask ou por cópia de FAT.
+
+O shebang é sinal de **conteúdo**: nenhum filesystem o fabrica. Preço aceito: um
+executável compilado (sem `.sh` e sem shebang) deixaria de ser marcado e seria
+gravado 0644. Nenhuma skill do catálogo traz binário — os executáveis de hoje são
+todos `.sh` com shebang, e o único `.mjs` roda por `node` e já é declarado não
+executável. Se um dia houver binário, é esta regra que precisa crescer.
+
 ### Como o git é consultado
 
 - **Caminho é nome de arquivo, nunca padrão.** Toda consulta usa
@@ -306,8 +333,24 @@ explícito. O que o ExpxDev faz:
   causa de uma sonda que não tinha pergunta a responder. Qualquer erro da sonda
   (sem permissão, raiz inexistente) devolve "sem prova, sem achado", e a pasta da
   sonda é removida em todos os caminhos de saída.
-- **Erro de git não é escondido.** Fora de repositório e sem git, o índice vem
-  vazio e nada é afirmado — não há o que acusar. Quando o índice responde mas a
-  consulta ao `HEAD` falha, a verificação do modo commitado fica inconclusiva e
-  isso sai como **aviso** (`modo-executavel-head-indisponivel`), na severidade
-  proporcional: não derruba a saída, e não deixa ninguém achar que foi conferido.
+- **Erro de git não é escondido, e git ausente não é erro.** Sem git no PATH e
+  fora de repositório, a consulta ao índice devolve vazio: nenhum executável é
+  declarado com modo errado, nenhum aviso de `core.filemode` sai, e a consulta ao
+  `HEAD` nem chega a acontecer (ela só é feita para caminhos que o índice
+  reportou como `100755`). O portão **degrada para silêncio**, e é o desenho
+  pretendido: um projeto sem git não tem modo versionado para estar errado.
+  Quando o índice responde mas a consulta ao `HEAD` falha, aí sim a verificação
+  do modo commitado fica inconclusiva, e isso sai como **aviso**
+  (`modo-executavel-head-indisponivel`), na severidade proporcional: não derruba
+  a saída, e não deixa ninguém achar que foi conferido.
+- **Entrada que não é arquivo comum (`120000`, `160000`) não é acusada.** Medido:
+  um symlink aparece como `120000` no estágio 0, tanto no índice quanto no
+  `HEAD`. Como não é `100644` nem `100755`, ele não entra em nenhum dos dois
+  achados de modo versionado, e o portão fica calado a respeito dele — não há
+  comando de reparo correto a sugerir, porque `--chmod=+x` não descreve um
+  symlink. Quem cobre esse caso é a verificação de integridade: um artefato
+  gerenciado substituído por symlink vira `artefato-alterado` (ou
+  `artefato-ausente`, se o alvo não existir), que é o achado certo. No aviso do
+  `init` a entrada cai no bloco **sem comando**, junto do não rastreado — pode
+  ficar redundante ali, e continua sem prometer comando que falharia. O plano
+  nunca cria destino desse tipo: ele escreve arquivos comuns.
