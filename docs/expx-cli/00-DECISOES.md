@@ -119,6 +119,12 @@ decisoes:
     motivo: A decisao de congelar tem de ser do proprio projeto e versionada no ExpxDev, e nao depender de um executavel de main fora do freeze; e a decisao P0.2 D-03
     status: fechada
     bloqueante: false
+  - id: D-20
+    decisao: O lock trava a lista de executaveis em instalacao.executaveis e o doctor reprova executavel gerenciado registrado como 100644 no indice, entregando o git update-index --chmod=+x pronto sem nunca executa-lo
+    alternativa_descartada: O init rodar git add e git update-index por conta propria, ou reescrever os settings para invocar os hooks por bash
+    motivo: Produto com core.filemode=false recebe 0755 em disco e versiona 100644, e o clone seguinte materializa 0644 com hook morto em 126; preparar o indice de quem instala e mexer em trabalho alheio, e trocar a invocacao mudaria a execucao direta que a SprintX registra
+    status: fechada
+    bloqueante: false
 ---
 
 # Decisões — expx-cli
@@ -149,6 +155,7 @@ D-16 | Escrita atômica: montar em .expx/.tmp-<pid>/ e trocar por rename ao fina
 D-18 | O pacote publicado chama-se `expxdev`, com o binário `expx` | `expx` não-escopado, e `@expx/cli` | O npm recusou `expx` com 403 por similaridade com `expo`/`exit`/`cpx`, e o escopo `@expx` não existe no registry (404 em todo PUT). Revê o D-01: o nome do pacote mudou, o binário `expx` não
 D-17 | Todas as decisões desta F2 foram tomadas pela IA, a pedido explícito do usuário | Entrevistar o usuário em blocos de 5 perguntas, como a F2 manda | O usuário instruiu "roda tudo ate o final implementa sem me perguntar nada"; instrução do usuário tem precedência sobre a skill
 D-19 | SessionStart não aplica atualização automática a instalações que contenham origem local (`commit *-local`). O lock congelado vence a conveniência de sincronização. Atualização dessas instalações exige ação explícita | Deixar o `expx update` vindo de AxisGov/main decidir, confiando no comparador tratar `<sha>-local` como não comparável por commit | Decisão P0.2 D-03: congelar é decisão do próprio projeto, lida do lock antes de qualquer rede, e não de um executável de `main` fora do freeze. Regra em `docs/contrato/CONTRATO-expx-instalacao.md` §10
+D-20 | O lock trava `instalacao.executaveis` e o `expx doctor` REPROVA executável gerenciado registrado como `100644` no índice, com o `git update-index --chmod=+x -- …` pronto na mensagem; o bit ausente no disco (onde a raiz do projeto prova preservar o bit POSIX) é reparado por `expx init` | O `init` preparar o índice (`git add`, `git update-index`) por conta própria, ou reescrever os settings para invocar os hooks por `bash <script>` | Com `core.filemode=false` o disco fica 0755 e o git versiona `100644`: o próximo clone/worktree materializa 0644 e o hook por execução direta morre com 126, com `doctor` verde. Preparar o índice de quem instala é mexer em trabalho alheio (um `git commit -a` levaria a mudança junto de um commit alheio), e trocar a invocação mudaria a execução direta que a SprintX registra
 ```
 
 ## Pendências

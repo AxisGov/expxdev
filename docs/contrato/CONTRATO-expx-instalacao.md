@@ -174,6 +174,10 @@ Além de `skills` (versão e hash da cópia de cada skill no plugin), o lock tem
 - `arquivos`: destino → sha256 de todo arquivo que o plano escreveu —
   `.claude/hooks/**`, `.claude/skills/**` (helpers como
   `catalogo-de-metodo.sh` inclusive), comandos e o plugin;
+- `executaveis`: dos destinos acima, os que o plano marcou como executáveis, em
+  ordem canônica. Campo **opcional**: lock escrito por versão anterior continua
+  válido, e a verificação cai no fallback da regra do plano (todo `.sh` é
+  executável), que erra só para menos;
 - `settings`: as entradas de hook gerenciadas no `.claude/settings.json`,
   exatamente como escritas, e o hash delas;
 - `modos`: o que as skills publicaram para `.expx/hooks.json` e o hash do
@@ -219,3 +223,37 @@ sincronização. Atualização dessas instalações exige ação explícita.**
 - **Lock sem origem local:** comportamento anterior, inclusive a precedência da
   árvore suja (sincronização adiada).
 - **`expx update` explícito:** inalterado, inclusive em instalação local.
+
+## 11. O bit de execução, em disco e VERSIONADO (D-20)
+
+Os hooks são registrados por **execução direta**
+(`"$CLAUDE_PROJECT_DIR"/.claude/hooks/sprintx/git-perigoso.sh`), e o `init`
+grava cada executável com 0755. Num repositório com `core.filemode=false` isso
+não basta: o git ignora o bit do filesystem, `git add` registra `100644` e o
+commit leva `100644`. No produto onde a instalação foi feita tudo bate — bytes,
+hashes, settings, modos — e o primeiro `git clone`/`git worktree add`
+materializa 0644: o hook morre com **126 (Permission denied)** e a proteção
+desaparece em silêncio. Medido: `chmod 0755` + `git add` grava `100644`; só
+`git update-index --chmod=+x` grava `100755`.
+
+**O ExpxDev nunca roda `git add` nem `git update-index`, e nunca prepara o
+índice de quem instalou.** Versionar o modo é decisão explícita, com commit
+explícito. O que o ExpxDev faz:
+
+- **`expx init`**: avisa quando o repositório tem `core.filemode=false` e algum
+  executável gerenciado ainda não está `100755` no índice, com o comando pronto
+  na última linha do aviso. Sem git, fora de repositório, `core.filemode`
+  diferente de `false`, ou modo já versionado: nenhum aviso.
+- **`expx doctor`**, achado `modo-executavel-nao-versionado` (**erro**):
+  executável gerenciado rastreado como `100644` no índice. A mensagem traz
+  `git update-index --chmod=+x -- <caminhos>` com a lista exata, diz que o
+  `expx init` conserta o disco mas **não** o modo versionado, e não executa
+  nada. Executável ainda não rastreado não é achado: não há modo versionado
+  errado.
+- **`expx doctor`**, achado `modo-executavel-sem-bit` (**erro**): executável
+  gerenciado sem bit de execução no disco. Reparo: `expx init`. Só é cobrado
+  quando a **raiz do projeto** prova preservar o bit — uma sonda de dois tempos
+  (0644 sem bit, depois 0755 com bit) escrita ali, nunca em `os.tmpdir()`, que
+  pode estar em outro filesystem. Windows nativo (o `chmod` não muda o modo) e
+  WSL/DrvFs (todo arquivo aparece 0777) reprovam a sonda e o disco não é
+  cobrado — é assim que o falso positivo é evitado.
