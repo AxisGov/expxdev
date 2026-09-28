@@ -718,7 +718,7 @@ funcionando. Degradar mostrando, nunca quebrar.
 
 ```bash
 npm install
-npm test          # 771 testes em 120 arquivos, sem acesso à rede
+npm test          # 780 testes em 121 arquivos, sem acesso à rede
 npm run typecheck
 npm run build
 ```
