@@ -167,6 +167,57 @@ describe("verificarModoExecutavel", () => {
   });
 });
 
+describe("verificarModoExecutavel — a sonda escreve, então só sonda se precisar", () => {
+  const A = ".claude/hooks/a.sh";
+
+  /** Quantas vezes a sonda que ESCREVE na pasta do projeto foi chamada. */
+  function sondagens(raiz: string, modoNoDisco: number, indice: Record<string, string>): number {
+    arquivo(raiz, A, modoNoDisco);
+    let vezes = 0;
+    verificarModoExecutavel(
+      raiz,
+      [A],
+      () => undefined,
+      {
+        modosNoIndice: () => new Map(Object.entries(indice)),
+        modosNoHead: () => noHead(indice),
+        preservaBit: () => {
+          vezes += 1;
+          return true;
+        },
+      },
+    );
+    return vezes;
+  }
+
+  it("funcional: com o bit presente em todos, a sonda não é chamada e nada é escrito na raiz", () => {
+    expect(sondagens(temporario(), 0o755, { [A]: "100755" })).toBe(0);
+  });
+
+  it("funcional: sem candidato porque o arquivo nem existe, a sonda não é chamada", () => {
+    const raiz = temporario();
+    let vezes = 0;
+    verificarModoExecutavel(
+      raiz,
+      [A],
+      () => undefined,
+      {
+        modosNoIndice: () => new Map([[A, "100755"]]),
+        modosNoHead: () => noHead({ [A]: "100755" }),
+        preservaBit: () => {
+          vezes += 1;
+          return true;
+        },
+      },
+    );
+    expect(vezes).toBe(0);
+  });
+
+  it("funcional: havendo candidato sem bit, a sonda é chamada uma vez", () => {
+    expect(sondagens(temporario(), 0o644, { [A]: "100755" })).toBe(1);
+  });
+});
+
 describe("verificarModoExecutavel — indice preparado x HEAD commitado", () => {
   const A = ".claude/hooks/a.sh";
 

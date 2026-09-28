@@ -238,22 +238,43 @@ export function filemodeDesligado(raiz: string, ambiente?: NodeJS.ProcessEnv): b
 }
 
 /**
+ * A decisão da sonda, a partir dos dois modos que ela mediu.
+ *
+ * Pura, e exportada, porque os ramos que importam não são reproduzíveis numa
+ * bancada ext4 — e um teste que dependesse de estar rodando no Windows ou num
+ * `/mnt/c` seria um teste que nunca roda:
+ *
+ * - Windows nativo: `chmod` não muda o modo POSIX (o Node devolve 0666 antes e
+ *   depois), o bit nunca aparece → false;
+ * - WSL/DrvFs (`/mnt/c`): todo arquivo aparece 0777, o bit nunca DESAPARECE →
+ *   false, porque um filesystem que não sabe dizer "não executável" também não
+ *   sabe acusar a ausência do bit;
+ * - ext4/APFS: 0644 sem bit, 0755 com bit → true.
+ *
+ * Os dois tempos são conjunção: o bit tem de ESTAR AUSENTE quando não foi pedido
+ * e PRESENTE quando foi. Só assim "sem bit" é uma afirmação, e não um artefato
+ * do filesystem.
+ */
+export function decidirPreservaBit(modoSemPedir: number, modoDepoisDePedir: number): boolean {
+  if ((modoSemPedir & 0o111) !== 0) return false;
+  return (modoDepoisDePedir & 0o111) !== 0;
+}
+
+/**
  * O filesystem DESTE projeto distingue arquivo executável de não executável?
  *
  * A pergunta é sobre a raiz do projeto, e por isso a sonda é escrita ali —
  * nunca em `os.tmpdir()`, que pode estar em outro filesystem com outras regras
  * (é o caso comum no Windows e no WSL).
  *
- * A sonda é de DOIS tempos, e é isso que evita o falso positivo:
+ * **Ela escreve, então só deve ser chamada quando há pergunta a responder.** O
+ * chamador calcula os candidatos primeiro e sonda só se houver algum: no
+ * caminho saudável — o normal, em toda execução de `expx doctor` — nada é
+ * escrito na árvore de quem pediu o diagnóstico. Ver `verificarModoExecutavel`.
  *
- * - Windows nativo: `chmod` não muda o modo POSIX, o bit nunca aparece → false;
- * - WSL/DrvFs (`/mnt/c`): todo arquivo aparece 0777, o bit nunca DESAPARECE →
- *   false, porque um filesystem que não sabe dizer "não executável" também não
- *   sabe acusar a ausência do bit;
- * - ext4/APFS: 0644 sem bit, 0755 com bit → true.
- *
- * Qualquer erro (raiz somente leitura, sem permissão) devolve `false`: sem
- * prova, sem achado.
+ * Qualquer erro (raiz somente leitura, sem permissão, raiz inexistente) devolve
+ * `false`: sem prova, sem achado. E o `finally` remove a pasta da sonda em todos
+ * os caminhos, inclusive nos de saída antecipada.
  */
 export function raizPreservaBitExecutavel(raiz: string): boolean {
   if (process.platform === "win32") return false;
@@ -266,9 +287,9 @@ export function raizPreservaBitExecutavel(raiz: string): boolean {
     const sonda = join(dir, "sonda.sh");
     writeFileSync(sonda, "#!/usr/bin/env bash\nexit 0\n");
     chmodSync(sonda, 0o644);
-    if ((statSync(sonda).mode & 0o111) !== 0) return false;
+    const semPedir = statSync(sonda).mode;
     chmodSync(sonda, 0o755);
-    return (statSync(sonda).mode & 0o111) !== 0;
+    return decidirPreservaBit(semPedir, statSync(sonda).mode);
   } catch {
     return false;
   } finally {

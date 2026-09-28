@@ -83,6 +83,9 @@ describe("flags do update", () => {
     execFileSync("git", ["init", "-q", "-b", "main"], { cwd: p.raiz, env });
     execFileSync("git", ["config", "core.filemode", "false"], { cwd: p.raiz, env });
     await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: repo } });
+    // o `git add` é da PESSOA, não do ExpxDev: é ele que faz o índice registrar
+    // 100644 e, com isso, o comando de reparo virar promessa cumprível
+    execFileSync("git", ["add", "-A"], { cwd: p.raiz, env });
 
     novaTag(repo, "v1.1.0");
     const r = await executarUpdate({ raiz: p.raiz, sim: true, origens: { sprintx: repo } });

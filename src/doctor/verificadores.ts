@@ -415,20 +415,26 @@ export function verificarModoExecutavel(
   const preparados = executaveis.filter((c) => modos.get(c) === MODO_EXECUTAVEL);
   if (preparados.length > 0) verificarModoNoHead(raiz, preparados, push, sondas);
 
+  // Os candidatos ANTES da sonda, nesta ordem e não na inversa: a sonda ESCREVE
+  // na árvore de quem pediu o diagnóstico, e no caminho saudável — o normal, em
+  // toda execução — não há nada para ela responder. Um `doctor` que escreve na
+  // raiz do projeto para dizer "está tudo bem" também falha onde a raiz é
+  // somente leitura, e sem motivo nenhum.
+  const semBit = semBitNoDisco(raiz, executaveis);
+  if (semBit.length === 0) return;
+
   // O disco só é cobrado onde a resposta é confiável: num filesystem que não
   // distingue os dois modos, "sem bit" não quer dizer nada.
   if (!sondas.preservaBit(raiz)) return;
-  const semBit = semBitNoDisco(raiz, executaveis);
-  if (semBit.length > 0) {
-    push({
-      id: "modo-executavel-sem-bit",
-      severidade: "erro",
-      problema: `executavel gerenciado sem o bit de execucao no disco: ${amostra(semBit)}`,
-      correcao:
-        "rode `expx init` para regravar o bit (este filesystem preserva o bit POSIX); se o modo tambem nao " +
-        "estiver versionado, o achado modo-executavel-nao-versionado diz como versiona-lo",
-    });
-  }
+
+  push({
+    id: "modo-executavel-sem-bit",
+    severidade: "erro",
+    problema: `executavel gerenciado sem o bit de execucao no disco: ${amostra(semBit)}`,
+    correcao:
+      "rode `expx init` para regravar o bit (este filesystem preserva o bit POSIX); se o modo tambem nao " +
+      "estiver versionado, o achado modo-executavel-nao-versionado diz como versiona-lo",
+  });
 }
 
 /**
