@@ -3,7 +3,11 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { comandoDeReparo, modosNoIndice } from "./modo-executavel.js";
-import { gitEm, novoProduto } from "../teste/candidatos.js";
+import { bashDosHooks, gitEm, novoProduto } from "../teste/candidatos.js";
+import { suportaNomeComCaractereReservado } from "../teste/fs-capacidades.js";
+
+/** Os nomes reservados entram só onde o disco os aceita. */
+const NOMES_LIVRES = suportaNomeComCaractereReservado();
 
 /**
  * O comando de reparo é para COPIAR E COLAR num shell.
@@ -22,22 +26,40 @@ afterEach(() => {
   for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true });
 });
 
-/** Nomes adversariais, todos gravados 0644 para o índice nascer 100644. */
+/**
+ * Nomes adversariais que TODA plataforma aceita em disco, gravados 0644 para o
+ * índice nascer 100644.
+ *
+ * Medido no Windows (NTFS): espaço, `'`, `$`, `$(…)`, crase, `;`, `[`, `]` e
+ * hífen inicial passam. Cada um destes é significativo no shell, então a
+ * certificação funcional continua real em Windows e em POSIX.
+ */
 const ADVERSARIAIS = [
   "h/com espaco.sh",
   "h/ap'ostrofo.sh",
-  'h/aspas"duplas.sh',
   "h/$HOME.sh",
   "h/$(touch payload-cmd).sh",
   "h/`touch payload-crase`.sh",
-  "h/glob*.sh",
   "h/a;touch payload-pv.sh",
-  "h/nova\nlinha.sh",
+  "h/classe[1].sh",
   "-hifen.sh",
 ];
 
-/** Vizinhos que o glob do shell alcançaria, e que NÃO podem mudar de modo. */
-const VIZINHOS = ["h/globA.sh", "h/com.sh"];
+/**
+ * Nomes que o Windows recusa no disco: medido, `writeFileSync` devolve `ENOENT`
+ * para `"`, `*` e newline. Eles são significativos no shell e continuam
+ * certificados — em POSIX pelo teste funcional, e em TODA plataforma pela
+ * citação, que é função pura e não toca no disco.
+ */
+const SO_POSIX = ['h/aspas"duplas.sh', "h/glob*.sh", "h/nova\nlinha.sh"];
+
+/**
+ * Vizinhos que o shell alcançaria se o caminho saísse cru, e que NÃO podem mudar
+ * de modo. `classe[1].sh` tem vizinho portável (`classe1.sh`, alcançado pela
+ * classe de caractere); `glob*.sh` só existe em POSIX.
+ */
+const VIZINHOS = ["h/classe1.sh", "h/com.sh"];
+const VIZINHOS_SO_POSIX = ["h/globA.sh"];
 
 function arquivo(raiz: string, rel: string, modo: number): void {
   const caminho = join(raiz, ...rel.split("/"));
@@ -82,19 +104,26 @@ describe("comandoDeReparo — colado num bash de verdade", () => {
   it("integração: só os caminhos declarados viram 100755, e nenhum payload executa", () => {
     const p = novoProduto("expx-reparo-");
     criados.push(p);
-    for (const rel of [...ADVERSARIAIS, ...VIZINHOS]) arquivo(p, rel, 0o644);
+    // Os nomes reservados entram só onde o disco os aceita; o resto do cenário é
+    // idêntico nas duas plataformas, e cada nome que fica é metacaractere real.
+    const nomes = NOMES_LIVRES ? [...ADVERSARIAIS, ...SO_POSIX] : [...ADVERSARIAIS];
+    const vizinhos = NOMES_LIVRES ? [...VIZINHOS, ...VIZINHOS_SO_POSIX] : [...VIZINHOS];
+    for (const rel of [...nomes, ...vizinhos]) arquivo(p, rel, 0o644);
     gitEm(p, "add", "-A");
 
     const antes = indice(p);
-    for (const rel of [...ADVERSARIAIS, ...VIZINHOS]) expect(antes.get(rel), rel).toBe("100644");
+    for (const rel of [...nomes, ...vizinhos]) expect(antes.get(rel), rel).toBe("100644");
 
-    const comando = comandoDeReparo(ADVERSARIAIS);
-    const r = spawnSync("bash", ["-c", comando], { cwd: p, encoding: "utf8", timeout: 60000 });
+    const comando = comandoDeReparo(nomes);
+    // `bashDosHooks()` e não `"bash"`: no Windows o primeiro `bash` do PATH pode
+    // ser o do WSL, e o comando é para ser colado no Git Bash — que é o shell em
+    // que os hooks do projeto rodam lá.
+    const r = spawnSync(bashDosHooks(), ["-c", comando], { cwd: p, encoding: "utf8", timeout: 60000 });
     expect(r.status, `${comando}\n${r.stdout}${r.stderr}`).toBe(0);
 
     const depois = indice(p);
-    for (const rel of ADVERSARIAIS) expect(depois.get(rel), rel).toBe("100755");
-    for (const rel of VIZINHOS) expect(depois.get(rel), rel).toBe("100644");
+    for (const rel of nomes) expect(depois.get(rel), rel).toBe("100755");
+    for (const rel of vizinhos) expect(depois.get(rel), rel).toBe("100644");
     // e o índice não ganhou nem perdeu caminho
     expect([...depois.keys()].sort()).toEqual([...antes.keys()].sort());
 
@@ -106,18 +135,31 @@ describe("comandoDeReparo — colado num bash de verdade", () => {
     expect(gitEm(p, "status", "--porcelain", "--untracked-files=all").includes("??")).toBe(false);
   });
 
-  it("integração: e o modo gravado é o que a consulta ao índice passa a ler", () => {
-    const p = novoProduto("expx-reparo-leitura-");
+  /**
+   * O caminho declarado muda de modo e o vizinho que o shell alcançaria não. Em
+   * `[1]` o vizinho é alcançado pela classe de caractere, e o nome é aceito em
+   * toda plataforma; em `*` é o glob, e o nome só existe em POSIX.
+   */
+  function reparoNaoVazaParaOVizinho(alvo: string, vizinho: string, prefixo: string): void {
+    const p = novoProduto(prefixo);
     criados.push(p);
-    arquivo(p, "h/glob*.sh", 0o644);
-    arquivo(p, "h/globA.sh", 0o644);
+    arquivo(p, alvo, 0o644);
+    arquivo(p, vizinho, 0o644);
     gitEm(p, "add", "-A");
 
-    const r = spawnSync("bash", ["-c", comandoDeReparo(["h/glob*.sh"])], { cwd: p, encoding: "utf8" });
+    const r = spawnSync(bashDosHooks(), ["-c", comandoDeReparo([alvo])], { cwd: p, encoding: "utf8" });
     expect(r.status, `${r.stdout}${r.stderr}`).toBe(0);
 
-    const m = modosNoIndice(p, ["h/glob*.sh", "h/globA.sh"]);
-    expect(m.get("h/glob*.sh")).toBe("100755");
-    expect(m.get("h/globA.sh")).toBe("100644");
+    const m = modosNoIndice(p, [alvo, vizinho]);
+    expect(m.get(alvo), alvo).toBe("100755");
+    expect(m.get(vizinho), vizinho).toBe("100644");
+  }
+
+  it("integração: e o modo gravado é o que a consulta ao índice passa a ler", () => {
+    reparoNaoVazaParaOVizinho("h/classe[1].sh", "h/classe1.sh", "expx-reparo-classe-");
+  });
+
+  it.skipIf(!NOMES_LIVRES)("integração: o mesmo com glob, onde o disco aceita * no nome", () => {
+    reparoNaoVazaParaOVizinho("h/glob*.sh", "h/globA.sh", "expx-reparo-glob-");
   });
 });

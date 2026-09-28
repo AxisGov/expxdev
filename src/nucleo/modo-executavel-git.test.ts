@@ -4,6 +4,14 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { modosNoHead, modosNoIndice } from "./modo-executavel.js";
 import { gitEm, novoProduto } from "../teste/candidatos.js";
+import { suportaNomeComCaractereReservado } from "../teste/fs-capacidades.js";
+
+/**
+ * O disco aceita `*`, `?` e `:` no nome? No Windows não — medido: `ENOENT`. O
+ * `[`, que é classe de caractere no pathspec do git e no shell, ele aceita, e é
+ * por ele que a literalidade do pathspec continua certificada lá.
+ */
+const NOMES_LIVRES = suportaNomeComCaractereReservado();
 
 /**
  * A consulta ao git, contra o git de verdade.
@@ -41,7 +49,7 @@ function arquivo(raiz: string, rel: string, modo = 0o755): void {
 }
 
 describe("modosNoIndice — pathspec literal", () => {
-  it("funcional: nome com * devolve só ele, e nunca o que o glob alcançaria", () => {
+  it.skipIf(!NOMES_LIVRES)("funcional: nome com * devolve só ele, e nunca o que o glob alcançaria", () => {
     const p = produto();
     arquivo(p, "h/x.sh");
     arquivo(p, "h/xy.sh");
@@ -54,7 +62,7 @@ describe("modosNoIndice — pathspec literal", () => {
     expect(m.get("h/x*.sh")).toBe("100755");
   });
 
-  it("funcional: nome com ? não arrasta o vizinho de um caractere", () => {
+  it.skipIf(!NOMES_LIVRES)("funcional: nome com ? não arrasta o vizinho de um caractere", () => {
     const p = produto();
     arquivo(p, "h/qa.sh");
     arquivo(p, "h/q?.sh");
@@ -63,6 +71,9 @@ describe("modosNoIndice — pathspec literal", () => {
     expect([...modosNoIndice(p, ["h/q?.sh"]).keys()]).toEqual(["h/q?.sh"]);
   });
 
+  // Este é o caso portável: o `[` é aceito no disco em toda plataforma, e sem
+  // `--literal-pathspecs` ele viraria classe de caractere. É ele que mantém a
+  // literalidade do pathspec certificada no Windows.
   it("funcional: nome com [ ] não vira classe de caractere", () => {
     const p = produto();
     arquivo(p, "h/ab.sh");
@@ -72,7 +83,7 @@ describe("modosNoIndice — pathspec literal", () => {
     expect([...modosNoIndice(p, ["h/a[b].sh"]).keys()]).toEqual(["h/a[b].sh"]);
   });
 
-  it("funcional: nome iniciado por : não é lido como magia de pathspec", () => {
+  it.skipIf(!NOMES_LIVRES)("funcional: nome iniciado por : não é lido como magia de pathspec", () => {
     const p = produto();
     arquivo(p, ":x.sh");
     arquivo(p, "h/n:m.sh", 0o644);
@@ -124,19 +135,29 @@ describe("modosNoIndice — estágios de merge", () => {
 });
 
 describe("modosNoHead — o que está COMMITADO", () => {
-  it("funcional: o modo do HEAD é lido, e o pathspec continua literal", () => {
+  /** O modo do HEAD por caminho literal, com o vizinho que o padrão alcançaria. */
+  function headLiteral(comPadrao: string, vizinho: string): void {
     const p = produto();
-    arquivo(p, "h/x*.sh");
-    arquivo(p, "h/x.sh", 0o644);
+    arquivo(p, comPadrao);
+    arquivo(p, vizinho, 0o644);
     gitEm(p, "add", "-A");
+    gitEm(p, "update-index", "--chmod=+x", "--", comPadrao);
     gitEm(p, "commit", "-q", "-m", "base");
 
-    const r = modosNoHead(p, ["h/x*.sh", "h/x.sh"]);
+    const r = modosNoHead(p, [comPadrao, vizinho]);
     expect(r.tipo).toBe("modos");
     if (r.tipo !== "modos") return;
-    expect([...r.modos.keys()].sort()).toEqual(["h/x*.sh", "h/x.sh"]);
-    expect(r.modos.get("h/x*.sh")).toBe("100755");
-    expect(r.modos.get("h/x.sh")).toBe("100644");
+    expect([...r.modos.keys()].sort()).toEqual([comPadrao, vizinho].sort());
+    expect(r.modos.get(comPadrao), comPadrao).toBe("100755");
+    expect(r.modos.get(vizinho), vizinho).toBe("100644");
+  }
+
+  it("funcional: o modo do HEAD é lido, e o pathspec continua literal", () => {
+    headLiteral("h/x[1].sh", "h/x1.sh");
+  });
+
+  it.skipIf(!NOMES_LIVRES)("funcional: o mesmo com glob, onde o disco aceita * no nome", () => {
+    headLiteral("h/x*.sh", "h/x.sh");
   });
 
   it("funcional: o update-index sem commit muda o índice e NÃO o HEAD", () => {
