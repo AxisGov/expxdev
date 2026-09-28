@@ -161,6 +161,68 @@ export function modosNoIndice(
 }
 
 /**
+ * O resultado da consulta ao `HEAD`, com os três desfechos separados.
+ *
+ * Separar `sem-head` de `indisponivel` é o que evita as duas falhas opostas:
+ * tratar "repositório sem commit nenhum" como erro de git esconde um estado
+ * legítimo, e tratar "o git falhou" como "não está commitado" acusa sem prova.
+ */
+export type ConsultaAoHead =
+  | { tipo: "modos"; modos: Map<string, string> }
+  | { tipo: "sem-head" }
+  | { tipo: "indisponivel"; motivo: string };
+
+/**
+ * O modo de cada caminho NO `HEAD` — o que está de fato COMMITADO.
+ *
+ * O índice não basta: `git update-index --chmod=+x` grava 100755 nele e o
+ * commit é um passo separado. Entre os dois, o índice diz 100755, o `doctor`
+ * diria "resolvido", e o clone ou worktree seguinte — que materializa a partir
+ * do `HEAD`, não do índice — continuaria nascendo 0644 com o hook morto em 126.
+ * É verde que só vale na máquina onde o `update-index` foi rodado.
+ *
+ * `ls-tree -r` porque o pathspec é o caminho completo; `--literal-pathspecs`
+ * pela mesma razão de `modosNoIndice`. Caminho que nunca foi commitado
+ * simplesmente não aparece no mapa (o git devolve saída vazia e sucesso).
+ */
+export function modosNoHead(
+  raiz: string,
+  caminhos: readonly string[],
+  ambiente?: NodeJS.ProcessEnv,
+): ConsultaAoHead {
+  if (caminhos.length === 0) return { tipo: "modos", modos: new Map() };
+  try {
+    git(raiz, ["rev-parse", "--verify", "--quiet", "HEAD"], ambiente);
+  } catch {
+    // Sem HEAD resolvível. Repositório recém-criado (nada commitado ainda) é
+    // estado legítimo; qualquer outra causa deixa a verificação inconclusiva.
+    try {
+      const dentro = git(raiz, ["rev-parse", "--is-inside-work-tree"], ambiente).trim();
+      return dentro === "true" ? { tipo: "sem-head" } : { tipo: "indisponivel", motivo: "HEAD nao resolvivel" };
+    } catch {
+      return { tipo: "indisponivel", motivo: "git ausente, ou esta pasta nao e um repositorio git" };
+    }
+  }
+  let bruto: string;
+  try {
+    bruto = git(raiz, [LITERAL, "ls-tree", "-r", "HEAD", "-z", "--", ...caminhos], ambiente);
+  } catch {
+    return { tipo: "indisponivel", motivo: "git ls-tree HEAD falhou" };
+  }
+  const modos = new Map<string, string>();
+  for (const registro of bruto.split("\0")) {
+    if (registro === "") continue;
+    const tab = registro.indexOf("\t");
+    if (tab < 0) continue;
+    // `<modo> <tipo> <objeto>\t<caminho>`
+    const campos = registro.slice(0, tab).split(" ");
+    if (campos.length !== 3) continue;
+    modos.set(registro.slice(tab + 1), campos[0] as string);
+  }
+  return { tipo: "modos", modos };
+}
+
+/**
  * `core.filemode` está desligado neste repositório?
  *
  * Só `false` explícito conta. Config ausente, git ausente e pasta que não é

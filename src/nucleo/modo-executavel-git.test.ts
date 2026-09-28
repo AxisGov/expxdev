@@ -1,14 +1,14 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
-import { rmSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { modosNoIndice } from "./modo-executavel.js";
+import { modosNoHead, modosNoIndice } from "./modo-executavel.js";
 import { gitEm, novoProduto } from "../teste/candidatos.js";
 
 /**
  * A consulta ao git, contra o git de verdade.
  *
- * Dois defeitos que só aparecem aqui, e nunca com sonda injetada:
+ * Três coisas que só aparecem aqui, e nunca com sonda injetada:
  *
  * - **pathspec**: os destinos do lock são nomes de arquivo, não padrões. Se o
  *   git os interpretar como glob ou como magia de pathspec, um nome com `*`,
@@ -17,6 +17,9 @@ import { gitEm, novoProduto } from "../teste/candidatos.js";
  * - **estágios de merge**: durante um conflito o índice não tem estágio 0, e
  *   traz 1/2/3. Ler o modo de um estágio de conflito é ler um modo que o
  *   próximo commit pode não gravar.
+ * - **índice x `HEAD`**: `update-index` e commit são dois passos, e só o
+ *   segundo chega a quem clona. Entre eles o índice diz 100755 e o `HEAD` ainda
+ *   diz 100644.
  */
 
 const criados: string[] = [];
@@ -117,5 +120,76 @@ describe("modosNoIndice — estágios de merge", () => {
     expect(estagios.sort()).toEqual(["1", "2", "3"]);
 
     expect(modosNoIndice(p, ["h/a.sh"]).has("h/a.sh")).toBe(false);
+  });
+});
+
+describe("modosNoHead — o que está COMMITADO", () => {
+  it("funcional: o modo do HEAD é lido, e o pathspec continua literal", () => {
+    const p = produto();
+    arquivo(p, "h/x*.sh");
+    arquivo(p, "h/x.sh", 0o644);
+    gitEm(p, "add", "-A");
+    gitEm(p, "commit", "-q", "-m", "base");
+
+    const r = modosNoHead(p, ["h/x*.sh", "h/x.sh"]);
+    expect(r.tipo).toBe("modos");
+    if (r.tipo !== "modos") return;
+    expect([...r.modos.keys()].sort()).toEqual(["h/x*.sh", "h/x.sh"]);
+    expect(r.modos.get("h/x*.sh")).toBe("100755");
+    expect(r.modos.get("h/x.sh")).toBe("100644");
+  });
+
+  it("funcional: o update-index sem commit muda o índice e NÃO o HEAD", () => {
+    const p = produto();
+    gitEm(p, "config", "core.filemode", "false");
+    arquivo(p, "h/a.sh");
+    gitEm(p, "add", "-A");
+    gitEm(p, "commit", "-q", "-m", "instala");
+    expect(modosNoIndice(p, ["h/a.sh"]).get("h/a.sh")).toBe("100644");
+
+    gitEm(p, "update-index", "--chmod=+x", "--", "h/a.sh");
+    expect(modosNoIndice(p, ["h/a.sh"]).get("h/a.sh")).toBe("100755");
+
+    const antes = modosNoHead(p, ["h/a.sh"]);
+    expect(antes.tipo === "modos" && antes.modos.get("h/a.sh")).toBe("100644");
+
+    gitEm(p, "commit", "-q", "-m", "versiona o modo");
+    const depois = modosNoHead(p, ["h/a.sh"]);
+    expect(depois.tipo === "modos" && depois.modos.get("h/a.sh")).toBe("100755");
+  });
+
+  it("funcional: caminho rastreado e nunca commitado não aparece no HEAD", () => {
+    const p = produto();
+    arquivo(p, "h/a.sh");
+    gitEm(p, "add", "-A");
+
+    const r = modosNoHead(p, ["h/a.sh"]);
+    expect(r.tipo).toBe("modos");
+    if (r.tipo !== "modos") return;
+    expect(r.modos.has("h/a.sh")).toBe(false);
+  });
+
+  it("funcional: repositório sem nenhum commit é sem-head, não erro", () => {
+    const p = mkdtempSync(join(tmpdir(), "expx-sem-head-"));
+    criados.push(p);
+    gitEm(p, "init", "-q", "-b", "main");
+    arquivo(p, "h/a.sh");
+    gitEm(p, "add", "-A");
+
+    expect(modosNoHead(p, ["h/a.sh"]).tipo).toBe("sem-head");
+  });
+
+  it("funcional: pasta que não é repositório é indisponível, e não lança", () => {
+    const p = mkdtempSync(join(tmpdir(), "expx-sem-git-"));
+    criados.push(p);
+    arquivo(p, "h/a.sh");
+
+    const r = modosNoHead(p, ["h/a.sh"]);
+    expect(r.tipo).toBe("indisponivel");
+  });
+
+  it("funcional: sem caminho nenhum, nem chama o git", () => {
+    const r = modosNoHead("/caminho/que/nao/existe", []);
+    expect(r.tipo).toBe("modos");
   });
 });

@@ -69,6 +69,15 @@ function modoNoIndice(produto: string, rel: string): string {
   return linha.slice(0, 6);
 }
 
+/** O modo COMMITADO: o que um clone ou `git worktree add` vai materializar. */
+function modoNoHead(produto: string, rel: string): string {
+  const linha = gitEm(produto, "--literal-pathspecs", "ls-tree", "-r", "HEAD", "--", rel)
+    .split("\n")
+    .find((l) => l.endsWith(`\t${rel}`));
+  if (linha === undefined) throw new Error(`${rel} nao esta no HEAD de ${produto}`);
+  return linha.slice(0, 6);
+}
+
 /** O comando de reparo, exatamente como o `doctor` o escreveu. */
 function comandoSugerido(saida: string): string[] {
   const m = /git update-index --chmod=\+x -- ([^\n]+)/.exec(saida);
@@ -164,12 +173,33 @@ describe("modo executável — o defeito, medido", () => {
 });
 
 describe("modo executável — o reparo explícito", () => {
-  it("funcional: aplicado o comando sugerido e commitado, a worktree nova bloqueia e o doctor fica verde", () => {
+  it("funcional: preparado no indice e NAO commitado, o doctor reprova e a worktree nova ainda nasce 0644", () => {
     const sugerido = comandoSugerido(doctor(A).stdout);
     expect(sugerido).toContain(SPRINTX);
     gitEm(A, ...sugerido);
     expect(modoNoIndice(A, SPRINTX)).toBe("100755");
+    // o índice já diz 100755 — e é exatamente aqui que o falso verde aparecia
+    expect(modoNoHead(A, SPRINTX)).toBe("100644");
+
+    const r = doctor(A);
+    expect(r.status, r.stdout).toBe(1);
+    expect(r.stdout).toContain("preparado no indice mas ainda nao no HEAD");
+    expect(r.stdout).toContain("COMMITAR");
+    // o reparo do índice já foi feito: o doctor não pode mandar repeti-lo
+    expect(r.stdout).not.toContain("update-index");
+
+    // e a prova de que o doctor está certo: o clone materializa do HEAD
+    const nova = join(temporario("expx-modo-wt-indice-"), "checkout");
+    gitEm(A, "worktree", "add", "-q", "-b", "checkout-so-indice", nova);
+    criados.push(nova);
+    expect(statSync(join(nova, SPRINTX)).mode & 0o111).toBe(0);
+    expect(rodarHook(nova, SPRINTX, "git branch -D velha").status).toBe(126);
+  });
+
+  it("funcional: commitado o modo, a worktree nova bloqueia e o doctor fica verde", () => {
+    expect(modoNoIndice(A, SPRINTX)).toBe("100755");
     gitEm(A, "commit", "-q", "-m", "chore: versiona o modo executavel dos hooks");
+    expect(modoNoHead(A, SPRINTX)).toBe("100755");
 
     const verde = doctor(A);
     expect(verde.status, verde.stdout).toBe(0);

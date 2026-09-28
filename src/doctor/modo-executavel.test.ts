@@ -10,6 +10,7 @@ import {
   modosNoIndice,
 } from "../nucleo/modo-executavel.js";
 import { verificarModoExecutavel, type Achado } from "./verificadores.js";
+import type { ConsultaAoHead } from "../nucleo/modo-executavel.js";
 import { gitEm, novoProduto } from "../teste/candidatos.js";
 
 /**
@@ -43,18 +44,32 @@ function arquivo(raiz: string, rel: string, modo: number): void {
   chmodSync(caminho, modo);
 }
 
+/**
+ * Os achados, com as três sondas injetadas.
+ *
+ * `head` omitido significa "o HEAD espelha o índice": o commit já aconteceu. É
+ * o estado saudável, e deixá-lo implícito mantém cada teste falando de uma
+ * coisa só.
+ */
 function achados(
   raiz: string,
   executaveis: readonly string[],
   indice: Record<string, string>,
   preservaBit: boolean,
+  head: ConsultaAoHead = { tipo: "modos", modos: new Map(Object.entries(indice)) },
 ): Achado[] {
   const saida: Achado[] = [];
   verificarModoExecutavel(raiz, executaveis, (a) => saida.push(a), {
     modosNoIndice: () => new Map(Object.entries(indice)),
+    modosNoHead: () => head,
     preservaBit: () => preservaBit,
   });
   return saida;
+}
+
+/** O HEAD como um mapa, para o teste não repetir o invólucro. */
+function noHead(modos: Record<string, string>): ConsultaAoHead {
+  return { tipo: "modos", modos: new Map(Object.entries(modos)) };
 }
 
 describe("executaveisDoLock", () => {
@@ -149,6 +164,66 @@ describe("verificarModoExecutavel", () => {
 
   it("funcional: nada declarado, nada a dizer", () => {
     expect(achados(temporario(), [], {}, true)).toEqual([]);
+  });
+});
+
+describe("verificarModoExecutavel — indice preparado x HEAD commitado", () => {
+  const A = ".claude/hooks/a.sh";
+
+  it("funcional: 100755 no indice e 100644 no HEAD é erro: o commit ainda não aconteceu", () => {
+    const raiz = temporario();
+    arquivo(raiz, A, 0o755);
+    const r = achados(raiz, [A], { [A]: "100755" }, true, noHead({ [A]: "100644" }));
+    expect(r).toHaveLength(1);
+    const a = r[0] as Achado;
+    expect(a.id).toBe("modo-executavel-nao-commitado");
+    expect(a.severidade).toBe("erro");
+    expect(a.problema).toContain(A);
+    expect(a.problema).toContain("100755");
+    expect(a.correcao).toContain("commit");
+    // o reparo aqui NÃO é rodar o update-index de novo: ele já foi feito
+    expect(a.correcao).not.toContain("update-index");
+  });
+
+  it("funcional: 100755 no indice e caminho ausente do HEAD é o mesmo erro", () => {
+    const raiz = temporario();
+    arquivo(raiz, A, 0o755);
+    const r = achados(raiz, [A], { [A]: "100755" }, true, noHead({}));
+    expect(r.map((a) => a.id)).toEqual(["modo-executavel-nao-commitado"]);
+  });
+
+  it("funcional: repositório sem nenhum commit acusa e diz que não há HEAD", () => {
+    const raiz = temporario();
+    arquivo(raiz, A, 0o755);
+    const r = achados(raiz, [A], { [A]: "100755" }, true, { tipo: "sem-head" });
+    expect(r).toHaveLength(1);
+    const a = r[0] as Achado;
+    expect(a.id).toBe("modo-executavel-nao-commitado");
+    expect(a.problema).toContain("nenhum commit");
+  });
+
+  it("funcional: 100644 no indice não vira os dois achados — o reparo é um só", () => {
+    const raiz = temporario();
+    arquivo(raiz, A, 0o755);
+    const r = achados(raiz, [A], { [A]: "100644" }, true, noHead({ [A]: "100644" }));
+    expect(r.map((a) => a.id)).toEqual(["modo-executavel-nao-versionado"]);
+  });
+
+  it("funcional: consulta ao HEAD inconclusiva vira aviso, e nunca acusação", () => {
+    const raiz = temporario();
+    arquivo(raiz, A, 0o755);
+    const r = achados(raiz, [A], { [A]: "100755" }, true, { tipo: "indisponivel", motivo: "git explodiu" });
+    expect(r).toHaveLength(1);
+    const a = r[0] as Achado;
+    expect(a.id).toBe("modo-executavel-head-indisponivel");
+    expect(a.severidade).toBe("aviso");
+    expect(a.problema).toContain("git explodiu");
+  });
+
+  it("funcional: fora de repositório o índice vem vazio e o HEAD nem é consultado", () => {
+    const raiz = temporario();
+    arquivo(raiz, A, 0o755);
+    expect(achados(raiz, [A], {}, true, { tipo: "indisponivel", motivo: "nao e repositorio" })).toEqual([]);
   });
 });
 

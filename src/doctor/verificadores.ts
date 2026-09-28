@@ -5,10 +5,13 @@ import { hashDoArquivo } from "../nucleo/integridade.js";
 import {
   comandoDeReparo,
   executaveisDoLock,
+  modosNoHead,
   modosNoIndice,
+  MODO_EXECUTAVEL,
   MODO_SEM_EXECUCAO,
   raizPreservaBitExecutavel,
   semBitNoDisco,
+  type ConsultaAoHead,
 } from "../nucleo/modo-executavel.js";
 import { jsonCanonico } from "../plugin/plano.js";
 import {
@@ -343,11 +346,13 @@ function verificarInstalacao(raiz: string, inst: InstalacaoTravada, push: (a: Ac
  */
 export type SondasDeModo = {
   modosNoIndice: (raiz: string, caminhos: readonly string[]) => Map<string, string>;
+  modosNoHead: (raiz: string, caminhos: readonly string[]) => ConsultaAoHead;
   preservaBit: (raiz: string) => boolean;
 };
 
 const SONDAS: SondasDeModo = {
   modosNoIndice: (raiz, caminhos) => modosNoIndice(raiz, caminhos),
+  modosNoHead: (raiz, caminhos) => modosNoHead(raiz, caminhos),
   preservaBit: raizPreservaBitExecutavel,
 };
 
@@ -362,13 +367,21 @@ const SONDAS: SondasDeModo = {
  * (Permission denied). Um verde que só vale na máquina onde a instalação foi
  * feita é pior que um vermelho.
  *
- * São dois achados independentes, porque os reparos são diferentes:
+ * São achados independentes, porque os reparos são diferentes:
  *
- * - modo versionado errado → `git update-index --chmod=+x`, feito pela pessoa,
+ * - modo 100644 no índice → `git update-index --chmod=+x`, feito pela pessoa,
  *   com commit explícito. O `expx init` NÃO resolve isto, e a mensagem diz.
+ * - 100755 no índice e não no `HEAD` → falta COMMITAR. O `update-index` já foi
+ *   rodado, e parar aqui era o falso verde mais fácil de cair: o índice diz
+ *   100755 e o `doctor` calava, mas clone e `git worktree add` materializam a
+ *   partir do `HEAD` — a worktree nova continuava nascendo 0644.
+ * - a consulta ao `HEAD` falhar → **aviso**, nunca acusação: sem prova do modo
+ *   commitado, dizer que não está commitado seria inventar. E calar também não
+ *   serve, porque a verificação ficou inconclusiva e ninguém saberia.
  * - bit ausente no disco → `expx init`, que regrava 0755.
  *
- * O ExpxDev nunca executa o `update-index`: ver `nucleo/modo-executavel.ts`.
+ * O ExpxDev nunca executa o `update-index` nem commita: ver
+ * `nucleo/modo-executavel.ts`.
  */
 export function verificarModoExecutavel(
   raiz: string,
@@ -397,6 +410,11 @@ export function verificarModoExecutavel(
     });
   }
 
+  // O `update-index` já rodado, mas o commit não: o índice diz 100755 e o HEAD
+  // não. É o estado em que o falso verde aparecia.
+  const preparados = executaveis.filter((c) => modos.get(c) === MODO_EXECUTAVEL);
+  if (preparados.length > 0) verificarModoNoHead(raiz, preparados, push, sondas);
+
   // O disco só é cobrado onde a resposta é confiável: num filesystem que não
   // distingue os dois modos, "sem bit" não quer dizer nada.
   if (!sondas.preservaBit(raiz)) return;
@@ -411,6 +429,50 @@ export function verificarModoExecutavel(
         "estiver versionado, o achado modo-executavel-nao-versionado diz como versiona-lo",
     });
   }
+}
+
+/**
+ * Dos que já estão 100755 NO ÍNDICE, quais ainda não estão assim no `HEAD`.
+ *
+ * O `git update-index --chmod=+x` e o commit são dois passos, e só o segundo
+ * chega a quem clona. Enquanto o `HEAD` não tiver 100755, o diagnóstico fica
+ * não saudável: é a única forma de o "resolvido" não valer apenas na máquina
+ * onde o `update-index` foi rodado.
+ */
+function verificarModoNoHead(
+  raiz: string,
+  preparados: readonly string[],
+  push: (a: Achado) => void,
+  sondas: SondasDeModo,
+): void {
+  const head = sondas.modosNoHead(raiz, preparados);
+  if (head.tipo === "indisponivel") {
+    push({
+      id: "modo-executavel-head-indisponivel",
+      severidade: "aviso",
+      problema:
+        "nao foi possivel conferir no HEAD o modo commitado dos executaveis gerenciados " +
+        `(${head.motivo}): a verificacao do modo COMMITADO fica inconclusiva`,
+      correcao:
+        "confira a mao com `git ls-tree -r HEAD -- <caminho>`: o modo commitado precisa ser " +
+        `${MODO_EXECUTAVEL}. Fica como aviso porque acusar sem prova seria pior que avisar`,
+    });
+    return;
+  }
+  const semHead = head.tipo === "sem-head";
+  const naoCommitados = semHead ? [...preparados] : preparados.filter((c) => head.modos.get(c) !== MODO_EXECUTAVEL);
+  if (naoCommitados.length === 0) return;
+  push({
+    id: "modo-executavel-nao-commitado",
+    severidade: "erro",
+    problema:
+      `executavel gerenciado com ${MODO_EXECUTAVEL} preparado no indice mas ainda nao no HEAD` +
+      `${semHead ? " (este repositorio nao tem nenhum commit ainda)" : ""}: ${amostra(naoCommitados)}`,
+    correcao:
+      "o modo ja esta preparado no indice; o que falta e COMMITAR. Um clone ou `git worktree add` " +
+      "materializa a partir do HEAD, nao do indice: sem o commit a worktree nova continua nascendo 0644 " +
+      "e o hook registrado por execucao direta falha com 126 (Permission denied). O ExpxDev nao commita por voce",
+  });
 }
 
 /**
