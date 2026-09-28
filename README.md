@@ -718,7 +718,7 @@ funcionando. Degradar mostrando, nunca quebrar.
 
 ```bash
 npm install
-npm test          # 767 testes em 120 arquivos, sem acesso à rede
+npm test          # 771 testes em 120 arquivos, sem acesso à rede
 npm run typecheck
 npm run build
 ```
@@ -735,7 +735,7 @@ src/
   nucleo/     catálogo das skills, resolução de versão, busca, layout, lock, integridade
   plugin/     montagem do plugin e dos manifestos, com escrita atômica
   harness/    configuração de Claude Code e OpenCode, merge de settings, backup
-  doctor/     os quatorze verificadores e o efeito de cada achado
+  doctor/     os verificadores e o efeito de cada achado
   update/     comparação com o lock, detecção de modificação local, compatibilidade de schema
   parser/     leitura do expx-schema — frontmatter, kinds, enums, descoberta e conformidade
               e a leitura do índice da memox (memoria/), com falha aberta
