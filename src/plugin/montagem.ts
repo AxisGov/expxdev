@@ -2,6 +2,16 @@ import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { montarPluginJson, montarMarketplaceJson, ORIGEM_DO_PLUGIN } from "./manifestos.js";
+import {
+  aplicarArtefatos,
+  artefato,
+  artefatosDaArvore,
+  consolidar,
+  descreverColisoes,
+  emOrdemCanonica,
+  jsonCanonico,
+  type Artefato,
+} from "./plano.js";
 
 /**
  * Monta a árvore do plugin local com as skills selecionadas.
@@ -28,6 +38,10 @@ export type SkillMontavel = {
    * `montarHooks`: é ela que carrega os hooks de verdade.
    */
   arvoreHooks?: string;
+  /** `.claude/settings.json` publicado pela skill (ver `harness/composicao.ts`). */
+  settings?: string;
+  /** `.expx/hooks.json` publicado pela skill (ver `harness/modos.ts`). */
+  modos?: string;
 };
 
 /**
@@ -69,47 +83,72 @@ type ManifestoHooks = { hooks: Record<string, unknown[]> };
  * ## Conflito entre skills
  *
  * Cada skill traz o seu `hooks.json` e todas caem na mesma pasta. Os arquivos
- * são copiados sob o namespace que a própria skill já usa (`comum/`, `runx/`,
- * `sprintx/`), então a colisão real seria duas skills com o mesmo caminho —
- * que é o `comum/` compartilhado, e nesse caso são o mesmo arquivo por
- * construção. Os eventos são concatenados: dois `PostToolUse` de skills
- * diferentes viram duas entradas, e o Claude Code roda as duas.
+ * são projetados sob o namespace que a própria skill já usa (`comum/`,
+ * `runx/`, `sprintx/`) e passam pelo plano (`plano.ts`): o mesmo caminho com
+ * bytes iguais é deduplicado, com bytes diferentes FALHA — nunca "a última
+ * skill vence". Os eventos dos manifestos são concatenados em ordem canônica
+ * (por skill), sem repetir grupo idêntico.
  */
-function montarHooks(destino: string, skills: readonly SkillMontavel[]): void {
-  const comArvore = skills.filter((s) => s.arvoreHooks !== undefined && existsSync(s.arvoreHooks));
-  if (comArvore.length === 0) return;
+export type PlanoDoPlugin =
+  | { ok: true; artefatos: Artefato[]; manifestoHooks?: ManifestoHooks }
+  | { ok: false; erro: string };
 
-  const dirHooks = join(destino, "hooks");
-  mkdirSync(dirHooks, { recursive: true });
+/** Nome do manifesto de hooks do plugin: consolidado, nunca copiado. */
+const MANIFESTO_HOOKS = "hooks.json";
 
+/**
+ * O que o plugin recebe das skills, sem escrever nada. O `init` chama isto na
+ * fase de validação, antes de tocar o projeto; `montarPlugin` chama de novo na
+ * aplicação.
+ */
+export function planejarPlugin(skills: readonly SkillMontavel[]): PlanoDoPlugin {
+  const artefatos: Artefato[] = [];
   const consolidado: ManifestoHooks = { hooks: {} };
+  const vistos = new Map<string, Set<string>>();
 
-  for (const s of comArvore) {
-    // O `hooks.json` de cada skill é consolidado, não copiado: dois arquivos
-    // com o mesmo nome se sobrescreveriam e a última skill venceria em
-    // silêncio, desligando os hooks de todas as outras.
-    cpSync(s.arvoreHooks as string, dirHooks, {
-      recursive: true,
-      filter: (origem) => basename(origem) !== "hooks.json",
-    });
+  for (const s of emOrdemCanonica(skills)) {
+    // O nome da pasta tem que continuar igual ao `name` do frontmatter: o
+    // OpenCode exige isso para descobrir a skill.
+    artefatos.push(...artefatosDaArvore(s.raizSkill, `skills/${s.nome}`, s.nome, "skill"));
+    for (const c of s.comandos) artefatos.push(artefato(c, `commands/${basename(c)}`, s.nome, "comando"));
 
-    const manifesto = join(s.arvoreHooks as string, "hooks.json");
+    if (s.arvoreHooks === undefined || !existsSync(s.arvoreHooks)) continue;
+    artefatos.push(
+      ...artefatosDaArvore(s.arvoreHooks, "hooks", s.nome, "hook", (rel) => rel !== MANIFESTO_HOOKS),
+    );
+
+    const manifesto = join(s.arvoreHooks, MANIFESTO_HOOKS);
     if (!existsSync(manifesto)) continue;
-    let lido: ManifestoHooks;
+    let lido: unknown;
     try {
-      lido = JSON.parse(readFileSync(manifesto, "utf8")) as ManifestoHooks;
-    } catch {
-      continue; // hooks.json quebrado não derruba a instalação inteira
+      lido = JSON.parse(readFileSync(manifesto, "utf8"));
+    } catch (e: unknown) {
+      return { ok: false, erro: `manifesto invalido: ${s.nome} ${MANIFESTO_HOOKS}: ${String(e)}` };
     }
-    for (const [evento, grupos] of Object.entries(lido.hooks ?? {})) {
-      if (!Array.isArray(grupos)) continue;
-      consolidado.hooks[evento] = [...(consolidado.hooks[evento] ?? []), ...grupos];
+    const hooks = (lido as { hooks?: unknown } | null)?.hooks;
+    if (typeof hooks !== "object" || hooks === null || Array.isArray(hooks)) {
+      return { ok: false, erro: `manifesto invalido: ${s.nome} ${MANIFESTO_HOOKS}: "hooks" precisa ser um objeto` };
+    }
+    for (const [evento, grupos] of Object.entries(hooks as Record<string, unknown>)) {
+      if (!Array.isArray(grupos)) {
+        return { ok: false, erro: `manifesto invalido: ${s.nome} ${MANIFESTO_HOOKS}: evento ${evento} precisa ser uma lista` };
+      }
+      const ja = vistos.get(evento) ?? new Set<string>();
+      vistos.set(evento, ja);
+      for (const g of grupos) {
+        const chave = jsonCanonico(g);
+        if (ja.has(chave)) continue;
+        ja.add(chave);
+        consolidado.hooks[evento] = [...(consolidado.hooks[evento] ?? []), g];
+      }
     }
   }
 
-  if (Object.keys(consolidado.hooks).length > 0) {
-    writeFileSync(join(dirHooks, "hooks.json"), `${JSON.stringify(consolidado, null, 2)}\n`);
-  }
+  const c = consolidar(artefatos);
+  if (!c.ok) return { ok: false, erro: descreverColisoes(c.colisoes) };
+  return Object.keys(consolidado.hooks).length > 0
+    ? { ok: true, artefatos: c.artefatos, manifestoHooks: consolidado }
+    : { ok: true, artefatos: c.artefatos };
 }
 
 /** Monta só o plugin, em `destino`. */
@@ -155,17 +194,16 @@ export function montarPlugin(
     `${JSON.stringify(montarPluginJson(versao), null, 2)}\n`,
   );
 
-  for (const s of skills) {
-    // O nome da pasta tem que continuar igual ao `name` do frontmatter: o
-    // OpenCode exige isso para descobrir a skill.
-    cpSync(s.raizSkill, join(destino, "skills", s.nome), { recursive: true });
-    for (const c of s.comandos) {
-      cpSync(c, join(destino, "commands", basename(c)));
-    }
+  // Skills, comandos e hooks passam pelo plano: colisão entre skills falha
+  // aqui, antes de escrever qualquer um deles. Sem os hooks o plugin sobe sem
+  // hook nenhum e o rastro nunca é escrito.
+  const plano = planejarPlugin(skills);
+  if (!plano.ok) throw new Error(plano.erro);
+  aplicarArtefatos(destino, plano.artefatos);
+  if (plano.manifestoHooks !== undefined) {
+    mkdirSync(join(destino, "hooks"), { recursive: true });
+    writeFileSync(join(destino, "hooks", MANIFESTO_HOOKS), `${JSON.stringify(plano.manifestoHooks, null, 2)}\n`);
   }
-
-  // Sem isto o plugin sobe sem hook nenhum e o rastro nunca é escrito.
-  montarHooks(destino, skills);
 }
 
 /**

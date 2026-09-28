@@ -1,6 +1,26 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { lerLock } from "../nucleo/lock.js";
+import { lerLock, type InstalacaoTravada } from "../nucleo/lock.js";
+import { hashDoArquivo } from "../nucleo/integridade.js";
+import {
+  comandoDeReparo,
+  executaveisDoLock,
+  modosNoHead,
+  modosNoIndice,
+  MODO_EXECUTAVEL,
+  MODO_SEM_EXECUCAO,
+  raizPreservaBitExecutavel,
+  semBitNoDisco,
+  type ConsultaAoHead,
+} from "../nucleo/modo-executavel.js";
+import { jsonCanonico } from "../plugin/plano.js";
+import {
+  descreverEntrada,
+  entradasDivergentes,
+  hashDasEntradas,
+  type DefinicaoHook,
+  type EntradaGerenciada,
+} from "../harness/composicao.js";
 import { validarRastro } from "../parser/esquema/evento.js";
 import { verificarCaminhos } from "../nucleo/caminhos.js";
 import { expxNoGitignore } from "../cli/projeto.js";
@@ -190,10 +210,280 @@ export function diagnosticar(raiz: string): Diagnostico {
     }
   }
 
+  if (l.lock.instalacao !== undefined) {
+    verificarInstalacao(raiz, l.lock.instalacao, push);
+    verificarModoExecutavel(raiz, executaveisDoLock(l.lock.instalacao), push);
+  }
   verificarHooks(raiz, push);
   verificarRastro(raiz, push);
 
   return { saudavel: achados.filter((a) => a.severidade === "erro").length === 0, achados };
+}
+
+function amostra(lista: readonly string[]): string {
+  const resto = lista.length - 5;
+  return `${lista.slice(0, 5).join(", ")}${resto > 0 ? ` e mais ${String(resto)}` : ""}`;
+}
+
+/**
+ * O estado instalado ainda é o que o lock travou?
+ *
+ * O lock cobria só a cópia das skills dentro do plugin; os hooks instalados
+ * em `.claude/hooks/`, os helpers que eles chamam (como o
+ * `catalogo-de-metodo.sh` da mergex) e o settings composto podiam mudar sem
+ * que nada acusasse — e um hook de segurança editado à mão é exatamente o que
+ * precisa aparecer. Aqui cada arquivo é conferido pelo hash, cada hook
+ * gerenciado precisa estar no settings com a definição exata, e o
+ * `.expx/hooks.json` precisa ser o que foi escrito.
+ *
+ * Mudar só o `modo` de um id é decisão legítima da pessoa: vira aviso, não
+ * erro. Qualquer outra divergência é erro.
+ */
+function verificarInstalacao(raiz: string, inst: InstalacaoTravada, push: (a: Achado) => void): void {
+  const ausentes: string[] = [];
+  const alterados: string[] = [];
+  const copiaDoPlugin = `.expx/marketplace/${ORIGEM_DO_PLUGIN.replace(/^\.\//, "")}/skills/`;
+  for (const [rel, hash] of Object.entries(inst.arquivos)) {
+    // A cópia da skill dentro do plugin já é conferida por `modificacao-local`,
+    // com a semântica que o `update` usa (aviso: decidir manter ou substituir).
+    if (rel.startsWith(copiaDoPlugin)) continue;
+    const caminho = join(raiz, ...rel.split("/"));
+    if (!existsSync(caminho)) ausentes.push(rel);
+    else if (hashDoArquivo(caminho) !== hash) alterados.push(rel);
+  }
+  if (ausentes.length > 0) {
+    push({
+      id: "artefato-ausente",
+      severidade: "erro",
+      problema: `arquivo instalado removido: ${amostra(ausentes)}`,
+      correcao: "rode `expx init` para reinstalar; hook ou helper ausente desliga a protecao em silencio",
+    });
+  }
+  if (alterados.length > 0) {
+    push({
+      id: "artefato-alterado",
+      severidade: "erro",
+      problema: `arquivo instalado difere do lock: ${amostra(alterados)}`,
+      correcao: "a alteracao manual nao e a versao travada: corrija na origem da skill e rode `expx init`",
+    });
+  }
+
+  if (inst.settings !== undefined) {
+    const entradas: EntradaGerenciada[] = inst.settings.entradas.map((e) => ({
+      evento: e.evento,
+      ...(e.matcher !== undefined ? { matcher: e.matcher } : {}),
+      hook: e.hook as DefinicaoHook,
+    }));
+    if (hashDasEntradas(entradas) !== inst.settings.hash) {
+      push({
+        id: "lock-adulterado",
+        severidade: "erro",
+        problema: "as entradas de settings do lock nao batem com o hash registrado",
+        correcao: "rode `expx init` para reconstruir o lock",
+      });
+    }
+    const faltam = entradasDivergentes(lerJson(caminhoDoSettings(raiz)), entradas);
+    if (faltam.length > 0) {
+      push({
+        id: "settings-divergente",
+        severidade: "erro",
+        problema: `hook gerenciado ausente ou alterado no .claude/settings.json: ${amostra(faltam.map(descreverEntrada))}`,
+        correcao: "rode `expx init` para recompor o settings; as entradas que sao suas ficam onde estao",
+      });
+    }
+  }
+
+  if (inst.modos !== undefined) {
+    const caminho = join(raiz, ".expx", "hooks.json");
+    if (!existsSync(caminho)) {
+      push({
+        id: "modos-ausente",
+        severidade: "erro",
+        problema: ".expx/hooks.json ausente: os hooks caem no modo padrao de cada um",
+        correcao: "rode `expx init` para recompor o manifesto de modos",
+      });
+    } else if (hashDoArquivo(caminho) !== inst.modos.hash) {
+      const atual = lerJson(caminho) as { hooks?: Record<string, unknown> } | undefined;
+      const hooks = atual?.hooks;
+      const estruturais: string[] = [];
+      const deModo: string[] = [];
+      for (const [id, cfg] of Object.entries(inst.modos.publicados)) {
+        const noArquivo = hooks?.[id];
+        if (typeof noArquivo !== "object" || noArquivo === null) {
+          estruturais.push(id);
+          continue;
+        }
+        const { modo: _m1, ...resto } = noArquivo as Record<string, unknown>;
+        const { modo: _m2, ...restoPublicado } = cfg;
+        if (jsonCanonico(resto) !== jsonCanonico(restoPublicado)) estruturais.push(id);
+        else if ((noArquivo as Record<string, unknown>)["modo"] !== cfg["modo"]) deModo.push(id);
+      }
+      if (atual === undefined || estruturais.length > 0) {
+        push({
+          id: "modos-divergente",
+          severidade: "erro",
+          problema: `.expx/hooks.json difere do composto travado${estruturais.length > 0 ? `: ${amostra(estruturais)}` : " (arquivo ilegivel)"}`,
+          correcao: "rode `expx init` para recompor; o modo que voce escolheu para cada id e preservado",
+        });
+      } else {
+        push({
+          id: "modo-alterado",
+          severidade: "aviso",
+          problema: `modo alterado localmente em .expx/hooks.json: ${amostra(deModo.length > 0 ? deModo : ["(ids fora das skills)"])}`,
+          correcao: "se foi de proposito, rode `expx init` para travar o arquivo com a sua escolha",
+        });
+      }
+    }
+  }
+}
+
+/**
+ * As três sondas que o portão de modo executável usa: o índice, o `HEAD`, e a
+ * capacidade do filesystem.
+ *
+ * Injetáveis porque dois estados que importam não são reproduzíveis na bancada:
+ * "a raiz não distingue executável de não executável" (Windows nativo,
+ * WSL/DrvFs) e "a consulta ao `HEAD` falhou por motivo inesperado". Um teste que
+ * dependesse deles seria não determinista — ou não rodaria nunca. As consultas
+ * reais ao git são medidas contra o git de verdade em
+ * `nucleo/modo-executavel-git.test.ts`, e a sonda real em
+ * `nucleo/sonda-de-bit.test.ts`.
+ */
+export type SondasDeModo = {
+  modosNoIndice: (raiz: string, caminhos: readonly string[]) => Map<string, string>;
+  modosNoHead: (raiz: string, caminhos: readonly string[]) => ConsultaAoHead;
+  preservaBit: (raiz: string) => boolean;
+};
+
+const SONDAS: SondasDeModo = {
+  modosNoIndice: (raiz, caminhos) => modosNoIndice(raiz, caminhos),
+  modosNoHead: (raiz, caminhos) => modosNoHead(raiz, caminhos),
+  preservaBit: raizPreservaBitExecutavel,
+};
+
+/**
+ * O bit de execução dos artefatos gerenciados — em disco e, principalmente,
+ * VERSIONADO.
+ *
+ * O caso que o lock e o resto do `doctor` não pegavam: eles conferem BYTES.
+ * Num produto com `core.filemode=false`, os `.sh` ficam 0755 em disco e o git
+ * registra 100644; hash, settings e modos batem, o `doctor` fica verde, e é a
+ * primeira worktree ou clone novo que materializa 0644 e mata o hook com 126
+ * (Permission denied). Um verde que só vale na máquina onde a instalação foi
+ * feita é pior que um vermelho.
+ *
+ * São achados independentes, porque os reparos são diferentes:
+ *
+ * - modo 100644 no índice → `git update-index --chmod=+x`, feito pela pessoa,
+ *   com commit explícito. O `expx init` NÃO resolve isto, e a mensagem diz.
+ * - 100755 no índice e não no `HEAD` → falta COMMITAR. O `update-index` já foi
+ *   rodado, e parar aqui era o falso verde mais fácil de cair: o índice diz
+ *   100755 e o `doctor` calava, mas clone e `git worktree add` materializam a
+ *   partir do `HEAD` — a worktree nova continuava nascendo 0644.
+ * - a consulta ao `HEAD` falhar → **aviso**, nunca acusação: sem prova do modo
+ *   commitado, dizer que não está commitado seria inventar. E calar também não
+ *   serve, porque a verificação ficou inconclusiva e ninguém saberia.
+ * - bit ausente no disco → `expx init`, que regrava 0755.
+ *
+ * O ExpxDev nunca executa o `update-index` nem commita: ver
+ * `nucleo/modo-executavel.ts`.
+ */
+export function verificarModoExecutavel(
+  raiz: string,
+  executaveis: readonly string[],
+  push: (a: Achado) => void,
+  sondas: SondasDeModo = SONDAS,
+): void {
+  if (executaveis.length === 0) return;
+
+  const modos = sondas.modosNoIndice(raiz, executaveis);
+  const naoVersionados = executaveis.filter((c) => modos.get(c) === MODO_SEM_EXECUCAO);
+  if (naoVersionados.length > 0) {
+    push({
+      id: "modo-executavel-nao-versionado",
+      severidade: "erro",
+      problema:
+        `executavel gerenciado rastreado como ${MODO_SEM_EXECUCAO} no indice do git ` +
+        `(o bit de execucao nao esta versionado): ${amostra(naoVersionados)}`,
+      // O comando fica na ÚLTIMA linha, sozinho: é o que se copia e cola. Prosa
+      // depois dele na mesma linha vira argumento colado sem ninguém notar.
+      correcao:
+        "`expx init` conserta o bit no disco, mas NAO o modo versionado: um clone ou worktree novo " +
+        "materializa 0644 e o hook registrado por execucao direta falha com 126 (Permission denied). " +
+        "O ExpxDev nunca executa este comando nem prepara o indice por voce — rode exatamente isto na " +
+        `raiz do projeto e commite o resultado:\n  ${comandoDeReparo(naoVersionados)}`,
+    });
+  }
+
+  // O `update-index` já rodado, mas o commit não: o índice diz 100755 e o HEAD
+  // não. É o estado em que o falso verde aparecia.
+  const preparados = executaveis.filter((c) => modos.get(c) === MODO_EXECUTAVEL);
+  if (preparados.length > 0) verificarModoNoHead(raiz, preparados, push, sondas);
+
+  // Os candidatos ANTES da sonda, nesta ordem e não na inversa: a sonda ESCREVE
+  // na árvore de quem pediu o diagnóstico, e no caminho saudável — o normal, em
+  // toda execução — não há nada para ela responder. Um `doctor` que escreve na
+  // raiz do projeto para dizer "está tudo bem" também falha onde a raiz é
+  // somente leitura, e sem motivo nenhum.
+  const semBit = semBitNoDisco(raiz, executaveis);
+  if (semBit.length === 0) return;
+
+  // O disco só é cobrado onde a resposta é confiável: num filesystem que não
+  // distingue os dois modos, "sem bit" não quer dizer nada.
+  if (!sondas.preservaBit(raiz)) return;
+
+  push({
+    id: "modo-executavel-sem-bit",
+    severidade: "erro",
+    problema: `executavel gerenciado sem o bit de execucao no disco: ${amostra(semBit)}`,
+    correcao:
+      "rode `expx init` para regravar o bit (este filesystem preserva o bit POSIX); se o modo tambem nao " +
+      "estiver versionado, o achado modo-executavel-nao-versionado diz como versiona-lo",
+  });
+}
+
+/**
+ * Dos que já estão 100755 NO ÍNDICE, quais ainda não estão assim no `HEAD`.
+ *
+ * O `git update-index --chmod=+x` e o commit são dois passos, e só o segundo
+ * chega a quem clona. Enquanto o `HEAD` não tiver 100755, o diagnóstico fica
+ * não saudável: é a única forma de o "resolvido" não valer apenas na máquina
+ * onde o `update-index` foi rodado.
+ */
+function verificarModoNoHead(
+  raiz: string,
+  preparados: readonly string[],
+  push: (a: Achado) => void,
+  sondas: SondasDeModo,
+): void {
+  const head = sondas.modosNoHead(raiz, preparados);
+  if (head.tipo === "indisponivel") {
+    push({
+      id: "modo-executavel-head-indisponivel",
+      severidade: "aviso",
+      problema:
+        "nao foi possivel conferir no HEAD o modo commitado dos executaveis gerenciados " +
+        `(${head.motivo}): a verificacao do modo COMMITADO fica inconclusiva`,
+      correcao:
+        "confira a mao com `git ls-tree -r HEAD -- <caminho>`: o modo commitado precisa ser " +
+        `${MODO_EXECUTAVEL}. Fica como aviso porque acusar sem prova seria pior que avisar`,
+    });
+    return;
+  }
+  const semHead = head.tipo === "sem-head";
+  const naoCommitados = semHead ? [...preparados] : preparados.filter((c) => head.modos.get(c) !== MODO_EXECUTAVEL);
+  if (naoCommitados.length === 0) return;
+  push({
+    id: "modo-executavel-nao-commitado",
+    severidade: "erro",
+    problema:
+      `executavel gerenciado com ${MODO_EXECUTAVEL} preparado no indice mas ainda nao no HEAD` +
+      `${semHead ? " (este repositorio nao tem nenhum commit ainda)" : ""}: ${amostra(naoCommitados)}`,
+    correcao:
+      "o modo ja esta preparado no indice; o que falta e COMMITAR. Um clone ou `git worktree add` " +
+      "materializa a partir do HEAD, nao do indice: sem o commit a worktree nova continua nascendo 0644 " +
+      "e o hook registrado por execucao direta falha com 126 (Permission denied). O ExpxDev nao commita por voce",
+  });
 }
 
 /**
@@ -276,12 +566,14 @@ function verificarHooks(raiz: string, push: (a: Achado) => void): void {
     return;
   }
 
-  // uma entrada por skill dona de hook, para não repetir o achado por arquivo
+  // uma entrada por skill dona de hook, para não repetir o achado por arquivo.
+  // Só conta o hook solto `<skill>-<nome>.sh`: `doctor.sh`/`teste.sh` são
+  // ferramentas da árvore de hooks, e `expx-*` é o núcleo, que não tem motor.
   const skills = new Set(
     arquivos
-      .filter((a) => a.endsWith(".sh"))
+      .filter((a) => a.endsWith(".sh") && a.includes("-"))
       .map((a) => a.split("-")[0] ?? "")
-      .filter((n) => n !== ""),
+      .filter((n) => n !== "" && n !== "expx"),
   );
 
   for (const skill of skills) {

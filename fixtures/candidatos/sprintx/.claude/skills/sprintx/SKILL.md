@@ -1,0 +1,282 @@
+---
+name: sprintx
+description: Use para planejar e implementar qualquer feature, integração, refatoração, migração ou mudança no sistema — sempre que o usuário descrever algo que quer construir, adicionar, integrar, corrigir de forma estruturada ou alterar no código, mesmo sem pedir plano, sprint ou sprintx por nome. Cobre ingestão de contexto, descoberta de requisitos, plano de sprints/fases/tasks com TDD, orquestração, auditoria e execução autônoma de ponta a ponta.
+---
+
+# sprint^x
+
+sprint^x ("sprint elevado a x") é o método de planejamento e execução de features da Expx (Exponencial).
+
+## Princípio central
+
+Todo o esforço vai para o planejamento. A execução é autônoma porque a ambiguidade já foi eliminada no planejamento. Uma pergunta feita durante a execução é sempre uma falha da fase de planejamento.
+
+## Máquina de estados
+
+As seis fases são estritamente sequenciais e a skill nunca pula fase:
+
+F1 INGESTÃO → F2 DESCOBERTA → F3 PLANO → *(F3.5 ESTIMATIVA — opcional)* → F4 ORQUESTRADOR → F5 AUDITORIA → F6 EXECUÇÃO
+
+A **F3.5 ESTIMATIVA é a única fase opcional** do método e é a única exceção à sequencialidade estrita: ela roda entre a F3 e a F4, sobre o plano pronto, **apenas quando o usuário pede estimativa**. Não é pré-requisito de nada: a ausência de `00-ESTIMATIVA.md` NUNCA impede a passagem para a F4, e a F5 não a audita nem a exige. Se o usuário não pediu estimativa, siga da F3 direto para a F4. A F3.5 nunca bloqueia o fluxo, nunca altera o plano e pode ser rodada depois, sobre um plano já auditado, sem invalidar nada.
+
+Toda transição desta máquina — entrar numa fase, abrir ou fechar uma task, registrar ou resolver bloqueio, concluir o trabalho — atualiza também `.expx/estado.json`, o arquivo de exibição que a barra de status lê (`references/09-estado.md`). Ele é **derivado e descartável**: a fase continua sendo detectada pelo disco, como na tabela abaixo, e nunca por ele. Se `.expx/` não existir no projeto, a skill segue sem gravar, sem erro e sem aviso.
+
+Antes de agir, descubra em que fase está rodando `scripts/planejamento.sh fase <slug>` (caminho relativo à raiz desta skill). Ele lê o disco em `docs/sprintx/features/<slug-da-feature>/` e responde de forma determinística; na falta de bash, aplique as mesmas duas tabelas abaixo, na mesma ordem.
+
+**Com `00-PLANEJAMENTO.md` (`kind: planejamento`), ele é a fonte primária** — o campo `estado` decide, e nenhum outro arquivo o contradiz:
+
+| `estado` em `00-PLANEJAMENTO.md` | Fase atual |
+|---|---|
+| `null`, `base/` não existe | F1 |
+| `null`, `base/` existe | F2 |
+| `aguardando_f3` | F3 |
+| `aguardando_f4` | F4 |
+| `aguardando_f5` | F5 |
+| `replanejar` | F3 — **nunca** F5 direto: o plano reprovado ainda não mudou |
+| `aprovado` | F6 |
+| `orcamento_esgotado` | **terminal** — pare; não continue automaticamente, nem para a F3, nem para a F5, nem para a F6 |
+| `replanejar_execucao` | F3 — a F6 achou `defeito_de_plano`; o plano volta à revisão, com as tasks concluídas congeladas |
+| `replanejamento_execucao_esgotado` | **terminal** — o orçamento de replanejamento da execução acabou; pare, como em `orcamento_esgotado` |
+| `replanejamento_execucao_recusado` | **terminal** — a F6 achou `defeito_de_plano`, mas o retorno não pôde abrir (motivo em `recusa_replanejamento_f6`); pare, como em `replanejamento_execucao_esgotado` |
+
+Nunca infira F5 só porque `ORQUESTRADOR.md` existe.
+
+**Sem `00-PLANEJAMENTO.md` (feature legada)**, o estado sai do disco pela tabela antiga, com uma correção — um veredito NÃO nunca devolve a feature à F5 sobre o mesmo plano:
+
+| Estado do disco | Fase atual |
+|---|---|
+| `docs/sprintx/features/<slug>/base/` não existe | F1 |
+| `base/` existe, `00-DECISOES.md` não | F2 |
+| `00-DECISOES.md` existe, `sprint-01/` não | F3 |
+| `sprint-01/` existe, `ORQUESTRADOR.md` não | F4 |
+| `ORQUESTRADOR.md` existe, `00-AUDITORIA.md` não | F5 |
+| Última linha `VEREDITO:` de `00-AUDITORIA.md` é `VEREDITO: NÃO` | F3 |
+| Última linha `VEREDITO:` de `00-AUDITORIA.md` é `VEREDITO: SIM` | F6 |
+
+A primeira transição gravada numa feature legada cria o `00-PLANEJAMENTO.md` com o estado que o disco mostra, sem teto (`references/00-schema.md`, `kind: planejamento`); dali em diante, vale a primeira tabela.
+
+**Orçamento de reprovações da F5.** Quem aciona a `sprintx` pode declarar um teto de vereditos NÃO (`max_reprovacoes_f5`, com `orcamento_declarado_por`), e o teto de replanejamentos da execução (`max_replanejamentos_f6`); a F1 grava os três exatamente como vieram, e `null` no que não veio — a `sprintx` não tem teto padrão. Sem declaração, não há teto e o laço F3 ↔ F5 segue até `VEREDITO: SIM`, como sempre. Com teto, a reprovação que o atinge leva ao estado terminal `orcamento_esgotado`: a skill para ali, sem F6 e sem nova F5 automática (`references/05-auditoria.md`).
+
+**Replanejamento da execução (retorno da F6).** Quando a F6 registra um bloqueio `defeito_de_plano`, ela não abre task nova sobre um plano que já sabe estar errado: `scripts/planejamento.sh replanejar-execucao <slug>` leva o plano de volta à revisão (F3) por um estado próprio, `replanejar_execucao`, e dali pelos portões de sempre (F4, F5) até `aprovado`. É um eixo separado do `replanejar` da F5, com orçamento próprio — `max_replanejamentos_f6`, declarado pelo mesmo caller e pelo mesmo caminho do orçamento da F5; sem ele declarado, o retorno não abre. O orçamento da F5 **continua** de onde estava: nenhum dos dois reinicia o outro. **Tasks concluídas são congeladas** durante o replanejamento: nada as apaga, renumera, reabre, reescreve ou reexecuta, e o script recusa em cada portão qualquer diferença nelas; o replanejamento mexe só no que ainda não foi concluído. O trabalho parcial **da própria task bloqueada** — o teste que ela escreveu primeiro, pela ordem TDD — não impede o retorno: o script o preserva na árvore, grava caminho, estado e hash em `parciais_replanejamento_f6` e confere em cada portão que ele continua lá, intacto e da mesma task; sujeira que não se atribui inequivocamente à task bloqueada recusa a fronteira. Com o orçamento da F6 consumido, uma nova necessidade leva ao estado terminal `replanejamento_execucao_esgotado`; quando o retorno não pode abrir por um motivo operacional — classes de bloqueio misturadas, orçamento da F6 legado ou não declarado, feature sem `00-PLANEJAMENTO.md` —, ao terminal `replanejamento_execucao_recusado`, com o motivo gravado e persistido para a retomada (`references/06-execucao.md`).
+
+**Checkpoints do planejamento.** Com Git e na branch `feature/<slug>`, o fim da F2, da F3, da F4 e todo veredito da F5 viram um commit **local** só da pasta da feature — é o que faz o planejamento sobreviver à sessão antes da F6. Sem Git, ou fora dessa branch, nada é commitado e o método segue como sempre (`references/00-schema.md`, e "Checkpoint do planejamento" em `references/02-descoberta.md`). Nessa branch, um estado gravado no disco e ainda não persistido no `HEAD` **não governa**: `fase` responde `CHECKPOINT` (código `3`), `avanca` recusa, e a única ação é `scripts/planejamento.sh checkpoint <slug>` — só depois do commit a tabela acima volta a valer.
+
+A F3.5 não aparece na tabela porque não é um estado da máquina: ela é um desvio opcional a partir da F3, disparado por pedido do usuário (ou pelo comando `/sprintx-estimar`), e o disco continua indicando F4 com ou sem `00-ESTIMATIVA.md`.
+
+Se o usuário pedir uma fase adiantada, explique o que falta e execute a fase pendente em vez de obedecer fora de ordem. Ao entrar em uma fase, leia o arquivo dela em `references/` (tabela abaixo) antes de qualquer ação — e somente o da fase atual.
+
+## Contratos
+
+### Contrato da Task — toda task declara, obrigatoriamente
+
+| Campo | Conteúdo |
+|---|---|
+| `id` | T-NN.MM |
+| `titulo` | título curto |
+| `objetivo` | uma frase |
+| `arquivos` | criados e alterados |
+| `teste_integracao` | o que valida, contra o quê |
+| `teste_funcional` | o que valida, com qual entrada e saída |
+| `criterio_aceite` | verificável, binário, sem adjetivo |
+| `depende_de` | [ids] ou [] |
+| `paralelizavel` | true \| false |
+| `status` | pendente \| em_andamento \| concluida \| bloqueada |
+
+### Contrato da Fase
+
+Objetivo, tasks que a compõem, critério de saída, com qual outra fase pode rodar em paralelo.
+
+### Contrato da Sprint
+
+Objetivo, fases, critério de saída, riscos conhecidos.
+
+## Entrega no repositório
+
+A `sprintx` termina com o código escrito e os testes verdes. Levar isso até o repositório e até
+o revisor é trabalho da [`mergex`](https://github.com/bittencourtthulio/mergex): ela adota a
+branch e o worktree que a F1 abriu (regra 21), commita cada task que fecha, e ao fim monta a
+entrega — portão de prontidão, classificação do diff por atenção humana, descrição do pull
+request e pacote para o QA.
+
+Ela entra **apenas na F6**, nos três pontos que `references/06-execucao.md` define: E0 na
+abertura do trabalho, E1 a cada task concluída, E2 a E8 no fechamento, depois do
+`FECHAMENTO.md`. A `mergex` não é uma fase, não entra na máquina de estados e não acrescenta
+campo nenhum ao contrato da task.
+
+A integração é condicional: sem a `mergex` instalada, a F6 roda exatamente como sempre. E ela
+**para no E8** — revisar e integrar código é decisão humana, nunca encadeada por esta skill.
+
+## Regras invioláveis
+
+1. Todo o esforço vai para o planejamento; pergunta feita durante a execução é sempre falha da fase de planejamento.
+2. As fases são estritamente sequenciais; nunca pule fase nem execute fora de ordem.
+3. TDD é obrigatório: o teste é escrito antes da implementação.
+4. Task só é marcada como concluída quando o teste de integração E o teste funcional passam; não existe "concluído com ressalva". Na task roda o subconjunto afetado (`suite: parcial`); a suíte inteira é cobrada uma vez, ao fechar a sprint.
+5. Toda transição (task → task, task → fase, fase → sprint) tem critério de aceite verificável, binário e sem adjetivo; critério não atendido = não avança.
+6. O paralelismo é declarado no plano para cada task e cada fase; a IA em execução nunca decide isso sozinha.
+7. Nenhuma task pode depender de decisão humana em tempo de execução.
+8. Dúvida nova durante a execução: registrar em `00-BLOQUEIOS.md`, pular a task e seguir para a próxima paralelizável; nunca parar e esperar. A exceção é o bloqueio `defeito_de_plano`: o plano aprovado é que está errado, e a F6 não segue executando sobre ele — devolve o plano ao planejamento (`replanejar_execucao`) ou, recusado o retorno, encerra com o relatório final.
+9. Na F1 nada de invenção: se a fonte não afirma, escreva "NÃO DOCUMENTADO"; todo número vem com a referência que o afirma.
+10. A F2 é a fase de entrevista: nela a IA é obrigada a perguntar, em blocos de no máximo 5 perguntas, esperando resposta entre os blocos, cobrindo os eixos mínimos. A F2 abre confirmando densidade (`mvp`/`padrao`/`completo`/`profundo`) e forma de construção (`entrevista`/`autonomo`, `references/02-descoberta.md`); o modo `autonomo` muda como os outros eixos são preenchidos — pesquisa e hipótese registrada em vez de bloco de perguntas —, nunca se a F2 pode perguntar: ela continua sendo a única fase do método que pergunta. Fora da F2, a única pergunta permitida no método inteiro é a exceção prevista na regra 11 (decisão nova detectada na F3); em qualquer outro momento, dúvida não é pergunta — é bloqueio (regra 8).
+11. A F3 bloqueia se houver PENDENTE bloqueante em `00-DECISOES.md`. Se, ao planejar, a F3 encontrar algo que exigiria decisão humana em execução, essa é a única pergunta permitida fora da F2: pergunta na hora e registra a resposta como nova decisão D-NN.
+12. Granularidade: se os dois testes da task não cabem em uma frase cada, a task está grande demais — quebre.
+13. A primeira sprint entrega a capacidade de testar (config, client, harness, fixtures), não funcionalidade de negócio.
+14. Na F5 a IA é auditora: só aponta, nunca corrige; achado de severidade ALTA manda voltar para a F3 — ou para o estado terminal `orcamento_esgotado`, quando a reprovação atinge o teto declarado pelo caller — nunca corrigir à mão o arquivo gerado.
+15. Proibido escrever código de implementação em qualquer fase antes da F6.
+16. Use sempre caminhos relativos; nunca escreva caminhos absolutos em nenhum artefato.
+17. Todo arquivo de estado é gravado com o frontmatter do contrato expx-schema v1, descrito em `references/00-schema.md`. Arquivo de estado sem frontmatter válido é considerado não entregue. Ao abrir uma pasta de trabalho que já existe e cujos arquivos não têm frontmatter, acrescente o frontmatter na próxima vez que gravar aquele arquivo, inferindo os valores da prosa existente — exceto a `classe` de bloqueio, que nunca é inferida da prosa; nunca reescreva em massa nem migre pastas que não vai tocar.
+18. Estimativa sai sempre como faixa, com premissas, invalidadores e nível de confiança. Número único é proibido.
+19. Estimativa é esforço, nunca prazo de calendário. A conversão em data é decisão humana.
+20. Todo trabalho fecha com `FECHAMENTO.md`, declarando módulo afetado, arquivos alterados e palavras-chave.
+21. Uma feature aberta por árvore de trabalho. Com git, ela nasce em worktree próprio na F1, e toda sessão que a toca trabalha de dentro dele — ver "Sessões paralelas".
+
+## Sessões paralelas
+
+Várias sessões — do mesmo harness ou de harnesses diferentes (Claude Code, OpenCode) — podem
+trabalhar ao mesmo tempo no mesmo projeto. Sem isolamento, três coisas dão errado: um `stash`
+ou uma troca de branch de uma sessão leva junto o trabalho não salvo de outra; a suíte
+inteira do fechamento de sprint reprova por causa do código que outra sessão está no meio de
+mudar; e o rastro de uma sessão acaba gravado no arquivo `.jsonl` da outra, porque
+`rastro_trabalho_id()` escolhe pela feature de `ORQUESTRADOR.md` mais recente, sem
+discriminar qual sessão está em qual.
+
+**O que resolve isso:**
+
+- **Regra 21 — worktree por feature.** Com git, a F1 abre a feature num `git worktree`
+  próprio, num diretório irmão do checkout principal, na branch `feature/<slug>`. Cada
+  feature vive isolada: `stash` e troca de branch de uma sessão não alcançam a árvore de
+  outra. Sem git, ou com o pedido explícito de "sem worktree", o comportamento é o de sempre.
+- **Reivindicação de task pelo rastro.** A F6 já grava `task_iniciada`/`task_concluida`/
+  `task_bloqueada` no rastro. O hook `task-reivindicada` avisa quando uma sessão tenta abrir
+  uma task que o rastro mostra aberta por outra sessão sem fechamento.
+- **Árvore limpa antes da suíte completa.** O portão de fechamento de sprint (ver "Portões de
+  fase e de sprint" em `references/06-execucao.md`) só roda a suíte inteira depois de
+  confirmar que a árvore não tem trabalho de outra sessão no meio. Uma árvore contaminada
+  nunca faz a sprint fechar por engano — ela simplesmente adia o portão.
+- **Identidade no rastro.** Toda linha do rastro passa a trazer `sessao` (`<harness>@<id>`) e
+  `harness`, gravados por `rastro_grava` no parâmetro `extras`.
+
+**O que vale em cada harness:** o texto do método — a regra 21, os passos de F1 e F6 — vale
+nos dois harnesses, porque os dois leem o mesmo `SKILL.md`. Os hooks bash rodam nativamente
+no Claude Code e, no OpenCode, pela ponte já existente (`.opencode/plugin/sprintx.ts`).
+MimoCode não é suportado por esta skill.
+
+## Fases → arquivos da skill
+
+| Fase | Roteiro operacional | Templates usados |
+|---|---|---|
+| Todas as que gravam arquivo | `references/00-schema.md` — **leitura obrigatória** em qualquer fase que grave arquivo de estado (F1, F2, F3, F3.5, F4, F6) | — |
+| Todas as que gravam transição | `references/08-rastro.md` — formato do rastro de eventos, lido pelo painel | — |
+| Todas as que gravam transição | `references/09-estado.md` — contrato `expx-estado` v1: o `.expx/estado.json` que a barra de status lê | — |
+| F3 e F6 (ao gravar `fases.md` e ao fechar task) | `references/09-diagrama.md` — o bloco Mermaid do grafo de tasks dentro de `fases.md`. Derivado: sua ausência é inofensiva e nunca bloqueia | `assets/TEMPLATE-fases.md` |
+| F1 a F5 (estado do planejamento) | `scripts/planejamento.sh` — cria, avança, detecta a fase e faz o checkpoint; único escritor de `00-PLANEJAMENTO.md` | `assets/TEMPLATE-PLANEJAMENTO.md` |
+| F6 (ao registrar bloqueio) | `scripts/bloqueios.sh` — único escritor de B-NN novo em `00-BLOQUEIOS.md`, sempre com `classe`; lê o legado sem classe como `legado` | `assets/TEMPLATE-BLOQUEIOS.md` |
+| F1 INGESTÃO | `references/01-ingestao.md` | `assets/TEMPLATE-base-recurso.md`, `assets/TEMPLATE-base-indice.md`, `assets/TEMPLATE-BLOQUEIOS.md` |
+| F2 DESCOBERTA | `references/02-descoberta.md` | `assets/TEMPLATE-DECISOES.md` |
+| F3 PLANO | `references/03-plano.md` | `assets/TEMPLATE-sprint.md`, `assets/TEMPLATE-fases.md`, `assets/TEMPLATE-tasks.md` |
+| F3.5 ESTIMATIVA (opcional) | `references/07-estimativa.md` | `assets/TEMPLATE-ESTIMATIVA.md`, `assets/TEMPLATE-HISTORICO.md` |
+| F4 ORQUESTRADOR | `references/04-orquestrador.md` | `assets/TEMPLATE-ORQUESTRADOR.md` |
+| F5 AUDITORIA | `references/05-auditoria.md` | — |
+| F6 EXECUÇÃO | `references/06-execucao.md` — aciona a `mergex` (E0, E1, E2–E8) quando ela estiver instalada | `assets/TEMPLATE-FECHAMENTO.md`, `assets/TEMPLATE-HISTORICO.md` |
+
+Os caminhos acima são relativos à raiz desta skill. O detalhe operacional de cada fase mora exclusivamente no reference correspondente; leia-o apenas quando a fase chegar.
+
+## Hooks e agentes
+
+Toda regra inviolável desta skill é, sozinha, uma instrução que o modelo pode esquecer numa execução longa. Hook é script determinístico: roda sempre, porque quem executa é o harness, não o modelo. Agente roda em contexto próprio e com ferramentas restritas.
+
+**Hooks e agentes não criam regra nova.** Eles garantem regras que já existem acima. Nada do método muda por causa deles.
+
+### Os hooks
+
+Todo hook de método **nasce em modo `aviso`** e só é promovido a `bloqueio` depois de rodar sem falso positivo — guiado pela lista de `regra_violada` que o painel acumulou. A razão é prática: hook que dá falso positivo é desinstalado, e junto com ele vão os que funcionavam. Os hooks de segurança são a exceção e nascem em `bloqueio`.
+
+O modo de cada hook vive em `.expx/hooks.json`, e é lá que se promove. O id é o nome do hook; o que pode colidir com o de outra skill leva o namespace (`sprintx/git-perigoso`).
+
+| Hook | Evento | Modo inicial | O que faz |
+|---|---|---|---|
+| `escopo-da-task` | `PreToolUse` (escrita) | `aviso` | Resolve pelo rastro o par TRABALHO + TASK da SESSAO corrente (nunca "a primeira `em_andamento`", nunca o id da task sozinho: `T-01.01` se repete entre features) e compara o arquivo editado com o campo `arquivos` dessa task, lendo so o plano DAQUELE trabalho — plano de outra feature nao participa, nem como fallback (DS-153). Fora da task corrente mas dentro de outra task do MESMO trabalho — `arquivo_de_task_irma` —, bloqueia sempre, mesmo em modo `aviso` (DS-149); fora de toda task do trabalho corrente, so avisa. Contexto que nao fecha — `sessao_ambigua`, `contexto_de_trabalho_divergente`, `plano_corrente_ausente`, `plano_corrente_ambiguo`, `plano_corrente_ilegivel`, `task_fora_do_plano_corrente` — bloqueia por contrato, sem abrir B-NN (DS-154) |
+| `task-so-fecha-verde` | `PreToolUse` (`tasks.md`) | `aviso` | Barra `status: concluida` quando `suite` não é `verde` nem `parcial`, ou falta `teste_integracao`/`teste_funcional` |
+| `sem-placeholder-no-plano` | `PostToolUse` (plano) | `aviso` | Acha marcador `{{...}}` de template não substituído |
+| `tdd-teste-antes` | `PostToolUse` (escrita) | `aviso` | Avisa quando a implementação nasce antes do teste. **Inativo sem `CONVENCOES.md`** — não chuta onde o teste deveria estar |
+| `segredo` | `PreToolUse` (escrita) | `bloqueio` | Barra segredo com forma reconhecível indo para arquivo versionado |
+| `sprintx/git-perigoso` | `PreToolUse` (Bash) | `bloqueio` | Barra operação de versionamento irreversível durante a execução autônoma. Caminho e id com o namespace da skill — `.claude/hooks/sprintx/git-perigoso.sh`, modo sob `sprintx/git-perigoso` —, porque a `mergex` publica um `git-perigoso` próprio em `comum/`: nenhum sobrescreve o outro, em qualquer ordem de instalação (DS-158) |
+| `task-reivindicada` | `PreToolUse` (`tasks.md`) | `aviso` | Avisa ao marcar `em_andamento` uma task que o rastro mostra aberta por outra sessão (regras 6 e 8) |
+| `arvore-limpa-antes-da-suite` | `PreToolUse` (Bash) | `aviso` | Avisa, antes de rodar a suíte, se há arquivo sujo fora do escopo declarado ou task de outra sessão em andamento |
+
+Hook de método falha **aberta**: se ele quebra, o trabalho segue. Hook de segurança falha **fechada**.
+
+**O timeout do runner é falha aberta.** O Claude Code — e o plugin do OpenCode — cancela o hook que passa do `timeout` e deixa a ferramenta executar, sem aviso ao modelo: um hook lento demais é um hook desligado. Por isso os três hooks de que a segurança depende — `escopo-da-task`, `segredo` e `git-perigoso` — são escritos para quase não criar processo (no Git Bash, cada processo novo custa de 0,5 a 2 s): o caminho comum decide com um processo externo, ou nenhum, e o bloqueio com até três (DS-157). Só esses três têm `timeout` de 30 s; os outros continuam em 10 s. O timeout maior é **margem, não a garantia**. E nenhum hook sozinho garante segurança absoluta: o hook de pré-escrita é a **primeira barreira**; a barreira posterior, que falha fechada, é o E1 da `mergex`, que commita só o que o plano dá à task.
+
+### Os agentes
+
+Os agentes de veredito têm **acesso somente de leitura**. É isso que transforma "aponta, não corrige" de instrução em impossibilidade técnica.
+
+| Agente | Fase | Ferramentas | Papel |
+|---|---|---|---|
+| `auditor-plano` | F5 | leitura | Fura o plano antes de virar código, sem ter visto o raciocínio que o gerou |
+| `revisor-testes` | F5 e F6 | leitura | Responde a uma pergunta só: esse teste passaria com a implementação errada? |
+| `investigador` | F1 (opcional) | leitura | Monta a base em contexto próprio, para não consumir o contexto principal |
+
+Quando o agente não existe no harness em uso, a fase roda como sempre rodou — a skill nunca fica bloqueada por falta de agente.
+
+### O rastro
+
+Hooks e skill gravam os eventos em `docs/eventos/<trabalho_id>.jsonl`, formato em `references/08-rastro.md`. É o que dá ao painel a linha do tempo do trabalho, quem fez o quê, e a duração real por task — esta última alimentando a calibração da F3.5, sem ninguém anotar nada.
+
+## Onde fica `docs/sprintx/features/<slug>/`
+
+Todo artefato desta skill vive sob `docs/sprintx/`, nunca solto em `docs/`. A estrutura é fixa:
+
+```
+docs/sprintx/
+  features/<slug-da-feature>/    um diretório por feature, com a estrutura completa
+    00-PLANEJAMENTO.md           estado durável do laço F3 ↔ F5, nascido na F1
+    FECHAMENTO.md                gravado ao fim da F6: o que a feature entregou, e onde
+  estimativas/HISTORICO.md       esforço real do projeto inteiro (atravessa features)
+```
+
+**Os dois níveis de artefato, e o que é versionado.** Tudo em `features/<slug>/` é
+**feature-local**. Já `estimativas/HISTORICO.md` é o **artefato global de método** da skill:
+não é produto, não pertence a task nenhuma, atravessa trabalhos e é **deliberadamente
+versionado**, porque a calibração precisa sobreviver a máquina, sessão e worktree. Os dois são
+artefatos de método e, com a `mergex` instalada, entram no commit de artefatos que antecede o
+push — a `sprintx` escreve, a `mergex` versiona.
+
+**A exceção deliberada: os checkpoints do planejamento.** Antes da F6 a `mergex` ainda não
+entrou, e um plano que só existe na árvore morre com a sessão. Por isso a `sprintx` é a dona de
+um único tipo de commit: o **checkpoint de planejamento**, local, na branch `feature/<slug>`,
+contendo **somente** `docs/sprintx/features/<slug>/**`, feito pelo `scripts/planejamento.sh` ao
+fim da F2, da F3, da F4, a cada veredito da F5, ao chegar a `orcamento_esgotado` e nas transições do
+replanejamento da execução (`replanejar_execucao`, `replanejamento_execucao_esgotado`,
+`replanejamento_execucao_recusado`). Nunca push,
+nunca `--no-verify`, nunca arquivo de produto. Sem Git o checkpoint vira aviso no rastro, e a
+`sprintx` standalone continua sem exigir Git.
+
+Fora disso ficam o rastro (`docs/eventos/`) e o `.expx/estado.json`: **estado local da
+máquina**, reescritos a cada transição e mantidos fora do versionador pelo `info/exclude` do
+repositório, não pelo `.gitignore` (`references/01-ingestao.md`). A skill nunca altera o
+`.gitignore` do projeto.
+
+O `FECHAMENTO.md` é o que torna a feature encontrável depois — por arquivo, por módulo e por
+palavra-chave (regra inviolável 20). É o equivalente, do lado Build, ao relatório técnico da
+runx; sem ele, um índice dos artefatos do projeto conheceria apenas a manutenção, e metade da
+história do sistema ficaria invisível.
+
+`docs/sprintx/` é sempre ancorado na raiz do repositório Git mais próxima do diretório de trabalho atual (o diretório que contém `.git/`). Em um monorepo sem `.git` visível no diretório de trabalho, suba diretórios até encontrar a raiz do repositório; se não houver `.git` em nenhum ancestral, use a raiz do diretório de trabalho atual. Nunca crie `docs/sprintx/` dentro de um pacote/workspace individual sem antes checar se já existe um `docs/` na raiz do repositório — se existir, crie `sprintx/` dentro dele.
+
+O prefixo `docs/sprintx/` mantém a documentação da skill agrupada e separada da documentação normal do projeto, que continua em `docs/`. `features/` isola as features umas das outras; `estimativas/` fica fora de `features/` porque o histórico é do projeto, não de uma feature.
+
+**Pastas em formato antigo.** Se você encontrar uma feature em `docs/<slug>/` (formato anterior, sem o prefixo), trabalhe nela onde está: a máquina de estados detecta a fase pelo conteúdo, não pelo caminho. Não mova pastas por conta própria — mover é decisão do usuário, e uma migração silenciosa quebraria links e histórico do repositório dele. Features novas sempre nascem em `docs/sprintx/features/<slug>/`.
+
+## Como derivar o `<slug-da-feature>`
+
+A partir do que o usuário disse, gere o slug assim:
+
+1. Pegue o nome essencial da feature (substantivos que a identificam, sem verbos de pedido como "quero", "adicionar por favor").
+2. Converta para minúsculas e remova acentos (ç → c, ã → a, é → e, ...).
+3. Substitua espaços e separadores por hífen; remova qualquer caractere fora de `a-z`, `0-9` e `-`; colapse hifens repetidos.
+4. Se já existir `docs/sprintx/features/<slug>/` compatível com o pedido, reutilize esse slug — é a mesma feature em andamento.
+5. Se o pedido for ambíguo, proponha um slug em uma linha ("Vou usar o slug `x-y-z`.") e siga em frente sem esperar confirmação.
+
+Exemplo: "adicionar exportação de relatório em CSV" → `exportacao-relatorio-csv`.

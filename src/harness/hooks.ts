@@ -1,18 +1,38 @@
-import { chmodSync, cpSync, existsSync, mkdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { SkillMontavel } from "../plugin/montagem.js";
+import {
+  aplicarArtefatos,
+  artefato,
+  artefatosDaArvore,
+  consolidar,
+  descreverColisoes,
+  emOrdemCanonica,
+  SKILL_DO_NUCLEO,
+  type Artefato,
+} from "../plugin/plano.js";
 
 /**
  * Materializa hooks de skill em `.claude/hooks/`, com a skill ao lado em
  * `.claude/skills/`.
  *
  * Os dois andam juntos por imposição do próprio hook: o do memox resolve o
- * motor como `DIR_HOOK/../skills/<nome>/assets/...`. Copiar o hook sem copiar a
- * skill produz um hook que sai `0` em silêncio — e como TODO caminho de erro
- * dele sai `0`, a instalação quebrada fica indistinguível de um projeto sem
- * artefatos. É por isso que a cópia da skill aqui é incondicional, e não
- * depende de o harness incluir `opencode` (decisões D-14 e D-15).
+ * motor como `DIR_HOOK/../skills/<nome>/assets/...`, e o da mergex chama
+ * `DIR_HOOK/../../skills/mergex/scripts/...`. Copiar o hook sem copiar a skill
+ * produz um hook que sai `0` em silêncio — e como TODO caminho de erro dele sai
+ * `0`, a instalação quebrada fica indistinguível de um projeto sem artefatos.
+ * É por isso que a cópia da skill aqui é incondicional, e não depende de o
+ * harness incluir `opencode` (decisões D-14 e D-15).
+ *
+ * A árvore de hooks da skill vai INTEIRA, com a estrutura que ela publica
+ * (`sprintx/`, `mergex/`, `comum/`): os hooks chamam bibliotecas irmãs por
+ * caminho relativo (`../comum/rastro.sh`), e copiar só o que o settings cita
+ * deixaria cada um deles sem o que carregar. O `hooks.json` da árvore é
+ * manifesto do PLUGIN, não arquivo de projeto, e fica de fora.
+ *
+ * Nada aqui escreve direto: tudo vira artefato do plano (`plano.ts`), e a
+ * colisão entre skills falha antes da primeira escrita.
  *
  * Hooks são mecanismo do Claude Code. No OpenCode isso é lacuna declarada, não
  * paridade garantida.
@@ -38,72 +58,77 @@ export function comHooks(skills: readonly SkillMontavel[]): SkillMontavel[] {
   return skills.filter((s) => (s.hooks?.length ?? 0) > 0 || s.arvoreHooks !== undefined);
 }
 
+const PASTA_DO_NUCLEO = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "nucleo", "hooks");
+
 /**
- * Copia hooks e skills para `.claude/`. Devolve os hooks instalados, na ordem,
- * para quem for registrá-los no `settings.json`.
- */
-/**
- * O lembrete de skill, do núcleo.
+ * Os hooks do núcleo.
  *
- * Ele NÃO pertence a nenhuma skill: é do método. Uma descrição de skill só
- * compete depois que o modelo decide procurar uma, e quando ele forma hipótese
- * técnica direto do relato essa decisão não acontece — a descrição, por melhor
- * que seja, nunca é lida. Medido em seis sessões seguidas com três descrições
- * diferentes. O `UserPromptSubmit` é o único ponto que roda antes disso.
+ * O lembrete NÃO pertence a nenhuma skill: é do método. Uma descrição de skill
+ * só compete depois que o modelo decide procurar uma, e quando ele forma
+ * hipótese técnica direto do relato essa decisão não acontece — a descrição,
+ * por melhor que seja, nunca é lida. Medido em seis sessões seguidas com três
+ * descrições diferentes. O `UserPromptSubmit` é o único ponto que roda antes
+ * disso. Só vai quando alguma skill traz hook.
+ *
+ * O `expx-session-sync` vai sempre. Núcleo ausente (checkout parcial) é falha
+ * aberta: o hook simplesmente não é instalado.
  */
-function instalarLembrete(dirHooks: string): HookInstalado | null {
-  const origem = join(
-    dirname(fileURLToPath(import.meta.url)),
-    "..",
-    "..",
-    "nucleo",
-    "hooks",
-    "expx-lembrete.sh",
-  );
-  if (!existsSync(origem)) return null; // núcleo ausente: falha aberta
-
-  const destino = join(dirHooks, "expx-lembrete.sh");
-  cpSync(origem, destino);
-  chmodSync(destino, 0o755);
-  return { skill: "expx", relativo: ".claude/hooks/expx-lembrete.sh" };
+function artefatosDoNucleo(comLembrete: boolean): Artefato[] {
+  const saida: Artefato[] = [];
+  const sync = join(PASTA_DO_NUCLEO, "expx-session-sync.mjs");
+  if (existsSync(sync)) saida.push({ ...artefato(sync, ".claude/hooks/expx-session-sync.mjs", SKILL_DO_NUCLEO, "nucleo"), executavel: false });
+  const lembrete = join(PASTA_DO_NUCLEO, "expx-lembrete.sh");
+  if (comLembrete && existsSync(lembrete)) saida.push(artefato(lembrete, ".claude/hooks/expx-lembrete.sh", SKILL_DO_NUCLEO, "nucleo"));
+  return saida;
 }
 
-function instalarSync(dirHooks: string): HookInstalado | null {
-  const pasta = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "nucleo", "hooks");
-  const auxiliar = join(pasta, "expx-session-sync.mjs");
-  if (!existsSync(auxiliar)) return null;
-  cpSync(auxiliar, join(dirHooks, "expx-session-sync.mjs"));
-  return { skill: "expx", relativo: ".claude/hooks/expx-session-sync.mjs" };
-}
-
-export function instalarHooks(raizProjeto: string, skills: readonly SkillMontavel[]): HookInstalado[] {
-  const alvos = comHooks(skills);
-
-  const dirHooks = join(raizProjeto, ".claude", "hooks");
-  const dirSkills = join(raizProjeto, ".claude", "skills");
-  mkdirSync(dirHooks, { recursive: true });
-  if (alvos.length > 0) mkdirSync(dirSkills, { recursive: true });
-
-  const instalados: HookInstalado[] = [];
-  const sync = instalarSync(dirHooks);
-  if (sync !== null) instalados.push(sync);
-  if (alvos.length > 0) {
-    const lembrete = instalarLembrete(dirHooks);
-    if (lembrete !== null) instalados.push(lembrete);
-  }
+/** Os artefatos de `.claude/` para o harness Claude Code. */
+export function artefatosDeHooks(skills: readonly SkillMontavel[]): Artefato[] {
+  const alvos = emOrdemCanonica(comHooks(skills));
+  const saida = artefatosDoNucleo(alvos.length > 0);
   for (const s of alvos) {
     // a skill vai junto: é o que o hook procura ao lado de si mesmo
-    cpSync(s.raizSkill, join(dirSkills, s.nome), { recursive: true });
-
+    saida.push(...artefatosDaArvore(s.raizSkill, `.claude/skills/${s.nome}`, s.nome, "skill"));
+    if (s.arvoreHooks !== undefined && existsSync(s.arvoreHooks)) {
+      saida.push(...artefatosDaArvore(s.arvoreHooks, ".claude/hooks", s.nome, "hook", (rel) => rel !== "hooks.json"));
+    }
+    // arquivo solto fora de uma árvore detectada (não acontece com os layouts
+    // atuais, mas a detecção os devolve separados)
     for (const origem of s.hooks ?? []) {
-      if (!existsSync(origem)) continue;
-      const nome = basename(origem);
-      const destino = join(dirHooks, nome);
-      cpSync(origem, destino);
-      // o bit de execução não é detalhe: sem ele o hook não roda, e não avisa
-      chmodSync(destino, 0o755);
-      instalados.push({ skill: s.nome, relativo: `.claude/hooks/${nome}` });
+      if (s.arvoreHooks !== undefined && origem.startsWith(s.arvoreHooks)) continue;
+      saida.push(artefato(origem, `.claude/hooks/${basename(origem)}`, s.nome, "hook"));
     }
   }
-  return instalados;
+  return saida;
+}
+
+/**
+ * Os hooks de registro por NOME de arquivo: núcleo, e skill que não publica
+ * `.claude/settings.json` (o memox). Skill que publica o manifesto tem os
+ * hooks registrados por ele, não por aqui.
+ */
+export function hooksPorNome(artefatos: readonly Artefato[], skills: readonly SkillMontavel[]): HookInstalado[] {
+  const semManifesto = new Map(skills.map((s) => [s.nome, s.settings === undefined]));
+  const saida: HookInstalado[] = [];
+  for (const a of artefatos) {
+    if (a.tipo !== "nucleo" && a.tipo !== "hook") continue;
+    if (a.tipo === "hook" && semManifesto.get(a.skill) !== true) continue;
+    // só o nível de cima de `.claude/hooks/`: é onde mora hook solto
+    const rel = a.destino.slice(".claude/hooks/".length);
+    if (rel.includes("/")) continue;
+    if (a.tipo === "hook" && !(rel.startsWith(`${a.skill}-`) || rel.startsWith(`${a.skill}.`))) continue;
+    saida.push({ skill: a.skill, relativo: a.destino });
+  }
+  return saida;
+}
+
+/**
+ * Copia hooks e skills para `.claude/`. Devolve os hooks de registro por nome.
+ * Colisão entre skills lança ANTES de escrever.
+ */
+export function instalarHooks(raizProjeto: string, skills: readonly SkillMontavel[]): HookInstalado[] {
+  const c = consolidar(artefatosDeHooks(skills));
+  if (!c.ok) throw new Error(descreverColisoes(c.colisoes));
+  aplicarArtefatos(raizProjeto, c.artefatos);
+  return hooksPorNome(c.artefatos, skills);
 }

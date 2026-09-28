@@ -1,0 +1,11 @@
+{
+  "expx_hooks": 1,
+  "hooks": {
+    "sem-segredo": { "modo": "bloqueio" },
+    "mergex/git-perigoso": { "modo": "bloqueio" },
+    "branch-limpa": { "modo": "bloqueio" },
+    "commit-por-task": { "modo": "aviso" },
+    "arquivo-fora-do-plano": { "modo": "aviso" },
+    "pr-so-com-portao": { "modo": "aviso" }
+  }
+}

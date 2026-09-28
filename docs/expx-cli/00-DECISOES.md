@@ -3,7 +3,7 @@ expx_schema: 1
 expx_tool: sprintx
 kind: decisoes
 trabalho_id: expx-cli
-atualizado_em: 2026-08-29
+atualizado_em: 2026-09-27
 decisoes:
   - id: D-01
     decisao: Renomear o pacote para @expx/cli com bin expx, mantendo tambem o bin expx-painel
@@ -113,6 +113,30 @@ decisoes:
     motivo: O usuario instruiu rodar ate o fim sem perguntar nada e instrucao do usuario tem precedencia
     status: fechada
     bloqueante: false
+  - id: D-19
+    decisao: SessionStart nao aplica atualizacao automatica a instalacoes que contenham origem local (commit terminado em -local); o lock congelado vence a conveniencia de sincronizacao e atualizar essas instalacoes exige acao explicita
+    alternativa_descartada: Deixar o expx update vindo de AxisGov main decidir, confiando que o comparador trata sha-local como nao comparavel por commit
+    motivo: A decisao de congelar tem de ser do proprio projeto e versionada no ExpxDev, e nao depender de um executavel de main fora do freeze; e a decisao P0.2 D-03
+    status: fechada
+    bloqueante: false
+  - id: D-20
+    decisao: O lock trava a lista de executaveis em instalacao.executaveis e o doctor reprova executavel gerenciado registrado como 100644 no indice, entregando o git update-index --chmod=+x pronto sem nunca executa-lo
+    alternativa_descartada: O init rodar git add e git update-index por conta propria, ou reescrever os settings para invocar os hooks por bash
+    motivo: Produto com core.filemode=false recebe 0755 em disco e versiona 100644, e o clone seguinte materializa 0644 com hook morto em 126; preparar o indice de quem instala e mexer em trabalho alheio, e trocar a invocacao mudaria a execucao direta que a SprintX registra
+    status: fechada
+    bloqueante: false
+  - id: D-21
+    decisao: O portao de modo executavel so fica verde quando o HEAD contem 100755, e nao quando o indice contem; o aviso do init entrega comando apenas para o que esta rastreado como 100644; toda consulta ao git usa --literal-pathspecs e so aceita o estagio 0 do indice; a sonda de bit roda apenas quando ha candidato sem bit; consulta ao HEAD que falha vira aviso e nao erro
+    alternativa_descartada: Conferir so o indice, entregar um comando unico com todos os pendentes, confiar no pathspec do git e tratar falha de consulta como ausencia de defeito
+    motivo: O indice ficar 100755 sem commit deixava o doctor verde enquanto clone e worktree nasciam 0644; um comando que inclui caminho fora do indice falha atomicamente e ensina a ignorar o aviso; pathspec do git leria nome de arquivo como padrao e devolveria modo de outro arquivo; a sonda escreve na arvore de quem pediu o diagnostico; e tratar falha de git como ausencia de defeito esconderia verificacao inconclusiva
+    status: fechada
+    bloqueante: false
+  - id: D-22
+    decisao: Fora do .sh, o bit da origem so marca um artefato como executavel se o arquivo comecar com shebang
+    alternativa_descartada: Confiar no bit da origem sozinho, como antes, ou apagar a regra do bit e deixar so a extensao .sh
+    motivo: EXPX_SKILLS_LOCAIS copia com cpSync, que preserva o modo, e origem hospedada em DrvFs aparece 0777 — o 0777 virava modo real da copia e punha SKILL.md e json em instalacao.executaveis, com o doctor exigindo update-index --chmod=+x para a instalacao inteira como erro; o shebang e sinal de conteudo, que nenhum filesystem fabrica, e apagar a regra do bit tiraria o executavel legitimo sem .sh
+    status: fechada
+    bloqueante: false
 ---
 
 # Decisões — expx-cli
@@ -142,6 +166,10 @@ D-15 | Framework de CLI escrito à mão, sem dependência nova | Adotar commande
 D-16 | Escrita atômica: montar em .expx/.tmp-<pid>/ e trocar por rename ao final | Escrever direto no destino final | promptcli2.md:93-94 exige que .expx/ nunca fique inconsistente se falhar no meio
 D-18 | O pacote publicado chama-se `expxdev`, com o binário `expx` | `expx` não-escopado, e `@expx/cli` | O npm recusou `expx` com 403 por similaridade com `expo`/`exit`/`cpx`, e o escopo `@expx` não existe no registry (404 em todo PUT). Revê o D-01: o nome do pacote mudou, o binário `expx` não
 D-17 | Todas as decisões desta F2 foram tomadas pela IA, a pedido explícito do usuário | Entrevistar o usuário em blocos de 5 perguntas, como a F2 manda | O usuário instruiu "roda tudo ate o final implementa sem me perguntar nada"; instrução do usuário tem precedência sobre a skill
+D-19 | SessionStart não aplica atualização automática a instalações que contenham origem local (`commit *-local`). O lock congelado vence a conveniência de sincronização. Atualização dessas instalações exige ação explícita | Deixar o `expx update` vindo de AxisGov/main decidir, confiando no comparador tratar `<sha>-local` como não comparável por commit | Decisão P0.2 D-03: congelar é decisão do próprio projeto, lida do lock antes de qualquer rede, e não de um executável de `main` fora do freeze. Regra em `docs/contrato/CONTRATO-expx-instalacao.md` §10
+D-20 | O lock trava `instalacao.executaveis` e o `expx doctor` REPROVA executável gerenciado registrado como `100644` no índice, com o `git update-index --chmod=+x -- …` pronto na mensagem; o bit ausente no disco (onde a raiz do projeto prova preservar o bit POSIX) é reparado por `expx init` | O `init` preparar o índice (`git add`, `git update-index`) por conta própria, ou reescrever os settings para invocar os hooks por `bash <script>` | Com `core.filemode=false` o disco fica 0755 e o git versiona `100644`: o próximo clone/worktree materializa 0644 e o hook por execução direta morre com 126, com `doctor` verde. Preparar o índice de quem instala é mexer em trabalho alheio (um `git commit -a` levaria a mudança junto de um commit alheio), e trocar a invocação mudaria a execução direta que a SprintX registra
+D-21 | O portão de modo executável só fica verde quando o **`HEAD`** contém `100755` (e não quando o índice contém); o aviso do `init` entrega comando só para o que já está rastreado como `100644`, e instrução para o resto; toda consulta ao git usa `--literal-pathspecs` e aceita só o estágio 0 do índice; a sonda do bit roda apenas quando há candidato sem bit; consulta ao `HEAD` que falha vira **aviso** | Conferir só o índice, entregar um comando único com todos os pendentes, confiar no pathspec do git, sondar sempre, e tratar falha de consulta como ausência de defeito | Índice `100755` sem commit deixava o `doctor` verde enquanto clone e `git worktree add` nasciam 0644 — falso verde que aparecia justamente para quem seguiu a instrução pela metade. `git update-index` é atômico: um caminho fora do índice derruba o comando inteiro, e comando que falha ensina a ignorar o aviso. O pathspec do git leria nome de arquivo como padrão (`x*.sh` casa `x.sh`; nome com `:` faz o git recusar a consulta). A sonda ESCREVE na árvore de quem pediu o diagnóstico. E tratar falha de git como ausência de defeito esconderia uma verificação inconclusiva: vira aviso, proporcional. Regras em `docs/contrato/CONTRATO-expx-instalacao.md` §11
+D-22 | Fora do `.sh`, o bit da origem só marca um artefato como executável se o arquivo **começar com shebang** | Confiar no bit da origem sozinho, como antes; ou apagar a regra do bit e deixar só a extensão `.sh` | `EXPX_SKILLS_LOCAIS` não clona: copia com `cpSync`, que **preserva o modo**. Origem em DrvFs (`/mnt/c`) aparece 0777, e a cópia recebe 0777 de verdade — o número deixa de ser artefato de filesystem e passa a ser o modo real que o plano mede. Resultado medido: `SKILL.md`, `.md` e `.json` entravam em `instalacao.executaveis` e o `doctor` exigia `git update-index --chmod=+x` para a instalação **inteira**, como erro. O shebang é sinal de CONTEÚDO, que nenhum filesystem fabrica; apagar a regra do bit tiraria o executável legítimo sem `.sh`. Preço aceito: binário compilado deixa de ser marcado — nenhuma skill traz binário hoje. Regra em `docs/contrato/CONTRATO-expx-instalacao.md` §11
 ```
 
 ## Pendências

@@ -1,0 +1,330 @@
+import { describe, it, expect, afterEach } from "vitest";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import {
+  avisoDeFilemode,
+  comandoDeReparo,
+  executaveisDoLock,
+  filemodeDesligado,
+  modosNoIndice,
+} from "../nucleo/modo-executavel.js";
+import { verificarModoExecutavel, type Achado } from "./verificadores.js";
+import type { ConsultaAoHead } from "../nucleo/modo-executavel.js";
+import { gitEm, novoProduto } from "../teste/candidatos.js";
+import { suportaBitExecutavel } from "../teste/fs-capacidades.js";
+
+/**
+ * O portão do modo executável, na unidade.
+ *
+ * O caso que este arquivo cobre não é o disco: é o modo VERSIONADO. Um produto
+ * com `core.filemode=false` recebe os `.sh` como 0755 em disco e o `git add`
+ * registra 100644 — o clone ou a worktree seguinte materializa 0644 e o hook
+ * registrado por execução direta morre com 126 (Permission denied).
+ *
+ * As sondas são injetadas de propósito: o ramo "a raiz não preserva o bit"
+ * (Windows nativo, WSL/DrvFs) não é reproduzível no filesystem da bancada, e
+ * um teste que dependesse dele seria não determinista.
+ *
+ * Fronteira de plataforma: a classificação em achados é dado do GIT (índice e
+ * `HEAD`) e vale igual em toda plataforma — por isso os testes dela não criam
+ * arquivo em disco, para não acoplar a um bit que o Windows não expressa. Só o
+ * caso cujo assunto É o bit presente fica condicionado, e um por um.
+ */
+
+const criados: string[] = [];
+afterEach(() => {
+  for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true });
+});
+
+function temporario(prefixo = "expx-modo-"): string {
+  const d = mkdtempSync(join(tmpdir(), prefixo));
+  criados.push(d);
+  return d;
+}
+
+function arquivo(raiz: string, rel: string, modo: number): void {
+  const caminho = join(raiz, ...rel.split("/"));
+  mkdirSync(dirname(caminho), { recursive: true });
+  writeFileSync(caminho, "#!/usr/bin/env bash\nexit 0\n");
+  chmodSync(caminho, modo);
+}
+
+/**
+ * Os achados, com as três sondas injetadas.
+ *
+ * `head` omitido significa "o HEAD espelha o índice": o commit já aconteceu. É
+ * o estado saudável, e deixá-lo implícito mantém cada teste falando de uma
+ * coisa só.
+ */
+function achados(
+  raiz: string,
+  executaveis: readonly string[],
+  indice: Record<string, string>,
+  preservaBit: boolean,
+  head: ConsultaAoHead = { tipo: "modos", modos: new Map(Object.entries(indice)) },
+): Achado[] {
+  const saida: Achado[] = [];
+  verificarModoExecutavel(raiz, executaveis, (a) => saida.push(a), {
+    modosNoIndice: () => new Map(Object.entries(indice)),
+    modosNoHead: () => head,
+    preservaBit: () => preservaBit,
+  });
+  return saida;
+}
+
+/** O HEAD como um mapa, para o teste não repetir o invólucro. */
+function noHead(modos: Record<string, string>): ConsultaAoHead {
+  return { tipo: "modos", modos: new Map(Object.entries(modos)) };
+}
+
+describe("executaveisDoLock", () => {
+  it("funcional: o lock novo é a fonte de verdade, em ordem canônica", () => {
+    const lista = executaveisDoLock({
+      arquivos: { ".claude/hooks/a.sh": "h", ".claude/hooks/b.sh": "h", "README.md": "h" },
+      executaveis: [".claude/hooks/b.sh", ".claude/hooks/a.sh"],
+    });
+    expect(lista).toEqual([".claude/hooks/a.sh", ".claude/hooks/b.sh"]);
+  });
+
+  it("funcional: lock antigo, sem o campo, cai no fallback dos .sh e continua válido", () => {
+    const lista = executaveisDoLock({
+      arquivos: {
+        ".claude/hooks/sprintx/git-perigoso.sh": "h",
+        ".claude/hooks/expx-session-sync.mjs": "h",
+        ".claude/skills/sprintx/SKILL.md": "h",
+        ".claude/hooks/comum/base.sh": "h",
+      },
+    });
+    expect(lista).toEqual([".claude/hooks/comum/base.sh", ".claude/hooks/sprintx/git-perigoso.sh"]);
+  });
+
+  it("funcional: o campo vazio é declaração de que nada é executável, não ausência", () => {
+    expect(executaveisDoLock({ arquivos: { "a.sh": "h" }, executaveis: [] })).toEqual([]);
+  });
+});
+
+describe("comandoDeReparo", () => {
+  it("funcional: o comando é exato, com -- antes dos caminhos", () => {
+    expect(comandoDeReparo([".claude/hooks/a.sh", ".claude/hooks/b.sh"])).toBe(
+      "git update-index --chmod=+x -- .claude/hooks/a.sh .claude/hooks/b.sh",
+    );
+  });
+});
+
+describe("verificarModoExecutavel", () => {
+  it("funcional: executável rastreado como 100644 é erro, com o comando pronto e sem executá-lo", () => {
+    // Sem arquivo em disco de propósito: o assunto aqui é o ÍNDICE, e um
+    // executável declarado e ausente não gera achado de modo (coberto adiante).
+    // Criá-lo com 0755 acoplaria o teste a um bit que o Windows não expressa.
+    const raiz = temporario();
+    const r = achados(
+      raiz,
+      [".claude/hooks/comum/base.sh", ".claude/hooks/sprintx/git-perigoso.sh"],
+      { ".claude/hooks/comum/base.sh": "100644", ".claude/hooks/sprintx/git-perigoso.sh": "100755" },
+      true,
+    );
+    expect(r).toHaveLength(1);
+    const a = r[0] as Achado;
+    expect(a.id).toBe("modo-executavel-nao-versionado");
+    expect(a.severidade).toBe("erro");
+    expect(a.problema).toContain("100644");
+    expect(a.problema).toContain(".claude/hooks/comum/base.sh");
+    // só o que está errado entra no comando
+    expect(a.correcao).toContain("git update-index --chmod=+x -- .claude/hooks/comum/base.sh");
+    expect(a.correcao).not.toContain("git-perigoso.sh");
+    expect(a.correcao).toContain("expx init");
+    expect(a.correcao).toContain("126");
+  });
+
+  it("funcional: executável ainda não rastreado não é erro: não há modo versionado errado", () => {
+    expect(achados(temporario(), [".claude/hooks/a.sh"], {}, true)).toEqual([]);
+  });
+
+  it("funcional: sem o bit no disco, com raiz que preserva o bit, o reparo é o expx init", () => {
+    const raiz = temporario();
+    arquivo(raiz, ".claude/hooks/a.sh", 0o644);
+    const r = achados(raiz, [".claude/hooks/a.sh"], { ".claude/hooks/a.sh": "100755" }, true);
+    expect(r).toHaveLength(1);
+    const a = r[0] as Achado;
+    expect(a.id).toBe("modo-executavel-sem-bit");
+    expect(a.severidade).toBe("erro");
+    expect(a.problema).toContain(".claude/hooks/a.sh");
+    expect(a.correcao).toContain("expx init");
+  });
+
+  it("funcional: raiz sem suporte confiável ao bit não produz achado de disco", () => {
+    const raiz = temporario();
+    arquivo(raiz, ".claude/hooks/a.sh", 0o644);
+    expect(achados(raiz, [".claude/hooks/a.sh"], { ".claude/hooks/a.sh": "100755" }, false)).toEqual([]);
+    // o modo versionado, esse continua sendo conferido: não depende do filesystem
+    const r = achados(raiz, [".claude/hooks/a.sh"], { ".claude/hooks/a.sh": "100644" }, false);
+    expect(r.map((a) => a.id)).toEqual(["modo-executavel-nao-versionado"]);
+  });
+
+  it("funcional: executável declarado e ausente do disco não vira achado de modo (é artefato-ausente)", () => {
+    const raiz = temporario();
+    expect(achados(raiz, [".claude/hooks/a.sh"], { ".claude/hooks/a.sh": "100755" }, true)).toEqual([]);
+  });
+
+  it("funcional: nada declarado, nada a dizer", () => {
+    expect(achados(temporario(), [], {}, true)).toEqual([]);
+  });
+});
+
+describe("verificarModoExecutavel — a sonda escreve, então só sonda se precisar", () => {
+  const A = ".claude/hooks/a.sh";
+
+  /** Quantas vezes a sonda que ESCREVE na pasta do projeto foi chamada. */
+  function sondagens(raiz: string, modoNoDisco: number, indice: Record<string, string>): number {
+    arquivo(raiz, A, modoNoDisco);
+    let vezes = 0;
+    verificarModoExecutavel(
+      raiz,
+      [A],
+      () => undefined,
+      {
+        modosNoIndice: () => new Map(Object.entries(indice)),
+        modosNoHead: () => noHead(indice),
+        preservaBit: () => {
+          vezes += 1;
+          return true;
+        },
+      },
+    );
+    return vezes;
+  }
+
+  // O único caso deste arquivo que precisa de um arquivo COM o bit no disco. No
+  // Windows isso não é expressável: medido em NTFS, `chmodSync` não altera
+  // `stat().mode`, que fica 0666 para qualquer modo pedido — inclusive 0777. Lá
+  // todo executável conta como candidato, e é por isso que a sonda real
+  // (`raizPreservaBitExecutavel`) devolve `false` de saída no win32 e o disco
+  // nunca é cobrado. Condicionado a UM teste, e não ao arquivo.
+  it.skipIf(!suportaBitExecutavel())(
+    "funcional: com o bit presente em todos, a sonda não é chamada e nada é escrito na raiz",
+    () => {
+      expect(sondagens(temporario(), 0o755, { [A]: "100755" })).toBe(0);
+    },
+  );
+
+  it("funcional: sem candidato porque o arquivo nem existe, a sonda não é chamada", () => {
+    const raiz = temporario();
+    let vezes = 0;
+    verificarModoExecutavel(
+      raiz,
+      [A],
+      () => undefined,
+      {
+        modosNoIndice: () => new Map([[A, "100755"]]),
+        modosNoHead: () => noHead({ [A]: "100755" }),
+        preservaBit: () => {
+          vezes += 1;
+          return true;
+        },
+      },
+    );
+    expect(vezes).toBe(0);
+  });
+
+  it("funcional: havendo candidato sem bit, a sonda é chamada uma vez", () => {
+    expect(sondagens(temporario(), 0o644, { [A]: "100755" })).toBe(1);
+  });
+});
+
+describe("verificarModoExecutavel — indice preparado x HEAD commitado", () => {
+  const A = ".claude/hooks/a.sh";
+
+  // Nenhum teste deste bloco cria arquivo em disco: o assunto é a comparação
+  // entre índice e HEAD, que é dado do git e igual em toda plataforma.
+
+  it("funcional: 100755 no indice e 100644 no HEAD é erro: o commit ainda não aconteceu", () => {
+    const r = achados(temporario(), [A], { [A]: "100755" }, true, noHead({ [A]: "100644" }));
+    expect(r).toHaveLength(1);
+    const a = r[0] as Achado;
+    expect(a.id).toBe("modo-executavel-nao-commitado");
+    expect(a.severidade).toBe("erro");
+    expect(a.problema).toContain(A);
+    expect(a.problema).toContain("100755");
+    expect(a.correcao).toContain("commit");
+    // o reparo aqui NÃO é rodar o update-index de novo: ele já foi feito
+    expect(a.correcao).not.toContain("update-index");
+  });
+
+  it("funcional: 100755 no indice e caminho ausente do HEAD é o mesmo erro", () => {
+    const r = achados(temporario(), [A], { [A]: "100755" }, true, noHead({}));
+    expect(r.map((a) => a.id)).toEqual(["modo-executavel-nao-commitado"]);
+  });
+
+  it("funcional: repositório sem nenhum commit acusa e diz que não há HEAD", () => {
+    const r = achados(temporario(), [A], { [A]: "100755" }, true, { tipo: "sem-head" });
+    expect(r).toHaveLength(1);
+    const a = r[0] as Achado;
+    expect(a.id).toBe("modo-executavel-nao-commitado");
+    expect(a.problema).toContain("nenhum commit");
+  });
+
+  it("funcional: 100644 no indice não vira os dois achados — o reparo é um só", () => {
+    const r = achados(temporario(), [A], { [A]: "100644" }, true, noHead({ [A]: "100644" }));
+    expect(r.map((a) => a.id)).toEqual(["modo-executavel-nao-versionado"]);
+  });
+
+  it("funcional: consulta ao HEAD inconclusiva vira aviso, e nunca acusação", () => {
+    const r = achados(temporario(), [A], { [A]: "100755" }, true, { tipo: "indisponivel", motivo: "git explodiu" });
+    expect(r).toHaveLength(1);
+    const a = r[0] as Achado;
+    expect(a.id).toBe("modo-executavel-head-indisponivel");
+    expect(a.severidade).toBe("aviso");
+    expect(a.problema).toContain("git explodiu");
+  });
+
+  it("funcional: fora de repositório o índice vem vazio e o HEAD nem é consultado", () => {
+    expect(achados(temporario(), [A], {}, true, { tipo: "indisponivel", motivo: "nao e repositorio" })).toEqual([]);
+  });
+});
+
+describe("consulta ao git", () => {
+  it("integração: pasta que não é repositório git não produz modo nenhum e não lança", () => {
+    const raiz = temporario();
+    arquivo(raiz, ".claude/hooks/a.sh", 0o755);
+    expect(modosNoIndice(raiz, [".claude/hooks/a.sh"]).size).toBe(0);
+    expect(filemodeDesligado(raiz)).toBe(false);
+    expect(avisoDeFilemode(raiz, [".claude/hooks/a.sh"])).toBeUndefined();
+  });
+
+  it("integração: com core.filemode=false, o índice registra 100644 e o aviso separa os dois casos", () => {
+    const p = novoProduto("expx-modo-produto-");
+    criados.push(p);
+    gitEm(p, "config", "core.filemode", "false");
+    arquivo(p, ".claude/hooks/a.sh", 0o755);
+
+    expect(filemodeDesligado(p)).toBe(true);
+    // ainda fora do índice: o aviso já vale, mas SEM prometer um comando que falharia
+    const antes = avisoDeFilemode(p, [".claude/hooks/a.sh"]);
+    expect(antes).toContain("core.filemode=false");
+    expect(antes).toContain(".claude/hooks/a.sh");
+    expect(antes).not.toContain("git update-index --chmod=+x --");
+    expect(antes).toContain("expx doctor");
+
+    gitEm(p, "add", "-A");
+    expect(modosNoIndice(p, [".claude/hooks/a.sh"]).get(".claude/hooks/a.sh")).toBe("100644");
+    // rastreado como 100644: agora o comando exato é prometido
+    expect(avisoDeFilemode(p, [".claude/hooks/a.sh"])).toContain(
+      "git update-index --chmod=+x -- .claude/hooks/a.sh",
+    );
+
+    gitEm(p, "update-index", "--chmod=+x", "--", ".claude/hooks/a.sh");
+    expect(modosNoIndice(p, [".claude/hooks/a.sh"]).get(".claude/hooks/a.sh")).toBe("100755");
+    // resolvido no índice: o aviso some, mesmo com core.filemode ainda falso
+    expect(avisoDeFilemode(p, [".claude/hooks/a.sh"])).toBeUndefined();
+  });
+
+  it("integração: com core.filemode=true o aviso não aparece", () => {
+    const p = novoProduto("expx-modo-produto-");
+    criados.push(p);
+    gitEm(p, "config", "core.filemode", "true");
+    arquivo(p, ".claude/hooks/a.sh", 0o755);
+    expect(filemodeDesligado(p)).toBe(false);
+    expect(avisoDeFilemode(p, [".claude/hooks/a.sh"])).toBeUndefined();
+  });
+});

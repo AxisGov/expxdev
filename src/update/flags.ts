@@ -166,6 +166,11 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
     origens,
   });
 
+  // O `update` remonta pelo `init`, então os avisos dele são os mesmos avisos —
+  // inclusive o do `core.filemode=false`, que vale para os arquivos que acabaram
+  // de ser reescritos. Engoli-los aqui esconderia o defeito justamente no
+  // comando que traz artefato novo.
+  mensagens.push(...init.avisos);
   mensagens.push(AVISO_ROLLBACK);
   return {
     ok: init.ok,

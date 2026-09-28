@@ -30,6 +30,14 @@ export type Layout =
        * de `hooks` deixava o plugin sem nenhum hook — medido em produção.
        */
       arvoreHooks?: string;
+      /**
+       * O registro dos hooks no Claude Code que a skill publica
+       * (`.claude/settings.json` do repositório). É entrada de COMPOSIÇÃO: o
+       * `init` incorpora os hooks dele ao settings do projeto.
+       */
+      settings?: string;
+      /** O manifesto de modos (`.expx/hooks.json`) que a skill publica. */
+      modos?: string;
     }
   | { ok: false; erro: string };
 
@@ -133,6 +141,14 @@ function acharArvoreHooks(raiz: string): string | undefined {
   return undefined;
 }
 
+function arquivoSeExiste(caminho: string): string | undefined {
+  try {
+    return statSync(caminho).isFile() ? caminho : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function detectarLayout(raizRepo: string, nomeEsperado: string): Layout {
   const skillMd = acharSkillMd(raizRepo);
   if (skillMd === undefined) return { ok: false, erro: `SKILL.md nao encontrado em ${raizRepo}` };
@@ -143,6 +159,8 @@ export function detectarLayout(raizRepo: string, nomeEsperado: string): Layout {
     return { ok: false, erro: `nome da skill e "${nome}", esperado "${nomeEsperado}"` };
   }
   const arvore = acharArvoreHooks(raizRepo);
+  const settings = arquivoSeExiste(join(raizRepo, ".claude", "settings.json"));
+  const modos = arquivoSeExiste(join(raizRepo, ".expx", "hooks.json"));
   return {
     ok: true,
     nome,
@@ -150,5 +168,7 @@ export function detectarLayout(raizRepo: string, nomeEsperado: string): Layout {
     comandos: acharComandos(raizRepo, nome),
     hooks: acharHooks(raizRepo, nome),
     ...(arvore !== undefined ? { arvoreHooks: arvore } : {}),
+    ...(settings !== undefined ? { settings } : {}),
+    ...(modos !== undefined ? { modos } : {}),
   };
 }

@@ -9,11 +9,22 @@ function ambiente(raiz: string): Record<string, string> {
   return { EXPX_AXIS_CACHE: join(raiz, "cache"), HOME: raiz };
 }
 
-function projeto(comLock = true): string {
+function travada(repositorio: string, commit: string): Record<string, unknown> {
+  return { repositorio, referencia: "main", travado: false, commit, resolvido_em: "2026-09-27", arquivos: {} };
+}
+
+function lockCom(skills: Record<string, unknown>): Record<string, unknown> {
+  return { lock_version: 2, cli_version: "0.7.0", harness: ["claude"], skills };
+}
+
+const LOCK_REMOTO = lockCom({ sprintx: travada("https://github.com/AxisGov/SprintX", "ed7c7343165fc3b7dcf97895568015632c07457c") });
+
+/** `null`: projeto sem lock. String: bytes exatos do lock (para lock inválido). */
+function projeto(lock: Record<string, unknown> | string | null = LOCK_REMOTO): string {
   const raiz = mkdtempSync(join(tmpdir(), "expx-session-sync-"));
-  if (comLock) {
+  if (lock !== null) {
     mkdirSync(join(raiz, ".expx"));
-    writeFileSync(join(raiz, ".expx", "expx-lock.json"), "{}\n");
+    writeFileSync(join(raiz, ".expx", "expx-lock.json"), typeof lock === "string" ? lock : `${JSON.stringify(lock, null, 2)}\n`);
   }
   return raiz;
 }
@@ -444,7 +455,7 @@ describe("sincronização Axis no SessionStart", () => {
   });
 
   it("funcional: projeto sem lock não tenta sync", () => {
-    const raiz = projeto(false);
+    const raiz = projeto(null);
     try {
       const chamadas: string[][] = [];
       const executar = (_arquivo: string, argumentos: string[]) => { chamadas.push(argumentos); return ""; };

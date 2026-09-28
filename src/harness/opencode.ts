@@ -1,12 +1,22 @@
-import { cpSync, mkdirSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename } from "node:path";
 import type { SkillMontavel } from "../plugin/montagem.js";
+import {
+  aplicarArtefatos,
+  artefato,
+  artefatosDaArvore,
+  consolidar,
+  descreverColisoes,
+  emOrdemCanonica,
+  type Artefato,
+} from "../plugin/plano.js";
 
 /**
  * Materializa as skills e comandos onde o OpenCode os encontra.
  *
  * O namespace de plugin é do Claude Code; no OpenCode ele não existe. Por isso
- * os comandos vão sem prefixo.
+ * os comandos vão sem prefixo — e é exatamente onde duas skills podem publicar
+ * o mesmo nome de arquivo. Passam pelo plano: mesmo nome com bytes diferentes
+ * falha antes de escrever, em vez de a última skill vencer.
  *
  * As skills vão SOMENTE para `.claude/skills/`, que o OpenCode lê nativamente.
  * Copiar também para `.opencode/skills/` criaria duas cópias do mesmo `name`
@@ -18,16 +28,19 @@ import type { SkillMontavel } from "../plugin/montagem.js";
  * entre `.opencode/command/` e `.opencode/commands/`; normalizar aqui evita
  * projetos inconsistentes.
  */
-export function materializarOpenCode(raizProjeto: string, skills: readonly SkillMontavel[]): void {
-  const dirSkills = join(raizProjeto, ".claude", "skills");
-  const dirComandos = join(raizProjeto, ".opencode", "commands");
-  mkdirSync(dirSkills, { recursive: true });
-  mkdirSync(dirComandos, { recursive: true });
-
-  for (const s of skills) {
+export function artefatosOpenCode(skills: readonly SkillMontavel[]): Artefato[] {
+  const saida: Artefato[] = [];
+  for (const s of emOrdemCanonica(skills)) {
     // O nome da pasta precisa continuar igual ao `name` do frontmatter: o
     // OpenCode exige que os dois batam para descobrir a skill.
-    cpSync(s.raizSkill, join(dirSkills, s.nome), { recursive: true });
-    for (const c of s.comandos) cpSync(c, join(dirComandos, basename(c)));
+    saida.push(...artefatosDaArvore(s.raizSkill, `.claude/skills/${s.nome}`, s.nome, "skill"));
+    for (const c of s.comandos) saida.push(artefato(c, `.opencode/commands/${basename(c)}`, s.nome, "comando"));
   }
+  return saida;
+}
+
+export function materializarOpenCode(raizProjeto: string, skills: readonly SkillMontavel[]): void {
+  const c = consolidar(artefatosOpenCode(skills));
+  if (!c.ok) throw new Error(descreverColisoes(c.colisoes));
+  aplicarArtefatos(raizProjeto, c.artefatos);
 }
