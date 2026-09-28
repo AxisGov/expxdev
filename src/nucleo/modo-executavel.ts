@@ -54,16 +54,39 @@ export function executaveisDoLock(inst: InstalacaoTravada): string[] {
     .sort();
 }
 
-function comEspaco(caminho: string): string {
-  return caminho.includes(" ") ? `"${caminho}"` : caminho;
+/**
+ * Os caracteres que atravessam um shell POSIX sem significado nenhum.
+ *
+ * Fora desta lista, o caminho vai entre aspas SIMPLES. Aspas duplas não servem:
+ * dentro delas `$VAR`, `$(…)` e crase continuam valendo, e um nome de arquivo
+ * com `$(touch x)` EXECUTARIA ao ser colado. Dentro de aspas simples nada é
+ * interpretado — nem `$`, nem crase, nem `;`, nem `*`, nem newline — e o único
+ * caractere que precisa de tratamento é a própria aspa simples, que fecha a
+ * citação, sai crua com barra invertida e reabre: `'…'\''…'`.
+ */
+const SEM_SIGNIFICADO_NO_SHELL = /^[A-Za-z0-9_./@:%+=,-]+$/;
+
+/**
+ * Um caminho pronto para ser colado num shell.
+ *
+ * Caminho que começa por `-` também é citado. Não é o shell que o confunde com
+ * opção — é o leitor humano, e o `--` do comando já protege o git; citar deixa
+ * o argumento visivelmente um caminho.
+ */
+export function citarParaShell(caminho: string): string {
+  if (SEM_SIGNIFICADO_NO_SHELL.test(caminho) && !caminho.startsWith("-")) return caminho;
+  return `'${caminho.split("'").join(`'\\''`)}'`;
 }
 
 /**
  * O comando que versiona o bit. Literal, para ser copiado e colado: é a pessoa
  * que o executa, no momento em que decidir commitar o modo.
+ *
+ * O `--` não é enfeite: sem ele, um caminho que começa por `-` viraria opção do
+ * git.
  */
 export function comandoDeReparo(caminhos: readonly string[]): string {
-  return `git update-index --chmod=+x -- ${caminhos.map(comEspaco).join(" ")}`;
+  return `git update-index --chmod=+x -- ${caminhos.map(citarParaShell).join(" ")}`;
 }
 
 function git(raiz: string, args: readonly string[], ambiente?: NodeJS.ProcessEnv): string {
