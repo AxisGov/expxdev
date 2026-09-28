@@ -161,20 +161,26 @@ describe("consulta ao git", () => {
     expect(avisoDeFilemode(raiz, [".claude/hooks/a.sh"])).toBeUndefined();
   });
 
-  it("integração: com core.filemode=false, o índice registra 100644 e o aviso do init traz o comando", () => {
+  it("integração: com core.filemode=false, o índice registra 100644 e o aviso separa os dois casos", () => {
     const p = novoProduto("expx-modo-produto-");
     criados.push(p);
     gitEm(p, "config", "core.filemode", "false");
     arquivo(p, ".claude/hooks/a.sh", 0o755);
 
     expect(filemodeDesligado(p)).toBe(true);
-    // ainda não rastreado: o aviso do init já vale, porque o commit é o próximo passo
+    // ainda fora do índice: o aviso já vale, mas SEM prometer um comando que falharia
     const antes = avisoDeFilemode(p, [".claude/hooks/a.sh"]);
     expect(antes).toContain("core.filemode=false");
-    expect(antes).toContain("git update-index --chmod=+x -- .claude/hooks/a.sh");
+    expect(antes).toContain(".claude/hooks/a.sh");
+    expect(antes).not.toContain("git update-index --chmod=+x --");
+    expect(antes).toContain("expx doctor");
 
     gitEm(p, "add", "-A");
     expect(modosNoIndice(p, [".claude/hooks/a.sh"]).get(".claude/hooks/a.sh")).toBe("100644");
+    // rastreado como 100644: agora o comando exato é prometido
+    expect(avisoDeFilemode(p, [".claude/hooks/a.sh"])).toContain(
+      "git update-index --chmod=+x -- .claude/hooks/a.sh",
+    );
 
     gitEm(p, "update-index", "--chmod=+x", "--", ".claude/hooks/a.sh");
     expect(modosNoIndice(p, [".claude/hooks/a.sh"]).get(".claude/hooks/a.sh")).toBe("100755");

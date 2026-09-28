@@ -230,6 +230,12 @@ export function semBitNoDisco(raiz: string, caminhos: readonly string[]): string
   return saida;
 }
 
+/** Poucos caminhos por extenso; o resto por contagem. Aviso não é relatório. */
+function amostraDeCaminhos(lista: readonly string[]): string {
+  const resto = lista.length - 5;
+  return `${lista.slice(0, 5).join(", ")}${resto > 0 ? ` e mais ${String(resto)}` : ""}`;
+}
+
 /**
  * O aviso do `init` quando o repositório ignora o bit de execução.
  *
@@ -238,9 +244,22 @@ export function semBitNoDisco(raiz: string, caminhos: readonly string[]): string
  * registrado como 100755 no índice — nesse último caso o modo JÁ está
  * versionado e repetir o aviso só ensinaria a ignorá-lo.
  *
- * Avisa também sobre o que ainda não foi rastreado: é o caso normal logo
- * depois do primeiro `init`, e é exatamente aí que o `git add` seguinte
- * gravaria 100644.
+ * ## Por que os dois casos são separados
+ *
+ * O aviso entrega um comando para copiar e colar, e `git update-index` é
+ * ATÔMICO: um caminho fora do índice derruba o comando inteiro, e nem os
+ * caminhos que estavam certos são tocados. Medido: `error: <caminho>: cannot add
+ * to the index - missing --add option?` e `fatal: Unable to process path`.
+ * Logo depois do primeiro `init` é exatamente esse o estado — nada rastreado.
+ * Um comando que falha ensina a ignorar o aviso, e aí o defeito que ele
+ * denuncia volta a passar em silêncio.
+ *
+ * Então: só o que está rastreado como 100644 entra no comando. O que não tem
+ * entrada 100644 no índice (não rastreado, ou em conflito de merge) ganha
+ * instrução — adicionar conscientemente e voltar pelo `expx doctor`. Sem
+ * `--add` no `update-index` e sem o ExpxDev preparar índice: o índice é o
+ * trabalho em curso de quem instalou, e um `git commit -a` depois levaria a
+ * mudança junto de um commit alheio.
  */
 export function avisoDeFilemode(
   raiz: string,
@@ -252,16 +271,31 @@ export function avisoDeFilemode(
   const modos = modosNoIndice(raiz, executaveis, ambiente);
   const pendentes = executaveis.filter((c) => modos.get(c) !== MODO_EXECUTAVEL);
   if (pendentes.length === 0) return undefined;
+  const comComando = pendentes.filter((c) => modos.get(c) === MODO_SEM_EXECUCAO);
+  const semComando = pendentes.filter((c) => modos.get(c) !== MODO_SEM_EXECUCAO);
   const quantos =
     pendentes.length === 1
       ? "1 executavel gerenciado foi gravado"
       : `${String(pendentes.length)} executaveis gerenciados foram gravados`;
-  // O comando fica na ÚLTIMA linha, sozinho: é o que se copia e cola.
-  return [
+  const linhas = [
     `core.filemode=false neste repositorio: ${quantos} 0755 no disco,`,
-    "mas o git vai registrar 100644 — e um clone ou worktree novo materializa 0644, em que o hook",
-    "registrado por execucao direta falha com 126 (Permission denied). O ExpxDev nao toca no indice:",
-    "depois do `git add`, rode exatamente isto e commite o resultado:",
-    `  ${comandoDeReparo(pendentes)}`,
-  ].join("\n");
+    "mas o git registra 100644 — e um clone ou worktree novo materializa 0644, em que o hook",
+    "registrado por execucao direta falha com 126 (Permission denied). O ExpxDev nao toca no indice.",
+  ];
+  // Primeiro o que NÃO tem comando, para o comando ficar na última linha,
+  // sozinho: é o que se copia e cola, e prosa depois dele vira argumento colado.
+  if (semComando.length > 0) {
+    linhas.push(
+      `Ainda sem entrada 100644 no indice (nao rastreado, ou em conflito de merge): ${amostraDeCaminhos(semComando)}`,
+      "  para estes o `git update-index` falharia e derrubaria o comando inteiro. Adicione-os ao indice",
+      "  quando decidir versiona-los e rode `expx doctor`: ele entrega o comando exato do que estiver rastreado.",
+    );
+  }
+  if (comComando.length > 0) {
+    linhas.push(
+      "Rastreados como 100644 — rode exatamente isto na raiz do projeto e commite o resultado:",
+      `  ${comandoDeReparo(comComando)}`,
+    );
+  }
+  return linhas.join("\n");
 }
