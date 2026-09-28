@@ -390,6 +390,25 @@ Por fim, o harness é configurado: `.claude/settings.json` é **mesclado** — c
 preservando todo o resto, e recusando-se a "consertar" JSON inválido — e o `.opencode/` é
 materializado se você escolheu o OpenCode.
 
+> **O bit de execução dos hooks, e por que `chmod 0755` não basta.** Os hooks são registrados
+> por **execução direta** (`"$CLAUDE_PROJECT_DIR"/.claude/hooks/sprintx/git-perigoso.sh`), e o
+> `init` grava cada executável com 0755 no disco. Num repositório com `core.filemode=false`
+> isso **não é suficiente**: o git ignora o bit do sistema de arquivos, `git add` registra
+> `100644` e o commit leva `100644`. No projeto onde a instalação foi feita nada aparece —
+> bytes, hashes e configuração batem, e o arquivo continua 0755 em disco — mas o primeiro
+> `git clone` ou `git worktree add` materializa 0644 e o hook morre com **126 (Permission
+> denied)**: a proteção desaparece em silêncio. Medido: `chmod 0755` + `git add` grava
+> `100644`; só `git update-index --chmod=+x` grava `100755`.
+>
+> O `init` avisa e entrega o comando pronto para os executáveis **já rastreados** como
+> `100644`. Para os que ainda não estão no índice ele não entrega comando nenhum: o
+> `update-index` é atômico e falharia por causa deles, então o aviso pede que você os adicione
+> quando decidir versioná-los e rode `expx doctor` depois. **O ExpxDev nunca roda `git add`,
+> nunca roda `git update-index` e nunca prepara o índice por você** — o índice é o seu trabalho
+> em curso, e um `git commit -a` posterior levaria a mudança junto de um commit alheio.
+> Versionar o modo é decisão explícita, com commit explícito, e o `doctor` continua reprovando
+> até o `HEAD` conter `100755`.
+
 > **Sobre o registro do plugin.** Declarar o marketplace no `settings.json` do projeto **não
 > instala** o plugin — isso foi verificado em execução, não presumido da documentação. O `init`
 > chama `claude plugin marketplace add` e `claude plugin install`. Como esse registro grava um
@@ -493,11 +512,12 @@ skill encolhe entre versões.
 npx expxdev doctor
 ```
 
-Quatorze verificações, cada uma com severidade e correção sugerida. Achado de severidade `aviso`
-não derruba a saída; `erro` sim.
+Vinte e sete verificações, cada uma com severidade e correção sugerida. Achado de severidade
+`aviso` não derruba a saída; `erro` sim.
 
 | Verificação | Severidade |
 |---|---|
+| `.gitignore` não ignora o `.expx/` | erro |
 | `.expx/` existe | erro |
 | lock legível | erro |
 | lock não é de uma versão futura do CLI | erro |
@@ -508,10 +528,37 @@ não derruba a saída; `erro` sim.
 | `.claude/settings.json` presente | erro |
 | plugin habilitado no `settings.json` | erro |
 | sem colisão de nome entre Claude Code e OpenCode | erro |
+| nenhum arquivo instalado foi removido | erro |
+| nenhum arquivo instalado foi alterado (hash de cada um) | erro |
+| o próprio lock não foi adulterado | erro |
+| as entradas de hook do `settings.json` são as que o lock travou | erro |
+| `.expx/hooks.json` presente quando o lock declara modos | erro |
+| `.expx/hooks.json` é o composto que foi escrito | erro |
 | hook instalado tem o motor da skill ao lado | erro |
-| `.gitignore` não ignora o `.expx/` | erro |
+| executável gerenciado **rastreado como `100644`** no índice do git | erro |
+| executável gerenciado com `100755` no índice e **ainda não no `HEAD`** | erro |
+| executável gerenciado **sem o bit de execução no disco** | erro |
 | disco não divergiu do lock (modificação local) | aviso |
 | skill travada em versão publicada | aviso |
+| modo de um hook alterado localmente em `.expx/hooks.json` | aviso |
+| consulta do modo commitado ao `HEAD` respondeu | aviso |
+| rastro dentro do contrato `expx-eventos` | aviso |
+| rastro sem chave não declarada | aviso |
+
+> **Os três achados de modo executável, e por que são três.** Os reparos são diferentes, e um
+> reparo errado não conserta nada. `100644` no índice → `git update-index --chmod=+x`, com a
+> lista exata na mensagem, rodado **por você** e commitado; `expx init` regrava o bit no disco
+> mas **não** o modo versionado, e a mensagem diz isso. `100755` no índice e não no `HEAD` → o
+> que falta é **commitar**: clone e `git worktree add` materializam a partir do `HEAD`, não do
+> índice, e sem o commit a worktree nova continua nascendo 0644. Bit ausente no disco →
+> `expx init`, e este só é cobrado onde a resposta é confiável: a raiz do projeto precisa provar
+> que distingue executável de não executável, numa sonda de dois tempos escrita **ali** (nunca
+> em `/tmp`, que pode estar em outro sistema de arquivos). Windows nativo e WSL/DrvFs reprovam a
+> sonda e o disco não é cobrado — é assim que o falso positivo é evitado. A sonda só roda
+> quando há candidato: no caminho saudável o `doctor` não escreve nada no seu projeto.
+>
+> Quando a consulta ao `HEAD` falha por motivo inesperado, o achado é **aviso**, não erro:
+> acusar sem prova seria pior, e calar deixaria a verificação inconclusiva sem ninguém saber.
 
 > **Por que "hook sem motor" é erro.** Todo caminho de falha dos hooks do memox termina em
 > `exit 0`, de propósito: falha aberta nunca trava o prompt de quem está trabalhando. O preço é
@@ -671,12 +718,12 @@ funcionando. Degradar mostrando, nunca quebrar.
 
 ```bash
 npm install
-npm test          # 295 testes, sem acesso à rede
+npm test          # 767 testes em 120 arquivos, sem acesso à rede
 npm run typecheck
 npm run build
 ```
 
-TypeScript strict + ESM, Node ≥ 20.19, Vitest em três projetos (`servidor`, `ui`, `cli`). A
+TypeScript strict + ESM, Node ≥ 20.19, Vitest em quatro projetos (`servidor`, `watch-ink`, `cli`, `ui`). A
 suíte roda contra repositórios git locais criados em tempo de teste — nenhum teste depende de
 rede nem do estado do GitHub.
 

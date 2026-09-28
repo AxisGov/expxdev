@@ -241,15 +241,43 @@ desaparece em silêncio. Medido: `chmod 0755` + `git add` grava `100644`; só
 explícito. O que o ExpxDev faz:
 
 - **`expx init`**: avisa quando o repositório tem `core.filemode=false` e algum
-  executável gerenciado ainda não está `100755` no índice, com o comando pronto
-  na última linha do aviso. Sem git, fora de repositório, `core.filemode`
-  diferente de `false`, ou modo já versionado: nenhum aviso.
+  executável gerenciado ainda não está `100755` no índice. O aviso separa dois
+  casos, porque `git update-index` é **atômico** e um caminho fora do índice
+  derrubaria o comando inteiro (`error: <caminho>: cannot add to the index -
+  missing --add option?`, `fatal: Unable to process path <caminho>`):
+  - **rastreado como `100644`**: recebe o comando exato
+    `git update-index --chmod=+x -- <caminhos>`, na **última linha** do aviso,
+    sozinho — é o que se copia e cola, e prosa depois dele na mesma linha viraria
+    argumento colado;
+  - **sem entrada `100644` no índice** (não rastreado ainda, ou em conflito de
+    merge): **nenhum comando**. O aviso nomeia os caminhos e pede que sejam
+    adicionados ao índice quando a pessoa decidir versioná-los, e que
+    `expx doctor` seja rodado depois. Sem `--add` no `update-index`, e sem o
+    ExpxDev preparar índice.
+
+  Sem git, fora de repositório, `core.filemode` diferente de `false`, ou modo já
+  versionado em todos: nenhum aviso. O mesmo aviso sai no `expx update`, que
+  remonta pelo `init`.
 - **`expx doctor`**, achado `modo-executavel-nao-versionado` (**erro**):
   executável gerenciado rastreado como `100644` no índice. A mensagem traz
   `git update-index --chmod=+x -- <caminhos>` com a lista exata, diz que o
   `expx init` conserta o disco mas **não** o modo versionado, e não executa
   nada. Executável ainda não rastreado não é achado: não há modo versionado
   errado.
+- **`expx doctor`**, achado `modo-executavel-nao-commitado` (**erro**):
+  executável com `100755` no índice e **ainda não no `HEAD`**. O `update-index`
+  e o commit são dois passos, e só o segundo chega a quem clona: `git clone` e
+  `git worktree add` materializam a partir do `HEAD`, não do índice. Parar no
+  índice era falso verde — a worktree nova continuava nascendo 0644 com o hook
+  morto em 126. **O diagnóstico fica não saudável até o `HEAD` conter `100755`.**
+  A correção diz o que falta — COMMITAR — e não repete o `update-index`, que já
+  foi feito; o ExpxDev também não commita. Repositório sem nenhum commit entra no
+  mesmo achado, nomeando a causa.
+- **`expx doctor`**, achado `modo-executavel-head-indisponivel` (**aviso**): a
+  consulta do modo commitado ao `HEAD` falhou por motivo inesperado. É **aviso**,
+  e não erro, porque acusar sem prova seria pior; e não é silêncio, porque a
+  verificação ficou inconclusiva e isso precisa aparecer. A correção diz como
+  conferir à mão (`git ls-tree -r HEAD -- <caminho>`).
 - **`expx doctor`**, achado `modo-executavel-sem-bit` (**erro**): executável
   gerenciado sem bit de execução no disco. Reparo: `expx init`. Só é cobrado
   quando a **raiz do projeto** prova preservar o bit — uma sonda de dois tempos
@@ -257,3 +285,29 @@ explícito. O que o ExpxDev faz:
   pode estar em outro filesystem. Windows nativo (o `chmod` não muda o modo) e
   WSL/DrvFs (todo arquivo aparece 0777) reprovam a sonda e o disco não é
   cobrado — é assim que o falso positivo é evitado.
+
+### Como o git é consultado
+
+- **Caminho é nome de arquivo, nunca padrão.** Toda consulta usa
+  `--literal-pathspecs`. Sem isso o git leria os destinos do lock como pathspec:
+  `x*.sh` casaria também `x.sh` (devolvendo o modo de outro arquivo), `q?.sh`
+  arrastaria `qa.sh`, `a[b].sh` viraria classe de caractere, e um nome iniciado
+  por `:` faria o git **recusar a consulta inteira** — e o caminho errado
+  passaria como "não rastreado".
+- **Só o estágio 0 do índice conta.** Em merge conflitado o índice traz os
+  estágios 1/2/3 (base, nosso, deles), que podem divergir no modo, e nenhum deles
+  é o modo do próximo commit. O caminho conta como ausente: conflito aberto é
+  estado legítimo e transitório, e acusar modo no meio dele seria acusar um modo
+  que ninguém escolheu ainda.
+- **A raiz do projeto é somente leitura no caminho saudável.** A única escrita
+  que o `doctor` faria ali é a sonda do bit — e ela só roda quando existe
+  candidato sem bit no disco. Instalação saudável não escreve nada no projeto de
+  quem pediu o diagnóstico, e o `doctor` não falha em raiz somente leitura por
+  causa de uma sonda que não tinha pergunta a responder. Qualquer erro da sonda
+  (sem permissão, raiz inexistente) devolve "sem prova, sem achado", e a pasta da
+  sonda é removida em todos os caminhos de saída.
+- **Erro de git não é escondido.** Fora de repositório e sem git, o índice vem
+  vazio e nada é afirmado — não há o que acusar. Quando o índice responde mas a
+  consulta ao `HEAD` falha, a verificação do modo commitado fica inconclusiva e
+  isso sai como **aviso** (`modo-executavel-head-indisponivel`), na severidade
+  proporcional: não derruba a saída, e não deixa ninguém achar que foi conferido.

@@ -126,8 +126,8 @@
   <div class="cartoes">
     <div class="cartao"><div class="cartao__num">7</div><div class="cartao__rot">skills no catálogo</div></div>
     <div class="cartao"><div class="cartao__num">7</div><div class="cartao__rot">subcomandos do CLI</div></div>
-    <div class="cartao"><div class="cartao__num">441</div><div class="cartao__rot">testes, sem rede</div></div>
-    <div class="cartao"><div class="cartao__num">16</div><div class="cartao__rot">verificações do doctor</div></div>
+    <div class="cartao"><div class="cartao__num">767</div><div class="cartao__rot">testes, sem rede</div></div>
+    <div class="cartao"><div class="cartao__num">27</div><div class="cartao__rot">verificações do doctor</div></div>
   </div>
 
   <p style="margin-top:8px">
@@ -1446,6 +1446,19 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
   <code>.claude/skills/&lt;nome&gt;/</code> e o script para <code>.claude/hooks/</code>, com
   <code>chmod 0755</code> — sem o bit de execução o hook não roda e não avisa. A skill vai junto porque o hook
   resolve o próprio motor como um caminho relativo a si mesmo.</p>
+  <div class="nota nota--aviso">
+    <svg class="nota__icone" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 2.2 14.6 13.4H1.4z" stroke-linejoin="round"/><path d="M8 6.6v3.1M8 11.6v.1" stroke-linecap="round"/></svg>
+    <div><p><strong>E o <code>chmod 0755</code> sozinho NÃO basta.</strong> Os hooks são registrados por
+    execução direta, e num repositório com <code>core.filemode=false</code> o git ignora o bit do sistema de
+    arquivos: <code>git add</code> registra <code>100644</code> e o commit leva <code>100644</code>. No projeto
+    onde a instalação foi feita nada aparece — o arquivo continua 0755 em disco — e o primeiro
+    <code>git clone</code> ou <code>git worktree add</code> materializa 0644: o hook morre com
+    <strong>126 (Permission denied)</strong> e a proteção desaparece em silêncio. Medido:
+    <code>chmod 0755</code> + <code>git add</code> grava <code>100644</code>; só
+    <code>git update-index --chmod=+x</code> grava <code>100755</code>. O <code>init</code> avisa com o comando
+    pronto para o que já está rastreado, e o <code>doctor</code> reprova até o <code>HEAD</code> conter
+    <code>100755</code>.</p></div>
+  </div>
 
   <h2 id="init-harness">Claude Code e OpenCode lado a lado</h2>
   <div class="tabela-caixa"><table>
@@ -1624,7 +1637,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
 <section class="secao" id="doctor">
   <p class="eyebrow">Referência do CLI</p>
   <h1>O que o doctor verifica</h1>
-  <p class="lede">Dezesseis verificações, cada uma com severidade e correção sugerida. Achado de severidade
+  <p class="lede">Vinte e sete verificações, cada uma com severidade e correção sugerida. Achado de severidade
   <code>aviso</code> não derruba a saída; <code>erro</code> sim.</p>
 
   <div class="codigo" data-copiar>
@@ -1647,12 +1660,40 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
       <tr><td><code>plugin-nao-habilitado</code></td><td><span class="selo selo--erro">erro</span></td><td>o plugin não está habilitado na configuração</td></tr>
       <tr><td><code>colisao-de-nome</code></td><td><span class="selo selo--erro">erro</span></td><td>a mesma skill existe em <code>.claude/skills/</code> e em <code>.opencode/skills/</code></td></tr>
       <tr><td><code>&lt;skill&gt;-sem-motor</code></td><td><span class="selo selo--erro">erro</span></td><td>hook instalado sem a pasta de <code>assets</code> da skill ao lado</td></tr>
+      <tr><td><code>artefato-ausente</code></td><td><span class="selo selo--erro">erro</span></td><td>arquivo que a instalação escreveu foi removido</td></tr>
+      <tr><td><code>artefato-alterado</code></td><td><span class="selo selo--erro">erro</span></td><td>arquivo instalado não bate com o hash travado no lock</td></tr>
+      <tr><td><code>lock-adulterado</code></td><td><span class="selo selo--erro">erro</span></td><td>o próprio lock foi editado à mão</td></tr>
+      <tr><td><code>settings-divergente</code></td><td><span class="selo selo--erro">erro</span></td><td>entrada de hook gerenciada ausente ou alterada no <code>settings.json</code></td></tr>
+      <tr><td><code>modos-ausente</code></td><td><span class="selo selo--erro">erro</span></td><td><code>.expx/hooks.json</code> ausente, e os hooks caem no modo padrão de cada um</td></tr>
+      <tr><td><code>modos-divergente</code></td><td><span class="selo selo--erro">erro</span></td><td><code>.expx/hooks.json</code> difere do composto travado, além do campo <code>modo</code></td></tr>
+      <tr><td><code>modo-executavel-nao-versionado</code></td><td><span class="selo selo--erro">erro</span></td><td>executável gerenciado rastreado como <code>100644</code> no índice: o bit não está versionado</td></tr>
+      <tr><td><code>modo-executavel-nao-commitado</code></td><td><span class="selo selo--erro">erro</span></td><td><code>100755</code> preparado no índice e ainda não no <code>HEAD</code>: falta commitar</td></tr>
+      <tr><td><code>modo-executavel-sem-bit</code></td><td><span class="selo selo--erro">erro</span></td><td>executável gerenciado sem o bit de execução no disco</td></tr>
       <tr><td><code>modificacao-local</code></td><td><span class="selo selo--aviso">aviso</span></td><td>o disco divergiu do lock</td></tr>
       <tr><td><code>skill-nao-travada</code></td><td><span class="selo selo--aviso">aviso</span></td><td>a skill segue uma branch, não uma versão publicada</td></tr>
+      <tr><td><code>modo-alterado</code></td><td><span class="selo selo--aviso">aviso</span></td><td>o modo de um hook foi mudado à mão em <code>.expx/hooks.json</code> — decisão legítima</td></tr>
+      <tr><td><code>modo-executavel-head-indisponivel</code></td><td><span class="selo selo--aviso">aviso</span></td><td>a consulta do modo commitado ao <code>HEAD</code> falhou: a verificação ficou inconclusiva</td></tr>
       <tr><td><code>rastro-fora-do-contrato</code></td><td><span class="selo selo--aviso">aviso</span></td><td>linhas do rastro fora do contrato <code>expx-eventos</code></td></tr>
       <tr><td><code>rastro-chave-nao-declarada</code></td><td><span class="selo selo--aviso">aviso</span></td><td>chaves não declaradas no rastro</td></tr>
     </tbody>
   </table></div>
+
+  <div class="nota nota--info">
+    <svg class="nota__icone" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6.4"/><path d="M8 7.2v4M8 4.9v.1" stroke-linecap="round"/></svg>
+    <div><p><strong>Por que o modo executável rende três achados, e não um.</strong> Porque os reparos são
+    diferentes, e o reparo errado não conserta nada. <code>100644</code> no índice →
+    <code>git update-index --chmod=+x</code>, com a lista exata na mensagem, rodado <strong>por você</strong> e
+    commitado; o <code>expx init</code> regrava o bit no disco mas <strong>não</strong> o modo versionado.
+    <code>100755</code> no índice e não no <code>HEAD</code> → falta <strong>commitar</strong>: clone e
+    <code>git worktree add</code> materializam a partir do <code>HEAD</code>, não do índice, e sem o commit a
+    worktree nova continua nascendo 0644 com o hook morto em 126. Bit ausente no disco → <code>expx init</code>,
+    e só onde a resposta é confiável: a raiz do projeto precisa provar que distingue executável de não
+    executável, numa sonda de dois tempos escrita ali — que só roda quando há candidato, para o
+    <code>doctor</code> não escrever no seu projeto para dizer que está tudo bem.</p>
+    <p><strong>O ExpxDev nunca roda <code>git add</code>, nunca roda <code>git update-index</code> e nunca
+    commita.</strong> Preparar o índice de quem instalou é mexer em trabalho alheio, e um <code>git commit -a</code>
+    posterior levaria a mudança junto de um commit que não é esse.</p></div>
+  </div>
 
   <div class="nota nota--info">
     <svg class="nota__icone" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6.4"/><path d="M8 7.2v4M8 4.9v.1" stroke-linecap="round"/></svg>
@@ -2353,20 +2394,20 @@ docs/contrato/  <span class="tok-com">os contratos compartilhados pelas oito ski
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
     <pre><code><span class="tok-cmd">npm</span> install
-<span class="tok-cmd">npm</span> test          <span class="tok-com"># 441 testes em 92 arquivos, sem acesso à rede</span>
+<span class="tok-cmd">npm</span> test          <span class="tok-com"># 767 testes em 120 arquivos, sem acesso à rede</span>
 <span class="tok-cmd">npm</span> run typecheck
 <span class="tok-cmd">npm</span> run build</code></pre>
   </div>
 
   <div class="cartoes">
-    <div class="cartao"><div class="cartao__num">441</div><div class="cartao__rot">testes, sem rede</div></div>
-    <div class="cartao"><div class="cartao__num">92</div><div class="cartao__rot">arquivos de teste</div></div>
-    <div class="cartao"><div class="cartao__num">3</div><div class="cartao__rot">projetos no runner</div></div>
+    <div class="cartao"><div class="cartao__num">767</div><div class="cartao__rot">testes, sem rede</div></div>
+    <div class="cartao"><div class="cartao__num">120</div><div class="cartao__rot">arquivos de teste</div></div>
+    <div class="cartao"><div class="cartao__num">4</div><div class="cartao__rot">projetos no runner</div></div>
     <div class="cartao"><div class="cartao__num">0</div><div class="cartao__rot">testes que dependem de rede</div></div>
   </div>
 
-  <p>TypeScript estrito e ESM, Node ≥ 20.19, com o runner dividido em três projetos —
-  <code>servidor</code>, <code>ui</code> e <code>cli</code>. A suíte roda contra repositórios git locais
+  <p>TypeScript estrito e ESM, Node ≥ 20.19, com o runner dividido em quatro projetos —
+  <code>servidor</code>, <code>watch-ink</code>, <code>cli</code> e <code>ui</code>. A suíte roda contra repositórios git locais
   criados em tempo de teste: <strong>nenhum teste depende de rede nem do estado do GitHub.</strong></p>
 
   <h2 id="dev-seguranca">Segurança e limites</h2>

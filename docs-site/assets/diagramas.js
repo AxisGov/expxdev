@@ -230,7 +230,7 @@ D.init = `
       <text x="476" y="76" fill="var(--ink-muted)">settings.json</text>
       <text x="600" y="76" font-size="9.5" fill="var(--ink-faint)" font-family="var(--sans)">mesclado, com backup datado</text>
       <text x="476" y="96" fill="var(--ink-muted)">hooks/&lt;nome&gt;.sh</text>
-      <text x="600" y="96" font-size="9.5" fill="var(--ink-faint)" font-family="var(--sans)">chmod 0755</text>
+      <text x="600" y="96" font-size="9.5" fill="var(--ink-faint)" font-family="var(--sans)">chmod 0755 no disco; o modo versionado e decisao sua</text>
       <text x="476" y="116" fill="var(--ink-muted)">skills/&lt;nome&gt;/</text>
       <text x="600" y="116" font-size="9.5" fill="var(--ink-faint)" font-family="var(--sans)">so quando ha hook</text>
       <text x="476" y="138" fill="var(--ink-faint)" font-size="10">o motor do hook fica ao lado dele</text>
