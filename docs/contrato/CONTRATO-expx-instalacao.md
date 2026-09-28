@@ -313,6 +313,29 @@ gravado 0644. Nenhuma skill do catálogo traz binário — os executáveis de ho
 todos `.sh` com shebang, e o único `.mjs` roda por `node` e já é declarado não
 executável. Se um dia houver binário, é esta regra que precisa crescer.
 
+### A fronteira de plataforma
+
+O defeito tem uma metade POSIX e uma metade portável, e confundir as duas leva a
+conclusão errada sobre o que o portão garante em cada sistema.
+
+- **Portável, porque é dado do git:** o índice registrar `100644`, o `doctor`
+  acusar, o `git update-index --chmod=+x` da pessoa corrigir o índice, o commit
+  levar o modo ao `HEAD`, e o diagnóstico ficar verde só depois disso. Vale igual
+  no Linux e no Windows, e é certificado nos dois.
+- **Só POSIX:** o **126**. No Windows o hook não morre por falta de bit — quem o
+  executa é o Git Bash, que decide por shebang e não pelo modo do arquivo, e ele
+  bloqueia com 2 mesmo sem bit. Medido em NTFS: `chmodSync` não altera
+  `stat().mode` (fica 0666 para qualquer modo pedido, 0777 inclusive), então
+  "0644 materializado" não é estado alcançável lá.
+
+Por isso o portão **não cobra o disco no Windows** (a sonda reprova de saída), e
+por isso `instalacao.executaveis` de uma instalação feita no Windows contém
+apenas os `.sh`: sem bit expressável, a regra do bit não promove nada. É
+degradação segura — no Windows o bit não é o que faz o hook rodar. A consequência
+a registrar é que a lista pode diferir entre quem instalou no Windows e quem
+instalou em POSIX, se algum dia uma skill trouxer executável sem `.sh`. Nenhuma
+traz hoje.
+
 ### Como o git é consultado
 
 - **Caminho é nome de arquivo, nunca padrão.** Toda consulta usa
@@ -337,8 +360,11 @@ executável. Se um dia houver binário, é esta regra que precisa crescer.
   fora de repositório, a consulta ao índice devolve vazio: nenhum executável é
   declarado com modo errado, nenhum aviso de `core.filemode` sai, e a consulta ao
   `HEAD` nem chega a acontecer (ela só é feita para caminhos que o índice
-  reportou como `100755`). O portão **degrada para silêncio**, e é o desenho
-  pretendido: um projeto sem git não tem modo versionado para estar errado.
+  reportou como `100755`). O silêncio é **apenas quanto ao modo versionado**, e é
+  o desenho pretendido: um projeto sem git não tem modo versionado para estar
+  errado. A dimensão do DISCO continua valendo sem git nenhum — onde a raiz prova
+  preservar o bit e falta bit em executável gerenciado, `modo-executavel-sem-bit`
+  sai normalmente, porque essa pergunta não depende de repositório.
   Quando o índice responde mas a consulta ao `HEAD` falha, aí sim a verificação
   do modo commitado fica inconclusiva, e isso sai como **aviso**
   (`modo-executavel-head-indisponivel`), na severidade proporcional: não derruba
@@ -348,9 +374,13 @@ executável. Se um dia houver binário, é esta regra que precisa crescer.
   `HEAD`. Como não é `100644` nem `100755`, ele não entra em nenhum dos dois
   achados de modo versionado, e o portão fica calado a respeito dele — não há
   comando de reparo correto a sugerir, porque `--chmod=+x` não descreve um
-  symlink. Quem cobre esse caso é a verificação de integridade: um artefato
-  gerenciado substituído por symlink vira `artefato-alterado` (ou
-  `artefato-ausente`, se o alvo não existir), que é o achado certo. No aviso do
+  symlink. A verificação de integridade cobre esse caso **só em parte**, e a
+  fronteira importa: o hash é lido SEGUINDO o link, então o symlink é detectado
+  apenas quando o alvo tem bytes diferentes do travado (`artefato-alterado`) ou
+  não é legível — alvo ausente ou link quebrado (`artefato-ausente`). Um symlink
+  cujo alvo tem exatamente os bytes esperados **não é detectado por ninguém**:
+  nem pelo modo, nem pela integridade. É limitação conhecida, e não efeito do
+  portão de modo. No aviso do
   `init` a entrada cai no bloco **sem comando**, junto do não rastreado — pode
   ficar redundante ali, e continua sem prometer comando que falharia. O plano
   nunca cria destino desse tipo: ele escreve arquivos comuns.
