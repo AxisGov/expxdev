@@ -2148,8 +2148,14 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
     <span class="selo">origem</span><span class="selo">evento</span><span class="selo">fase</span><span class="selo">task</span>
     <span class="selo">agente</span><span class="selo">resultado</span><span class="selo">detalhe</span><span class="selo">arquivos</span>
   </div>
-  <p>Duas chaves extras são permitidas depois das doze: <code>hook</code> (o nome do hook que decidiu, quando
-  a origem é <code>hook</code>) e <code>faixa</code> (a faixa de atenção do arquivo tocado).</p>
+  <p>Quatro chaves extras são permitidas depois das doze: <code>hook</code> (o nome do hook que decidiu, quando
+  a origem é <code>hook</code>), <code>faixa</code> (a faixa de atenção do arquivo tocado) e o par
+  <code>sessao</code> · <code>harness</code> (a identidade da sessão, derivada pelo escritor da skill — é ela
+  que liga a edição seguinte à task que a sessão abriu). Permitidas, mas não indiferentes: o par é
+  <strong>obrigatório</strong> em <code>task_iniciada</code>, <code>task_concluida</code> e
+  <code>task_bloqueada</code>, que são a reivindicação que os hooks leem — sem identidade o escritor não grava a
+  linha, e uma reivindicação sem dono bloqueia a primeira edição da task; vale <code>null</code> em evento que
+  não depende dela; e fica <strong>ausente</strong> na linha gravada por hook, que não a leva.</p>
 
   <div class="nota nota--info">
     <svg class="nota__icone" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6.4"/><path d="M8 7.2v4M8 4.9v.1" stroke-linecap="round"/></svg>
@@ -2164,6 +2170,10 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
     <tbody>
       <tr><td><code>fase_iniciada</code> · <code>fase_concluida</code></td><td>a skill</td></tr>
       <tr><td><code>task_iniciada</code> · <code>task_concluida</code> · <code>task_bloqueada</code></td><td>a skill</td></tr>
+      <tr><td><code>task_reaberta</code></td><td>a sprintx, quando a rodada de replanejamento devolve a task de bloqueada a pendente</td></tr>
+      <tr><td><code>checkpoint_planejamento</code></td><td>a sprintx, a cada checkpoint do plano</td></tr>
+      <tr><td><code>replanejamento_execucao_iniciado</code> · <code>replanejamento_execucao_retomado</code> · <code>replanejamento_execucao_aprovado</code> · <code>replanejamento_execucao_esgotado</code> · <code>replanejamento_execucao_recusado</code></td><td>a sprintx, em cada transição do replanejamento da execução</td></tr>
+      <tr><td><code>bloqueio_resolvido</code></td><td>a sprintx, ao resolver um bloqueio</td></tr>
       <tr><td><code>suite_executada</code></td><td>hook <code>PostToolUse</code></td></tr>
       <tr><td><code>arquivo_alterado</code></td><td>hook <code>PostToolUse</code></td></tr>
       <tr><td><code>regra_violada</code></td><td>hook em modo <code>aviso</code></td></tr>

@@ -105,6 +105,7 @@ Por R6, nenhuma delas é omitida: sem valor, escreva `null` (ou `[]` em `arquivo
 |---|---|---|
 | `hook` | mergex, legadox | nome do hook que decidiu, quando `origem: hook` |
 | `faixa` | legadox | faixa de atenção do arquivo tocado |
+| `sessao` · `harness` | sprintx, pelo escritor `scripts/rastro.sh` | identidade da sessão (`<harness>@<id>`), **derivada** do harness — nunca preenchida por quem chama. Obrigatória em `task_iniciada`/`task_concluida`/`task_bloqueada`, que são a reivindicação que os hooks leem; `null` num evento que não depende dela; ausente na linha gravada por hook |
 
 Quem valida uma linha verifica que as doze estão **contidas** nela — nunca igualdade exata de conjunto. Um validador de igualdade estrita reprova as skills que usam extras legítimas, e foi assim que a verificação da `runx` passou a reprovar toda linha da `mergex` e da `legadox`.
 
@@ -120,6 +121,10 @@ Quem valida uma linha verifica que as doze estão **contidas** nela — nunca ig
 |---|---|
 | `fase_iniciada` · `fase_concluida` | skill |
 | `task_iniciada` · `task_concluida` · `task_bloqueada` | skill |
+| `task_reaberta` | sprintx, por `scripts/planejamento.sh`: no fechamento da rodada, a task do B-NN volta de `bloqueada` a `pendente`. Task concluída nunca gera este evento |
+| `checkpoint_planejamento` | sprintx, por `scripts/planejamento.sh`: ao fim da F2, F3 e F4, a cada veredito da F5 e em cada transição do replanejamento da execução |
+| `replanejamento_execucao_iniciado` · `replanejamento_execucao_retomado` · `replanejamento_execucao_aprovado` · `replanejamento_execucao_esgotado` · `replanejamento_execucao_recusado` | sprintx, por `scripts/planejamento.sh`: rodada aberta, retomada na mesma rodada, aprovada pela F5, orçamento da F6 consumido, transição recusada |
+| `bloqueio_resolvido` | sprintx, por `scripts/bloqueios.sh resolver`, ao gravar `resolvido_em` |
 | `suite_executada` | hook `PostToolUse` |
 | `arquivo_alterado` | hook `PostToolUse` |
 | `regra_violada` | hook, em modo aviso |
@@ -127,6 +132,16 @@ Quem valida uma linha verifica que as doze estão **contidas** nela — nunca ig
 | `agente_iniciado` · `agente_concluido` | hook `SubagentStop` e skill |
 | `veredito_emitido` | agente auditor ou QA |
 | `commit_criado` · `pr_aberto` | mergex |
+
+**Esta tabela não é a fonte: o enum é.** A lista mora em `EventoNome`
+(`src/parser/esquema/evento.ts`) e `src/nucleo/documentacao.test.ts` confere a
+tabela contra ele — nome a mais, a menos ou repetido aqui quebra a suíte. Era a
+tabela escrita à mão que sustentava a divergência: ela ficou nos catorze eventos
+originais enquanto a `sprintx` já gravava outros oito por
+`scripts/planejamento.sh` e `scripts/bloqueios.sh`, e o `doctor` contava rastro
+legítimo como fora do contrato. Evento novo entra **no mesmo commit** no enum,
+nesta tabela, na tabela publicada do `docs-site` e no rótulo do painel
+(`src/watch/logica/atividade.ts`) — as três são conferidas contra o enum.
 
 ### Valores de `agente`
 

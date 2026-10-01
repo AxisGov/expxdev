@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import {
+  CHAVES_EVENTO,
+  EVENTOS_COM_IDENTIDADE,
+  EXTRAS_EVENTO,
+  EventoNome,
+} from "../parser/esquema/evento.js";
+import { ROTULO_EVENTO } from "../watch/logica/atividade.js";
 
 /**
  * A contagem de skills está escrita em prosa em vários lugares, e prosa
@@ -111,5 +118,145 @@ describe("contagem de verificações do doctor na documentação", () => {
     expect(i, "a apresentacao perdeu o indicador de verificacoes do doctor").toBeGreaterThan(0);
     expect(apre.slice(Math.max(0, i - 200), i)).toContain(`<div class="stat-value">${String(n)}</div>`);
     expect(apre).toContain(`Diagnostica uma instalação quebrada, ${String(n)} verificações.`);
+  });
+});
+
+/**
+ * D-06 — o vocabulário de `evento` e a tabela de chaves extras viviam escritos à
+ * mão no `CONTRATO-expx-eventos.md`, e a mão esqueceu: o documento ficou com 14
+ * eventos enquanto a `sprintx` congelada gravava oito outros, e o `doctor`
+ * mandava declarar a extra "em CONTRATO-expx-eventos.md" sem que nada
+ * verificasse se ela estava lá.
+ *
+ * Mesmo remédio da contagem do `doctor`, acima: a fonte de verdade é o CÓDIGO —
+ * `EventoNome` e `EXTRAS_EVENTO` em `parser/esquema/evento.ts` — e o documento é
+ * conferido contra ele. Lista nova entra uma vez, no enum; aqui ninguém repete
+ * nome nenhum.
+ */
+
+/** A quantidade de extras como a prosa a escreve. Janela estreita, como EXTENSO. */
+const EXTENSO_EXTRAS: Record<number, string> = {
+  2: "Duas",
+  3: "Três",
+  4: "Quatro",
+  5: "Cinco",
+  6: "Seis",
+};
+
+function extensoExtras(n: number): string {
+  const e = EXTENSO_EXTRAS[n];
+  if (e === undefined) throw new Error(`adicione ${String(n)} ao mapa EXTENSO_EXTRAS deste teste`);
+  return e;
+}
+
+/** Os `code` spans da primeira coluna da tabela da seção que começa em `titulo`. */
+function primeiraColunaDaTabela(markdown: string, titulo: string): string[] {
+  const i = markdown.indexOf(titulo);
+  if (i < 0) throw new Error(`secao ausente em CONTRATO-expx-eventos.md: ${titulo}`);
+  const resto = markdown.slice(i + titulo.length);
+  const fim = resto.search(/\n#{2,3} /);
+  const secao = fim < 0 ? resto : resto.slice(0, fim);
+  const valores: string[] = [];
+  for (const l of secao.split("\n")) {
+    // Só linha de corpo de tabela: a separadora é `|---|---|`, sem backtick.
+    if (!l.startsWith("|") || !l.includes("`")) continue;
+    const col = l.split("|")[1] ?? "";
+    for (const m of col.matchAll(/`([^`]+)`/g)) valores.push(m[1] as string);
+  }
+  return valores;
+}
+
+/** Os `code` spans da primeira célula de cada `<tr>` da seção `id` do docs-site. */
+function primeiraColunaDaTabelaHtml(html: string, id: string): string[] {
+  const i = html.indexOf(`id="${id}"`);
+  if (i < 0) throw new Error(`secao ausente no docs-site: ${id}`);
+  const resto = html.slice(i);
+  const fim = resto.indexOf("<h2");
+  const secao = fim < 0 ? resto : resto.slice(0, fim);
+  const valores: string[] = [];
+  for (const linha of secao.matchAll(/<tr><td>(.*?)<\/td>/g)) {
+    for (const c of (linha[1] as string).matchAll(/<code>([^<]+)<\/code>/g)) valores.push(c[1] as string);
+  }
+  return valores;
+}
+
+describe("vocabulário do contrato expx-eventos na documentação (D-06)", () => {
+  const CONTRATO = "docs/contrato/CONTRATO-expx-eventos.md";
+  const doc = readFileSync(CONTRATO, "utf8");
+
+  it("funcional: a tabela de `evento` lista exatamente os nomes do enum, sem repetir nem faltar", () => {
+    const naTabela = primeiraColunaDaTabela(doc, "### Vocabulário de `evento`");
+    expect(new Set(naTabela).size, "nome repetido na tabela de evento").toBe(naTabela.length);
+    expect([...naTabela].sort()).toEqual([...EventoNome.options].sort());
+  });
+
+  it("funcional: a tabela de chaves extras lista exatamente EXTRAS_EVENTO", () => {
+    const naTabela = primeiraColunaDaTabela(doc, "| Chave extra | Quem grava | O que é |");
+    expect([...naTabela].sort()).toEqual([...EXTRAS_EVENTO].sort());
+  });
+
+  it("funcional: as doze obrigatórias continuam doze, e o documento as escreve na ordem do código", () => {
+    expect(doc).toContain(CHAVES_EVENTO.map((c) => `\`${c}\``).join(" · "));
+  });
+
+  it("funcional: o docs-site publica a mesma lista de eventos, e a mesma contagem de extras", () => {
+    const site = readFileSync("docs-site/index.html", "utf8");
+    const naTabela = primeiraColunaDaTabelaHtml(site, "eventos-vocabulario");
+    expect([...naTabela].sort()).toEqual([...EventoNome.options].sort());
+    // A prosa diz a quantidade por extenso, e número em prosa é o que envelhece.
+    expect(site).toContain(`${extensoExtras(EXTRAS_EVENTO.length)} chaves extras são permitidas`);
+    for (const extra of EXTRAS_EVENTO) expect(site, extra).toContain(`<code>${extra}</code>`);
+  });
+
+  it("integração: o painel tem rótulo para todo evento do contrato — nenhum vira vocabulário de máquina na tela", () => {
+    const semRotulo = EventoNome.options.filter((e) => ROTULO_EVENTO[e] === undefined);
+    expect(semRotulo).toEqual([]);
+  });
+});
+
+/**
+ * Revisão do PR #10 — as extras novas entraram na documentação descritas só como
+ * "permitidas", e permitido não é a regra: `sessao`/`harness` têm três estados
+ * (obrigatórias na reivindicação da task, `null` em evento que não depende delas,
+ * ausentes na linha gravada por hook). O `CONTRATO-expx-eventos.md` já diz os
+ * três; a página publicada dizia só o primeiro — e é a página que a pessoa lê
+ * antes de escrever um escritor de rastro.
+ *
+ * Mesmo remédio: a fonte é `EVENTOS_COM_IDENTIDADE` em `parser/esquema/evento.ts`,
+ * e os dois documentos são conferidos contra ela.
+ */
+
+/** O parágrafo que abre com `abertura`, até o `</p>`. */
+function paragrafoHtml(html: string, abertura: string): string {
+  const i = html.indexOf(abertura);
+  if (i < 0) throw new Error(`paragrafo ausente no docs-site: ${abertura}`);
+  const fim = html.indexOf("</p>", i);
+  return html.slice(i, fim < 0 ? undefined : fim);
+}
+
+/** A linha da tabela de extras que fala de `chave`. */
+function linhaDaExtra(markdown: string, chave: string): string {
+  const l = markdown.split("\n").find((x) => x.startsWith("|") && x.includes(`\`${chave}\``));
+  if (l === undefined) throw new Error(`extra ausente na tabela do contrato: ${chave}`);
+  return l;
+}
+
+describe("a condição das extras `sessao`/`harness` na documentação (revisão do PR #10)", () => {
+  const CONTRATO = "docs/contrato/CONTRATO-expx-eventos.md";
+
+  it("funcional: o contrato nomeia os três eventos em que a identidade é obrigatória", () => {
+    const linha = linhaDaExtra(readFileSync(CONTRATO, "utf8"), "sessao");
+    for (const e of EVENTOS_COM_IDENTIDADE) expect(linha, e).toContain(`\`${e}\``);
+    expect(linha).toMatch(/[Oo]brigat/);
+  });
+
+  it("funcional: a página publicada diz QUANDO, não só que são permitidas", () => {
+    const site = readFileSync("docs-site/index.html", "utf8");
+    const p = paragrafoHtml(site, "<p>Quatro chaves extras são permitidas");
+    for (const e of EVENTOS_COM_IDENTIDADE) expect(p, e).toContain(`<code>${e}</code>`);
+    // Os três estados, não um: obrigatória, nula, ausente.
+    expect(p).toMatch(/[Oo]brigat/);
+    expect(p).toContain("<code>null</code>");
+    expect(p).toMatch(/ausente/);
   });
 });
