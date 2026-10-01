@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  EXTRAS_EVENTO,
   CHAVES_EVENTO,
   chavesDesconhecidas,
   chavesFaltando,
@@ -132,5 +133,128 @@ describe("as funcoes de chave", () => {
 
   it("unitário: o contrato tem exatamente doze chaves obrigatórias", () => {
     expect(CHAVES_EVENTO).toHaveLength(12);
+  });
+});
+
+/**
+ * D-06 — o contrato aceitava só 14 eventos e declarava só `hook`/`faixa`. O
+ * catálogo da `sprintx` congelada tem vinte, oito deles fora do enum, e duas
+ * extras que ninguém havia declarado. O `doctor` do replay C7-C reprovou 8 de 24
+ * linhas de um rastro legítimo e chamou `sessao`/`harness` de chaves fora do
+ * contrato.
+ *
+ * Fonte do catálogo: `references/08-rastro.md` da sprintx congelada
+ * (4e1f7b88d85f3fe9f87ae578f7789760d92d6829), tabela "O que a skill grava".
+ * Cada nome abaixo tem escritor oficial — não é fixture nem evento inventado.
+ */
+const EVENTOS_SPRINTX: Array<[evento: string, escritor: string]> = [
+  ["fase_iniciada", "scripts/rastro.sh fase-iniciada"],
+  ["fase_concluida", "scripts/rastro.sh fase-concluida"],
+  ["task_iniciada", "scripts/rastro.sh task-iniciada"],
+  ["task_concluida", "scripts/rastro.sh task-concluida"],
+  ["task_bloqueada", "scripts/rastro.sh task-bloqueada"],
+  ["veredito_emitido", "scripts/rastro.sh veredito-emitido"],
+  ["checkpoint_planejamento", "scripts/planejamento.sh (rastro)"],
+  ["replanejamento_execucao_iniciado", "scripts/planejamento.sh"],
+  ["replanejamento_execucao_retomado", "scripts/planejamento.sh"],
+  ["replanejamento_execucao_aprovado", "scripts/planejamento.sh"],
+  ["replanejamento_execucao_esgotado", "scripts/planejamento.sh"],
+  ["replanejamento_execucao_recusado", "scripts/planejamento.sh"],
+  ["task_reaberta", "scripts/planejamento.sh"],
+  ["bloqueio_resolvido", "scripts/bloqueios.sh resolver"],
+  ["agente_iniciado", "reservado no contrato"],
+  ["agente_concluido", "hooks/comum/rastro-subagente.sh"],
+  ["suite_executada", "hooks/comum/rastro-post.sh"],
+  ["arquivo_alterado", "hooks/comum/rastro-post.sh"],
+  ["regra_violada", "hooks/sprintx/*.sh, modo aviso"],
+  ["acao_bloqueada", "hooks/comum/segredo.sh, hooks/sprintx/*.sh"],
+];
+
+describe("catalogo de eventos da sprintx congelada (D-06)", () => {
+  it.each(EVENTOS_SPRINTX)(
+    "integração: `%s` está no contrato — grava-o %s",
+    (evento) => {
+      const r = validarRastro(j(linha({ ferramenta: "sprintx", evento })));
+      expect(r.defeitos).toEqual([]);
+    },
+  );
+
+  it("funcional: os dois eventos que o replay C7-C reprovou passam a valer", () => {
+    for (const evento of ["checkpoint_planejamento", "bloqueio_resolvido"]) {
+      const r = validarRastro(j(linha({ ferramenta: "sprintx", evento })));
+      expect(r.defeitos, evento).toEqual([]);
+    }
+  });
+
+  it("funcional: evento inventado continua sendo defeito — o enum não virou texto livre", () => {
+    const r = validarRastro(j(linha({ evento: "replanejamento_execucao_inventado" })));
+    expect(r.defeitos).toHaveLength(1);
+    expect(r.defeitos[0]?.motivo).toContain("evento");
+  });
+
+  it("funcional: `artefato_gravado` segue fora — é evento da mergex, não deste catálogo", () => {
+    const r = validarRastro(j(linha({ ferramenta: "mergex", evento: "artefato_gravado" })));
+    expect(r.defeitos).toHaveLength(1);
+  });
+});
+
+describe("`sessao` e `harness` como extras declaradas (D-06)", () => {
+  it("integração: a linha do escritor oficial `scripts/rastro.sh` não tem defeito nem chave desconhecida", () => {
+    // Byte a byte na ordem em que `_rastro_linha` (hooks/comum/rastro.sh) monta
+    // a linha, com as duas extras depois das doze — como manda o contrato.
+    const bruta =
+      '{"ts":"2026-09-22T10:14:00Z","expx_eventos":1,"trabalho_id":"menu",' +
+      '"ferramenta":"sprintx","origem":"skill","evento":"task_iniciada","fase":"f6",' +
+      '"task":"T-04.03","agente":"principal","resultado":"ok","detalhe":"T-04.03 aberta",' +
+      '"arquivos":[],"sessao":"claude-code@2f7a1c","harness":"claude-code"}';
+    const r = validarRastro(bruta);
+    expect(r.linhas).toBe(1);
+    expect(r.defeitos).toEqual([]);
+    expect(r.desconhecidas).toEqual([]);
+  });
+
+  it("funcional: `sessao`/`harness` nulas valem — evento que não depende da identidade", () => {
+    const r = validarRastro(
+      j(linha({ ferramenta: "sprintx", evento: "fase_iniciada", sessao: null, harness: null })),
+    );
+    expect(r.defeitos).toEqual([]);
+    expect(r.desconhecidas).toEqual([]);
+  });
+
+  it("unitário: as duas extras entram em EXTRAS_EVENTO, sem tirar `hook` e `faixa`", () => {
+    expect([...EXTRAS_EVENTO]).toEqual(expect.arrayContaining(["hook", "faixa", "sessao", "harness"]));
+  });
+
+  it("funcional: a tolerância a extra NÃO declarada continua — aviso, nunca defeito", () => {
+    const r = validarRastro(j(linha({ sessao: "x@1", harness: "x", gadget: "?" })));
+    expect(r.defeitos).toEqual([]);
+    expect(r.desconhecidas).toEqual(["gadget"]);
+  });
+});
+
+describe("os contratos das demais skills seguem de pé (D-06)", () => {
+  it("integração: a linha da mergex com `hook`, e os eventos que só ela grava", () => {
+    for (const evento of ["commit_criado", "pr_aberto"]) {
+      const r = validarRastro(
+        j(linha({ ferramenta: "mergex", evento, hook: "pr-so-com-portao" })),
+      );
+      expect(r.defeitos, evento).toEqual([]);
+      expect(r.desconhecidas, evento).toEqual([]);
+    }
+  });
+
+  it("integração: a linha da legadox com `hook` e `faixa` segue válida", () => {
+    const r = validarRastro(
+      j(linha({ ferramenta: "legadox", evento: "regra_violada", resultado: "aviso", hook: "raio", faixa: "alta" })),
+    );
+    expect(r.defeitos).toEqual([]);
+    expect(r.desconhecidas).toEqual([]);
+  });
+
+  it("unitário: continuam sendo doze as chaves obrigatórias — extra nova não promove ninguém", () => {
+    expect(CHAVES_EVENTO).toHaveLength(12);
+    for (const extra of ["sessao", "harness"]) {
+      expect(chavesFaltando(linha()), extra).toEqual([]);
+    }
   });
 });

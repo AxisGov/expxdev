@@ -28,17 +28,48 @@ export const CHAVES_EVENTO = [
 /**
  * Chaves extras que o contrato declara, por skill. Extras existem porque a
  * alternativa — espremer a informação em `detalhe` — perde o dado para sempre.
+ *
+ * `sessao`/`harness` são a identidade que o escritor da `sprintx`
+ * (`scripts/rastro.sh`) deriva do harness — é por ela que o hook `escopo-da-task`
+ * liga a edição à task aberta. Linha gravada por hook não as leva, e evento que
+ * não depende da identidade as leva `null`: por isso são opcionais, nunca
+ * obrigatórias.
  */
-export const EXTRAS_EVENTO = ["hook", "faixa"] as const;
+export const EXTRAS_EVENTO = ["hook", "faixa", "sessao", "harness"] as const;
 
 export const Origem = z.enum(["hook", "skill", "agente"]);
 
+/**
+ * O vocabulário de `evento`, para as nove skills.
+ *
+ * Fonte única: `docs/contrato/CONTRATO-expx-eventos.md` é conferido contra este
+ * enum por `src/nucleo/documentacao.test.ts` — a lista mora aqui e a tabela do
+ * contrato precisa bater com ela, nunca o contrário.
+ *
+ * O bloco do planejamento e do replanejamento da execução entrou pelo catálogo
+ * da `sprintx` congelada (`references/08-rastro.md`, "O que a skill grava"), que
+ * já os gravava por `scripts/planejamento.sh` e `scripts/bloqueios.sh` enquanto
+ * este enum reprovava a linha — um rastro legítimo contado como fora do contrato.
+ */
 export const EventoNome = z.enum([
   "fase_iniciada",
   "fase_concluida",
   "task_iniciada",
   "task_concluida",
   "task_bloqueada",
+  // `scripts/planejamento.sh`: a task do B-NN volta de bloqueada a pendente
+  // quando a rodada de replanejamento fecha.
+  "task_reaberta",
+  // `scripts/planejamento.sh`: o checkpoint do plano (fim de F2/F3/F4, cada
+  // veredito da F5, e cada transição de replanejamento da execução).
+  "checkpoint_planejamento",
+  "replanejamento_execucao_iniciado",
+  "replanejamento_execucao_retomado",
+  "replanejamento_execucao_aprovado",
+  "replanejamento_execucao_esgotado",
+  "replanejamento_execucao_recusado",
+  // `scripts/bloqueios.sh resolver`, ao gravar `resolvido_em`.
+  "bloqueio_resolvido",
   "suite_executada",
   "arquivo_alterado",
   "regra_violada",
@@ -83,6 +114,8 @@ export const LinhaEvento = z
     arquivos: z.array(z.string()),
     hook: z.string().nullable().optional(),
     faixa: z.string().nullable().optional(),
+    sessao: z.string().nullable().optional(),
+    harness: z.string().nullable().optional(),
   })
   // Extras declaradas passam; o que não é declarado é reportado por
   // `chavesDesconhecidas`, não rejeitado — o rastro nunca trava trabalho.
