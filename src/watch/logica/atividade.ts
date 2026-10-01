@@ -31,13 +31,32 @@ export const ROTULO_EVENTO: Record<string, string> = {
   pr_aberto: "pr aberto",
 };
 
+/**
+ * Os eventos cujo `✓` a tela mostra: DESFECHO, não transição.
+ *
+ * `bloqueio_resolvido` é o inverso exato do `task_bloqueada`, que sai `!` — sem
+ * ele aqui, o bloqueio abrindo gritava e o bloqueio fechando saía com o mesmo `·`
+ * do ruído de rotina. `replanejamento_execucao_aprovado` é o fechamento da rodada
+ * (a F5 aprovou o plano replanejado), do mesmo tipo que `fase_concluida`.
+ *
+ * Quem fica fora, de propósito: as transições em curso
+ * (`replanejamento_execucao_iniciado`/`_retomado`), a rotina
+ * (`checkpoint_planejamento`) e o `task_reaberta`, que reabre trabalho em vez de
+ * fechá-lo. Os terminais de insucesso (`_esgotado`, `_recusado`) nem chegam aqui:
+ * o escritor os grava `bloqueado`, e o `houveFalha` decide antes.
+ */
+const DESFECHO_COM_EXITO = new Set([
+  "task_concluida",
+  "fase_concluida",
+  "suite_executada",
+  "bloqueio_resolvido",
+  "replanejamento_execucao_aprovado",
+]);
+
 /** O sinal de um grupo: o que a pessoa lê antes de ler a linha. */
 export function sinalDe(g: GrupoAtividade): { marca: string; papel: Papel } {
   if (g.houveFalha) return { marca: "!", papel: "erro" };
-  if (g.evento === "task_concluida" || g.evento === "fase_concluida") {
-    return { marca: "✓", papel: "sucesso" };
-  }
-  if (g.evento === "suite_executada") return { marca: "✓", papel: "sucesso" };
+  if (DESFECHO_COM_EXITO.has(g.evento)) return { marca: "✓", papel: "sucesso" };
   return { marca: "·", papel: "apagado" };
 }
 

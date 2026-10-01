@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { CHAVES_EVENTO, EXTRAS_EVENTO, EventoNome } from "../parser/esquema/evento.js";
+import {
+  CHAVES_EVENTO,
+  EVENTOS_COM_IDENTIDADE,
+  EXTRAS_EVENTO,
+  EventoNome,
+} from "../parser/esquema/evento.js";
 import { ROTULO_EVENTO } from "../watch/logica/atividade.js";
 
 /**
@@ -206,5 +211,52 @@ describe("vocabulário do contrato expx-eventos na documentação (D-06)", () =>
   it("integração: o painel tem rótulo para todo evento do contrato — nenhum vira vocabulário de máquina na tela", () => {
     const semRotulo = EventoNome.options.filter((e) => ROTULO_EVENTO[e] === undefined);
     expect(semRotulo).toEqual([]);
+  });
+});
+
+/**
+ * Revisão do PR #10 — as extras novas entraram na documentação descritas só como
+ * "permitidas", e permitido não é a regra: `sessao`/`harness` têm três estados
+ * (obrigatórias na reivindicação da task, `null` em evento que não depende delas,
+ * ausentes na linha gravada por hook). O `CONTRATO-expx-eventos.md` já diz os
+ * três; a página publicada dizia só o primeiro — e é a página que a pessoa lê
+ * antes de escrever um escritor de rastro.
+ *
+ * Mesmo remédio: a fonte é `EVENTOS_COM_IDENTIDADE` em `parser/esquema/evento.ts`,
+ * e os dois documentos são conferidos contra ela.
+ */
+
+/** O parágrafo que abre com `abertura`, até o `</p>`. */
+function paragrafoHtml(html: string, abertura: string): string {
+  const i = html.indexOf(abertura);
+  if (i < 0) throw new Error(`paragrafo ausente no docs-site: ${abertura}`);
+  const fim = html.indexOf("</p>", i);
+  return html.slice(i, fim < 0 ? undefined : fim);
+}
+
+/** A linha da tabela de extras que fala de `chave`. */
+function linhaDaExtra(markdown: string, chave: string): string {
+  const l = markdown.split("\n").find((x) => x.startsWith("|") && x.includes(`\`${chave}\``));
+  if (l === undefined) throw new Error(`extra ausente na tabela do contrato: ${chave}`);
+  return l;
+}
+
+describe("a condição das extras `sessao`/`harness` na documentação (revisão do PR #10)", () => {
+  const CONTRATO = "docs/contrato/CONTRATO-expx-eventos.md";
+
+  it("funcional: o contrato nomeia os três eventos em que a identidade é obrigatória", () => {
+    const linha = linhaDaExtra(readFileSync(CONTRATO, "utf8"), "sessao");
+    for (const e of EVENTOS_COM_IDENTIDADE) expect(linha, e).toContain(`\`${e}\``);
+    expect(linha).toMatch(/[Oo]brigat/);
+  });
+
+  it("funcional: a página publicada diz QUANDO, não só que são permitidas", () => {
+    const site = readFileSync("docs-site/index.html", "utf8");
+    const p = paragrafoHtml(site, "<p>Quatro chaves extras são permitidas");
+    for (const e of EVENTOS_COM_IDENTIDADE) expect(p, e).toContain(`<code>${e}</code>`);
+    // Os três estados, não um: obrigatória, nula, ausente.
+    expect(p).toMatch(/[Oo]brigat/);
+    expect(p).toContain("<code>null</code>");
+    expect(p).toMatch(/ausente/);
   });
 });

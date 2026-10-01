@@ -31,11 +31,39 @@ export const CHAVES_EVENTO = [
  *
  * `sessao`/`harness` são a identidade que o escritor da `sprintx`
  * (`scripts/rastro.sh`) deriva do harness — é por ela que o hook `escopo-da-task`
- * liga a edição à task aberta. Linha gravada por hook não as leva, e evento que
- * não depende da identidade as leva `null`: por isso são opcionais, nunca
- * obrigatórias.
+ * liga a edição à task aberta. Opcionais no esquema porque têm TRÊS estados, e
+ * `EVENTOS_COM_IDENTIDADE` (abaixo) é o único em que a ausência é defeito.
  */
 export const EXTRAS_EVENTO = ["hook", "faixa", "sessao", "harness"] as const;
+
+/**
+ * Os eventos em que `sessao`/`harness` são OBRIGATÓRIAS — a reivindicação da task.
+ *
+ * Os três estados da identidade, pelo escritor da `sprintx` congelada
+ * (`scripts/rastro.sh`, 4e1f7b88d85f3fe9f87ae578f7789760d92d6829) e pela tabela de
+ * chaves extras do `CONTRATO-expx-eventos.md`:
+ *
+ *  - **obrigatórias** nestes três: são as únicas com `EXIGE_IDENTIDADE=1`, e sem
+ *    identidade o escritor sai `3` e NÃO grava a linha. Uma delas sem identidade
+ *    não reivindica nada, e a primeira edição da task para em `sessao_ambigua`
+ *    (`hooks/sprintx/escopo-da-task.sh`) — é defeito de quem gravou, não dado
+ *    faltando;
+ *  - **`null`** em `fase_iniciada`/`fase_concluida`/`veredito_emitido`: o `else`
+ *    do mesmo escritor grava `"sessao":null,"harness":null`;
+ *  - **ausentes** no que `scripts/planejamento.sh`, `scripts/bloqueios.sh` e os
+ *    hooks gravam: nenhum passa extras, e `_rastro_linha` só anexa o que recebe.
+ *
+ * Por isso a exigência é condicional, nunca global: global reprovaria a linha
+ * legítima de todo hook — a mesma regressão que a nota das doze chaves narra.
+ *
+ * Condicionada também à `ferramenta`: a extra é declarada no contrato para o
+ * escritor da `sprintx`. Outra skill que venha a emitir a reivindicação segue o
+ * contrato dela, e nenhuma emite hoje.
+ */
+export const EVENTOS_COM_IDENTIDADE = ["task_iniciada", "task_concluida", "task_bloqueada"] as const;
+
+/** A ferramenta cujo escritor deriva a identidade (contrato `expx-eventos`). */
+const FERRAMENTA_COM_IDENTIDADE = "sprintx";
 
 export const Origem = z.enum(["hook", "skill", "agente"]);
 
@@ -145,6 +173,24 @@ export function chavesDesconhecidas(obj: Record<string, unknown>): string[] {
   return Object.keys(obj).filter((k) => !conhecidas.has(k));
 }
 
+/**
+ * A identidade que ESTA linha exige e não traz.
+ *
+ * Vazio quando a linha não exige identidade — e aí ausente e `null` são os dois
+ * estados válidos, não omissão. `""` conta como ausência: é o mesmo dado que
+ * falta, escrito de outro jeito.
+ */
+export function identidadeFaltando(obj: Record<string, unknown>): string[] {
+  if (obj["ferramenta"] !== FERRAMENTA_COM_IDENTIDADE) return [];
+  if (!EVENTOS_COM_IDENTIDADE.includes(obj["evento"] as (typeof EVENTOS_COM_IDENTIDADE)[number])) {
+    return [];
+  }
+  return ["sessao", "harness"].filter((k) => {
+    const v = obj[k];
+    return typeof v !== "string" || v === "";
+  });
+}
+
 export type ResultadoRastro = {
   linhas: number;
   defeitos: DefeitoEvento[];
@@ -184,7 +230,24 @@ export function validarRastro(conteudo: string): ResultadoRastro {
     }
     for (const k of chavesDesconhecidas(mapa)) desconhecidas.add(k);
 
+    // A identidade da reivindicação: condição do contrato, não estrutura da
+    // linha — por isso aqui, e não no `LinhaEvento`. O painel (`lerRastro`)
+    // descarta o que o esquema reprova, e sumir com a linha que diz quem abriu a
+    // task esconderia justamente o que ela existe para contar. Aqui o `doctor`
+    // avisa quem gravou, e a linha segue na tela.
+    const semIdentidade = faltando.length === 0 ? identidadeFaltando(mapa) : [];
+    if (semIdentidade.length > 0) {
+      defeitos.push({
+        linha: n,
+        motivo:
+          `${semIdentidade.join(", ")}: a reivindicacao da task exige a identidade da ` +
+          `sessao, que scripts/rastro.sh deriva (sem ela ele nao grava a linha)`,
+      });
+    }
+
     const r = LinhaEvento.safeParse(mapa);
+    // Causas independentes contam separado: a identidade que falta não esconde um
+    // `ts` fora do formato na mesma linha.
     if (!r.success && faltando.length === 0) {
       const p = r.error.issues[0];
       const caminho = p?.path.join(".") ?? "";
