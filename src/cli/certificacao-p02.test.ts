@@ -24,16 +24,20 @@ import {
 } from "../teste/candidatos.js";
 
 /**
- * Certificação P0.2: SprintX e0582cd + MergeX cab6d5f instaladas SÓ pelo
+ * Certificação P0.2: SprintX 796895a + MergeX cab6d5f instaladas SÓ pelo
  * `expxdev init` real (o binário do `dist/`, num processo novo), a partir dos
  * snapshots fixados em `fixtures/candidatos/`. Nenhum arquivo é copiado,
  * nenhum settings ou hooks.json é montado à mão: o que está no produto é o que
  * o `init` escreveu.
  *
- * `e0582cd` é o merge do PR AxisGov/sprintx#13 na `main` da SprintX, e descende
- * tanto da antiga base `253b592` quanto de `1c629ea`: o corte UTF-8 que antes era
- * propagado à mão por cima do snapshot está AGORA no próprio commit. Os dois
- * snapshots são o commit, byte a byte — não há mais propagação a reaplicar.
+ * `796895a` é o merge do PR AxisGov/sprintx#14 na `p0.2/sprintx-rastro-identidade`,
+ * e descende de `e0582cd` — o pin anterior, que já trazia no próprio commit o corte
+ * UTF-8 antes propagado à mão. O que o commit novo acrescenta é a correção dos
+ * achados que a auditoria levantou sobre o candidato: entre eles, a saída de suíte
+ * COLORIDA classificada certo (a cor colava a sequência ANSI em `[ERROR]` e em
+ * `BUILD FAILURE`, e a suíte vermelha entrava no rastro como `ok`).
+ *
+ * Os dois snapshots são o commit, byte a byte — não há propagação a reaplicar.
  */
 
 type Json = Record<string, any>;
@@ -505,6 +509,29 @@ describe("P0.2 — o resultado da suíte que o hook instalado grava", () => {
 
   it("funcional: controle — Maven verde (BUILD SUCCESS) continua ok", () => {
     expect(resultado("[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0\n[INFO] BUILD SUCCESS")).toBe("ok");
+  });
+
+  /**
+   * O achado do candidato anterior, certificado no pin novo (SprintX 796895a):
+   * os dois padrões de Maven exigem fronteira de ESPAÇO em branco ao redor do
+   * marcador, e Maven colorido cola a sequência ANSI nos dois lados — `…[1;31m`
+   * imediatamente antes de `[ERROR]`, `…[m` imediatamente depois. Sem apagar a
+   * cor ANTES de classificar, nenhum dos dois padrões casa e a suíte vermelha
+   * entra no rastro como `ok`: falso verde no painel, exatamente o defeito que
+   * o reconhecimento do Maven existia para fechar.
+   */
+  const ESC = "";
+
+  it("funcional: Maven COLORIDO com [ERROR] é gravado como falha — a cor não apaga o marcador", () => {
+    expect(resultado(`${ESC}[1;31m[ERROR]${ESC}[m Tests run: 3, Failures: 1, Errors: 0, Skipped: 0`)).toBe("falha");
+  });
+
+  it("funcional: Maven COLORIDO com BUILD FAILURE é gravado como falha", () => {
+    expect(resultado(`${ESC}[1;34m[INFO]${ESC}[m ----\n${ESC}[1;31mBUILD FAILURE${ESC}[m\n${ESC}[1;34m[INFO]${ESC}[m ----`)).toBe("falha");
+  });
+
+  it("funcional: controle — Maven verde COLORIDO continua ok: a cor não inventa falha", () => {
+    expect(resultado(`${ESC}[1;34m[INFO]${ESC}[m Tests run: 3, Failures: 0\n${ESC}[1;32mBUILD SUCCESS${ESC}[m`)).toBe("ok");
   });
 });
 

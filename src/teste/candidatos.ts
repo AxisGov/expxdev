@@ -22,7 +22,7 @@ export const BINARIO = join(RAIZ_DO_REPO, "dist", "cli", "expx-bin.js");
  * dele: cada snapshot é o commit, byte a byte.
  */
 export const CANDIDATOS = {
-  sprintx: { pasta: "SprintX", sha: "e0582cdf31601ca1970ee49177e2878207bb4b87" },
+  sprintx: { pasta: "SprintX", sha: "796895a9e61739d94f6d970259a5c392044a2110" },
   mergex: { pasta: "MergeX", sha: "cab6d5f13807a50f65abaa359238868c56933077" },
 } as const;
 
@@ -113,13 +113,13 @@ export function arvore(raiz: string, ignorar: (rel: string) => boolean = () => f
 }
 
 /**
- * O snapshot está coerente consigo? Confere o commit BASE declarado e cada arquivo
+ * O snapshot está coerente consigo? Confere o commit declarado e cada arquivo
  * contra o manifesto gerado por `scripts/fixture-candidatos.sh`.
  *
- * Coerência, não procedência: o snapshot pode ter correção propagada por cima da
- * base (`fixtures/candidatos/<nome>.PROPAGACOES.md`), e nada aqui vai à SprintX
- * conferir bytes — a bancada não usa rede. Quem prova que a propagação continua no
- * snapshot é teste de comportamento sobre o hook instalado, não este manifesto.
+ * Coerência, não procedência: nada aqui vai à origem conferir bytes — a bancada
+ * não usa rede, e o manifesto só diz que o snapshot no disco é o que o gerador
+ * extraiu. Quem prova que a correção do commit novo chegou é teste de
+ * comportamento sobre o hook INSTALADO, não este manifesto.
  */
 export function conferirSnapshot(nome: NomeCandidato): void {
   const base = snapshot(nome);
