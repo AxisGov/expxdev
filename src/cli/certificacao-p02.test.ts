@@ -70,18 +70,37 @@ function json(caminho: string): Json {
   return JSON.parse(readFileSync(caminho, "utf8")) as Json;
 }
 
+/**
+ * O byte ESC, escrito como sequência de escape e não cru.
+ *
+ * Ele é o assunto de duas provas daqui — a cor de terminal que a classificação
+ * da suíte tem de apagar, e o controle que o `detalhe` tem de escapar para a
+ * linha continuar JSON —, e nas duas o que importa é o byte que CHEGA ao hook,
+ * não como o fonte o escreve. Cru no fonte, ele é invisível em diff, em revisão
+ * e no terminal de quem lê o teste.
+ */
+const ESC = "\u001b";
+
 /** O rastro em que o `rastro-post.sh` grava quando a sessão não reivindica trabalho. */
 const RASTRO = "docs/eventos/sem-trabalho.jsonl";
 
 /**
  * Entrega ao `rastro-post.sh` INSTALADO (pelo comando registrado no settings que
- * o `init` escreveu) o PostToolUse de um comando de suíte, e devolve o evento
- * `suite_executada` que ele gravou no jsonl.
+ * o `init` escreveu) o PostToolUse de um comando de suíte, e devolve a LINHA crua
+ * que ele gravou no jsonl junto com o evento `suite_executada` lido dela.
  *
- * A leitura do jsonl é em UTF-8 ESTRITO: byte inválido lança aqui, como lança em
- * consumidor estrito. O painel atual não lança — ele troca por U+FFFD.
+ * `resposta` vai para `tool_response` na forma em que for dada: string, e também
+ * OBJETO — no Bash o Claude Code entrega `{stdout, stderr, interrupted}`, e é
+ * essa a forma real que o hook tem de classificar.
+ *
+ * Duas conferências acontecem aqui, e as duas são prova:
+ *
+ * - a leitura do jsonl é em UTF-8 ESTRITO: byte inválido lança aqui, como lança
+ *   em consumidor estrito. O painel atual não lança — ele troca por U+FFFD;
+ * - o `JSON.parse` da linha é estrito quanto a CONTROLE: JSON proíbe
+ *   U+0000..U+001F cru dentro de string, e uma linha com ESC cru morre aqui.
  */
-function eventoDaSuite(p: string, comando: string, resposta: string, path?: string): Json {
+function linhaDaSuite(p: string, comando: string, resposta: unknown, path?: string): { linha: string; evento: Json } {
   rmSync(join(p, RASTRO), { force: true });
   const r = rodarHookComPayload(
     p,
@@ -93,9 +112,14 @@ function eventoDaSuite(p: string, comando: string, resposta: string, path?: stri
   const texto = new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(join(p, RASTRO)));
   const linhas = texto.split("\n").filter((l) => l.trim() !== "");
   expect(linhas).toHaveLength(1);
-  const evento = JSON.parse(linhas[0] as string) as Json;
+  const linha = linhas[0] as string;
+  const evento = JSON.parse(linha) as Json;
   expect(evento["evento"]).toBe("suite_executada");
-  return evento;
+  return { linha, evento };
+}
+
+function eventoDaSuite(p: string, comando: string, resposta: unknown, path?: string): Json {
+  return linhaDaSuite(p, comando, resposta, path).evento;
 }
 
 /** Todos os hooks do settings como (evento, matcher, definição). */
@@ -458,6 +482,52 @@ describe("P0.2 — o rastro do hook instalado é UTF-8 válido no corte do detal
     expect(Buffer.byteLength(detalhe, "utf8")).toBe(119);
   });
 
+  /**
+   * O `detalhe` é texto que o USUÁRIO escolheu — o comando de suíte —, e JSON
+   * proíbe caractere de controle CRU dentro de string (U+0000..U+001F). Um
+   * `npm test` com cor de terminal (ESC), com barra de progresso ou com separador
+   * de registro no meio punha o byte cru na linha, e a linha deixava de ser JSON:
+   * o mesmo estrago do byte UTF-8 partido que o corte evita — o leitor do rastro
+   * perde o arquivo a partir dali.
+   *
+   * Escapar só TAB, CR e LF deixava todo o resto passar inteiro. A prova é
+   * CAUSAL pelo parser: `JSON.parse` de uma linha com ESC cru é SyntaxError
+   * (`linhaDaSuite` o faz), então a linha só nasce legível se o hook escapar o
+   * controle. E a volta pelo `detalhe` prova que o escape é reversível: o que o
+   * comando dizia não foi trocado nem perdido no caminho.
+   *
+   * As duas rotas de leitura entram, porque elas NÃO são a mesma: sem jq, quem lê
+   * o comando é `rastro_json_campo_em`, que esconde a barra escapada atrás do byte
+   * 0x01 enquanto decodifica — e `` do payload decodifica para exatamente
+   * esse byte. É o caso em que marcador interno e dado do usuário colidem, e por
+   * isso o comando abaixo traz 0x01, barra invertida e aspas juntos.
+   */
+  const CONTROLES_CRUS = `${ESC}[1;31m\b\f\t\\"fim`;
+
+  function controleNoDetalhe(path?: string): void {
+    const comando = `npm test -- ${CONTROLES_CRUS}`;
+    expect(Buffer.byteLength(comando, "utf8")).toBeLessThanOrEqual(120);
+    const { linha, evento } = linhaDaSuite(P, comando, "Test Files  1 passed (1)", path);
+    // o detalhe volta IGUAL ao comando: nada foi trocado nem perdido
+    expect(evento["detalhe"]).toBe(comando);
+    // e no disco não há controle cru nenhum — o que está lá é o escape
+    expect(/[ -]/.test(linha), linha).toBe(false);
+    for (const escapado of ["\\u001b", "\\u0001", "\\u0007", "\\u000b", "\\u001f", "\\b", "\\f", "\\t", "\\\\", '\\"']) {
+      expect(linha, escapado).toContain(escapado);
+    }
+  }
+
+  it("funcional: comando com ESC e controle crus grava jsonl parseável, e o detalhe volta inteiro", () => {
+    controleNoDetalhe();
+  });
+
+  it("funcional: SEM jq, o mesmo comando — e o 0x01 do payload não vira a barra do marcador", () => {
+    const semJq = pathDosHooksSemJq();
+    expect(jqVisivelCom(semJq)).toBe("");
+    expect(jqVisivelCom(pathDosHooks())).not.toBe("");
+    controleNoDetalhe(semJq);
+  });
+
   it("funcional: SEM jq no PATH do hook, o corte de 120 bytes continua sem sequência partida", () => {
     // O fallback sem jq é contrato (`rastro_json_get`, `rastro_tool_input_get`): o
     // hook roda em PostToolUse e não pode exigir jq para gravar o rastro. O corte
@@ -495,8 +565,21 @@ describe("P0.2 — o resultado da suíte que o hook instalado grava", () => {
     expect(init(P, "sprintx,mergex").status).toBe(0);
   }, 300000);
 
-  function resultado(resposta: string): string {
-    return eventoDaSuite(P, "mvn test", resposta)["resultado"] as string;
+  function resultado(resposta: unknown, path?: string): string {
+    return eventoDaSuite(P, "mvn test", resposta, path)["resultado"] as string;
+  }
+
+  /**
+   * A resposta como o Claude Code a entrega na ferramenta Bash: um OBJETO, não
+   * uma string.
+   *
+   * `interrupted` entra junto de propósito: é campo que não é texto, e as duas
+   * rotas de leitura têm de passar por cima dele sem tropeçar — com jq, a
+   * recursão seleciona só `type == "string"`; sem jq, só as chaves de texto que o
+   * contrato nomeia são lidas.
+   */
+  function respostaDoBash(stdout: string, stderr = ""): Json {
+    return { stdout, stderr, interrupted: false };
   }
 
   it("funcional: Maven com [ERROR] na saída é gravado como falha", () => {
@@ -520,7 +603,6 @@ describe("P0.2 — o resultado da suíte que o hook instalado grava", () => {
    * entra no rastro como `ok`: falso verde no painel, exatamente o defeito que
    * o reconhecimento do Maven existia para fechar.
    */
-  const ESC = "";
 
   it("funcional: Maven COLORIDO com [ERROR] é gravado como falha — a cor não apaga o marcador", () => {
     expect(resultado(`${ESC}[1;31m[ERROR]${ESC}[m Tests run: 3, Failures: 1, Errors: 0, Skipped: 0`)).toBe("falha");
@@ -532,6 +614,48 @@ describe("P0.2 — o resultado da suíte que o hook instalado grava", () => {
 
   it("funcional: controle — Maven verde COLORIDO continua ok: a cor não inventa falha", () => {
     expect(resultado(`${ESC}[1;34m[INFO]${ESC}[m Tests run: 3, Failures: 0\n${ESC}[1;32mBUILD SUCCESS${ESC}[m`)).toBe("ok");
+  });
+
+  /**
+   * As provas acima entregam `tool_response` como STRING, e nenhuma suíte real
+   * chega assim pela ferramenta Bash: ali o Claude Code entrega um OBJETO
+   * (`{"stdout":…,"stderr":…,"interrupted":…}`). Lido como string, o objeto dava
+   * dois desfechos — e os dois eram falso verde:
+   *
+   *   - com jq, `.tool_response` de um objeto sai IMPRESSO como JSON, onde a
+   *     quebra de linha aparece escapada (`\n` literal) e o marcador perde a
+   *     fronteira de espaço em branco que os padrões do Maven exigem;
+   *   - sem jq, NADA: o casamento de `"chave": "valor"` não casa objeto, e a
+   *     saída vinha vazia — nenhuma suíte era classificada como falha nessa rota.
+   *
+   * Por isso o objeto é provado nas DUAS rotas, com o Maven colorido (que soma a
+   * cor ao problema da forma) e com o verde como controle: sem o controle, um
+   * classificador que respondesse `falha` para tudo passaria por "corrigido".
+   *
+   * O `stderr` entra num caso de propósito: é onde a saída vermelha costuma
+   * estar, e um leitor que só olhasse `stdout` ficaria verde nos outros casos.
+   */
+  const COLORIDO_ERROR = `${ESC}[1;31m[ERROR]${ESC}[m Tests run: 3, Failures: 1, Errors: 0, Skipped: 0`;
+  const COLORIDO_FAILURE = `${ESC}[1;34m[INFO]${ESC}[m ----\n${ESC}[1;31mBUILD FAILURE${ESC}[m\n${ESC}[1;34m[INFO]${ESC}[m ----`;
+  const COLORIDO_VERDE = `${ESC}[1;34m[INFO]${ESC}[m Tests run: 3, Failures: 0\n${ESC}[1;32mBUILD SUCCESS${ESC}[m`;
+
+  /** As três classificações do objeto, na rota de leitura dada. */
+  function objetoDoBash(path?: string): void {
+    expect(resultado(respostaDoBash(COLORIDO_ERROR), path), "[ERROR] colorido no stdout").toBe("falha");
+    expect(resultado(respostaDoBash(COLORIDO_FAILURE), path), "BUILD FAILURE colorido no stdout").toBe("falha");
+    expect(resultado(respostaDoBash("", COLORIDO_ERROR), path), "[ERROR] colorido no stderr").toBe("falha");
+    expect(resultado(respostaDoBash(COLORIDO_VERDE), path), "controle verde").toBe("ok");
+  }
+
+  it("funcional: tool_response no formato OBJETO do Bash classifica o Maven colorido — com jq", () => {
+    expect(jqVisivelCom(pathDosHooks())).not.toBe("");
+    objetoDoBash();
+  });
+
+  it("funcional: o mesmo objeto SEM jq no PATH do hook — a rota em que a saída vinha vazia", () => {
+    const semJq = pathDosHooksSemJq();
+    expect(jqVisivelCom(semJq)).toBe("");
+    objetoDoBash(semJq);
   });
 });
 

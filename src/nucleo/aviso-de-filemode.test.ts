@@ -1,9 +1,9 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { avisoDeFilemode, modosNoIndice } from "./modo-executavel.js";
-import { gitEm, novoProduto } from "../teste/candidatos.js";
+import { gitEm, novoProduto, temporarios } from "../teste/candidatos.js";
 
 /**
  * O aviso do `init`, e a promessa que ele faz.
@@ -22,15 +22,18 @@ import { gitEm, novoProduto } from "../teste/candidatos.js";
  * conscientemente e voltar pelo `expx doctor`. O ExpxDev não prepara índice.
  */
 
-const criados: string[] = [];
-afterEach(() => {
-  for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true });
+/**
+ * O ciclo oficial da bancada: ver `temporarios` em `src/teste/candidatos.ts`.
+ * `novoProduto` registra o produto no nascimento, e o recolhimento é no fim do
+ * arquivo — nenhum teste remove o que outro ainda pode precisar.
+ */
+afterAll(() => {
+  temporarios.descartar();
 });
 
 /** Um produto com `core.filemode=false`: o repositório que ignora o bit. */
 function produto(): string {
   const p = novoProduto("expx-aviso-");
-  criados.push(p);
   gitEm(p, "config", "core.filemode", "false");
   return p;
 }

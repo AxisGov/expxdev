@@ -1,9 +1,9 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { comandoDeReparo, modosNoIndice } from "./modo-executavel.js";
-import { bashDosHooks, gitEm, novoProduto } from "../teste/candidatos.js";
+import { bashDosHooks, gitEm, novoProduto, temporarios } from "../teste/candidatos.js";
 import { suportaNomeComCaractereReservado } from "../teste/fs-capacidades.js";
 
 /** Os nomes reservados entram só onde o disco os aceita. */
@@ -21,9 +21,13 @@ const NOMES_LIVRES = suportaNomeComCaractereReservado();
  * nenhum payload embutido em nome de arquivo executou.
  */
 
-const criados: string[] = [];
-afterEach(() => {
-  for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true });
+/**
+ * O ciclo oficial da bancada: ver `temporarios` em `src/teste/candidatos.ts`.
+ * `novoProduto` registra o produto no nascimento, e o recolhimento é no fim do
+ * arquivo — nenhum teste remove o que outro ainda pode precisar.
+ */
+afterAll(() => {
+  temporarios.descartar();
 });
 
 /**
@@ -118,7 +122,6 @@ describe("comandoDeReparo — citação", () => {
 describe("comandoDeReparo — colado num bash de verdade", () => {
   it("integração: só os caminhos declarados viram 100755, e nenhum payload executa", () => {
     const p = novoProduto("expx-reparo-");
-    criados.push(p);
     // Os nomes reservados entram só onde o disco os aceita; o resto do cenário é
     // idêntico nas duas plataformas, e cada nome que fica é metacaractere real.
     const nomes = NOMES_LIVRES ? [...ADVERSARIAIS, ...SO_POSIX] : [...ADVERSARIAIS];
@@ -157,7 +160,6 @@ describe("comandoDeReparo — colado num bash de verdade", () => {
    */
   function reparoNaoVazaParaOVizinho(alvo: string, vizinho: string, prefixo: string): void {
     const p = novoProduto(prefixo);
-    criados.push(p);
     arquivo(p, alvo, 0o644);
     arquivo(p, vizinho, 0o644);
     gitEm(p, "add", "-A");

@@ -2,7 +2,7 @@ import { execFileSync, spawnSync, type SpawnSyncReturns } from "node:child_proce
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, dirname, join, relative, resolve, sep } from "node:path";
+import { delimiter, dirname, join, posix, relative, resolve, sep, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
@@ -37,6 +37,60 @@ const ehWindows = process.platform === "win32";
 /** Os caminhos sob o ciclo, do mais velho ao mais novo. */
 const sobOCiclo: string[] = [];
 
+/** Dois caminhos são o mesmo para o filesystem? No Windows a caixa não distingue. */
+function mesmoCaminho(a: string, b: string): boolean {
+  return ehWindows ? a.toLowerCase() === b.toLowerCase() : a === b;
+}
+
+/**
+ * `caminho` está ESTRITAMENTE dentro de `base`?
+ *
+ * Os dois são NORMALIZADOS antes de comparar, porque é a forma normalizada que o
+ * `rmSync` alcança: `base/x/../..` é o avô de `base`, não um filho dele, e
+ * comparar texto cru deixaria o avô passar. No Windows a normalização também
+ * troca `\` por `/` — os dois separadores abrem o mesmo caminho lá.
+ *
+ * O prefixo comparado TERMINA em separador, e o alvo tem de ser mais longo que
+ * ele. São as duas pontas do "estritamente": `base` não está dentro de si mesma,
+ * e `base-vizinho` não está dentro de `base`.
+ *
+ * `janela` escolhe a semântica de comparação em vez de `process.platform` para
+ * que a regra do Windows — onde a caixa NÃO distingue caminho, e comparar com
+ * caixa deixaria `C:\TEMP\x` passar por fora de `C:\Temp\` — seja verificável na
+ * plataforma em que a bancada roda.
+ *
+ * Caminho relativo é resolvido contra o diretório de trabalho do processo, como o
+ * `rmSync` faria. Vazio nunca está dentro de nada: `resolve("")` devolveria o
+ * diretório de trabalho — a raiz do repositório, quando a bancada roda.
+ */
+export function estritamenteDentro(base: string, caminho: string, janela = ehWindows): boolean {
+  if (base === "" || caminho === "") return false;
+  const p = janela ? win32 : posix;
+  const raiz = p.resolve(base);
+  const alvo = p.resolve(caminho);
+  const prefixo = raiz.endsWith(p.sep) ? raiz : `${raiz}${p.sep}`;
+  const a = janela ? alvo.toLowerCase() : alvo;
+  const b = janela ? prefixo.toLowerCase() : prefixo;
+  return a.startsWith(b) && a.length > b.length;
+}
+
+/**
+ * O ciclo pode adotar este caminho?
+ *
+ * Adotar é entregar um caminho ao `rmSync -r`, então a pergunta é destrutiva e a
+ * resposta é fail-closed: só passa o que se PROVA estritamente dentro do
+ * temporário do sistema. Raiz de repositório, HOME, o próprio `tmpdir()` e
+ * qualquer ancestral dele ficam de fora, e nenhum deles é caminho que um teste
+ * tenha criado para si.
+ *
+ * `tmpdir()` é lido a cada chamada, e não fixado na carga do módulo: é dele que
+ * `temporarios.novo` deriva o que cria, e um teste que troca `TMPDIR` para medir
+ * o que aparece no temporário precisa que as duas pontas concordem.
+ */
+export function adotavelPeloCiclo(caminho: string): boolean {
+  return estritamenteDentro(tmpdir(), caminho);
+}
+
 /**
  * O ciclo de vida dos temporários desta bancada.
  *
@@ -51,6 +105,12 @@ const sobOCiclo: string[] = [];
  * Temporário de execução anterior, de outro arquivo de teste rodando em paralelo
  * ou de outro processo qualquer nunca é alcançado — e um `rm -rf` de padrão
  * (`expx-*`) jamais acontece.
+ *
+ * A adoção é o único jeito de um caminho de fora entrar nessa lista, e por isso é
+ * validada: `adotar` só aceita caminho estritamente dentro do temporário do
+ * sistema (`adotavelPeloCiclo`). Raiz de repositório, HOME e ancestral de
+ * `tmpdir()` reprovam com exceção — adotar é agendar um `rm -rf` para o
+ * `afterAll`, e nenhum desses caminhos foi criado por um teste para ser removido.
  */
 export const temporarios = {
   /** Uma pasta temporária nova, já sob o ciclo. */
@@ -60,10 +120,31 @@ export const temporarios = {
     return d;
   },
 
-  /** Põe sob o ciclo um caminho criado FORA daqui — uma worktree, um arquivo de mensagem. */
+  /**
+   * Põe sob o ciclo um caminho criado FORA daqui — uma worktree, um arquivo de
+   * mensagem.
+   *
+   * A adoção é VALIDADA, e validada antes de qualquer mudança de estado: o ciclo
+   * remove recursivamente o que adota, e um caminho adotado por engano é um
+   * `rm -rf` agendado para o `afterAll`. Só entra o que `adotavelPeloCiclo`
+   * aprova; o resto reprova com exceção, nunca em silêncio — quem precisa de
+   * caminho de fora precisa saber que ele não tem dono aqui.
+   *
+   * O que entra na lista é o caminho NORMALIZADO: é a forma que o `rmSync`
+   * alcança, e é a que a validação aprovou. Adotar duas vezes é idempotente — o
+   * caminho não entra duas vezes, e o descarte não volta a um caminho que já saiu
+   * do disco.
+   */
   adotar(caminho: string): string {
-    sobOCiclo.push(caminho);
-    return caminho;
+    if (!adotavelPeloCiclo(caminho)) {
+      throw new Error(
+        `temporarios.adotar recusou ${JSON.stringify(caminho)}: o ciclo REMOVE o que adota, e so adota ` +
+          `caminho estritamente dentro de ${tmpdir()}`,
+      );
+    }
+    const alvo = resolve(caminho);
+    if (!sobOCiclo.some((d) => mesmoCaminho(d, alvo))) sobOCiclo.push(alvo);
+    return alvo;
   },
 
   /** O que está sob o ciclo agora, do mais velho ao mais novo. */
@@ -76,17 +157,34 @@ export const temporarios = {
    * adotada depois do produto que a hospeda sai antes dele.
    *
    * Uma remoção que falhe não cala nem interrompe as outras: todas são tentadas,
-   * e o que não saiu é reportado no fim.
+   * e o que não saiu é reportado no fim, na ordem em que foi tentado.
+   *
+   * O caminho que NÃO saiu continua sob o ciclo. A lista só muda depois da
+   * varredura, e só pelo que o disco confirmou: tirar o caminho da lista antes
+   * (um `splice` na entrada) deixava órfã justamente a pasta cuja remoção falhou
+   * — ela perdia o dono no instante em que provou precisar de outra tentativa, e
+   * nenhuma chamada seguinte voltaria a ela.
    */
   descartar(): void {
     const falhas: string[] = [];
-    for (const d of sobOCiclo.splice(0).reverse()) {
+    const presos: string[] = [];
+    for (const d of [...sobOCiclo].reverse()) {
       try {
-        rmSync(d, { recursive: true, force: true });
+        // `maxRetries`/`retryDelay`: no Windows a remoção esbarra em EBUSY, EPERM
+        // e ENOTEMPTY transitórios enquanto o antivírus, o indexador ou o
+        // processo de git que acabou de sair ainda seguram um handle do que está
+        // dentro da pasta. O Node repete só esses, com espera crescente; EACCES e
+        // o resto continuam reprovando de primeira, sem segurar a bancada.
+        rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
       } catch (e) {
         falhas.push(`${d}: ${String(e)}`);
+        presos.push(d);
       }
     }
+    sobOCiclo.length = 0;
+    // De volta na ordem original (do mais velho ao mais novo), para a próxima
+    // tentativa continuar saindo do mais novo para o mais velho.
+    sobOCiclo.push(...presos.reverse());
     if (falhas.length > 0) throw new Error(`temporarios da bancada nao removidos:\n${falhas.join("\n")}`);
   },
 };
