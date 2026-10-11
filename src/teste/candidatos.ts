@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, symlinkSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +33,63 @@ export function snapshot(nome: NomeCandidato): string {
 }
 
 const ehWindows = process.platform === "win32";
+
+/** Os caminhos sob o ciclo, do mais velho ao mais novo. */
+const sobOCiclo: string[] = [];
+
+/**
+ * O ciclo de vida dos temporários desta bancada.
+ *
+ * Todo helper daqui que cria pasta temporária a registra no ciclo no instante em
+ * que ela NASCE — antes de qualquer trabalho que possa falhar. Com isso o dono é
+ * sempre conhecido: erro no meio da montagem e retorno antecipado não deixam
+ * pasta órfã, porque o registro já aconteceu. Quem fecha o ciclo é o `afterAll`
+ * da bancada, com `descartar()`.
+ *
+ * O descarte é pela LISTA de caminhos desta execução, NUNCA por prefixo: só sai
+ * do disco o que `mkdtempSync` devolveu aqui, ou o que foi adotado de propósito.
+ * Temporário de execução anterior, de outro arquivo de teste rodando em paralelo
+ * ou de outro processo qualquer nunca é alcançado — e um `rm -rf` de padrão
+ * (`expx-*`) jamais acontece.
+ */
+export const temporarios = {
+  /** Uma pasta temporária nova, já sob o ciclo. */
+  novo(prefixo: string): string {
+    const d = mkdtempSync(join(tmpdir(), prefixo));
+    sobOCiclo.push(d);
+    return d;
+  },
+
+  /** Põe sob o ciclo um caminho criado FORA daqui — uma worktree, um arquivo de mensagem. */
+  adotar(caminho: string): string {
+    sobOCiclo.push(caminho);
+    return caminho;
+  },
+
+  /** O que está sob o ciclo agora, do mais velho ao mais novo. */
+  lista(): readonly string[] {
+    return [...sobOCiclo];
+  },
+
+  /**
+   * Remove o que está sob o ciclo, do mais novo ao mais velho — uma worktree
+   * adotada depois do produto que a hospeda sai antes dele.
+   *
+   * Uma remoção que falhe não cala nem interrompe as outras: todas são tentadas,
+   * e o que não saiu é reportado no fim.
+   */
+  descartar(): void {
+    const falhas: string[] = [];
+    for (const d of sobOCiclo.splice(0).reverse()) {
+      try {
+        rmSync(d, { recursive: true, force: true });
+      } catch (e) {
+        falhas.push(`${d}: ${String(e)}`);
+      }
+    }
+    if (falhas.length > 0) throw new Error(`temporarios da bancada nao removidos:\n${falhas.join("\n")}`);
+  },
+};
 
 export function sha256(caminho: string): string {
   return createHash("sha256").update(readFileSync(caminho)).digest("hex");
@@ -107,7 +164,7 @@ export function gitEm(cwd: string, ...args: string[]): string {
  * `git ls-remote` na origem, como faria com a remota.
  */
 export function fontesCandidatas(): string {
-  const raiz = mkdtempSync(join(tmpdir(), "expx-candidatas-"));
+  const raiz = temporarios.novo("expx-candidatas-");
   for (const nome of Object.keys(CANDIDATOS) as NomeCandidato[]) {
     conferirSnapshot(nome);
     const destino = join(raiz, CANDIDATOS[nome].pasta);
@@ -122,7 +179,7 @@ export function fontesCandidatas(): string {
 
 /** Um produto Git novo, com um commit na principal. */
 export function novoProduto(prefixo = "expx-produto-"): string {
-  const raiz = mkdtempSync(join(tmpdir(), prefixo));
+  const raiz = temporarios.novo(prefixo);
   git(raiz, "init", "-q", "-b", "main");
   git(raiz, "config", "core.autocrlf", "false");
   git(raiz, "config", "user.email", "produto@example.invalid");
@@ -184,6 +241,11 @@ export function ambienteCom(path: string, extra: Record<string, string> = {}): N
  * a bancada. Monta uma pasta de links onde o sistema permite (Linux); no
  * Windows, usa só as pastas da instalação do Git, conferindo que o jq não
  * está nelas.
+ *
+ * A bancada chama isto a cada `init` e a cada `doctor`, então a pasta de links
+ * nasce sob o ciclo (`temporarios`) e some no `afterAll`. No Windows nada é
+ * criado: o retorno são as pastas da INSTALAÇÃO do Git, que o ciclo não conhece
+ * e, portanto, nunca remove.
  */
 export function pathControlado(comJq: boolean): string {
   const jq = obrigatorio("jq");
@@ -197,9 +259,11 @@ export function pathControlado(comJq: boolean): string {
     }
     return [...dirs, ...(comJq ? [dirname(jq)] : [])].join(delimiter);
   }
-  const bin = mkdtempSync(join(tmpdir(), "expx-bin-"));
-  mkdirSync(bin, { recursive: true });
-  symlinkSync(obrigatorio("git"), join(bin, "git"));
+  // Os alvos primeiro, a pasta depois: externo que falte reprova ANTES de existir
+  // pasta para ficar órfã.
+  const gitBin = obrigatorio("git");
+  const bin = temporarios.novo("expx-bin-");
+  symlinkSync(gitBin, join(bin, "git"));
   if (comJq) symlinkSync(jq, join(bin, "jq"));
   return bin;
 }
@@ -219,7 +283,7 @@ export function pathControlado(comJq: boolean): string {
  * do HOME em Linux.
  */
 export function larIsolado(): { lar: string; env: Record<string, string> } {
-  const lar = mkdtempSync(join(tmpdir(), "expx-lar-"));
+  const lar = temporarios.novo("expx-lar-");
   return {
     lar,
     env: {
@@ -268,8 +332,11 @@ const EXTERNOS_DOS_HOOKS = [
  */
 export function pathDosHooksSemJq(): string {
   if (ehWindows) return pathControlado(false);
-  const bin = mkdtempSync(join(tmpdir(), "expx-sem-jq-"));
-  for (const nome of EXTERNOS_DOS_HOOKS) symlinkSync(obrigatorio(nome), join(bin, nome));
+  // Resolve a lista INTEIRA antes de criar a pasta: ferramenta que falte reprova
+  // alto, e reprova sem deixar pasta pela metade no temporário do sistema.
+  const alvos = EXTERNOS_DOS_HOOKS.map((nome) => [nome, obrigatorio(nome)] as const);
+  const bin = temporarios.novo("expx-sem-jq-");
+  for (const [nome, alvo] of alvos) symlinkSync(alvo, join(bin, nome));
   return bin;
 }
 

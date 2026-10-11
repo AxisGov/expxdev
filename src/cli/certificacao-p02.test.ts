@@ -20,6 +20,7 @@ import {
   rodarHookComPayload,
   sha256,
   snapshot,
+  temporarios,
 } from "../teste/candidatos.js";
 
 /**
@@ -37,7 +38,6 @@ import {
 
 type Json = Record<string, any>;
 
-const criados: string[] = [];
 let fontes = "";
 /** O HOME descartável de TODO init e doctor desta bancada. */
 let lar = "";
@@ -59,9 +59,7 @@ function doctor(produto: string): ReturnType<typeof rodarExpx> {
 }
 
 function produto(): string {
-  const p = novoProduto();
-  criados.push(p);
-  return p;
+  return novoProduto();
 }
 
 function json(caminho: string): Json {
@@ -127,19 +125,22 @@ function gerenciado(p: string): Record<string, string> {
 
 beforeAll(() => {
   fontes = fontesCandidatas();
-  criados.push(fontes);
   const isolado = larIsolado();
   lar = isolado.lar;
   envLar = isolado.env;
-  criados.push(lar);
   A = produto();
   saidaA = init(A, "sprintx,mergex");
   B = produto();
   init(B, "mergex,sprintx");
 }, 600000);
 
+/**
+ * O ciclo oficial da bancada: tudo que os helpers de `candidatos.ts` criaram
+ * nesta execução — fontes, produtos, lar, e TODA pasta de links de PATH montada
+ * pelos `init` e `doctor` daqui — sai junto.
+ */
 afterAll(() => {
-  for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true });
+  temporarios.descartar();
 });
 
 describe("P0.2 — init real de SprintX + MergeX", () => {
@@ -668,7 +669,7 @@ describe("P0.2 — E1 da MergeX na instalação feita só pelo ExpxDev", () => {
     writeFileSync(join(p, "src/a.js"), "base a\nalterado\n");
     const msg = join(p, "..", `${p.split(/[\\/]/).pop() ?? "p"}.msg`);
     writeFileSync(msg, "fix(src): fecha T-01.01\n\nObjetivo da task.\n\nTask: T-01.01\nTrabalho: ft-m4\n");
-    criados.push(msg);
+    temporarios.adotar(msg);
     const r = spawnSync(
       bashDosHooks(),
       [join(p, ".claude/skills/mergex/scripts/fechamento-do-e1.sh"), "--fechar", "--entrega", ENTREGA, "--task", "T-01.01", "--mensagem", msg, "--", "src/a.js"],
