@@ -16,6 +16,11 @@ Ao longo do trabalho, sempre no mesmo arquivo — e **nunca recriado do zero**:
 | A cada task commitada | E1 | `aberto`, com a lista `commits` crescendo |
 | Retomada depois de replanejamento | E0 | volta a `aberto`, **preservando** `commits` e `criado_em` (`00-abertura.md`) |
 | Fim do fluxo | E8 | `entregue` ou `bloqueado` — os dois são persistidos por commit |
+| Base integrada depois do E8 | `reconciliacao-base.sh --registrar` (`references/11-reconciliacao-base.md`) | volta a `aberto`, com `portao: null` e `portao_sha: null`; `base_validada_sha` passa ao `b1_sha` registrado e `reconciliacoes` ganha o item; **preserva** `commits`, `criado_em`, `pr_url`, `pr_estado` e `desvios`. Persistido pelo checkpoint `reconciliacao-base` |
+
+O resultado do E2 (`portao`, `portao_sha`, `falhas_portao`) é gravado só por `registrar-portao.sh`
+(`references/02-prontidao.md`). Os checkpoints de método que levam o arquivo ao histórico formam o
+enum fechado `pre-e2 | reconciliacao-base | pre-e6 | e8`.
 
 ## O contrato — `kind: entrega`
 
@@ -40,6 +45,7 @@ o que segue é o que você precisa para gravar. As regras universais valem todas
 | `estado` | `aberto` \| `entregue` \| `bloqueado` |
 | `portao` | `pronto` \| `bloqueado` \| `null` (ainda não rodou) |
 | `pr_estado` | `rascunho` \| `aberto` \| `merged` \| `fechado` \| `null` |
+| `origem_base` | `registrada_e0` \| `inferida_legado` \| `null` (sem versionador) |
 | `tipo_trabalho` | `feature` \| `ocorrencia` |
 | `raio` | `baixo` \| `medio` \| `alto` \| `null` (sem modo legado) |
 | `causa` | as dez causas de `references/00-schema.md` \| `indeterminada` \| `null` |
@@ -62,6 +68,9 @@ estado: entregue
 versionado: true
 branch: fix/OC-2026-0184-icms-st-base-desconto
 branch_base: main
+base_validada_sha: 4c1e9a0b2d3f4e5a6b7c8d9e0f1a2b3c4d5e6f70
+origem_base: registrada_e0
+reconciliacoes: []
 commits:
   - seq: 1
     task: T-01.01
@@ -84,6 +93,7 @@ atencao:
   leitura_rapida: 2
   dispensavel: 4
 portao: pronto
+portao_sha: 7b2e4019c1d8e2f3a4b5c6d7e8f90a1b2c3d4e5f
 falhas_portao: []
 causa: null
 desvios: []
@@ -106,6 +116,9 @@ entregue_em: 2026-08-29
 | `estado` | `aberto` no E0; `entregue` quando o fluxo completou; `bloqueado` quando o portão barrou |
 | `versionado` | `false` em repositório sem versionador |
 | `branch`, `branch_base` | `null` quando `versionado: false`. `branch_base` é a **base efetiva** determinada no E0 — inclusive quando informada pelo chamador; é ela que os diffs do E2, do E3 e do E4 usam |
+| `base_validada_sha`, `origem_base` | A base validada **por SHA**, gravada no E0 e trocada só pelo `reconciliacao-base.sh --registrar`; o E8 nunca a altera (`references/00-schema.md`) |
+| `reconciliacoes` | A cadeia `{numero, arquivo, b1_sha, m_sha}` das reconciliações de base; `[]` sem reconciliação. O E8 a preserva |
+| `portao_sha` | O `HEAD` que o E2 avaliou, gravado com `portao` por `registrar-portao.sh`; o E8 o preserva. O commit `e8` é método de um pai no catálogo, e por isso não vence o portão |
 | `commits` | Um item por **fechamento de task em cada execução**, na ordem em que fecharam, cada um com a chave de ordem `seq` (`references/00-schema.md`, "A ordem de registro"); `[]` sem versionador. É histórico de execução: na retomada depois de replanejamento a lista é **preservada**, e um `task` id pode reaparecer com outro SHA (`01-commits.md`). O commit de artefatos de método não é task e **não entra aqui** — ele vai na prosa |
 | `modulo_afetado` | Os módulos que a entrega toca; copiado da skill de origem quando ela o declara |
 | `arquivos_alterados` | **O diff real** (`git diff --name-only <branch_base>...HEAD`), não a previsão do plano |
@@ -190,14 +203,15 @@ git status --porcelain
 
 | O que é | O que fazer |
 |---|---|
-| Artefato de método **deste** trabalho: `docs/entregas/<trabalho_id>/` e a pasta do trabalho na skill de origem | **Entra** no commit final |
+| Artefato de método **deste** trabalho: `docs/entregas/<trabalho_id>/` (inclusive os `RECONCILIACAO-BASE-NNN.md` de `ENTREGA.reconciliacoes`) e a pasta do trabalho na skill de origem | **Entra** no commit final. O catálogo de `e8` é cumulativo: o de `pre-e2`, o de `pre-e6` e os artefatos de reconciliação |
 | `docs/sprintx/estimativas/HISTORICO.md`, quando a origem é a **sprintx** e ele está sujo | **Entra** — é o artefato global de método da sprintx (`references/integracao/sprintx.md`). A exceção é exata: nada mais sob `docs/sprintx/estimativas/`, e nada equivalente na runx |
 | Arquivo de **produto** fora da lista declarada | **Não entra.** Continua sendo desvio (regra 4, `01-commits.md`); nomeie no relatório |
 | Artefato de **outro** trabalho | **Não entra.** É desvio pelo mesmo critério |
 | Derivado e não versionado: `docs/eventos/<trabalho_id>.jsonl`, `.expx/estado.json`, índice do memox | **Não entra.** Não é artefato da entrega |
 
 **O `HISTORICO.md` normalmente já está limpo aqui**, porque entrou no `pre-e2`. Se voltou a ficar
-dirty e o diff continua pertencendo ao trabalho explícito, o catálogo cumulativo de `e8` o inclui.
+dirty e a prova contra HEAD continua passando (entradas antigas intactas, novas só do trabalho
+explícito — DM-175), o catálogo cumulativo de `e8` o inclui.
 
 Depois do E6 e do E7, o que costuma estar sujo é **um arquivo só**: o próprio `ENTREGA.md` — o
 E7 gravou `pr_url` e `pr_estado`, e o E8 acabou de gravar `estado`, `portao`, `push_feito`,
@@ -361,7 +375,9 @@ rodaram —, mas a sprintx já gravou `docs/sprintx/estimativas/HISTORICO.md` an
 `FECHAMENTO.md` e do portão. Quando a origem é a sprintx e ele está sujo, ele **entra no commit
 final do bloqueio**: por caminho explícito, com a mesma varredura de segredo, fora da lista
 `commits`, sem inventar task e sem publicar nada. É o que evita que uma retomada perca a memória
-que a sprintx já havia registrado.
+que a sprintx já havia registrado. Vale também quando ele **nasceu neste trabalho** e nenhum
+checkpoint anterior o persistiu: o `e8` faz a prova integral da primeira criação (DM-174) e, se
+ela falhar, para sem commit.
 
 Termina com o bloqueio preservado no HEAD local — é o que permite a uma sessão futura, ou a
 outra skill, ver que este trabalho parou no portão, e por quê, mesmo depois de o worktree sumir.
@@ -383,8 +399,9 @@ estado de quem ainda está trabalhando.
 
 Repositório sem versionador: os dois campos já são `null` desde o E0 e nada é gravado.
 
-O procedimento é o de `10-estado.md`. Falha de gravação vai para o rastro e **não interrompe
-o E8** — a entrega já está registrada no `ENTREGA.md`, que é a fonte de verdade.
+O procedimento é o de `10-estado.md`. Falha de gravação é **silenciosa** e **não interrompe
+o E8** — a entrega já está registrada no `ENTREGA.md`, que é a fonte de verdade. Sem linha de
+rastro, pela lacuna registrada em `10-estado.md`, "A lacuna".
 
 ## Entrega ao usuário
 
@@ -442,7 +459,7 @@ Avisos: <lista, ou "nenhum">
 | Reindexação falha | Aviso na prosa e siga; o índice é reconstruível com `/memox-indexar` |
 | E3 não rodou (portão barrou) | `faixa_atencao: []` e `atencao` zerado; `arquivos_alterados` continua sendo o diff real |
 | `.expx/` não existe | Segue sem limpar o estado da barra, sem erro e sem aviso; **nunca cria o diretório** |
-| Gravação do `estado.json` falhou | Registra no rastro e segue; a entrega continua concluída |
+| Gravação do `estado.json` falhou | Segue **em silêncio**, sem rastro (`10-estado.md`, "A lacuna"); a entrega continua concluída |
 | Nada deste trabalho está sujo no fechamento | O checkpoint devolve `noop=true`; nunca cria commit vazio |
 | Segredo no artefato do fechamento | Aborta o commit final, mascara o trecho, e a entrega fica sem o registro publicado até a pessoa resolver |
 | Remoto à frente na publicação final | Não publica, não reconcilia, não força; relata literal; branch local guarda o registro final |

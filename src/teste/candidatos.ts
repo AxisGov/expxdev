@@ -23,7 +23,7 @@ export const BINARIO = join(RAIZ_DO_REPO, "dist", "cli", "expx-bin.js");
  */
 export const CANDIDATOS = {
   sprintx: { pasta: "SprintX", sha: "253b59233e6d7a225a05f011cf52668b708e448b" },
-  mergex: { pasta: "MergeX", sha: "25d479725b0d91d7b794899c9e25e214bb55fb04" },
+  mergex: { pasta: "MergeX", sha: "cab6d5f13807a50f65abaa359238868c56933077" },
 } as const;
 
 export type NomeCandidato = keyof typeof CANDIDATOS;
@@ -202,6 +202,35 @@ export function pathControlado(comJq: boolean): string {
   symlinkSync(obrigatorio("git"), join(bin, "git"));
   if (comJq) symlinkSync(jq, join(bin, "jq"));
   return bin;
+}
+
+/**
+ * Um HOME descartável para o `expxdev init`.
+ *
+ * O PATH controlado já tira o `claude` de vista, e sem o binário a instalação
+ * do plugin só IMPRIME a instrução manual. Mas isso é garantia por ausência:
+ * quem lê a bancada precisa inferir, do PATH, que `~/.claude` do operador não
+ * pode ser tocado. Aqui a garantia fica positiva — o processo recebe um HOME
+ * (e um `CLAUDE_CONFIG_DIR`) vazio, em pasta temporária, e o teste confere
+ * depois que nada foi escrito nele.
+ *
+ * `USERPROFILE` acompanha o `HOME` porque é dele que o Node deriva `homedir()`
+ * no Windows, e as três XDG porque é por elas que um cache de plugin escaparia
+ * do HOME em Linux.
+ */
+export function larIsolado(): { lar: string; env: Record<string, string> } {
+  const lar = mkdtempSync(join(tmpdir(), "expx-lar-"));
+  return {
+    lar,
+    env: {
+      HOME: lar,
+      USERPROFILE: lar,
+      XDG_CONFIG_HOME: join(lar, ".config"),
+      XDG_CACHE_HOME: join(lar, ".cache"),
+      XDG_DATA_HOME: join(lar, ".local", "share"),
+      CLAUDE_CONFIG_DIR: join(lar, ".claude"),
+    },
+  };
 }
 
 /**

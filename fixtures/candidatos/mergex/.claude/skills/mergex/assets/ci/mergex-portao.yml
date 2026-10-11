@@ -1,0 +1,55 @@
+# TEMPLATE de workflow do portão da MergeX. Não é um workflow ativo.
+#
+# Esta branch entrega o template e o executável (scripts/portao-ci.sh) e NÃO o
+# ativa em lugar nenhum: nenhum arquivo daqui existe em .github/workflows/.
+# Ativar no produto é handoff posterior e separado: copiar este arquivo para
+# .github/workflows/ do repositório do produto e configurar a proteção de merge
+# da branch principal exigindo o check "mergex-portao". Sem a proteção de merge
+# exigindo o check, ele não barra nada.
+#
+# O check seleciona as entregas governadas pelo portão só pelo conteúdo do PR
+# (DM-185: o diff de árvores entre a base e a cabeça do PR e os commits do
+# intervalo que tocam docs/entregas/<id>/ENTREGA.md) e aplica a cada uma a
+# mesma validade do `pre-push` sobre o SHA da cabeça do PR, com o mesmo modo de
+# `portao: null`. O nome da branch de origem (`head.ref`) é só conferência
+# (`aviso=branch_divergente`), nunca seleciona nem isenta. É a barreira contra
+# `git push --no-verify` e contra o contorno pelo nome da branch. Não substitui
+# o `pre-push`.
+#
+# Limites (spec, seção 15.1, itens 1 e 9 a 12): a DM-185 fecha o contorno pelo
+# nome; o check não é barreira contra todo contorno deliberado. Com
+# `on: pull_request` o autor do PR controla a cabeça do PR, inclusive
+# `.expx/hooks.json` (o modo de `portao: null`) e os próprios scripts; o check
+# confia neles. No produto, exija CODEOWNERS e revisão obrigatória para `.expx/**`,
+# `.claude/**` e `.github/**`. Um PR sem nenhum ENTREGA.md alterado não está sob
+# o portão (passa); várias entregas no mesmo PR ou base do evento defasada
+# barram (falso bloqueio, nunca aprovação).
+name: mergex-portao
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  mergex-portao:
+    name: mergex-portao
+    runs-on: ubuntu-latest
+    steps:
+      # história completa: clone raso é historia_incompleta e reprova
+      - name: Checkout da cabeça do PR
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # os valores do evento entram pelo ambiente do step, nunca interpolados
+      # no texto do shell (head.ref é controlado por quem abre o PR)
+      - name: Verificar o portão
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bash .claude/skills/mergex/scripts/portao-ci.sh --verificar --sha "$PR_HEAD_SHA" --branch "$PR_HEAD_REF" --base "$PR_BASE_SHA"

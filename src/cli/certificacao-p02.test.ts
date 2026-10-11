@@ -9,6 +9,7 @@ import {
   CANDIDATOS,
   fontesCandidatas,
   gitEm,
+  larIsolado,
   novaLinhaDoJq,
   novoProduto,
   pathControlado,
@@ -21,7 +22,7 @@ import {
 } from "../teste/candidatos.js";
 
 /**
- * Certificação P0.2: SprintX 253b592 + MergeX 25d4797 instaladas SÓ pelo
+ * Certificação P0.2: SprintX 253b592 + MergeX cab6d5f instaladas SÓ pelo
  * `expxdev init` real (o binário do `dist/`, num processo novo), a partir dos
  * snapshots fixados em `fixtures/candidatos/`. Nenhum arquivo é copiado,
  * nenhum settings ou hooks.json é montado à mão: o que está no produto é o que
@@ -35,16 +36,23 @@ type Json = Record<string, any>;
 
 const criados: string[] = [];
 let fontes = "";
+/** O HOME descartável de TODO init e doctor desta bancada. */
+let lar = "";
+let envLar: Record<string, string> = {};
 let A = "";
 let B = "";
 let saidaA: ReturnType<typeof rodarExpx>;
 
 function init(produto: string, skills: string, comJq = true): ReturnType<typeof rodarExpx> {
-  return rodarExpx(["init", "--skills", skills, "--yes"], produto, ambienteCom(pathControlado(comJq), { EXPX_SKILLS_LOCAIS: fontes }));
+  return rodarExpx(
+    ["init", "--skills", skills, "--yes"],
+    produto,
+    ambienteCom(pathControlado(comJq), { ...envLar, EXPX_SKILLS_LOCAIS: fontes }),
+  );
 }
 
 function doctor(produto: string): ReturnType<typeof rodarExpx> {
-  return rodarExpx(["doctor"], produto, ambienteCom(pathControlado(true)));
+  return rodarExpx(["doctor"], produto, ambienteCom(pathControlado(true), envLar));
 }
 
 function produto(): string {
@@ -89,6 +97,10 @@ function gerenciado(p: string): Record<string, string> {
 beforeAll(() => {
   fontes = fontesCandidatas();
   criados.push(fontes);
+  const isolado = larIsolado();
+  lar = isolado.lar;
+  envLar = isolado.env;
+  criados.push(lar);
   A = produto();
   saidaA = init(A, "sprintx,mergex");
   B = produto();
@@ -105,6 +117,14 @@ describe("P0.2 — init real de SprintX + MergeX", () => {
     expect(saidaA.status).toBe(0);
     expect(saidaA.stdout).toContain("instaladas: mergex, sprintx");
     expect(saidaA.stdout).toContain("claude plugin marketplace add");
+  });
+
+  it("integração: o init não escreve nada no HOME nem no CLAUDE_CONFIG_DIR que recebeu", () => {
+    // O `init` de A e B já rodou no beforeAll com este HOME. Se a instalação do
+    // plugin tivesse acontecido, `~/.claude/plugins/cache/` estaria aqui — e a
+    // bancada estaria mexendo na configuração de quem a roda.
+    expect(arvore(lar)).toEqual([]);
+    expect(existsSync(join(lar, ".claude"))).toBe(false);
   });
 
   it("funcional: 1-2 — a árvore de hooks de cada skill está inteira, byte a byte", () => {
@@ -421,6 +441,70 @@ describe("P0.2 — o rastro do hook instalado é UTF-8 válido no corte do detal
     const detalhe = detalheDaSuite(`${comando}${"á".repeat(3)}`);
     expect(detalhe).toBe(esperado);
     expect(Buffer.byteLength(detalhe, "utf8")).toBe(119);
+  });
+});
+
+describe("P0.2 — a MergeX com DM-185 chega inteira ao produto", () => {
+  /**
+   * Os artefatos que a DM-185 acrescentou à MergeX: a reconciliação de base
+   * pós-E8, a barreira de `pre-push` (ativação + o hook gerenciado), o
+   * template e o validador do portão no CI, e o ownership por `Trabalho:`.
+   *
+   * A lista é NOMEADA de propósito. Uma varredura da árvore do snapshot se
+   * compara consigo mesma: ela fica verde com qualquer pin, inclusive o
+   * anterior, e não distingue "instalou tudo" de "o candidato não tem nada
+   * disso". Nomear o que a DM-185 trouxe é o que faz o pin velho reprovar.
+   */
+  const DM185 = [
+    ".claude/hooks/comum/integracao-da-mensagem.sh",
+    ".claude/skills/mergex/assets/ci/mergex-portao.yml",
+    ".claude/skills/mergex/assets/pre-push-gerenciado.sh",
+    ".claude/skills/mergex/references/11-reconciliacao-base.md",
+    ".claude/skills/mergex/references/12-barreira-de-push.md",
+    ".claude/skills/mergex/scripts/ativacao-pre-push.sh",
+    ".claude/skills/mergex/scripts/ownership-da-task.sh",
+    ".claude/skills/mergex/scripts/portao-ci.sh",
+    ".claude/skills/mergex/scripts/portao-push.sh",
+    ".claude/skills/mergex/scripts/portao-regras.sh",
+    ".claude/skills/mergex/scripts/portao-v9.sh",
+    ".claude/skills/mergex/scripts/reconciliacao-artefato.sh",
+    ".claude/skills/mergex/scripts/reconciliacao-arvore.sh",
+    ".claude/skills/mergex/scripts/reconciliacao-base.sh",
+    ".claude/skills/mergex/scripts/registrar-portao.sh",
+    ".claude/skills/mergex/scripts/validade-do-portao.sh",
+  ];
+
+  it("funcional: cada artefato da DM-185 está no snapshot e no produto, byte a byte", () => {
+    for (const rel of DM185) {
+      const fonte = join(snapshot("mergex"), rel);
+      expect(existsSync(fonte), `ausente no snapshot: ${rel}`).toBe(true);
+      expect(existsSync(join(A, rel)), `nao instalado: ${rel}`).toBe(true);
+      expect(sha256(join(A, rel)), rel).toBe(sha256(fonte));
+    }
+  });
+
+  it("funcional: a árvore inteira da skill mergex chega ao produto, sem arquivo a menos", () => {
+    const fonte = join(snapshot("mergex"), ".claude", "skills", "mergex");
+    const arquivos = arvore(fonte);
+    expect(arquivos.length).toBeGreaterThan(DM185.length);
+    for (const rel of arquivos) {
+      expect(sha256(join(A, ".claude/skills/mergex", rel)), rel).toBe(sha256(join(fonte, rel)));
+    }
+  });
+
+  /**
+   * `.sh` é executável pela EXTENSÃO (`decidirExecutavel`), e é isso que mantém
+   * os scripts novos da DM-185 executáveis mesmo onde o bit da origem não
+   * sobrevive. O `.yml` do CI é o controle: ele não pode entrar em
+   * `instalacao.executaveis`, ou o doctor passaria a exigir `--chmod=+x` para
+   * um template de workflow.
+   */
+  it("funcional: os scripts novos entram como executáveis e o template de CI não", () => {
+    const executaveis = new Set((json(join(A, ".expx/expx-lock.json"))["instalacao"]["executaveis"] as string[]) ?? []);
+    for (const rel of DM185.filter((r) => r.endsWith(".sh"))) {
+      expect(executaveis.has(rel), `deveria ser executavel: ${rel}`).toBe(true);
+    }
+    expect(executaveis.has(".claude/skills/mergex/assets/ci/mergex-portao.yml")).toBe(false);
   });
 });
 

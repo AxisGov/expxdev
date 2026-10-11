@@ -21,6 +21,11 @@ retroativamente (`references/00-schema.md`, "A ordem de registro").
 bloqueio"). `causa` é `null` salvo em `estado: bloqueado`, onde é obrigatória e sai do script,
 nunca da mão. Confira com `scripts/causa-do-portao.sh --validar` antes de commitar.
 
+`base_validada_sha`, `origem_base`, `reconciliacoes` e `portao_sha` nunca são omitidas
+(`references/00-schema.md`; `references/11-reconciliacao-base.md`). O E0 grava a base por SHA;
+só o `reconciliacao-base.sh --registrar` a troca e acrescenta itens a `reconciliacoes`; só o
+`registrar-portao.sh` grava `portao_sha`. Nenhuma delas é escrita à mão.
+
 ---
 
 ---
@@ -36,6 +41,9 @@ estado: {{aberto | entregue | bloqueado}}
 versionado: {{true | false}}
 branch: {{nome da branch | null}}
 branch_base: {{nome da base | null}}
+base_validada_sha: {{sha de 40 hex de git merge-base HEAD <branch_base>, gravado no E0 | null sem versionador}}
+origem_base: {{registrada_e0 | inferida_legado | null sem versionador}}
+reconciliacoes: []
 commits:
   - seq: {{ordem de registro do E1: 1, 2, 3...}}
     task: {{T-NN.MM}}
@@ -51,6 +59,7 @@ atencao:
   leitura_rapida: {{n}}
   dispensavel: {{n}}
 portao: {{pronto | bloqueado | null}}
+portao_sha: {{sha de 40 hex do HEAD que o E2 avaliou, gravado so por registrar-portao.sh | null}}
 falhas_portao: [{{as verificacoes com FALHA no E2: v1..v11, ou vN_sem_prova; vazio sem portao ou com PRONTO}}]
 causa: {{null | a causa derivada por scripts/causa-do-portao.sh --derivar, so com estado bloqueado}}
 desvios: []

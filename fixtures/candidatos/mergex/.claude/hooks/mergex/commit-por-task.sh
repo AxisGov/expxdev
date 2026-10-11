@@ -23,6 +23,8 @@ PADRAO="aviso"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../comum/base.sh
 . "$DIR/../comum/base.sh"
+# shellcheck source=../comum/integracao-da-mensagem.sh
+. "$DIR/../comum/integracao-da-mensagem.sh"
 
 # Falha aberta: sem `set -e`, um comando que retorna não-zero não derruba o
 # script — ele segue e, no limite, chega ao fim e sai 0. É esse o comportamento
@@ -35,7 +37,11 @@ ENTRADA="$(cat)"
 
 CMD="$(printf '%s' "$ENTRADA" | jq -r '.tool_input.command // empty' 2>/dev/null)"
 [ -n "$CMD" ] || exit 0
-printf '%s' "$CMD" | grep -Eq 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]+commit([[:space:]]|$)' || exit 0
+# Sem `-q`, de propósito: base.sh liga `pipefail`, e um grep que casa na primeira
+# linha e sai dá SIGPIPE ao printf quando o comando passa do buffer do pipe — o
+# pipeline devolvia 141 e este `|| exit 0` pulava o hook (rodada extra da
+# revisão). Sem `-q` o grep lê até o fim, e o status é só dele.
+printf '%s' "$CMD" | grep -E 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]+commit([[:space:]]|$)' >/dev/null || exit 0
 
 CWD="$(printf '%s' "$ENTRADA" | jq -r '.cwd // empty' 2>/dev/null)"
 RAIZ="$(expx_raiz "${CWD:-$PWD}")"
@@ -99,15 +105,17 @@ CONTRATO_COMMIT="$DIR/../../skills/mergex/scripts/contrato-de-commit.sh"
 # escolher a primeira task do plano, ou a do arquivo mais recente, inventaria
 # o dono. Duas declarações diferentes, ou nenhuma, é "não determinada".
 MSG="$CMD"
-ARQ_MSG="$(printf '%s' "$CMD" | sed -n 's/.*[[:space:]]-F[[:space:]]*\([^[:space:]]*\).*/\1/p; s/.*--file=\([^[:space:]]*\).*/\1/p' | head -1)"
+# A mensagem só como o hook a leu (arquivo de -F/--file, com ou sem aspas, ou
+# -m), sem o comando: a leitura é a da biblioteca (integracao-da-mensagem.sh),
+# a mesma do arquivo-fora-do-plano — uma implementação só, provada pelo
+# teste.sh, em vez de um sed repetido aqui.
+MSG_LIDA="$(integracao_mensagem_do_comando "$CMD")"
+ARQ_MSG="$(integracao_arquivo_do_comando "$CMD")"
 if [ -n "$ARQ_MSG" ]; then
-  ARQ_MSG="$(printf '%s' "$ARQ_MSG" | sed "s/^['\"]//; s/['\"]$//")"
-  case "$ARQ_MSG" in
-    /*) : ;;
-    *) ARQ_MSG="$RAIZ/$ARQ_MSG" ;;
-  esac
-  [ -r "$ARQ_MSG" ] && MSG="$MSG
-$(cat "$ARQ_MSG" 2>/dev/null)"
+  if [ -r "$ARQ_MSG" ]; then
+    MSG="$MSG
+$MSG_LIDA"
+  fi
 else
   # O evento do harness traz a linha de comando, não argv. Para `-m "..."`,
   # retire somente o invólucro externo usado pelo chamador; o corpo, inclusive
@@ -118,6 +126,33 @@ else
       MSG="${CMD#*"$MARCADOR_M"}"
       MSG="${MSG%\"*}"
       ;;
+  esac
+fi
+
+# --------------------------------------------------------------------------
+# Merge de integração da base — a terceira classe de commit
+# --------------------------------------------------------------------------
+# A classe é ativada pela MENSAGEM, não pelo estado do Git: com MERGE_HEAD, só
+# a mensagem lida que declara `Integra-base:` passa por
+# contrato-de-commit.sh --validar-integracao (Trabalho + Integra-base igual a
+# MERGE_HEAD, sem Task nem Metodo). Inválida: exit 2. Válida: as regras de
+# mistura de tasks, status e suíte não se aplicam. Qualquer outra mensagem —
+# sem Integra-base, ilegível, com trailers que a leitura não isola — segue as
+# regras de sempre: bloquear só com prova.
+if git -C "$RAIZ" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && [ -n "$MSG_LIDA" ]; then
+  integracao_da_mensagem "$MSG_LIDA" "$TRABALHO" "$CONTRATO_COMMIT"
+  case "$INT_CLASSE" in
+    invalida)
+      printf '%s
+' "mergex/commit-por-task — merge de integração com mensagem inválida
+
+$INT_SAIDA
+
+O merge em andamento declara Integra-base, então é a integração da base: exige
+exatamente Trabalho + Integra-base (SHA completo de MERGE_HEAD) e nunca aceita
+Task nem Metodo." >&2
+      exit 2 ;;
+    valida) expx_permite "$RAIZ" "$HOOK" "merge de integracao da base" ;;
   esac
 fi
 
@@ -374,7 +409,10 @@ fi
 # 2. Task não concluída, ou com registro de suíte que não sustenta um commit
 # --------------------------------------------------------------------------
 for id in $TASKS_TOCADAS; do
-  linha="$(grep -F "$id	" "$TMP" | head -1)" || continue
+  # o `head -1` sai cedo: o status do pipeline sob `pipefail` pode ser 141; a
+  # decisão é pelo conteúdo (rodada extra da revisão)
+  linha="$(grep -F "$id	" "$TMP" | head -1)"
+  [ -n "$linha" ] || continue
   status="$(printf '%s' "$linha" | cut -f2)"
   suite="$(printf '%s' "$linha" | cut -f3)"
 

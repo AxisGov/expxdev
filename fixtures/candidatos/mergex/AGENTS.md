@@ -60,13 +60,26 @@ Três nascem em **bloqueio**, porque o erro não tem volta:
 
 Três nascem em **aviso**, e só sobem a bloqueio depois de rodarem sem falso
 positivo: `commit-por-task`, `arquivo-fora-do-plano` e `pr-so-com-portao`.
+O `pr-so-com-portao` é consultivo: é aviso antecipado no `git push`, bloqueia só
+o push que prova inválido e o `--no-verify` reconhecido, e no indeterminado
+avisa e deixa o Git seguir. Não é barreira (DM-184).
 
-Uma única condição de método barra **mesmo em aviso**: commitar, no fechamento
+Entre as condições de commit, uma única barra **mesmo em aviso**, no
+`commit-por-task`: commitar, no fechamento
 de uma task, um arquivo que **só outra task da feature declara**. Ele não é
 desvio — foi planejado, só que noutra task —, e deixá-lo passar criaria um
 commit parcial enganoso, que o histórico não desfaz. Tire-o do índice
 (`git restore --staged`), **não o apague e não o restaure**, e leve a condição
 ao planejamento: quem abre bloqueio e replaneja é a sprintx.
+
+O `pr-so-com-portao`, que é consultivo, também sai 2 em qualquer modo, mas só
+em dois casos provados: o `--no-verify` reconhecido num `git push` e o push
+simples que a regra do portão prova inválido. No resto, só avisa.
+
+Fora dos hooks do Claude, o `pre-push` do Git barra o portão inválido em qualquer modo
+(DM-184): ativado pelo E0 e provado pelo E2, ele é a barreira local contra erro
+normal e decide pelo SHA realmente enviado. Nunca o contorne com `--no-verify`.
+Detalhe: `.claude/skills/mergex/references/12-barreira-de-push.md`.
 
 Se um hook barrar sua ação, **a mensagem diz o que fazer** — leia e corrija, não
 contorne. O modo de cada hook vive em `.expx/hooks.json`.

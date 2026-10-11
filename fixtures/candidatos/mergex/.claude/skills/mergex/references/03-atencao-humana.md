@@ -145,7 +145,7 @@ olhar, que é o ponto inteiro. O formato está no Passo 4.
 
 ## Passo 3 — Classificar, arquivo por arquivo
 
-Aplique **nesta ordem**. Pare no primeiro critério que bater: a ordem já é a da rigidez. É a mesma ordem que o classificador aplica (`classificar-atencao.sh --ordem`): O1–O9, L1–L4, D1–D4, padrão.
+Aplique **nesta ordem**. Pare no primeiro critério que bater: a ordem já é a da rigidez. É a mesma ordem que o classificador aplica (`classificar-atencao.sh --ordem`): O1–O10, L1–L4, D1–D4, padrão.
 
 ### OLHO OBRIGATÓRIO — o revisor lê linha a linha
 
@@ -162,6 +162,7 @@ Basta **um** destes:
 | O7 | Efeito irreversível declarado no plano de reversão | O plano de reversão da legadox diz que este arquivo produz efeito que o versionador não desfaz |
 | O8 | Veio de raio ALTO | O raio da legadox classifica este arquivo como ALTO |
 | O9 | Histórico de regressão registrado, ou reprovação anterior em QA no mesmo arquivo | O memox devolve `regressoes` não vazio, ou `reprovacoes_qa` maior que zero, para este caminho (`Passo 2.b`). Sem o memox instalado, este critério **não se aplica** |
+| O10 | Arquivo reconciliado da base | O caminho consta na lista de reconciliados do registro (`RECONCILIACAO-BASE-NNN.md`, `coberto`); passe-a ao classificador com `--reconciliados`. A faixa nunca desce. No `ATENCAO.md`, cite o `RECONCILIACAO-BASE-NNN.md` e copie o `motivo` dele |
 
 ### LEITURA RÁPIDA — o revisor confere intenção, não implementação
 
@@ -313,10 +314,34 @@ printf '%s\t%s\t%s\n' src/auth/sessao.ts "O4: cria o token de sessão (T-01.02)"
 ```
 
 - Entrada: uma linha por arquivo do diff — o caminho e, separados por TAB, os critérios
-  `Xn: evidência` confirmados (O1–O9, L1–L3, D1–D3). Arquivo sem critério vai só com o caminho.
+  `Xn: evidência` confirmados (O1–O9, L1–L3, D1–D3; O10 vem só da lista de reconciliados). Arquivo sem critério vai só com o caminho.
 - Saída: `<caminho> TAB <faixa> TAB <justificativa>`. A justificativa já nomeia o critério; copie
   para o `ATENCAO.md` e acrescente o que o revisor precisa saber.
 - `L4` ou `D4` passados na entrada são **ignorados**, e a saída diz isso.
+- `--reconciliados <arquivo>` recebe a lista dos reconciliados (O10): uma linha por arquivo, só o
+  caminho ou `<caminho> TAB <NNN>` (NNN com 3 dígitos). Com NNN, a justificativa vira
+  `O10: arquivo reconciliado da base (RECONCILIACAO-BASE-NNN.md)`; NNN fora do formato, ou lista
+  ausente ou ilegível, faz o classificador falhar (rc 66) sem classificar nada. Todo caminho da
+  lista sai em OLHO OBRIGATÓRIO, mesmo ausente da entrada. Monte a lista a partir do
+  `reconciliacao-base.sh --verificar`, **só depois de ele aprovar** (DM-186): grave a saída num
+  arquivo **temporário** (nunca na raiz da árvore, que o E1 e o E2 inventariam), exija código `0` e
+  a linha `ok=true`, e só então extraia os `coberto`:
+
+  ```bash
+  e3="$(mktemp -d "${TMPDIR:-/tmp}/mergex-e3.XXXXXX")"
+  bash .claude/skills/mergex/scripts/reconciliacao-base.sh --verificar \
+    --entrega docs/entregas/<trabalho_id>/ENTREGA.md \
+    --origem <sprintx|runx> --trabalho <trabalho_id> > "$e3/verificar.out"; rc=$?
+  [ "$rc" = 0 ] && grep -Fxq 'ok=true' "$e3/verificar.out" \
+    && awk -F'\t' '$1=="coberto"{print $2"\t"$3}' "$e3/verificar.out" > "$e3/reconciliados.tsv"
+  ```
+
+  Passe `--reconciliados "$e3/reconciliados.tsv"` ao classificador e remova `"$e3"` ao fim: nada
+  disso fica na árvore de trabalho. Código diferente de `0`, ou saída sem `ok=true`: a reconciliação está reprovada e
+  **o E3 não classifica** — relate os `motivo` da saída e volte ao E2, cuja barreira é essa mesma
+  verificação (`references/11-reconciliacao-base.md`). Encadear o `--verificar` direto no `awk`
+  perderia o código de saída: uma cadeia quebrada produziria uma lista vazia ou parcial, e o E3
+  classificaria por cima dela.
 - `--catalogo` imprime o catálogo; `--ordem`, a ordem. O validador de contrato confere que as
   duas batem com este reference e com o prompt do agente.
 - O resultado vem do trabalho corrente resolvido pela branch (exatamente um `ENTREGA.md` com
@@ -465,7 +490,7 @@ Esta saída vai inteira para a seção **"Onde eu quero seu olho"** da descriç�
 ## Critério de saída
 
 - [ ] Todo arquivo do diff está em exatamente uma faixa.
-- [ ] Toda classificação nomeia pelo menos um critério (`O1`..`O9`, `L1`..`L4`, `D1`..`D4`).
+- [ ] Toda classificação nomeia pelo menos um critério (`O1`..`O10`, `L1`..`L4`, `D1`..`D4`).
 - [ ] Todo L4 e D4 veio da saída do classificador, com a linha do catálogo ou a prova.
 - [ ] Todo artefato de método que é origem de decisão de risco foi avaliado pelos critérios O antes.
 - [ ] Nenhuma justificativa é baseada em tamanho de diff.

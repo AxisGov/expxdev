@@ -144,6 +144,273 @@ expx_trabalho_atual_por_branch() {
   printf '%s\n' "$1"
 }
 
+# expx_trabalho_por_branch_na_revisao <raiz> <branch> <revisão> — a mesma
+# regra de expx_trabalho_atual_por_branch (exatamente um ENTREGA.md declara
+# `branch: <branch>`), mas para uma branch DADA e lendo os
+# docs/entregas/*/ENTREGA.md da ÁRVORE da revisão, nunca do disco: um ENTREGA
+# não rastreado, apagado ou editado no disco não muda a resposta.
+# Saída: o <trabalho_id> e 0; nada e 1 (nenhum declara); nada e 2 (dois ou
+# mais declaram, ou a árvore não se lê: indeterminado).
+expx_trabalho_por_branch_na_revisao() {
+  local raiz="$1" branch="$2" rev="$3" lista arq id valor achados="" n=0
+  [ -n "$branch" ] && [ -n "$rev" ] || return 2
+  lista="$(git -C "$raiz" -c core.quotepath=false ls-tree -r --name-only "$rev" -- docs/entregas 2>/dev/null)" || return 2
+  while IFS= read -r arq; do
+    case "$arq" in docs/entregas/*/ENTREGA.md) ;; *) continue ;; esac
+    id="${arq#docs/entregas/}"; id="${id%/ENTREGA.md}"
+    case "$id" in ''|*/*) continue ;; esac
+    valor="$(git -C "$raiz" cat-file blob "$rev:$arq" 2>/dev/null | expx_frontmatter_valor /dev/stdin branch)"
+    [ -n "$valor" ] && [ "$valor" = "$branch" ] || continue
+    achados="$id"; n=$((n + 1))
+  done <<EOF
+$lista
+EOF
+  [ "$n" -eq 0 ] && return 1
+  [ "$n" -eq 1 ] || return 2
+  printf '%s\n' "$achados"
+}
+
+# --------------------------------------------------------------------------
+# Leitura do push — o segmento normalizado, por token
+# --------------------------------------------------------------------------
+# Uma leitura só, usada por `mergex/git-perigoso` (destino: a principal) e por
+# `pr-so-com-portao` (origem: a revisão que o push publica). A razão de ler por
+# token, e não por regex sobre a linha inteira, está no git-perigoso, seção 0.
+#
+# Não é um parser de shell: não expande variável, não resolve substituição de
+# comando, não entende agrupamento e só tira um par de aspas das pontas do
+# token. Classificar o que foi lido — e barrar o que não se classifica — é de
+# quem chama.
+
+# Uma aspa em cada ponta do token, no máximo, e só. As pontas são tratadas
+# separadamente porque o par se abre e se fecha em tokens diferentes quando o
+# comando inteiro está entre aspas (`bash -c "git push origin main"` dá os
+# tokens `"git` e `main"`).
+expx_sem_aspas() {
+  local v="$1"
+  # `${v#[\"\']}` tenta cada prefixo — e em UTF-8 reconverte o prefixo a cada
+  # tentativa: custo superlinear num token longo. O `case` decide numa passada e
+  # `${v#?}`/`${v%?}` tiram exatamente um caractere (rodada 5 da revisão, N3).
+  case "$v" in [\"\']*) v="${v#?}" ;; esac
+  case "$v" in *[\"\']) v="${v%?}" ;; esac
+  printf '%s' "$v"
+}
+
+# Programas que RODAM o que vem no argumento: é esta lista que separa EXECUTAR
+# (`bash -c "git push ..."`) de CITAR (`echo "git push ..."`). Compara-se o
+# NOME do programa, não o caminho: `/bin/sh` é o mesmo `sh`.
+expx_executor() {
+  case "$1" in
+    bash|sh|dash|zsh|ksh|ksh93|mksh|ash|busybox) return 0 ;;
+    eval|command|exec|env|sudo|doas|nohup|setsid|nice|time|timeout|stdbuf|xargs) return 0 ;;
+  esac
+  return 1
+}
+
+# expx_e_git <token> — o token é o programa git: `git`, por caminho
+# (`/usr/bin/git`, `./git`), `git.exe`, ou com a barra que pula alias (`\git`).
+# É o mesmo programa; ler só a grafia `git` deixava o push por caminho passar
+# sem ser lido (CodeAnt 4235529191).
+expx_e_git() {
+  local t
+  t="$(expx_sem_aspas "$1")"; t="${t#\\}"
+  case "$t" in git|*/git|git.exe|*/git.exe) return 0 ;; esac
+  return 1
+}
+
+# expx_nome_base <token> — o que vem depois da última `/`; o token inteiro quando
+# não há barra. `${tok##*/}` tentava cada prefixo e era quadrático num token
+# longo sem barra (512 KB: 65 s — rodada 5 da revisão, N3); `${1%/*}` para na
+# última barra, e a fatia por posição é uma só.
+expx_nome_base() {
+  local d="${1%/*}"
+  if [ "$d" = "$1" ]; then printf '%s' "$1"; else printf '%s' "${1:${#d}+1}"; fi
+}
+
+# O número que ABRE um redirecionamento sobra no fim do segmento depois da
+# quebra (`git push origin main 2>/tmp/log` vira `git push origin main 2`). Ele
+# é descritor só quando é uma palavra INTEIRA de dígitos: `main2` é outra
+# branch.
+expx_sem_descritor() {
+  local v="$1" r c
+  # Equivale a: t = o que vem depois do último [[:space:]]; se t é só dígitos, a
+  # palavra sai sem t. Mas `${v##*[[:space:]]}` tenta cada prefixo e é
+  # quadrático no tamanho do último token (32 KB sem espaço: 14-67 s — rodada 5
+  # da revisão, N3). Em uma passada: só há descritor se a palavra termina em
+  # dígito; `r` é tudo até antes do último não dígito (custo: os dígitos
+  # finais) e `c` é esse caractere. O descritor é a corrida de dígitos final
+  # exatamente quando `c` é separador — ou quando a palavra inteira é dígitos.
+  case "$v" in *[0-9]) ;; *) printf '%s' "$v"; return 0 ;; esac
+  r="${v%[!0-9]*}"
+  [ "$r" = "$v" ] && return 0            # só dígitos: a palavra inteira era o descritor
+  c="${v:${#r}:1}"
+  case "$c" in
+    [[:space:]]) printf '%s%s' "$r" "$c" ;;
+    *)           printf '%s' "$v" ;;
+  esac
+}
+
+# Emenda SÓ o par barra-invertida+quebra que continua a linha: a barra que NÃO
+# está escapada (corrida ímpar de barras no fim da linha). A quebra solta
+# continua separando comandos, como no shell.
+expx_emenda_continuacao() {
+  local linha saida='' barras r
+  while IFS= read -r linha; do
+    # A corrida de barras no fim da linha: `r` é tudo até antes da última
+    # não-barra (a linha inteira, se só há barras). `${linha##*[!\\]}` tentava
+    # cada prefixo e era quadrático na corrida; e `saida+=` em vez de
+    # `saida="$saida…"`, que recopiava tudo a cada linha (rodada 5, N3).
+    r="${linha%[!\\]*}"
+    if [ "$r" = "$linha" ]; then barras="$linha"; else barras="${linha:${#r}+1}"; fi
+    if [ $(( ${#barras} % 2 )) = 1 ]; then
+      saida+="${linha%?}"              # ímpar: a última barra continua a linha
+    else
+      saida+="$linha"$'\n'             # par: a quebra continua separando
+    fi
+  done <<<"$1"
+  printf '%s' "$saida"
+}
+
+# expx_segmentos <comando> — todos os segmentos do comando, um por linha.
+# Separadores de segmento: `&&`, `||`, `;`, `|`, `&`, subshell, crase e
+# redirecionamento; a quebra de linha que já estava no comando também separa.
+# A troca é do `tr` (byte a byte, POSIX), não do `sed`: `s/X/\n/` é extensão
+# GNU, e no sed do BSD o `\n` vira a letra `n` e grudaria os segmentos.
+expx_segmentos() {
+  local c="$1"
+  case "$c" in
+    *\\$'\n'*) c="$(expx_emenda_continuacao "$c")" ;;
+  esac
+  printf '%s\n' "$c" | tr ';|&()`<>' '\n\n\n\n\n\n\n\n'
+}
+
+# expx_push_segmentos <comando> — só os segmentos que podem ser um push.
+expx_push_segmentos() {
+  # Sem `-q`, de propósito: este arquivo liga `pipefail`, e um grep que casa cedo
+  # e sai dá SIGPIPE ao printf quando a entrada passa do buffer do pipe — o
+  # pipeline devolvia 141, e este `|| return 0` deixava sem leitura um push
+  # forçado seguido de milhares de linhas (rodada 5 da revisão). Sem `-q` o grep
+  # lê até o fim, e o status é só dele.
+  printf '%s' "$1" | grep -F push >/dev/null || return 0
+  expx_segmentos "$1" | grep -F push
+  return 0
+}
+
+# expx_push_le <segmento> — 0 se o segmento é mesmo um `git ... push`. Deixa:
+#   EXPX_PUSH_OPCOES    as opções do push, sem aspas, na ordem (o VALOR de
+#                       `--repo`, `--receive-pack`, `--exec`, `--push-option`,
+#                       `-o` e de aglomerado curto terminado em `o` é pulado);
+#   EXPX_PUSH_TEM_REMOTO 1 quando há um primeiro posicional (o remoto);
+#   EXPX_PUSH_REMOTO    esse remoto, sem aspas;
+#   EXPX_PUSH_REFSPECS  os posicionais seguintes (refspecs), sem aspas;
+#   EXPX_PUSH_GLOBAIS   as opções globais do git antes do `push`, com o valor
+#                       das que o levam na palavra seguinte, sem aspas;
+#   EXPX_PUSH_AMBIENTE_GIT 1 quando uma atribuição `GIT_*=` precede o `git`
+#                       (prefixo de ambiente ou argumento de `env`).
+EXPX_PUSH_OPCOES=(); EXPX_PUSH_REFSPECS=(); EXPX_PUSH_REMOTO=""; EXPX_PUSH_TEM_REMOTO=0
+EXPX_PUSH_GLOBAIS=(); EXPX_PUSH_AMBIENTE_GIT=0
+expx_push_le() {
+  local tok seg r atribuiu=0 aberta=""
+  EXPX_PUSH_OPCOES=(); EXPX_PUSH_REFSPECS=(); EXPX_PUSH_REMOTO=""; EXPX_PUSH_TEM_REMOTO=0
+  EXPX_PUSH_GLOBAIS=(); EXPX_PUSH_AMBIENTE_GIT=0
+  seg="$(expx_sem_descritor "$1")"
+  set -f                    # o segmento é texto: nada aqui vira glob
+  # shellcheck disable=SC2086
+  set -- $seg
+  set +f
+
+  # Prefixo de ambiente: `GIT_DIR=/tmp/x git push ...` continua sendo um push.
+  # Valor com espaço (`GIT_SSH_COMMAND="ssh -v" git push`, `FOO="a b" git
+  # push`) chega partido em vários tokens: a aspa que o valor abre e não fecha
+  # no mesmo token é lembrada (`aberta`), e os tokens seguintes são pulados até
+  # o que a fecha — sem isso `b"` era lido como programa e o push não era lido
+  # (re-revisão da rodada 1). Depois da primeira atribuição, pedaços soltos que
+  # começam por `-` também são pulados.
+  while [ "$#" -gt 0 ]; do
+    if [ -n "$aberta" ]; then
+      case "$1" in *"$aberta"*) aberta="" ;; esac
+      shift; continue
+    fi
+    case "$(expx_sem_aspas "$1")" in
+      GIT_*=*)         atribuiu=1; EXPX_PUSH_AMBIENTE_GIT=1 ;;
+      [_[:alpha:]]*=*) atribuiu=1 ;;
+      -*)              [ "$atribuiu" = 1 ] || break ;;
+      *)               break ;;
+    esac
+    # O que vem depois do primeiro `="` (ou `='`): `r` é o que vem antes dele,
+    # numa passada; `${1#*=\"}` tentava cada prefixo (rodada 5 da revisão, N3).
+    case "$1" in
+      *=\"*) r="${1%%=\"*}"; case "${1:${#r}+2}" in *\"*) ;; *) aberta='"' ;; esac ;;
+      *=\'*) r="${1%%=\'*}"; case "${1:${#r}+2}" in *\'*) ;; *) aberta="'" ;; esac ;;
+    esac
+    shift
+  done
+  [ "$#" -gt 0 ] || return 1
+
+  # O programa é o git (por qualquer grafia: expx_e_git), ou é um executor, e
+  # então o git só é procurado adiante.
+  if ! expx_e_git "$1"; then
+    tok="$(expx_sem_aspas "$1")"
+    expx_executor "$(expx_nome_base "$tok")" || return 1
+    while [ "$#" -gt 0 ]; do
+      expx_e_git "$1" && break
+      case "$(expx_sem_aspas "$1")" in
+        GIT_*=*) EXPX_PUSH_AMBIENTE_GIT=1 ;;
+      esac
+      shift
+    done
+    [ "$#" -gt 0 ] || return 1
+  fi
+  shift
+
+  # Opções globais do git, antes do subcomando. As desta lista levam o valor
+  # numa palavra separada (`git -C <path> push`, `git -c <k>=<v> push`).
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -C|-c|--git-dir|--work-tree|--namespace|--exec-path|--super-prefix|--attr-source|--config-env)
+        [ "$#" -ge 2 ] || return 1
+        EXPX_PUSH_GLOBAIS[${#EXPX_PUSH_GLOBAIS[@]}]="$(expx_sem_aspas "$1")"
+        EXPX_PUSH_GLOBAIS[${#EXPX_PUSH_GLOBAIS[@]}]="$(expx_sem_aspas "$2")"
+        shift 2 ;;
+      -*)
+        EXPX_PUSH_GLOBAIS[${#EXPX_PUSH_GLOBAIS[@]}]="$(expx_sem_aspas "$1")"
+        shift ;;
+      *) break ;;
+    esac
+  done
+  [ "$(expx_sem_aspas "${1:-}")" = push ] || return 1
+  shift
+
+  # A aspa sai do token ANTES de qualquer comparação: quando o comando vem
+  # embrulhado, a aspa de fechamento cola na última palavra (`--all"`).
+  while [ "$#" -gt 0 ]; do
+    tok="$(expx_sem_aspas "$1")"; shift
+    case "$tok" in
+      # Opções do push cujo valor vem na palavra seguinte.
+      --repo|--receive-pack|--exec|--push-option|-o)
+        EXPX_PUSH_OPCOES[${#EXPX_PUSH_OPCOES[@]}]="$tok"
+        [ "$#" -gt 0 ] && shift
+        continue ;;
+      --*)
+        EXPX_PUSH_OPCOES[${#EXPX_PUSH_OPCOES[@]}]="$tok"
+        continue ;;
+      -*) # Aglomerado curto: `-fu`; terminado em `o`, o valor vem a seguir.
+        EXPX_PUSH_OPCOES[${#EXPX_PUSH_OPCOES[@]}]="$tok"
+        case "$tok" in *o) [ "$#" -gt 0 ] && shift ;; esac
+        continue ;;
+    esac
+
+    # Primeiro posicional é o remoto; os seguintes são refspecs.
+    if [ "$EXPX_PUSH_TEM_REMOTO" = 0 ]; then
+      EXPX_PUSH_TEM_REMOTO=1
+      EXPX_PUSH_REMOTO="$tok"
+      continue
+    fi
+    EXPX_PUSH_REFSPECS[${#EXPX_PUSH_REFSPECS[@]}]="$tok"
+  done
+  return 0
+}
+
 expx_rastro() {
   # expx_rastro <raiz> <evento> <resultado> <detalhe> <hook> [arquivos_json]
   local raiz="$1" evento="$2" resultado="$3" detalhe="$4" hook="$5"

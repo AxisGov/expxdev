@@ -95,7 +95,7 @@ Nenhuma branch foi criada nem trocada. Crie a base, ou chame o E0 sem base
 explícita para usar a convenção do repositório.
 ```
 
-Registre qual das quatro respondeu. A base efetiva vai para `branch_base` no `ENTREGA.md`, e é ela que o E2 (V9, V10), o E3 e o E4 usam no `git diff <branch-base>...HEAD`.
+Registre qual das quatro respondeu. A base efetiva vai para `branch_base` no `ENTREGA.md`, e é ela que o E2 (V10), o E3 e o E4 usam no `git diff <branch-base>...HEAD`. A V9 não usa o nome: usa a base validada **por SHA**, `base_validada_sha`, que o passo 5 grava (`references/11-reconciliacao-base.md`). Um nome de ref que avançou ou ficou parado muda o resultado de um diff; um SHA, não.
 
 Se a branch atual **não** for a base determinada e já for uma branch de trabalho de outra coisa, use a base determinada como ponto de partida — nunca ramifique um trabalho de dentro de outro sem que isso esteja declarado.
 
@@ -207,7 +207,11 @@ replanejamento (portão bloqueado → replaneja → F3/F4/F5 → F6 de novo → 
 - `versionado: true` (ou `false`, se o passo 1 assim determinou)
 - `commits: []` — a lista cresce no E1, e o primeiro item dela recebe `seq: 1`. **Não existe `seq` de topo**: o próximo número sai da própria lista (`00-schema.md`, "A ordem de registro")
 - `portao: null`, `falhas_portao: []`, `causa: null`, `push_feito: false`, `pr_url: null`, `pr_estado: null`
+- `base_validada_sha` com o SHA completo (40 hex) de `git merge-base HEAD <branch_base>`, e `origem_base: registrada_e0` — a base em que o trabalho é validado, fixada por SHA, nunca por nome de ref
+- `reconciliacoes: []` e `portao_sha: null` — a lista só cresce pelo `reconciliacao-base.sh --registrar`, e `portao_sha` só é gravado pelo E2 (`registrar-portao.sh`)
 - `criado_em` e `atualizado_em` com a data de hoje
+
+Repositório sem versionador (passo 1): `base_validada_sha` e `origem_base` ficam `null`, como `branch` e `branch_base`.
 
 Na prosa, a linha da branch diz como ela chegou até aqui — `aberta pela mergex`, `retomada` ou `adotada da skill de origem` — e de onde saiu a base (chamador, `CONVENCOES.md`, `origin/HEAD` ou principal atual). É o que permite, depois, entender um diff que não bate com `main`.
 
@@ -227,6 +231,9 @@ Atualize **somente o necessário** para abrir uma nova tentativa de entrega:
 | `desvios` | preservado enquanto continuar verdadeiro |
 | `pr_url`, `pr_estado` | **preservados como estão.** O E0 não verifica e não afirma que aquele PR ainda vale; quem confirma é o E7, que já trata "PR já existe" como retomada. **Nunca abra um segundo PR e nunca recrie a branch** |
 | `branch`, `branch_base` | coerentes com a branch adotada e com a base efetiva do passo 3 |
+| `portao_sha` | volta para `null`, junto com `portao` |
+| `base_validada_sha`, `origem_base` | **preservados como estão.** O E0 de retomada **nunca acrescenta nem troca `base_validada_sha`** num `ENTREGA.md` existente: a base validada só muda pelo `reconciliacao-base.sh --registrar`, e uma entrega legada sem a chave só a ganha, uma única vez, na primeira reconciliação (`origem_base: inferida_legado`, `references/11-reconciliacao-base.md`) |
+| `reconciliacoes` | preservado — a cadeia de reconciliações é histórico da entrega |
 | `atualizado_em` | a data de hoje |
 | prosa | acrescente que **esta é uma retomada** — e, quando for o caso, que a tentativa anterior parou no portão |
 
@@ -238,7 +245,34 @@ que só voltou para o começo da entrega, não para o começo do mundo.
 relate**, sem reescrever nada: ou o `trabalho_id` está sendo reaproveitado por outro trabalho, ou
 alguém trocou a branch por fora — as duas coisas são decisão humana.
 
-**3. Atualize `.expx/estado.json`**, o arquivo que a barra de status lê:
+**3. Ative o `pre-push` da MergeX** — depois de criar ou retomar o `ENTREGA.md` (casos 1 e 2):
+
+```bash
+bash .claude/skills/mergex/scripts/ativacao-pre-push.sh --instalar \
+  --entrega docs/entregas/<trabalho_id>/ENTREGA.md
+```
+
+O script resolve o diretório de hooks efetivo pelo próprio Git (respeita `core.hooksPath` e a
+worktree vinculada, **nunca altera `core.hooksPath`**), instala o chamador gerenciado quando não há
+`pre-push`, não muda nada quando ele já é o gerenciado, e **nunca sobrescreve, renomeia ou edita**
+um `pre-push` de terceiro. Em todos os casos termina com a prova funcional
+(`references/12-barreira-de-push.md`). Quando o diretório efetivo está
+**fora da árvore de trabalho e do diretório Git comum** (um `core.hooksPath` global, compartilhado
+por vários repositórios), o script **não instala** o chamador (DM-186): sai `3` com a instrução de
+composição, para quem mantém aquele diretório — instalado ali, o chamador viraria o `pre-push` de
+todos os repositórios da máquina, preso ao validador deste checkout. Um `pre-push` já presente ali
+segue a regra do hook de terceiro: só a prova funcional o aceita.
+
+**Código diferente de zero: `mergex E0 BLOQUEADO — pre-push`.** O E0 encerra ali — não siga para o
+item 4 nem devolva o controle como OK — e mostre ao usuário a instrução que o script imprimiu. Com
+hook de terceiro (código `3`), a instrução é a de composição: o `pre-push` existente chama
+`portao-push.sh --pre-push "$@"`, repassa a entrada padrão e propaga exatamente o código de saída
+dele. A composição é feita à mão pelo responsável do hook; depois dela, o E0 roda de novo e a
+prova decide. Repositório sem versionador (passo 1): não há `pre-push` a ativar; pule este item —
+e, se o script rodar fora de um repositório Git, ele próprio sai `0` sem instalar nada (DM-186;
+o critério é o Git real, nunca o campo `versionado`).
+
+**4. Atualize `.expx/estado.json`**, o arquivo que a barra de status lê:
 
 - `branch`: o nome da branch, **completo e sem corte** — a criada agora, a retomada ou a adotada;
 - `pr_estado`: `null` — no E0 nunca existe pull request, inclusive na retomada de uma branch
@@ -249,7 +283,9 @@ alguém trocou a branch por fora — as duas coisas são decisão humana.
 
 O procedimento é o de `10-estado.md`: só se `.expx/` existir, alterando apenas estes dois
 campos e preservando os das outras skills, com gravação em temporário e renomeação. Falha de
-gravação vai para o rastro e **não interrompe o E0** — a barra nunca barra trabalho.
+gravação é **silenciosa** e **não interrompe o E0** — a barra nunca barra trabalho. Ela não vira
+linha de rastro: o contrato não tem evento para isso, e a lacuna está registrada em
+`10-estado.md`, "A lacuna".
 
 ## Critério de saída
 
@@ -262,6 +298,8 @@ O E0 terminou quando **todas** são verdade:
 - [ ] `git status --porcelain` estava vazio na hora de criar ou trocar a branch (ou o repositório não é versionado, ou a branch foi adotada sem troca).
 - [ ] `ORQUESTRADOR.md` tem a linha da branch.
 - [ ] `docs/entregas/<trabalho_id>/ENTREGA.md` existe com `estado: aberto` e frontmatter válido.
+- [ ] Numa entrega nova, `base_validada_sha` é um SHA de 40 hex com `origem_base: registrada_e0`; numa retomada, os dois estão exatamente como estavam.
+- [ ] O `pre-push` efetivo está ativo: `ativacao-pre-push.sh --instalar` saiu `0` (chamador gerenciado instalado ou já presente, ou integração externa válida), sem alterar `core.hooksPath` nem hook de terceiro — ou o repositório não é versionado.
 - [ ] `.expx/estado.json` tem `branch` e `pr_estado: null` — **ou** `.expx/` não existe, ou o repositório não é versionado, e nesses casos nada foi gravado. Este item nunca reprova o E0.
 
 Devolva ao chamador uma linha só: `mergex E0 OK — branch <nome> (base <base>, <criada | retomada | adotada>), entrega registrada.` E devolva o controle: quem executa as tasks é a skill de origem.
@@ -281,4 +319,5 @@ Devolva ao chamador uma linha só: `mergex E0 OK — branch <nome> (base <base>,
 | Sem trabalho planejado | Diz o que falta (F4 da sprintx / E2 da runx) e encerra |
 | Pasta do trabalho em formato antigo | Trabalha nela onde está; **nunca move**, e registra qual pasta usou |
 | `.expx/` não existe | Segue sem gravar o estado da barra, sem erro e sem aviso; **nunca cria o diretório** |
-| Gravação do `estado.json` falhou | Registra no rastro e segue; o E0 continua OK |
+| Gravação do `estado.json` falhou | Segue **em silêncio**, sem rastro (`10-estado.md`, "A lacuna"); o E0 continua OK |
+| `ativacao-pre-push.sh --instalar` saiu diferente de zero | `mergex E0 BLOQUEADO — pre-push`: encerra o E0 e mostra a instrução do script (com hook de terceiro, a de composição); nunca edita o hook nem `core.hooksPath` |

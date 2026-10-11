@@ -12,6 +12,7 @@ import {
   CANDIDATOS,
   fontesCandidatas,
   gitEm,
+  larIsolado,
   novoProduto,
   pathControlado,
   RAIZ_DO_REPO,
@@ -139,7 +140,11 @@ describe("certificação D-03: freeze local no SessionStart", () => {
 
     const produto = novoProduto("expx-d03-update-");
     criados.push(produto);
-    const envCli = ambienteCom(pathControlado(true), { EXPX_SKILLS_LOCAIS: fontes });
+    // HOME descartável também no CLI: o init desta bancada não pode registrar
+    // plugin na configuração de quem a roda (ver `larIsolado`).
+    const isolado = larIsolado();
+    criados.push(isolado.lar);
+    const envCli = ambienteCom(pathControlado(true), { ...isolado.env, EXPX_SKILLS_LOCAIS: fontes });
     const init = rodarExpx(["init", "--skills", "sprintx,mergex", "--yes"], produto, envCli);
     expect(init.status, `${init.stdout}${init.stderr}`).toBe(0);
     commitarTudo(produto, "instalacao local");

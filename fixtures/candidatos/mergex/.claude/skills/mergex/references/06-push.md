@@ -14,10 +14,18 @@ bash .claude/skills/mergex/scripts/persistir-metodo.sh --verificar \
   --origem <sprintx|runx> --trabalho <trabalho_id> --checkpoint pre-e6
 ```
 
-Se falhar, o E6 não começa. A ação explícita `persistir-metodo pre-e6` pertence ao fluxo anterior ao gate; E6 só confirma que ela foi cumprida.
+Se falhar, o E6 não começa. A ação explícita `persistir-metodo pre-e6` pertence ao fluxo anterior ao gate; E6 só confirma que ela foi cumprida. A barreira `pre-e6` também exige o `pre-push` funcional quando o `ENTREGA.md` tem `portao: pronto`: ela roda a mesma prova de `ativacao-pre-push.sh --provar` e recusa sem ela (`references/12-barreira-de-push.md`, "Prova funcional").
 
 - [ ] O repositório é versionado. Se não for, o E6 não tem o que fazer: registre `push_feito: false` e siga para o E8 (não há PR a abrir).
 - [ ] O E2 devolveu `PRONTO`. **Portão bloqueado não sobe.**
+- [ ] O portão **ainda vale** para o `HEAD` que vai subir (DM-181):
+
+```bash
+bash .claude/skills/mergex/scripts/validade-do-portao.sh --verificar \
+  --entrega docs/entregas/<trabalho_id>/ENTREGA.md
+```
+
+`ok=false` (qualquer `motivo`, inclusive `historia_incompleta` e `erro_ambiente`): o E6 não começa. Commit de produto, de teste, de plano ou merge depois de `portao_sha` exige o E2 de novo; `historia_incompleta` pede completar a história (`git fetch --unshallow`); `erro_ambiente` descreve a falha do ambiente. Só commits de método `pre-e6`/`e8` de um pai mantêm o portão.
 - [ ] `docs/entregas/<trabalho_id>/QA-PACOTE.md` existe (E5).
 - [ ] A branch ativa é a do trabalho e **não** é a principal.
 - [ ] Há remoto configurado (`git remote -v`). Sem remoto: registre `push_feito: false`, informe que o trabalho está commitado localmente, e siga para o E8.
@@ -81,7 +89,9 @@ Pushes seguintes:
 git push origin <branch>
 ```
 
-**Nunca `--force`. Nunca `--force-with-lease`. Nunca `+<branch>`.** Em nenhuma circunstância, por nenhum motivo, nem para "consertar" um push anterior (regra 11). Se a única saída aparente é forçar, a saída correta é parar e relatar.
+**Quem autoriza o push é o `pre-push` do Git**, a barreira local autoritativa contra erro normal (DM-184): ele recebe do Git as refs realmente enviadas e roda a mesma validade sobre o **SHA enviado**, não sobre o checkout. Portão `pronto` vencido, ausente, inconsistente ou ilegível, `historia_incompleta` e `erro_ambiente` barram o push inteiro em qualquer modo; `portao: null` segue o modo de `pr-so-com-portao` em `.expx/hooks.json`. O hook do Claude `pr-so-com-portao` é **consultivo**: antecipa o diagnóstico quando consegue provar, e no resto só avisa e deixa o Git seguir até o `pre-push`. O push nunca reexecuta a reconciliação de base: ela foi provada no E2. Detalhe em `references/12-barreira-de-push.md`.
+
+**Nunca `--force`. Nunca `--force-with-lease`. Nunca `+<branch>`. Nunca `--no-verify`.** Em nenhuma circunstância, por nenhum motivo, nem para "consertar" um push anterior (regra 11). Se a única saída aparente é forçar, a saída correta é parar e relatar.
 
 ## Passo 4 — Confirmar e registrar
 
@@ -118,6 +128,8 @@ Siga para o E7.
 | Situação | O que fazer |
 |---|---|
 | Portão bloqueado | Não sobe. O E6 nem começa |
+| Portão vencido (`validade-do-portao.sh` com `ok=false`) | Não sobe. Rode o E2 de novo; com `historia_incompleta`, complete a história antes |
+| Push barrado pelo `pre-push` | Relata a saída literal (ref, SHA, motivo); nunca contorna com `--no-verify`. O E2 de novo é o caminho |
 | Pacote de QA ausente | Não sobe. Rode o E5 antes |
 | Branch é a principal | Para imediatamente e relata |
 | Remoto à frente | Para e avisa; nunca reconcilia |

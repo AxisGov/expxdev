@@ -193,19 +193,57 @@ push, nunca barra uma etapa, nunca vira aviso na saída ao usuário.
 | `.expx/` não existe | Segue sem gravar. Sem erro, sem aviso, sem criar o diretório |
 | `estado.json` não existe, mas `.expx/` existe | Cria a partir de `{}`, com os seus campos e `expx_estado: 1` |
 | `estado.json` ilegível ou corrompido | Segue sem gravar. Não conserta, não substitui |
-| Sem permissão de escrita, disco cheio, `mv` falhou | Registra no rastro e segue |
+| Sem permissão de escrita, disco cheio, `mv` falhou | Segue **em silêncio**; ver "A lacuna" |
 | `python3` e `jq` ausentes | Segue sem gravar |
 | Repositório sem versionador | Não grava nada |
 
-Falha de gravação vai para `docs/eventos/<trabalho_id>.jsonl`, com `resultado` `falha`, e o
-trabalho continua:
-
-```json
-{"ts":"<ISO-8601 UTC>","expx_eventos":1,"trabalho_id":"<id>","ferramenta":"mergex","origem":"skill","evento":"artefato_gravado","fase":"<e0|e7|e8|e9>","task":null,"agente":null,"resultado":"falha","detalhe":"estado.json nao gravado: <erro literal>","arquivos":[".expx/estado.json"]}
-```
+Falha de gravação **nunca interrompe** o trabalho: a etapa continua, o `ENTREGA.md` já tem
+o registro que importa, e nada é avisado ao usuário.
 
 `.expx/` ausente **não** é falha e não gera evento: é a configuração normal de um projeto
 sem a barra instalada.
+
+### A lacuna — por que a falha não vira linha de rastro
+
+O vocabulário de `evento` do contrato `expx-eventos` v1 **não tem um termo para "falhou ao
+gravar artefato de saída"**. Os valores que a mergex grava são `commit_criado`, `pr_aberto`,
+`veredito_emitido`, e os de hook (`regra_violada`, `acao_bloqueada`, `suite_executada`,
+`arquivo_alterado`). Nenhum deles é esta ocorrência.
+
+Por isso, **a passagem é silenciosa**. As duas saídas que pareciam alternativas não são:
+
+- **Inventar um evento** (`artefato_gravado` e afins) quebra a leitura do painel, que trata
+  `evento` como lista fechada — e um nome que só existe aqui não é contrato, é divergência.
+- **Reusar um evento existente** dá à linha semântica falsa. Falha ao gravar `estado.json`
+  não é commit, não é PR e não é veredito; quem filtrar por `commit_criado` passaria a contar
+  gravação de barra, e o dado deixaria de significar o que diz.
+
+Nada se perde para o propósito declarado do rastro: o `estado.json` é **saída derivada**,
+nunca entrada de decisão nenhuma (ver "O que NÃO fazer"). A informação que a falha carregava é
+sobre a máquina de quem executou, não sobre a entrega.
+
+A fonte de verdade continua sendo o `ENTREGA.md`, e a gravação dele não depende desta falha:
+no E0 e no E7 ele está **gravado na árvore de trabalho, ainda não commitado** — é levado ao
+histórico pelo fechamento final do E8 (`07-abertura-pr.md`, "O E7 não commita e não faz push";
+`08-registro.md`, passo 2). Como a falha de gravação do `estado.json` **nunca interrompe** a
+etapa, ela não é o que impede esse fechamento de acontecer.
+
+**O que o silêncio aqui não cobre:** uma interrupção entre o E0/E7 e o fechamento do E8 — queda
+de energia, sessão morta, processo derrubado — deixa o `ENTREGA.md` fora do histórico. Isso vale
+com ou sem falha no `estado.json`: é risco da janela entre gravar e commitar, não consequência
+desta lacuna, e quem o endereça é o E8 ("O fechamento final — a entrega precisa sobreviver ao
+worktree", em `08-registro.md`). Não o confunda com a passagem silenciosa, e não leia esta seção
+como garantia de que o registro da entrega já está no histórico.
+
+É a mesma política da passagem limpa dos hooks (DM-43, `.claude/hooks/README.md`): quando o
+contrato não nomeia a ocorrência, a skill **não** inventa o nome e **não** empresta outro.
+
+**LACUNA REGISTRADA para o dono do contrato `expx-eventos`:** falta um evento para gravação de
+artefato derivado que falhou — algo como `artefato_nao_gravado`, com `resultado: falha`.
+Enquanto ele não existir no enum, esta passagem continua silenciosa. Quem mantém o contrato
+decide se acrescenta; **esta skill não decide sozinha**, porque `evento` é lido pelo painel e
+pelas outras skills. Acrescentado o evento, este trecho volta a trazer o exemplo da linha — e
+aí `agente` será `principal`, nunca `null`.
 
 ## O que NÃO fazer
 
@@ -241,4 +279,4 @@ sem a barra instalada.
 - [ ] Sem versionador: os dois campos `null` e nenhuma gravação.
 - [ ] Nenhuma decisão da skill leu este arquivo.
 - [ ] Nenhum campo de árvore suja foi criado.
-- [ ] Falha de gravação virou linha no rastro, não interrupção.
+- [ ] Falha de gravação não interrompeu nada, e não inventou evento nem reusou um alheio.

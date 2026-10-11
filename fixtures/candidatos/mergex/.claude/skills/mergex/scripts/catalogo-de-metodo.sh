@@ -21,10 +21,21 @@
 # Uso:
 #   catalogo_metodo <raiz> <origem> <trabalho> <pasta> <checkpoint>
 #     <pasta> relativa à raiz (a pasta resolvida do trabalho);
-#     <checkpoint> pre-e2 | pre-e6 | e8 (cumulativo; e8 é o conjunto inteiro).
+#     <checkpoint> pre-e2 | reconciliacao-base | pre-e6 | e8 (cumulativo; e8 é o
+#     conjunto inteiro). reconciliacao-base é só ENTREGA.md e os
+#     RECONCILIACAO-BASE-NNN.md de ENTREGA.reconciliacoes; pre-e6 e e8 também
+#     incluem esses artefatos. Nome fora de RECONCILIACAO-BASE-NNN.md: retorna 1.
 #   Imprime um caminho relativo por linha, sem ordem garantida.
 #   Retorna 1 com CATALOGO_ERRO preenchido quando o índice da base é inválido.
 #   Chame SEM subshell (`catalogo_metodo ... > arquivo`) para ler CATALOGO_ERRO.
+#
+#   catalogo_pasta_do_trabalho <raiz> <origem> <trabalho>
+#     A pasta do trabalho, relativa à raiz: SprintX canônica
+#     `docs/sprintx/features/<t>`, senão a legada `docs/<t>` (as duas ao mesmo
+#     tempo é erro); RunX `docs/manutencao/<t>`. Pasta ausente ou origem sem
+#     pasta: retorna 1 com CATALOGO_ERRO. Mesmas regras de persistir-metodo.sh.
+#     Também deixa a pasta em CATALOGO_PASTA, para quem a chama sem subshell
+#     e precisa ler CATALOGO_ERRO.
 #
 # Bash 3.2 (macOS): sem arrays associativos, mapfile ou recursos de Bash 4+.
 
@@ -45,6 +56,31 @@ catalogo_fm() { # <arquivo> <chave>
       }
     }
   ' "$1" 2>/dev/null
+}
+
+catalogo_pasta_do_trabalho() { # <raiz> <origem> <trabalho>
+  local raiz="$1" origem="$2" trabalho="$3" canonica legada pasta
+  CATALOGO_ERRO=""; CATALOGO_PASTA=""
+  case "$origem" in
+    sprintx)
+      canonica="docs/sprintx/features/$trabalho"
+      legada="docs/$trabalho"
+      if [ -d "$raiz/$canonica" ] && [ -d "$raiz/$legada" ]; then
+        CATALOGO_ERRO="há duas pastas SprintX para $trabalho"; return 1
+      elif [ -d "$raiz/$canonica" ]; then
+        pasta="$canonica"
+      elif [ -d "$raiz/$legada" ]; then
+        pasta="$legada"
+      else
+        CATALOGO_ERRO="pasta SprintX do trabalho não existe"; return 1
+      fi ;;
+    runx)
+      pasta="docs/manutencao/$trabalho"
+      [ -d "$raiz/$pasta" ] || { CATALOGO_ERRO="pasta RunX do trabalho não existe"; return 1; } ;;
+    *) CATALOGO_ERRO="origem sem pasta de trabalho: $origem"; return 1 ;;
+  esac
+  CATALOGO_PASTA="$pasta"
+  printf '%s\n' "$pasta"
 }
 
 catalogo_areas_do_indice() {
@@ -104,12 +140,68 @@ catalogo_sprints() { # <raiz> <pasta>
   done
 }
 
+catalogo_reconciliacoes_brutas() { # <ENTREGA.md> — `=<valor>` de cada `arquivo:` do bloco
+  [ -r "$1" ] || return 0
+  awk '
+    { sub(/\r$/, "") }
+    NR == 1 { if ($0 !~ /^---[[:space:]]*$/) exit; fm = 1; next }
+    fm && /^---[[:space:]]*$/ { exit }
+    !fm { next }
+    /^[A-Za-z_][A-Za-z0-9_]*:/ {
+      nome = $0; sub(/:.*/, "", nome); dentro = (nome == "reconciliacoes")
+      if (dentro) {
+        v = $0; sub(/^[^:]*:[[:space:]]*/, "", v); sub(/[[:space:]]+$/, "", v)
+        if (v != "" && v != "[]") print "!" v
+      }
+      next
+    }
+    dentro && /^[[:space:]]*(-[[:space:]]+)?arquivo:/ {
+      v = $0; sub(/^[[:space:]]*(-[[:space:]]+)?arquivo:[[:space:]]*/, "", v); sub(/[[:space:]]+$/, "", v)
+      print "=" v
+    }
+  ' "$1" 2>/dev/null
+}
+
+# catalogo_reconciliacoes <raiz> <trabalho> — os artefatos RECONCILIACAO-BASE-NNN.md
+# nomeados em `reconciliacoes[].arquivo` do ENTREGA.md do disco, como caminhos
+# relativos à raiz. Só nome literal; qualquer outro valor, ou lista que não seja
+# `[]` nem bloco, falha fechado.
+catalogo_reconciliacoes() {
+  local raiz="$1" trabalho="$2" arquivo nome
+  arquivo="$raiz/docs/entregas/$trabalho/ENTREGA.md"
+  [ -f "$arquivo" ] && [ ! -L "$arquivo" ] || return 0
+  while IFS= read -r nome; do
+    case "$nome" in
+      '!'*) CATALOGO_ERRO="ENTREGA.reconciliacoes fora do formato de bloco: ${nome#!}"; return 1 ;; # guarda:FLOW
+      =*) nome="${nome#=}" ;;
+      *) continue ;;
+    esac
+    case "$nome" in
+      RECONCILIACAO-BASE-[0-9][0-9][0-9].md) ;; # guarda:NOME-LITERAL
+      *) CATALOGO_ERRO="ENTREGA.reconciliacoes lista nome inválido: $nome"; return 1 ;;
+    esac
+    printf '%s\n' "docs/entregas/$trabalho/$nome"
+  done <<EOF
+$(catalogo_reconciliacoes_brutas "$arquivo")
+EOF
+}
+
 catalogo_metodo() { # <raiz> <origem> <trabalho> <pasta> <checkpoint>
   local raiz="$1" origem="$2" trabalho="$3" pasta="$4" checkpoint="$5" nome
   CATALOGO_ERRO=""
-  case "$checkpoint" in pre-e2|pre-e6|e8) ;;
+  case "$checkpoint" in pre-e2|reconciliacao-base|pre-e6|e8) ;;
     *) CATALOGO_ERRO="checkpoint desconhecido: $checkpoint"; return 1 ;;
   esac
+  if [ "$checkpoint" = reconciliacao-base ]; then # guarda:CAT-RECONCILIACAO
+    # Só a entrega e os artefatos da reconciliação: nada de plano, base,
+    # HISTORICO, produto, teste nem documentos E3-E5.
+    case "$origem" in sprintx|runx) ;;
+      *) CATALOGO_ERRO="origem sem catálogo de método: $origem"; return 1 ;;
+    esac
+    printf '%s\n' "docs/entregas/$trabalho/ENTREGA.md"
+    catalogo_reconciliacoes "$raiz" "$trabalho" || return 1
+    return 0
+  fi
   case "$origem" in
     sprintx)
       for nome in 00-DECISOES.md BUILDX-PREMISSAS.md 00-ESTIMATIVA.md ORQUESTRADOR.md \
@@ -129,7 +221,8 @@ catalogo_metodo() { # <raiz> <origem> <trabalho> <pasta> <checkpoint>
   case "$checkpoint" in
     pre-e6|e8)
       printf '%s\n' "docs/entregas/$trabalho/ATENCAO.md" \
-        "docs/entregas/$trabalho/PR.md" "docs/entregas/$trabalho/QA-PACOTE.md" ;;
+        "docs/entregas/$trabalho/PR.md" "docs/entregas/$trabalho/QA-PACOTE.md"
+      catalogo_reconciliacoes "$raiz" "$trabalho" || return 1 ;; # guarda:CAT-PRE-E6-E8
   esac
   return 0
 }
