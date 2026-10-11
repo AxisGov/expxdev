@@ -22,7 +22,7 @@ importam mais, e onde um hook mal escrito faz mais estrago.
 | `branch-limpa` | `PreToolUse` | **bloqueio** | Barra criação ou troca de branch com alteração não commitada pendente |
 | `commit-por-task` | `PreToolUse` | aviso¹ | Verifica que o commit corresponde a **uma** task, `concluida` e com registro de suíte válido (`parcial` ou `verde`); e que nenhum arquivo em preparação pertence **só a outra task** da feature |
 | `arquivo-fora-do-plano` | `PreToolUse` | aviso | Compara o que está em preparação com a lista declarada na task. Artefato de método do **próprio** trabalho é isento; o de outro trabalho, não |
-| `pr-so-com-portao` | `PreToolUse` | aviso | Barra push e abertura de PR sem `PRONTO` registrado no rastro |
+| `pr-so-com-portao` | `PreToolUse` | aviso² | Aviso antecipado no `git push`: avisa quando não determina o push; bloqueia só o push simples que a regra do `pre-push` prova inválido e o `--no-verify` |
 
 Os três de segurança nascem em bloqueio: segredo commitado não tem volta, e o
 falso positivo ali é raro. Os três de método nascem em aviso, e só sobem a
@@ -55,17 +55,44 @@ O plano também sai desse contexto: branch ativa + `branch:` de exatamente uma
 pasta canônica daquele trabalho. Nenhum plano histórico com task id repetido
 participa, e recência/rastro nunca selecionam ownership.
 
-A mensagem (`-m` ou arquivo de `-F`) declara uma de duas classes mecânicas:
+A mensagem (`-m` ou arquivo de `-F`) declara uma de três classes mecânicas:
 
 - **E1:** exatamente um `Task:` e um `Trabalho:`, sem `Metodo:`;
-- **método:** exatamente um `Trabalho:` e um `Metodo:` (`pre-e2`, `pre-e6`
-  ou `e8`), sem `Task:`.
+- **método:** exatamente um `Trabalho:` e um `Metodo:`, do enum fechado
+  `pre-e2 | reconciliacao-base | pre-e6 | e8`, sem `Task:`;
+- **integração de base:** exatamente um `Trabalho:` e um `Integra-base:` com o
+  SHA completo do segundo pai, sem `Task:` nem `Metodo:` — o merge que integra
+  uma base que avançou depois do E8
+  (`references/11-reconciliacao-base.md`).
 
 `Task:` + `Metodo:`, qualquer chave de controle duplicada e `Metodo:` fora do
-enum param mesmo quando o hook está em aviso. A gramática vem de uma única
-implementação, `scripts/contrato-de-commit.sh`: commit de método válido não é
-interpretado como E1 e segue para o hook de escopo, sem cobrar status/suíte de
-task. Sem nenhuma das duas declarações, o hook não inventa a classe.
+enum param mesmo quando o hook está em aviso.
+
+**O commit de integração da base.** Os dois hooks de commit reconhecem a classe
+pela **mensagem**, nunca pelo estado do Git, por uma biblioteca só:
+`comum/integracao-da-mensagem.sh`, carregada com `.` pelo `commit-por-task` e
+pelo `arquivo-fora-do-plano`. Só vale a mensagem que declara `Integra-base:`
+como trailer isolado e limpo, com `MERGE_HEAD` presente; ela passa por
+`contrato-de-commit.sh --validar-integracao` e o `Integra-base:` tem de ser o
+`MERGE_HEAD`. O que a leitura não isola (aspas soltas, lixo depois dos 40 hex,
+trailers que o Git não acha) é classe "nenhuma" e segue as regras de sempre:
+bloquear só com prova.
+
+- `commit-por-task`: integração válida não é mistura de tasks, e as regras de
+  status e suíte não se aplicam; integração que declara `Integra-base:` e não
+  passa no contrato barra (`exit 2`).
+- `arquivo-fora-do-plano`: numa integração válida, avalia só os caminhos que
+  diferem do segundo pai (`git diff --cached MERGE_HEAD`) — o que a resolução
+  acrescenta, não tudo o que veio da base. O arquivo nascido na base e ajustado
+  pela integração só deixa de ser fora do plano pela reconciliação de base.
+  Por isso, com o hook em `bloqueio`, o commit de `M` com arquivo reconciliável é barrado: esse commit
+  precisa do hook em `aviso`, e a cobertura vem depois, pelo `--registrar`.
+
+A gramática das três classes vem de uma única implementação,
+`scripts/contrato-de-commit.sh`: commit de método válido não é interpretado
+como E1 e segue para o hook de escopo, sem cobrar status/suíte de task.
+Sem nenhuma das três declarações (task, método ou integração), o hook não
+inventa a classe.
 
 A task que está fechando sai do `Task:` validado e **nunca é adivinhada**. O
 contrato inteiro está em
@@ -81,6 +108,147 @@ classificam pela mesma implementação, nunca por regras divergentes.
 
 A mergex só **detecta e nomeia** a condição (`arquivo_de_task_irma`). Abrir
 `B-NN` e replanejar é da sprintx.
+
+### ² O `pr-so-com-portao`: aviso antecipado, não barreira
+
+A barreira de push da MergeX (DM-184; spec de reconciliação pós-E8, seção
+13, itens 5, 7 e 8) tem três camadas. As três aplicam a mesma regra,
+`scripts/portao-regras.sh`, que roda `validade-do-portao.sh --rev` sobre o SHA
+enviado, e leem o mesmo modo (`pr-so-com-portao` em `.expx/hooks.json`):
+
+| Camada | Papel |
+|---|---|
+| `pre-push` do Git (`portao-push.sh`, ativado e provado pelo E0 e pelo E2) | Barreira local **autoritativa contra erro normal**. Decide pelas refs e SHAs que o Git entrega, qualquer que seja o comando que disparou o push: `cd … &&`, `bash -c`, `xargs`, função ou alias chegam iguais |
+| Este hook | **Aviso antecipado.** Antecipa o diagnóstico quando consegue provar o resultado; no resto, avisa e deixa o Git seguir até o `pre-push` |
+| CI com proteção de merge (`portao-ci.sh` e o template em `assets/ci/`) | Barreira contra `--no-verify` e contra o contorno pelo nome da branch: seleciona as entregas **só pelo conteúdo do PR** (DM-185), nunca pelo nome, nos limites da spec (seção 15.1). Esta branch entrega o executável e o template e não ativa CI em produto nenhum |
+
+**A validade do portão.** O portão do E2 vale para um SHA (`portao_sha`, DM-181).
+`scripts/validade-do-portao.sh --verificar --entrega <ENTREGA.md> --rev <sha>` lê
+`portao` e `portao_sha` da revisão avaliada, nunca do disco, e só mantém o
+`pronto` se todo commit em `portao_sha..<sha>` é commit de método `pre-e6` ou
+`e8`, de um pai, tocando só o catálogo daquele checkpoint. Commit de produto, de
+teste, de plano ou merge invalida (`commit_de_produto`, `commit_merge`,
+`metodo_fora_do_catalogo`); clone raso ou objeto ausente é
+`historia_incompleta`, e ambiente que impede a avaliação é `erro_ambiente` —
+os dois barram sempre. É a regra que as três camadas consomem; nenhuma tem regra
+própria.
+
+O hook não é fronteira de segurança. Ler o texto do shell nunca cobre tudo
+(alias, função, config de push, plumbing), e o que ele não consegue determinar
+vira aviso, nunca bloqueio.
+
+**Quando ele age.** Num comando que publica: `git` como programa seguido de
+`push`, `send-pack` ou `subtree push` (com opções globais no meio), ou o
+executável `git-push`/`git-send-pack`, inclusive dentro de `bash -c`, `xargs`,
+função ou subshell. Citação (`echo push`, `git log --grep push`), outro
+programa (`docker push`, `npm run push-notifications`) e abertura de PR
+(`gh pr create`) saem na hora, calados: o PR só expõe o que já chegou ao
+remoto por um push.
+
+**1. `--no-verify` reconhecido: bloqueia** (`exit 2`, em qualquer modo,
+`desligado` inclusive). O `--no-verify` faz o Git pular o `pre-push`, e a
+mensagem diz isso e aponta o CI como a barreira contra esse contorno.
+Reconhecido é um segmento cujo programa é o `git`, seguido do `push` (só
+opções globais no meio) e do `--no-verify` ou de um prefixo único dele que o
+Git aceita (`--no-veri`, `--no-verif`); ou um executor como `bash -c`, `env`,
+`nice` ou `xargs` que roda esse push. `git commit --no-verify` não é push, e a
+citação (`echo "git push --no-verify"`, `git commit -m "… git push
+--no-verify"`, `git log --grep …`) não executa nada: sai calada.
+
+**2. Bloqueia só com prova** (`exit 2`), quando tudo isto vale:
+
+- o comando é um único `git push` simples: uma linha, sem `;`, `&&`, `||`,
+  `|`, subshell, `cd`, `-C` ou outra opção global, prefixo de ambiente, aspas
+  ou expansão;
+- as opções não mudam quais refs sobem (`-u`, `-v`, `-q`, `-o`, `--force*`,
+  `--atomic`, `--follow-tags`…). `--all`, `--mirror`, `--tags`, `--delete`,
+  `--dry-run`, `--repo` e qualquer outra deixam o push indeterminado;
+- o repositório do cwd se lê pelo Git (`git rev-parse --show-toplevel`) e não
+  tem `remote.<nome>.push` nem `remote.<nome>.mirror` configurado;
+- cada refspec resolve sem ambiguidade. A origem é `HEAD`, uma branch local
+  sem tag ou remota homônima, um SHA ou uma expressão que o Git resolve num
+  commit. O destino vem do refspec ou, sem refspec, da branch atual pelo
+  `push.default` (`simple`, `current` ou `upstream`);
+- `pr_decide_ref` dá `barra` para alguma ref por um motivo do portão:
+  - vencido: `commit_de_produto`, `commit_merge`, `metodo_fora_do_catalogo`,
+    `portao_sha_nao_ancestral`;
+  - ausente ou inconsistente: `portao_sha_ausente`, `portao_nao_pronto`
+    (inclusive `portao: bloqueado`);
+  - `historia_incompleta` ou `caminho_com_controle`;
+  - `portao: null` com o modo `bloqueio`.
+
+O hook passa a `pr_decide_ref` o SHA enviado e o SHA remoto **nulo**: lê só a
+árvore do SHA enviado e a ponta local da branch, um subconjunto do que o
+`pre-push` lê. Assim ele nunca barra o que o `pre-push` deixaria passar. Uma
+ref aplicável inválida barra o push inteiro, como no `pre-push`. A mensagem
+nomeia a ref, o SHA, o motivo e o primeiro commit, e manda rodar o E2
+(`/mergex-check`).
+
+**3. Em qualquer outro caso, avisa e sai 0.** O aviso vai ao stderr (Claude
+Code) e ao JSON do stdout (OpenCode). Os casos:
+
+- comando composto, com expansão, opção global, prefixo de ambiente ou mais de
+  uma linha;
+- cwd que o Git não lê: fora de repositório, `.git` que não se resolve,
+  caminho UNC, `dubious ownership`;
+- opção, config ou refspec que o hook não lê sem ambiguidade (origem ambígua
+  ou que não resolve, destino `HEAD`);
+- `erro_ambiente` ou `entrega_indeterminada` da regra: o ambiente impediu a
+  avaliação, e isso não prova nada sobre o push;
+- validade que não termina dentro do orçamento, ou sem `timeout` funcional;
+- `portao-regras.sh` ausente ao lado dos hooks.
+
+**Modo.** É o de `pr_modo_null`, o mesmo do `pre-push` e do CI. Com
+`portao: null`: `bloqueio` barra, `aviso` avisa, `desligado` passa. Modo
+inválido ou `.expx/hooks.json` ilegível valem como `bloqueio`. O modo nunca
+afrouxa o portão vencido, ausente, inconsistente ou bloqueado.
+`desligado` silencia os avisos do hook, mas não pula a regra do portão no push
+simples nem o `--no-verify`. A suíte `scripts/ci/test-r2-barreira-push.sh modo`
+dá a mesma entrada aos três consumidores e exige a mesma decisão.
+
+**Tempo.** O hook inteiro cabe num orçamento interno de **8 s**
+(`ORCAMENTO=8`), abaixo do `timeout` de 10 s do harness, que é o mesmo dos
+outros hooks no `.claude/settings.json` e o limite único (`TEMPO_LIMITE`) do
+plugin do OpenCode. A regra roda num processo filho com o `timeout` do
+coreutils. Ele só é aceito depois de provar, pelo comportamento, que mata um
+processo no prazo (`timeout 0.2 sleep 3` sai 124 em menos de 2 s), a mesma
+técnica de `ativacao-pre-push.sh`. Sem `timeout` funcional, ou com o
+orçamento estourado, o hook avisa e sai 0, e o processo filho morre inteiro.
+Sem `timeout` funcional (macOS sem coreutils, por exemplo), o hook nunca
+antecipa bloqueio de portão e só avisa; o `--no-verify` continua bloqueado.
+
+São uma validade por ref enviada, nenhuma varredura de branches e nenhum laço
+de subida de diretório. Um cwd `//` ou UNC sem repositório avisa na hora.
+
+**Git for Windows sobre `\\wsl.localhost\...`.** O Git for Windows recusa um
+repositório do WSL sem uma exceção de `safe.directory` (`dubious ownership`).
+O hook então avisa, e a mensagem diz que a exceção na config **global** é
+pré-requisito do `pre-push` no Git for Windows:
+
+```
+git config --global --add safe.directory '<caminho do repositório>'
+```
+
+O hook tira o CR que o `jq.exe` do Windows escreve antes de comparar.
+
+**Limites.** O que o hook não lê vira aviso e fica com o `pre-push`:
+
+- **Alias de git.** Com `git config alias.p push`, `git p origin <branch>` não
+  é reconhecido como push e nem o aviso sai. O `pre-push` decide igual.
+- **Push que o hook não determina.** Comando composto, `cd`, `-C`,
+  `GIT_DIR=`, função, `xargs`, `bash -c`, `--all` e `--tags` avisam em vez de
+  bloquear, mesmo com o portão vencido.
+- **Publicação puxada pelo remoto.** Com um remoto no sistema de arquivos,
+  `git -C <remoto> fetch <wt> feature/x:feature/x` grava a branch no remoto
+  sem push. Isso não passa nem pelo hook nem pelo `pre-push`: a barreira é o
+  CI, nos limites da seção 15.1, itens 1 e 12.
+- **`send-pack`.** O `git send-pack` não roda o `pre-push`. O hook só avisa,
+  e a barreira é o CI, nos limites da seção 15.1, itens 1 e 12.
+
+A implementação anterior deste hook foi substituída pela DM-184. Ela varria o
+portão de todas as branches a cada comando, tinha um prazo de 45 s que falhava
+fechado e seguia o `cd` encadeado do texto do comando. Com dezenas de branches
+entregues, ela estourava o prazo e barrava push legítimo.
 
 ## Onde cada coisa mora
 
@@ -139,7 +307,7 @@ O modo vive em `.expx/hooks.json`, na raiz do projeto:
 |---|---|
 | `aviso` | Registra `regra_violada` no rastro e deixa passar |
 | `bloqueio` | Registra `acao_bloqueada`, sai com 2 e devolve o motivo ao modelo |
-| `desligado` | Não faz nada, nem registra |
+| `desligado` | Não faz nada, nem registra — menos, no `pr-so-com-portao`, o push simples provadamente inválido e o `--no-verify` (²), que nenhum modo pula |
 
 Arquivo ausente: valem os padrões da tabela dos seis hooks. **Um hook de
 segurança nunca é rebaixado por arquivo ausente** — a ausência do arquivo não
@@ -204,8 +372,9 @@ ainda **falham abertos** sem jq: risco registrado na DM-171, fora do escopo do
 M4-A.
 
 **Timeout.** O harness cancela o hook que estoura o timeout e deixa o comando
-rodar — timeout é falha aberta. O `mergex/git-perigoso` usa 30 s, o mesmo
-timeout crítico do `sprintx/git-perigoso`. A barreira posterior, fechada, é o
+rodar — timeout é falha aberta. No Claude Code, o `mergex/git-perigoso` usa
+30 s, o mesmo timeout crítico do `sprintx/git-perigoso`; no OpenCode, ele fica
+no limite único de 10 s do plugin (`TEMPO_LIMITE`). A barreira posterior, fechada, é o
 E1 (`fechamento-do-e1.sh`): ele inventaria a árvore inteira antes do
 `git add`, então um arquivo de task irmã escrito enquanto o hook de escopo da
 skill de origem estourava o timeout ainda barra o fechamento (DM-172).

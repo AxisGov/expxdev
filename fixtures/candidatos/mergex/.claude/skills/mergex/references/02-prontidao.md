@@ -8,7 +8,20 @@ A saída é binária: `PRONTO` ou `BLOQUEADO`.
 
 ## Pré-requisitos verificáveis
 
-Antes de qualquer V1–V11, confirme a barreira executável `pre-e2`:
+Antes de qualquer verificação, confirme as duas barreiras executáveis iniciais, nesta ordem.
+
+**1. O `pre-push` da MergeX comprovadamente ativo** — a prova funcional (`references/12-barreira-de-push.md`), que não confia no caminho nem na existência do arquivo:
+
+```bash
+bash .claude/skills/mergex/scripts/ativacao-pre-push.sh --provar \
+  --entrega docs/entregas/<trabalho_id>/ENTREGA.md
+```
+
+Falhou: **E2 não começa e nada é gravado** — nem `portao`, nem `falhas_portao`. Relate a saída do script e mande rodar o E0 (`ativacao-pre-push.sh --instalar`, que mostra a instrução de composição quando há hook de terceiro). Sem essa prova o E2 não emite `PRONTO`.
+
+**Fora de um repositório Git** (`git rev-parse --show-toplevel` falha; DM-186): não há push a proteger, e a prova é **dispensada** — não a rode; o `registrar-portao.sh` também a dispensa, grava `portao_sha: null` e emite `PRONTO` normalmente. O critério é só o Git real, **nunca pelo campo `versionado`** do `ENTREGA.md`: dentro de um repositório Git, um `ENTREGA.md` com `versionado: false` continua exigindo a prova.
+
+**2. A barreira `pre-e2`:**
 
 ```bash
 bash .claude/skills/mergex/scripts/persistir-metodo.sh --verificar \
@@ -17,6 +30,20 @@ bash .claude/skills/mergex/scripts/persistir-metodo.sh --verificar \
 ```
 
 Falhou: **E2 não começa**. Rode a ação explícita `persistir-metodo pre-e2` fora do portão e tente de novo. O E2 nunca chama o modo de gravação para consertar o lifecycle silenciosamente.
+
+**3. A reconciliação verificada e persistida** — só quando a entrega tem reconciliação de base (`reconciliacoes` não vazia no `ENTREGA.md`; `references/11-reconciliacao-base.md`):
+
+```bash
+bash .claude/skills/mergex/scripts/reconciliacao-base.sh --verificar \
+  --checkpoint reconciliacao-base --entrega docs/entregas/<trabalho_id>/ENTREGA.md \
+  --origem <sprintx|runx> --trabalho <trabalho_id>
+```
+
+Exige `ok=true`: a cadeia `RECONCILIACAO-BASE-NNN.md` recalculada do Git (assinatura, encadeamento, condições estruturais, as quatro provas, cobertura em `HEAD`) e persistida — artefatos e `ENTREGA.md` iguais em disco e em `HEAD`. Falhou (código `5` com `persistencia`, ou qualquer outro diferente de `0`): **E2 não emite `PRONTO`**. Relate os `motivo` e mande rodar o checkpoint explícito `reconciliacao-base` (ou o `--registrar` de novo, quando a saída pedir). Sem reconciliação, esta barreira não se aplica.
+
+**A ordem é fechada:** reconciliação verificada → validade do portão → autorização do push. Esta barreira prova a reconciliação, e a V9 executável consome os `coberto` dela; o portão aprovado grava `portao_sha`; depois disso, `validade-do-portao.sh` prova que nada fora do permitido mudou, e é sobre ela que o `pre-push` autoriza o push. O push nunca reexecuta a reconciliação.
+
+Só com as barreiras aprovadas o portão roda V1–V11.
 
 - `docs/entregas/<trabalho_id>/ENTREGA.md` existe (o E0 rodou). Se não existir, rode o E0 primeiro (`references/00-abertura.md`) — a branch pode não ter nascido, e o portão precisa saber o que foi commitado.
 - O `ORQUESTRADOR.md` e o `tasks.md` do trabalho existem. Sem eles não há o que verificar: relate que o trabalho não está planejado e encerre `BLOQUEADO`.
@@ -126,11 +153,22 @@ Cada item falho é uma linha da saída, com o arquivo onde deveria estar.
 
 Compare o conjunto de arquivos tocados pelos commits do trabalho com a união dos `arquivos.cria` + `arquivos.altera` de todas as tasks.
 
-```
-git diff --name-only <branch-base>...HEAD
+**A V9 é executável: o resultado dela é o do script**, nunca uma comparação feita à mão:
+
+```bash
+bash .claude/skills/mergex/scripts/portao-v9.sh --verificar \
+  --entrega docs/entregas/<trabalho_id>/ENTREGA.md \
+  --origem <sprintx|runx> --trabalho <trabalho_id>
 ```
 
-Falha: arquivo de produto no diff que não está declarado em nenhuma task. Nomeie cada um. Some a isso os `desvios` já registrados pelo E1.
+- **Base do diff por SHA, não por nome.** A base `B` é o `b1_sha` da última reconciliação, ou o `base_validada_sha` da entrega quando não há reconciliação; o conjunto é `git diff --name-only --no-renames B...HEAD`. Mover a ref local da base não muda o resultado. Entrega legada (nenhuma versão do `ENTREGA.md` com `base_validada_sha`) lê o merge-base único com `branch_base`, sem gravar nada.
+- **Conjunto aceito,** nesta ordem: a união das tasks do plano de `HEAD`; os artefatos de método do trabalho (abaixo); e os caminhos `coberto` de `reconciliacao-base.sh --verificar`, só quando ela devolve `ok=true`.
+- **Saída:** `resultado=ok`, ou `resultado=v9` com uma linha `fora_do_plano<TAB><caminho>` por desvio, ou `resultado=v9_sem_prova` com os `motivo`. Códigos: `0` ok; `1` `v9`; `3` `v9_sem_prova`; `64` uso. Nenhuma opção de força.
+- **`v9_sem_prova`** (verificação da reconciliação com `ok=false`, âncora da base inconsistente, base que já contém o trabalho, repositório raso ou objeto Git ausente) é `FALHA` registrada como `v9_sem_prova`. No clone raso, o diagnóstico manda rodar `git fetch --unshallow`.
+
+Falha: arquivo de produto no diff que não está declarado em nenhuma task. Nomeie cada um (as linhas `fora_do_plano`). Some a isso os `desvios` já registrados pelo E1.
+
+Arquivo reconciliado da base não é desvio enquanto a reconciliação verifica e o conteúdo em `HEAD` é o `blob_m` registrado; alterado depois do merge, deixa de estar coberto e volta a reprovar.
 
 Arquivo declarado que não aparece no diff **não** é falha: pode ter sido criado e revertido dentro do escopo, ou já existir como estava.
 
@@ -268,9 +306,36 @@ O portão **não grava `causa`**: ela continua `null` até o E8 fechar o bloquei
 
 ## Critério de saída
 
-**`PRONTO`** quando nenhuma verificação deu `FALHA`. Grave `portao: pronto` e `falhas_portao: []` no `ENTREGA.md`, reescreva `atualizado_em`, e siga para o E3.
+O resultado é gravado no `ENTREGA.md` **só por `registrar-portao.sh`** — o gravador único de `portao`, `portao_sha`, `falhas_portao` e `atualizado_em`. Nunca edite essas chaves à mão.
 
-**`BLOQUEADO`** quando qualquer verificação deu `FALHA`. Grave `portao: bloqueado` e `falhas_portao` com as verificações que falharam no `ENTREGA.md`.
+**`PRONTO`** quando nenhuma verificação deu `FALHA`. Registre:
+
+```bash
+bash .claude/skills/mergex/scripts/registrar-portao.sh \
+  --entrega docs/entregas/<trabalho_id>/ENTREGA.md \
+  --origem <sprintx|runx> --trabalho <trabalho_id> --resultado pronto
+```
+
+Ele roda de novo a prova funcional do `pre-push` **antes de qualquer escrita** e só então grava `portao: pronto`, `portao_sha` (o SHA completo do `HEAD` avaliado), `falhas_portao: []` e `atualizado_em`, imprimindo `RESULTADO: PRONTO`. Siga para o E3 só com essa saída. Se ele imprimir `RESULTADO: BLOQUEADO — pre-push sem prova funcional` (código `3`), nada foi gravado e o portão **não** está `PRONTO`: relate e mande rodar o E0. Fora de um repositório Git (pelo Git real, DM-186) ele dispensa a prova e grava `portao_sha: null`.
+
+**O portão vale para um SHA** (DM-181). `portao_sha` é o `HEAD` que este E2 avaliou. O `pronto` só continua valendo para um `HEAD` posterior se **todo** commit em `portao_sha..HEAD` é commit de método `pre-e6` ou `e8`, de um pai, tocando só o catálogo daquele checkpoint. Qualquer commit de produto, de teste, de plano, ou merge (inclusive de base nova) invalida o portão, e o E2 roda de novo. Quem prova isso é, só leitura:
+
+```bash
+bash .claude/skills/mergex/scripts/validade-do-portao.sh --verificar \
+  --entrega docs/entregas/<trabalho_id>/ENTREGA.md [--rev <commit>]
+```
+
+Saída `ok=true`, ou `ok=false` com `motivo=` (`portao_nao_pronto`, `portao_sha_ausente`, `portao_sha_nao_ancestral`, `commit_de_produto`, `commit_merge`, `metodo_fora_do_catalogo`, `historia_incompleta`, `erro_ambiente`) e `primeiro_commit=`. É a mesma validade que o E6, o E7, o `pre-push` e o CI consomem (`references/12-barreira-de-push.md`).
+
+**`BLOQUEADO`** quando qualquer verificação deu `FALHA`. Registre com as verificações que falharam (a mesma lista do `causa-do-portao.sh --lista`; não exige a prova):
+
+```bash
+bash .claude/skills/mergex/scripts/registrar-portao.sh \
+  --entrega docs/entregas/<trabalho_id>/ENTREGA.md \
+  --origem <sprintx|runx> --trabalho <trabalho_id> --resultado bloqueado --falhas v7 v1
+```
+
+O `--resultado bloqueado` também grava `portao_sha` = `HEAD` avaliado, junto com `portao: bloqueado` e `falhas_portao`. Isso não tem efeito na validade: `validade-do-portao.sh` dá `portao_nao_pronto` antes de olhar `portao_sha`, e um portão bloqueado nunca vale para push.
 
 **`BLOQUEADO` encerra as etapas de entrega e segue apenas ao E8 para registrar e persistir o bloqueio.** Não classifique o diff (E3), não monte a descrição do PR (E4), não gere o pacote de QA (E5), não faça push (E6), não abra PR (E7): **nenhuma dessas etapas executa.**
 
@@ -285,8 +350,10 @@ O trabalho fica na branch, commitado até onde estava correto. Nada é desfeito,
 | `tasks.md` sem frontmatter | Leia da prosa e registre o aviso; se não for possível determinar o status, é `FALHA` em V1 |
 | `QA.md` ausente em trabalho da runx | `FALHA` em V5 — a entrega ainda não passou pelo E4 da runx |
 | `PERFIL.md` ausente | V8 inteira é `n/a`; não invente modo legado |
-| Sem versionador | V9 e V10 rodam sobre árvore e tasks; as demais não mudam |
-| Branch base indisponível para o diff | Use `git diff --name-only HEAD~<n>..HEAD` sobre os commits do trabalho registrados no `ENTREGA.md`; registre a imprecisão como aviso |
+| Sem versionador | `portao-v9.sh` exige Git: fora de um repositório ele sai `v9_sem_prova` com o motivo `fora de um repositório Git` (código `3`). Por isso, com `versionado: false`, não o rode: V9 e V10 seguem a regra em prosa sobre os arquivos declarados nas tasks e a árvore de trabalho ("Repositório sem versionador", na V10); as demais não mudam. A prova do `pre-push` é dispensada **só** fora de um repositório Git real (DM-186), nunca pelo campo `versionado` |
+| Branch base indisponível para o diff da V10 | Use `git diff HEAD~<n>..HEAD` sobre os commits do trabalho registrados no `ENTREGA.md`; registre a imprecisão como aviso. A V9 não usa o nome da base: o que ela não consegue provar é `v9_sem_prova` |
+| `portao-v9.sh` devolve `v9_sem_prova` (código `3`) | `FALHA` em V9, registrada como `v9_sem_prova`, com os `motivo` do script. Raso: `git fetch --unshallow` e o E2 de novo |
+| Barreira `reconciliacao-base` reprovada | E2 não emite `PRONTO`; relate os `motivo`; persistência pendente se resolve com o checkpoint explícito `reconciliacao-base`, fora do portão |
 | Verificação impossível de rodar | Marque `FALHA`, nunca `OK`, e registre `vN_sem_prova` em `falhas_portao`. Ausência de prova não é prova |
 | Task `concluida` sem item em `ENTREGA.commits` | `FALHA` em V11. Sem commit existente: E1 tardio normal. Com commit existente e append perdido: `--registrar-existente`, nunca um segundo commit. |
 | `ENTREGA.md` sem a chave `commits`, ou ilegível | `FALHA` em V11, registrada como `v11_sem_prova` |

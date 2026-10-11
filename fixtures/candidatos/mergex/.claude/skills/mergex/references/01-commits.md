@@ -351,9 +351,13 @@ Eles **nunca contam como desvio** e **não entram no commit de uma task**: o inv
 
 ### Lifecycle dos artefatos de método
 
-O lifecycle tem três checkpoints executáveis e cumulativos: `pre-e2`, `pre-e6` e `e8`.
+O lifecycle tem três checkpoints executáveis e cumulativos: `pre-e2`, `pre-e6` e `e8`. Um quarto, `reconciliacao-base`, fica fora da cadeia cumulativa e só existe depois de um merge de base integrado após o E8 (`references/11-reconciliacao-base.md`). O enum fechado, na ordem do fluxo, é `pre-e2 | reconciliacao-base | pre-e6 | e8`.
 
-**O `HISTORICO.md` não entra no commit de uma task.** Se estiver dirty, o catálogo `pre-e2` o seleciona pelo caminho global exato e prova que o diff pertence ao trabalho explícito.
+**O `HISTORICO.md` não entra no commit de uma task.** Se estiver dirty, o catálogo `pre-e2` o seleciona pelo caminho global exato e prova, contra HEAD, que a mudança pertence ao trabalho explícito.
+
+**Append-only quanto às entradas, não aos bytes** (DM-175). Quando o `HISTORICO.md` já existe em HEAD, a prova não é diff textual: a versão de HEAD e a da working tree passam pelo mesmo leitor da primeira criação e são comparadas. Toda entrada de HEAD continua lá, com o mesmo `trabalho_id`, `task_id` e valor efetivo em cada campo (ordem de chaves, comentário, aspas e `sinais` inline ou em bloco não contam; `'d''agua'`, `"d'agua"` e `d'agua` são o mesmo valor, e `"a\n"` não é o texto `a\n` — DM-176: aspas simples desdobram `''`, aspas duplas decodificam `\"`, `\\`, `\/`, `\ ` e `\xHH` imprimível, e escape que gere controle, quebra de linha ou fique fora desse subconjunto barra); toda entrada nova é do trabalho explícito, de task `concluida` dele, sem duplicata e no schema; nenhuma linha anterior da tabela oficial de `## Entradas` some, e toda linha dela tem entrada no frontmatter. `atualizado_em`, `calibracao` (que termina estruturalmente válida: tipo no enum e sem repetição, `entradas` inteiro que não passa do que existe, `desvio_medio` número, `fator_ativo` booleano e `true` a partir de 3 entradas), a tabela de calibração e a prosa podem ser recalculados. O valor exato de `desvio_medio` não é provado pela mergex. HEAD fora do contrato não serve de base: para.
+
+**A primeira criação não tem diff** (DM-174). Quando o `HISTORICO.md` não existe em HEAD e a sprintx acabou de criá-lo, o checkpoint — qualquer um dos três — prova o ownership sobre o **arquivo inteiro**: ausência em HEAD pelo caminho exato, arquivo regular, frontmatter `estimativa_historico` com `trabalho_id: null`, toda entrada do trabalho explícito e de task `concluida` dele, sem duplicata, linhas de dados da tabela oficial de `## Entradas` com entrada correspondente, e nenhum marcador `{{...}}` no frontmatter nem nas linhas de dados das tabelas oficiais (na prosa, como a instrução "Substitua TODOS os marcadores `{{...}}`" do template, ele é texto — DM-175). A prova lê os valores efetivos do frontmatter — comentário YAML e `sinais` em bloco são aceitos — e não procura task em prosa: parágrafo, heading e tabela humana no corpo não são evidência. Falhou, para antes do `git add`. Depois que ele entra num commit de método, os checkpoints seguintes caem na prova contra HEAD acima.
 
 **1. `pre-e2`, ao fim da execução.** Persiste `ENTREGA.md` com todos os appends E1 e o estado SprintX/RunX já produzido: tasks, orquestrador, fechamento, bloqueios, planejamento, auditoria, base enumerada pelo índice e demais paths do catálogo vivo que existam e estejam dirty.
 
@@ -380,15 +384,25 @@ Trabalho: <trabalho_id>
 Metodo: e8
 ```
 
-**Commit de método é classe de primeira classe e não é E1.** A gramática é exatamente `Trabalho: <trabalho_id>` + `Metodo: pre-e2 | pre-e6 | e8`, sem `Task:`. Ele não entra em `ENTREGA.commits`, não consome `seq` e não satisfaz V11.
+**4. `reconciliacao-base`, só depois de um merge de base pós-E8.** Persiste o `ENTREGA.md` e os `RECONCILIACAO-BASE-NNN.md` de `ENTREGA.reconciliacoes` que o `reconciliacao-base.sh --registrar` acabou de gravar — nada de produto, de teste ou de plano. Roda antes do E2, que exige a barreira `--verificar --checkpoint reconciliacao-base` (`references/11-reconciliacao-base.md`):
 
-**Por que três checkpoints.** Eles carregam estados diferentes do mesmo trabalho.
+```
+chore(mergex): persiste metodo reconciliacao-base
+
+Trabalho: <trabalho_id>
+Metodo: reconciliacao-base
+```
+
+**Commit de método é classe de primeira classe e não é E1.** A gramática da DM-162/163 era `Metodo: pre-e2 | pre-e6 | e8`; com a DM-178 ela é exatamente `Trabalho: <trabalho_id>` + `Metodo: pre-e2 | reconciliacao-base | pre-e6 | e8`, sem `Task:`. Ele não entra em `ENTREGA.commits`, não consome `seq` e não satisfaz V11.
+
+**Por que três checkpoints cumulativos, e um quarto à parte.** Eles carregam estados diferentes do mesmo trabalho.
 
 1. **pre-e2** — torna duráveis as provas que o portão vai avaliar.
 2. **pre-e6** — torna duráveis descrição, atenção e pacote de QA antes da publicação.
 3. **e8** — leva o estado que só existe depois do push e do PR.
+4. **reconciliacao-base** — torna durável o registro de uma base integrada depois do E8, para que o E2 seguinte o avalie. Não é cumulativo: o catálogo dele é só o `ENTREGA.md` e os artefatos de reconciliação (que `pre-e6` e `e8` também incluem).
 
-Nenhum dos dois é task e nenhum dos dois entra na lista `commits`. **Ao retornar do E8, nenhuma atualização final da entrega fica dependendo de um trabalho futuro**: o que a entrega afirma está no commit para o qual a branch aponta.
+Nenhum deles é task e nenhum deles entra na lista `commits`. **Ao retornar do E8, nenhuma atualização final da entrega fica dependendo de um trabalho futuro**: o que a entrega afirma está no commit para o qual a branch aponta.
 
 O executor é o único escritor desses commits:
 
@@ -396,7 +410,7 @@ O executor é o único escritor desses commits:
 bash .claude/skills/mergex/scripts/persistir-metodo.sh --persistir \
   --entrega docs/entregas/<trabalho_id>/ENTREGA.md \
   --origem <sprintx|runx> --trabalho <trabalho_id> \
-  --checkpoint <pre-e2|pre-e6|e8>
+  --checkpoint <pre-e2|reconciliacao-base|pre-e6|e8>
 ```
 
 Ele deriva paths exatos, só inclui os que existem e estão dirty, usa a mesma trava C5, exige stage vazio, roda o gate de segredo e não cria commit vazio. E2 e E6 chamam somente `--verificar`; nunca usam gravação para corrigir o lifecycle por trás.
@@ -462,6 +476,27 @@ Task: <id>
 Trabalho: <trabalho_id>
 Testes: <o que os dois testes cobrem, resumido>
 ```
+
+### As três classes de commit
+
+`scripts/contrato-de-commit.sh` é a gramática mecânica única, e as classes nunca se misturam:
+
+| Classe | Trailers de controle | Quem cria |
+|---|---|---|
+| **E1** | exatamente um `Task:` e um `Trabalho:`; nenhum `Metodo:` | o E1, uma task por commit |
+| **método** | exatamente um `Trabalho:` e um `Metodo:` (`pre-e2`, `reconciliacao-base`, `pre-e6` ou `e8`); nenhum `Task:` | `persistir-metodo.sh` |
+| **integração de base** | exatamente um `Trabalho:` e um `Integra-base:` com o SHA completo (40 hex) da base integrada; nenhum `Task:`, nenhum `Metodo:` | a pessoa (ou o agente, sob autorização) que concluiu o merge da base |
+
+O commit de integração da base é o merge `M` da reconciliação (`references/11-reconciliacao-base.md`): tem **exatamente dois pais**, e o segundo é o `Integra-base:`. Não é E1, não entra em `ENTREGA.commits`, não consome `seq` e não satisfaz V11. A MergeX não o cria — valida e registra.
+
+```
+<título do merge>
+
+Trabalho: <trabalho_id>
+Integra-base: <sha de 40 hex do segundo pai>
+```
+
+Os hooks de commit reconhecem a classe pela mensagem (`.claude/hooks/README.md`): o `commit-por-task` não a trata como mistura de tasks, e o `arquivo-fora-do-plano` avalia só os caminhos que diferem do segundo pai — o que a integração mudou, não tudo o que veio da base. Arquivo nascido na base e ajustado pela integração, que nenhuma task declara, nunca é acrescentado a uma task: o único caminho para ele passar na V9 é a reconciliação (`reconciliacao-base.sh --registrar`, com as quatro provas). Sem ela, continua fora do plano.
 
 ### O tipo
 
@@ -616,12 +651,18 @@ Acrescente uma linha em `docs/eventos/<trabalho_id>.jsonl`, no formato do
 contrato `expx-eventos` v1:
 
 ```json
-{"ts":"<ISO-8601 UTC>","expx_eventos":1,"trabalho_id":"<id>","ferramenta":"mergex","origem":"skill","evento":"commit_criado","fase":"e1","task":"T-01.02","agente":null,"resultado":"ok","detalhe":"<tipo>(<escopo>): <título>","arquivos":["<caminhos do commit>"]}
+{"ts":"<ISO-8601 UTC>","expx_eventos":1,"trabalho_id":"<id>","ferramenta":"mergex","origem":"skill","evento":"commit_criado","fase":"e1","task":"T-01.02","agente":"principal","resultado":"ok","detalhe":"<tipo>(<escopo>): <título>","arquivos":["<caminhos do commit>"]}
 ```
 
 É com `commit_criado` que o painel mostra, por trabalho, a branch, os commits e
 a task de cada um — sem tocar no versionador. **Chave nunca omitida:** valor que
 não se aplica é `null`.
+
+**`agente` é onde isso não vale**, e não é exceção à regra: nenhum valor dele
+"não se aplica". O E1 roda no modelo principal, e o valor disso é `principal` —
+"foi o principal" é informação, não ausência. `null` ali é linha fora do
+contrato, que o painel reprova. `agente` só leva outro valor quando quem
+grava é um subagente do enum (`revisor-diff` no E3, `analista-de-conflito` no E9).
 
 O arquivo é append-only e ignorado pelo versionador (é local da máquina de quem
 executou). Ninguém o edita à mão.

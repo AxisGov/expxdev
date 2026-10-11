@@ -69,6 +69,7 @@ D1–D4, padrão.
 | O7 | Efeito irreversível declarado no plano de reversão |
 | O8 | Veio de raio ALTO |
 | O9 | Histórico de regressão registrado no memox, ou reprovação anterior em QA no mesmo arquivo — **sem o memox, não se aplica** |
+| O10 | Arquivo reconciliado da base — consta na lista de reconciliados do registro (`--reconciliados`); a faixa nunca desce. No `ATENCAO.md`, cite o `RECONCILIACAO-BASE-NNN.md` e copie o `motivo` dele |
 
 ### LEITURA RÁPIDA — o revisor confere intenção, não implementação
 
@@ -140,7 +141,7 @@ printf '%s\t%s\t%s\n' src/auth/sessao.ts "O4: cria o token de sessão (T-01.02)"
 ```
 
 - Uma linha por arquivo: o caminho e, separados por TAB, os critérios
-  `Xn: evidência` que você confirmou (O1–O9, L1–L3, D1–D3). Arquivo sem
+  `Xn: evidência` que você confirmou (O1–O9, L1–L3, D1–D3; O10 vem só da lista de reconciliados). Arquivo sem
   critério vai só com o caminho.
 - A saída é `<caminho> TAB <faixa> TAB <justificativa>`. **A faixa é a dela.**
   Se você discorda, a divergência é evidência que faltou na entrada — corrija a
@@ -255,7 +256,7 @@ e as fontes.
 - relatório de cobertura — O6 não pôde ser descartado por medição
 ```
 
-**Toda justificativa nomeia pelo menos um critério** (`O1`..`O9`, `L1`..`L4`,
+**Toda justificativa nomeia pelo menos um critério** (`O1`..`O10`, `L1`..`L4`,
 `D1`..`D4`) **e a evidência que o confirma.** Sem isso é opinião, e opinião não
 é auditável.
 

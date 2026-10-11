@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   ambienteCom,
   gitEm,
+  larIsolado,
   novoProduto,
   pathControlado,
   rodarExpx,
@@ -32,6 +33,8 @@ import { suportaBitExecutavel } from "../teste/fs-capacidades.js";
 
 const criados: string[] = [];
 let fontes = "";
+/** O HOME descartável de todo init e doctor desta bancada (ver `larIsolado`). */
+let envLar: Record<string, string> = {};
 /** O produto de referência: `core.filemode=false`, instalado e commitado. */
 let A = "";
 let indiceAposCommit = "";
@@ -70,12 +73,12 @@ function init(produto: string): ReturnType<typeof rodarExpx> {
   return rodarExpx(
     ["init", "--skills", "sprintx,mergex", "--yes"],
     produto,
-    ambienteCom(pathControlado(true), { EXPX_SKILLS_LOCAIS: fontes }),
+    ambienteCom(pathControlado(true), { ...envLar, EXPX_SKILLS_LOCAIS: fontes }),
   );
 }
 
 function doctor(produto: string): ReturnType<typeof rodarExpx> {
-  return rodarExpx(["doctor"], produto, ambienteCom(pathControlado(true)));
+  return rodarExpx(["doctor"], produto, ambienteCom(pathControlado(true), envLar));
 }
 
 /** O índice inteiro, com modo e sha de cada caminho: a prova de "nada foi preparado". */
@@ -110,6 +113,9 @@ function comandoSugerido(saida: string): string[] {
 beforeAll(() => {
   fontes = fontesCandidatas();
   criados.push(fontes);
+  const isolado = larIsolado();
+  envLar = isolado.env;
+  criados.push(isolado.lar);
   A = novoProduto("expx-modo-A-");
   criados.push(A);
   // o produto real que reproduz o defeito: o git deste repositório ignora o bit

@@ -13,7 +13,8 @@ O painel apenas LÊ. Esta skill continua sendo a única a escrever `docs/entrega
 
 O `expx-schema v1` é compartilhado com a [`sprintx`](https://github.com/bittencourtthulio/sprintx)
 (Build, F1–F6) e a [`runx`](https://github.com/bittencourtthulio/runx) (Run, E1–E5). A mergex
-não tem kind compartilhado: ela produz um kind só, o `entrega`, exclusivo dela.
+não tem kind compartilhado: ela produz dois kinds, exclusivos dela — o `entrega` e o
+`reconciliacao_base` (DM-178, ver "O kind da reconciliação de base").
 
 O que **é** compartilhado são os **nomes dos campos de indexação**. `modulo_afetado`,
 `arquivos_alterados` e `palavras_chave` existem nas três skills com **exatamente estes nomes**
@@ -68,6 +69,7 @@ Valem para todo arquivo que leva frontmatter:
 | `pr_estado` | `rascunho` \| `aberto` \| `merged` \| `fechado` \| `null` |
 | `raio` | `baixo` \| `medio` \| `alto` \| `null` (sem modo legado) |
 | `faixa` (por arquivo) | `alta` \| `media` \| `baixa` |
+| `origem_base` (no `entrega`) | `registrada_e0` \| `inferida_legado` \| `null` (sem versionador) |
 
 `expx_tool` fica como a skill de **origem** do trabalho (`sprintx` ou `runx`) — é ela que
 governa o trabalho. O campo `entregue_por: mergex` diz quem gravou este arquivo. Mudar o enum
@@ -105,6 +107,9 @@ estado: entregue
 versionado: true
 branch: fix/OC-2026-0184-icms-st-base-desconto
 branch_base: main
+base_validada_sha: 4c1e9a0b2d3f4e5a6b7c8d9e0f1a2b3c4d5e6f70
+origem_base: registrada_e0
+reconciliacoes: []
 commits:
   - seq: 1
     task: T-01.01
@@ -127,6 +132,7 @@ atencao:
   leitura_rapida: 2
   dispensavel: 4
 portao: pronto
+portao_sha: 7b2e4019c1d8e2f3a4b5c6d7e8f90a1b2c3d4e5f
 falhas_portao: []
 causa: null
 desvios: []
@@ -149,6 +155,10 @@ entregue_em: 2026-08-29
 | `estado` | `aberto` no E0; `entregue` quando o fluxo completou; `bloqueado` quando o portão barrou |
 | `versionado` | `false` em repositório sem versionador |
 | `branch`, `branch_base` | `null` quando `versionado: false` |
+| `base_validada_sha` | SHA de 40 hex da base em que o trabalho foi validado; gravado no E0 (`git merge-base HEAD <branch_base>`); atualizado pelo `reconciliacao-base.sh --registrar` para o `b1_sha` registrado. Nunca nome de ref. `null` sem versionador |
+| `origem_base` | `registrada_e0` \| `inferida_legado` (gravado uma única vez, pela primeira reconciliação de uma entrega anterior a esta chave — DM-183) |
+| `reconciliacoes` | Lista `{numero, arquivo, b1_sha, m_sha}`, na ordem da cadeia; `[]` sem reconciliação. Escrita só pelo `--registrar` |
+| `portao_sha` | SHA de 40 hex do `HEAD` que o E2 avaliou, gravado com `portao` só por `registrar-portao.sh`; `null` antes do E2 e depois de um `--registrar`. O `--resultado bloqueado` também grava `portao_sha` = `HEAD` avaliado, sem efeito na validade (`portao_nao_pronto` vem antes do SHA). O portão vale só para ele e para os commits de método `pre-e6`/`e8` de um pai que o seguem (DM-181) |
 | `commits` | Um item por task commitada, na ordem em que fecharam, cada um com a chave de ordem `seq`; `[]` sem versionador. Ver "A ordem de registro" |
 | `modulo_afetado` | Os módulos que a entrega toca (ver abaixo) |
 | `arquivos_alterados` | **O diff real** — ver abaixo. É o campo mais importante deste kind |
@@ -485,6 +495,61 @@ Um `ENTREGA.md` gravado antes de `causa` e `falhas_portao` existirem, **sem as d
 Um arquivo com **uma** das duas chaves e sem a outra não é legado: é gravação incompleta, e
 reprova nos dois modos.
 
+## O kind da reconciliação de base
+
+### `docs/entregas/<trabalho_id>/RECONCILIACAO-BASE-NNN.md` → `kind: reconciliacao_base`
+
+Um arquivo por merge de base integrado depois do E8, com `NNN` de três dígitos, a partir de `001`,
+contínuo e sem lacunas. É artefato de método da MergeX: entra no catálogo do checkpoint
+`reconciliacao-base` (e nos de `pre-e6` e `e8`), nunca no commit de uma task. **Só o
+`reconciliacao-base.sh --registrar` o escreve**: a `assinatura` cobre os SHAs e os arquivos, e
+editar à mão a quebra.
+
+```yaml
+---
+expx_schema: 1
+expx_tool: sprintx
+kind: reconciliacao_base
+trabalho_id: "ft-exemplo"
+numero: 1
+anterior: null
+branch: "feature/ft-exemplo"
+branch_base: "main"
+origem_base: registrada_e0
+b0_sha: <sha de 40 hex>
+p1_sha: <sha de 40 hex>
+b1_sha: <sha de 40 hex>
+m_sha: <sha de 40 hex>
+estado: ativa
+arquivos:
+  - caminho: "tests/ui/exemplo.test.tsx"
+    status_base: A
+    blob_b1: <sha de 40 hex>
+    blob_m: <sha de 40 hex>
+    diff_b1_m_sha256: <sha256 de 64 hex>
+    motivo: "a feature dividiu o botao em duas etapas"
+registrado_em: 2026-10-07
+assinatura: <sha256 de 64 hex>
+---
+```
+
+| Campo | Regra |
+|---|---|
+| `numero` | Igual ao `NNN` do nome do arquivo |
+| `anterior` | `RECONCILIACAO-BASE-<NNN-1>.md`; `null` só no `001` |
+| `origem_base` | `registrada_e0` \| `inferida_legado` (só no `001`) \| `reconciliacao_anterior` (do `002` em diante) |
+| `b0_sha`, `p1_sha`, `b1_sha`, `m_sha` | SHAs completos, nunca nome de ref; `b0_sha` é o `b1_sha` da anterior |
+| `estado` | `ativa` (a última da cadeia) \| `superada` (uma seguinte já a encadeou) |
+| `arquivos` | Um item por caminho reconciliado; `[]` quando o merge não exigiu ajuste — é esse artefato que avança a base validada |
+| `arquivos[].status_base` | `A` (nasceu entre `B0` e `B1`) \| `M` (mudou entre `B0` e `B1`) |
+| `arquivos[].motivo` | Uma linha, não vazia, para o revisor; não entra em prova nem na assinatura |
+| `assinatura` | sha256 das linhas canônicas (`numero`, `anterior`, `trabalho_id`, os quatro SHAs e uma linha por arquivo) |
+
+Abaixo do frontmatter, a prosa tem um parágrafo com a base integrada e o merge, e uma tabela por
+arquivo (caminho, status na base, motivo); nenhum frontmatter extra, nenhuma cópia de diff. O
+contrato completo, com as quatro provas e o diff canônico de `diff_b1_m_sha256`, está em
+`references/11-reconciliacao-base.md`. O painel ainda não lê este kind (fora de escopo).
+
 ## Arquivos SEM frontmatter
 
 Não recebem frontmatter, porque o painel não os lê individualmente:
@@ -527,3 +592,5 @@ Ao abrir um `ENTREGA.md` que já existe e não tem os campos de indexação:
       derivada de `falhas_portao` (`scripts/causa-do-portao.sh --validar` passa).
 - [ ] Todo item **novo** de `commits` tem `seq`; nenhum item legado ganhou `seq` retroativo
       (`scripts/sequencia-de-commits.sh --validar` passa).
+- [ ] `base_validada_sha` e `portao_sha` são SHA de 40 hex ou `null`, nunca nome de ref; nenhum
+      dos dois, nem `reconciliacoes`, foi escrito à mão.

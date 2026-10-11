@@ -233,8 +233,9 @@ Sem essa confirmação, **não ofereça o merge** deste PR. Passe para o próxim
    for `null`, se o `estado.json` não existir, ou se a correspondência não for certa,
    **não grave nada** — na dúvida, deixe a barra como está.
 
-   Não toque em `branch`. O procedimento é o de `10-estado.md`, e falha de gravação vai
-   para o rastro sem interromper a condução dos PRs seguintes.
+   Não toque em `branch`. O procedimento é o de `10-estado.md`, e falha de gravação é
+   silenciosa, sem interromper a condução dos PRs seguintes — sem linha de rastro, pela
+   lacuna registrada em `10-estado.md`, "A lacuna".
 6. Recusa ou silêncio: **não faça o merge**, siga para o próximo, e registre que ele ficou pendente.
 
 ### As cinco recusas duras

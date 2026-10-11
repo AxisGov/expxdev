@@ -60,7 +60,7 @@ O fluxo não é uma máquina de estados sequencial como a da sprintx ou da runx:
 
 **E1 COMMIT POR TASK** — durante a execução. Cada task com os dois testes escritos, `suite: parcial` ou `verde` e `status: concluida` vira um commit próprio, no momento em que fecha. O append do SHA em `ENTREGA.commits` pode deixar o registro dirty até o checkpoint seguinte; isso não cria outro E1. Arquivo de produto fora do plano nunca entra. Varredura de segredo antes de cada commit. **O índice Git é de dono único enquanto o E1 roda**: a execução das tasks pode ser paralela, o fechamento delas é serial. Na mesma árvore de trabalho, dois E1 nunca executam ao mesmo tempo; árvores diferentes têm índices independentes e não se bloqueiam. Um único escritor por árvore: tasks sequenciais reutilizam a mesma árvore depois do fechamento; tasks simultaneamente em voo exigem árvores distintas. O E1 inventaria a árvore inteira antes do primeiro `git add`, e a lista do agente não limita a detecção nem autoriza inclusão: produto da task atual não listado barra. Antes do primeiro `git add`, com a trava já adquirida e o stage de entrada já confirmado vazio, **o dono do arquivo é verificado**: a task que está fechando. Arquivo que mudou e que **só outra task da feature declara** não entra, não vira commit parcial e **não é desvio** — é evidência mecânica de que execução e plano não batem (`arquivo_de_task_irma`), e o fechamento para ali, liberando a trava normalmente.
 
-**E2 PORTÃO DE PRONTIDÃO** — ao fim da execução, depois da ação explícita `persistir-metodo pre-e2`. O E2 apenas verifica a barreira e devolve `PRONTO` ou `BLOQUEADO`; nunca persiste método silenciosamente. `PRONTO` segue para o E3. **`BLOQUEADO` encerra as etapas de entrega — E3 a E7 não executam — e segue apenas ao E8 para registrar e persistir o bloqueio.**
+**E2 PORTÃO DE PRONTIDÃO** — ao fim da execução, depois da ação explícita `persistir-metodo pre-e2`. O E2 apenas verifica a barreira e devolve `PRONTO` ou `BLOQUEADO`; nunca persiste método silenciosamente. Prova antes o `pre-push` funcional e, quando há reconciliação de base, a barreira `reconciliacao-base`; a V9 é o resultado de `scripts/portao-v9.sh`, sobre a base validada por SHA. O `PRONTO` grava `portao_sha`: o portão vale para aquele SHA, e só commits de método `pre-e6`/`e8` de um pai o mantêm válido depois (DM-181). `PRONTO` segue para o E3. **`BLOQUEADO` encerra as etapas de entrega — E3 a E7 não executam — e segue apenas ao E8 para registrar e persistir o bloqueio.**
 
 **E3 CLASSIFICAÇÃO DA ATENÇÃO HUMANA** — divide o diff em três faixas e explica cada arquivo. É o coração da skill.
 
@@ -68,17 +68,21 @@ O fluxo não é uma máquina de estados sequencial como a da sprintx ou da runx:
 
 **E5 PACOTE PARA O QA** — gera `docs/entregas/<trabalho_id>/QA-PACOTE.md`. O QA não deve precisar ler código para trabalhar.
 
-**E6 PUSH** — começa somente depois da ação explícita `persistir-metodo pre-e6` e verifica essa barreira antes de subir a branch. Nunca força e nunca conserta o lifecycle por trás.
+**E6 PUSH** — começa somente depois da ação explícita `persistir-metodo pre-e6` e verifica essa barreira e a validade do portão (`validade-do-portao.sh`) antes de subir a branch. Quem autoriza o push é o `pre-push` do Git, sobre o SHA enviado (DM-184). Nunca força e nunca conserta o lifecycle por trás.
 
 **E7 ABERTURA DO PULL REQUEST** — abre o PR pela ferramenta de linha de comando do serviço de hospedagem, quando existir e estiver autenticada. Ausente, grava a descrição em `PR.md` e informa — nunca falha, nunca pede credencial.
 
 **E8 REGISTRO DA ENTREGA** — é o último escritor do terminal e chama `scripts/persistir-metodo.sh --persistir ... --checkpoint e8`. Fecha **os dois desfechos**: `entregue`, publicando depois o commit pelo mesmo princípio do E6; e `bloqueado`, persistindo sem publicar a branch.
 
+**E9 REVISÃO E MERGE — MANUAL.** Lista os pull requests abertos, ordena do menor para o maior impacto, apresenta o estado de cada um e conduz um PR por vez com confirmação explícita. Nunca resolve conflito. **Só roda por chamada explícita do desenvolvedor.**
+
 ## Lifecycle executável dos artefatos de método
 
-O executor único é `.claude/skills/mergex/scripts/persistir-metodo.sh`. O trabalho vem dos argumentos explícitos conferidos contra `ENTREGA.md`; a branch apenas prova consistência. Os checkpoints são `pre-e2`, `pre-e6` e `e8`, usam a mesma trava C5 do índice e só adicionam paths dirty do catálogo fechado. Commit de método é classe própria, com `Trabalho:` e `Metodo: pre-e2 | pre-e6 | e8`, sem `Task:`; não entra em `ENTREGA.commits`, não consome `seq` e não satisfaz V11.
+O executor único é `.claude/skills/mergex/scripts/persistir-metodo.sh`. O trabalho vem dos argumentos explícitos conferidos contra `ENTREGA.md`; a branch apenas prova consistência. Os checkpoints formam o enum fechado `pre-e2 | reconciliacao-base | pre-e6 | e8`, usam a mesma trava C5 do índice e só adicionam paths dirty do catálogo fechado. Commit de método é classe própria, com `Trabalho:` e `Metodo:` (um dos quatro checkpoints), sem `Task:`; não entra em `ENTREGA.commits`, não consome `seq` e não satisfaz V11.
 
-**E9 REVISÃO E MERGE — MANUAL.** Lista os pull requests abertos, ordena do menor para o maior impacto, apresenta o estado de cada um e conduz um PR por vez com confirmação explícita. Nunca resolve conflito. **Só roda por chamada explícita do desenvolvedor.**
+## Reconciliação de base pós-E8
+
+Quando a base avança **depois** do E8 e a integração exige ajustar arquivos que nasceram ou mudaram na base nova e que nenhuma task declara, o caminho é a reconciliação de base: evento da entrega, não defeito de plano, e **nunca altera task** (DM-178). Depois do merge de integração (classe própria, com `Trabalho:` e `Integra-base:`), `scripts/reconciliacao-base.sh --registrar` prova cada arquivo pelas quatro provas e pelo inventário completo do merge (DM-179), grava `docs/entregas/<trabalho_id>/RECONCILIACAO-BASE-NNN.md`, avança `base_validada_sha` e reabre a entrega com `portao: null`. Segue o checkpoint `reconciliacao-base`, um E2 completo, o E3 com todo reconciliado em OLHO OBRIGATÓRIO (O10, DM-182), e o fluxo até o E8 retomando o PR existente. Base legada é inferida uma única vez, e a inferência ambígua falha fechada (DM-183). Detalhe: `references/11-reconciliacao-base.md`.
 
 ## As três faixas de atenção humana
 
@@ -151,11 +155,20 @@ O `analista-de-conflito` não tem ferramenta de escrita nem de execução: é
 | `branch-limpa` | **bloqueio** | Regra 2 — nunca criar ou trocar branch com alteração pendente |
 | `commit-por-task` | aviso | Regra 3 — um commit por task, concluída e com suíte verde; e nenhum arquivo de **outra** task no commit desta — essa condição barra **mesmo em aviso** |
 | `arquivo-fora-do-plano` | aviso | Regra 4 — nunca commitar arquivo fora da lista declarada |
-| `pr-so-com-portao` | aviso | Regra 6 — sem `PRONTO` no portão, não sobe e não abre PR |
+| `pr-so-com-portao` | aviso | Regra 6 — **consultivo**: aviso antecipado no `git push`; bloqueia só o push que prova inválido e o `--no-verify` reconhecido, e no indeterminado avisa. Não é barreira (DM-184) |
 
 Os de segurança nascem em bloqueio: segredo commitado não tem volta. Os de
 método nascem em aviso e só sobem depois de rodarem sem falso positivo — hook
 que atrapalha é desinstalado, e junto com ele vão os que funcionavam.
+
+Entre as condições de commit, a de task irmã do `commit-por-task` é a única que
+barra mesmo em aviso. O `pr-so-com-portao`, que é consultivo, também sai 2 em qualquer modo, mas só
+nos dois casos provados: o `--no-verify` reconhecido e o push simples que a regra
+do portão prova inválido; no resto, só avisa. Fora dos hooks do Claude, o `pre-push` do Git barra o portão inválido em qualquer modo (DM-184):
+ele é a barreira local autoritativa contra erro normal, e o CI com proteção de
+merge, quando o produto o ativar, é a barreira contra o `--no-verify` e contra o
+contorno pelo nome da branch, nos limites da spec, seção 15.1 (itens 1 e 12)
+(DM-185; `references/12-barreira-de-push.md`).
 
 O modo de cada um vive em `.expx/hooks.json`. Detalhe operacional, os três
 cuidados de desenho e os testes: `.claude/hooks/README.md`.
@@ -217,6 +230,7 @@ docs/entregas/
     QA-PACOTE.md      pacote executável pelo QA, sem ler código
     ATENCAO.md        a classificação das três faixas
     PR.md             a descrição do PR (sempre gravada, mesmo com PR aberto)
+    RECONCILIACAO-BASE-NNN.md   uma por base integrada depois do E8 (kind: reconciliacao_base)
 ```
 
 ## Etapas → arquivos da skill
@@ -236,6 +250,8 @@ Os caminhos são relativos à raiz desta skill. O detalhe operacional de cada et
 | E6 PUSH | `references/06-push.md` | — |
 | E7 ABERTURA DO PR | `references/07-abertura-pr.md` | `assets/TEMPLATE-PR.md` |
 | E8 REGISTRO | `references/08-registro.md` | `assets/TEMPLATE-ENTREGA.md` |
+| reconciliação de base pós-E8 | `references/11-reconciliacao-base.md` | — |
+| barreira de push (E0, E2, E6, E7) | `references/12-barreira-de-push.md` | `assets/pre-push-gerenciado.sh`, `assets/ci/mergex-portao.yml` |
 | E9 REVISÃO (manual) | `references/09-revisao.md` | `assets/TEMPLATE-revisao.md` |
 
 ## Integração com as skills irmãs

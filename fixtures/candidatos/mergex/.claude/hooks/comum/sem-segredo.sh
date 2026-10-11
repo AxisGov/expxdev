@@ -39,7 +39,12 @@ case "$FERRAMENTA" in
     [ -n "$CMD" ] || exit 0
     # Só interessa commit. `git commit -m "..."` carrega a mensagem, e o que
     # está em preparação é o que vai para o histórico.
-    printf '%s' "$CMD" | grep -Eq '(^|[;&|[:space:]])git([[:space:]]+-[^[:space:]]+)*[[:space:]]+commit([[:space:]]|$)' || exit 0
+    # Sem `-q`, de propósito: base.sh liga `pipefail`, e um grep que casa na
+    # primeira linha e sai dá SIGPIPE ao printf quando o comando passa do buffer
+    # do pipe; o pipeline devolvia 141 e este `|| exit 0` pulava a varredura de
+    # `git commit -m x` seguido de 70 KB de linhas — com chave privada em
+    # preparação (rodada extra da revisão). Sem `-q` o grep lê até o fim.
+    printf '%s' "$CMD" | grep -E '(^|[;&|[:space:]])git([[:space:]]+-[^[:space:]]+)*[[:space:]]+commit([[:space:]]|$)' >/dev/null || exit 0
     # A varredura é sobre o que está preparado, não sobre a linha de comando.
     ALVO="$(git -C "$RAIZ" diff --cached 2>/dev/null)"
     # Some a mensagem inline, que também vai para o histórico.
@@ -69,11 +74,15 @@ ACHADOS=""
 achou() {
   # achou <categoria> <regex estendida>
   local cat="$1" re="$2" linha valor
-  linha="$(printf '%s' "$ALVO" | grep -aEn -e "$re" | head -1)" || return 0
+  # O `head -1` sai cedo: com muitas linhas casando, o grep leva SIGPIPE e, sob
+  # `pipefail`, o pipeline devolve 141 — um `|| return 0` aqui diria "sem
+  # segredo" por causa do status. Decide-se pelo conteúdo (a linha), não pelo
+  # status (rodada extra da revisão).
+  linha="$(printf '%s' "$ALVO" | grep -aEn -e "$re" | head -1)"
   [ -n "$linha" ] || return 0
   # Descarta placeholder óbvio: xxx, 000, <coloque>, your-, example, changeme,
   # dummy, fake, sample, redacted, ${VAR}, $VAR, {{marcador}}.
-  printf '%s' "$linha" | grep -aEqi -e '(x{4,}|0{4,}|<[^>]*>|\{\{|\$\{|your[-_]|example|changeme|troque|placeholder|dummy|fake|sample|redacted|test[-_]?key|coloque)' && return 0
+  printf '%s' "$linha" | grep -aEi -e '(x{4,}|0{4,}|<[^>]*>|\{\{|\$\{|your[-_]|example|changeme|troque|placeholder|dummy|fake|sample|redacted|test[-_]?key|coloque)' >/dev/null && return 0
   # Mascara: nunca ecoa o valor (DM-16). Mostra os 4 últimos caracteres.
   valor="$(printf '%s' "$linha" | grep -aEo -e "$re" | head -1)"
   local fim="${valor: -4}"

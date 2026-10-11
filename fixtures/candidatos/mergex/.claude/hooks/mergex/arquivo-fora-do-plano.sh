@@ -16,13 +16,19 @@ PADRAO="aviso"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../comum/base.sh
 . "$DIR/../comum/base.sh"
+# shellcheck source=../comum/integracao-da-mensagem.sh
+. "$DIR/../comum/integracao-da-mensagem.sh"
 
 ENTRADA="$(cat)"
 [ "$(printf '%s' "$ENTRADA" | jq -r '.tool_name // empty' 2>/dev/null)" = "Bash" ] || exit 0
 
 CMD="$(printf '%s' "$ENTRADA" | jq -r '.tool_input.command // empty' 2>/dev/null)"
 [ -n "$CMD" ] || exit 0
-printf '%s' "$CMD" | grep -Eq 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]+commit([[:space:]]|$)' || exit 0
+# Sem `-q`, de propósito: base.sh liga `pipefail`, e um grep que casa na primeira
+# linha e sai dá SIGPIPE ao printf quando o comando passa do buffer do pipe — o
+# pipeline devolvia 141 e este `|| exit 0` pulava o hook (rodada extra da
+# revisão). Sem `-q` o grep lê até o fim, e o status é só dele.
+printf '%s' "$CMD" | grep -E 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]+commit([[:space:]]|$)' >/dev/null || exit 0
 
 CWD="$(printf '%s' "$ENTRADA" | jq -r '.cwd // empty' 2>/dev/null)"
 RAIZ="$(expx_raiz "${CWD:-$PWD}")"
@@ -30,7 +36,27 @@ RAIZ="$(expx_raiz "${CWD:-$PWD}")"
 MODO="$(expx_modo "$HOOK" "$PADRAO" "$RAIZ")"
 [ "$MODO" = "desligado" ] && exit 0
 
-PREP="$(git -C "$RAIZ" diff --cached --name-only 2>/dev/null)"
+# Merge de integração da base: só vale o que a integração muda em relação à
+# base — o resultado preparado contra MERGE_HEAD. O que veio da base inteira não
+# é desvio deste trabalho; o que a resolução acrescenta, é. Isso vale só quando
+# a MENSAGEM do commit é uma integração válida (Integra-base = MERGE_HEAD); um
+# merge qualquer, ou mensagem ilegível, é avaliado como sempre.
+CONTRATO_COMMIT="$DIR/../../skills/mergex/scripts/contrato-de-commit.sh"
+MSG_LIDA=""
+if git -C "$RAIZ" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+  MSG_LIDA="$(integracao_mensagem_do_comando "$CMD")"
+fi
+INT_SEM_CONTRATO=nenhuma
+PREP=""
+if [ -n "$MSG_LIDA" ]; then
+  TRAB_MSG="$(expx_trabalho_atual_por_branch "$RAIZ")" || TRAB_MSG=""
+  integracao_da_mensagem "$MSG_LIDA" "$TRAB_MSG" "$CONTRATO_COMMIT"
+  [ "$INT_CLASSE" = valida ] \
+    && PREP="$(git -C "$RAIZ" diff --cached --name-only MERGE_HEAD 2>/dev/null)"
+  [ "$INT_CLASSE" = valida ] || PREP="$(git -C "$RAIZ" diff --cached --name-only 2>/dev/null)"
+else
+  PREP="$(git -C "$RAIZ" diff --cached --name-only 2>/dev/null)"
+fi
 [ -n "$PREP" ] || exit 0
 
 TASKS_ARQS="$(find "$RAIZ/docs" -name tasks.md -not -path '*/node_modules/*' 2>/dev/null)"
@@ -125,7 +151,7 @@ while IFS= read -r arquivo; do
   [ -n "$arquivo" ] || continue
   eh_artefato_de_metodo "$arquivo" && continue
   eh_historico_global_sprintx "$arquivo" && continue
-  printf '%s\n' "$DECLARADOS" | grep -Fxq "$arquivo" || FORA="$FORA  - $arquivo
+  printf '%s\n' "$DECLARADOS" | grep -Fx "$arquivo" >/dev/null || FORA="$FORA  - $arquivo
 "
 done <<< "$PREP"
 

@@ -20,18 +20,23 @@ ENTRADA="$(cat)"
 CMD="$(printf '%s' "$ENTRADA" | jq -r '.tool_input.command // empty' 2>/dev/null)"
 [ -n "$CMD" ] || exit 0
 
-# Saída antecipada.
-printf '%s' "$CMD" | grep -Eq '(^|[;&|`(){}[:space:]])git([[:space:]]|$)' || exit 0
+# Saída antecipada. Sem `-q`, de propósito — aqui e nos greps abaixo: base.sh
+# liga `pipefail`, e um grep que casa na primeira linha e sai dá SIGPIPE ao
+# printf quando o comando passa do buffer do pipe; o pipeline devolvia 141 e
+# este `|| exit 0` liberava `git switch -c y` seguido de 70 KB de linhas com a
+# árvore suja (rodada extra da revisão). Sem `-q` o grep lê até o fim, e o
+# status é só dele. O critério não muda.
+printf '%s' "$CMD" | grep -E '(^|[;&|`(){}[:space:]])git([[:space:]]|$)' >/dev/null || exit 0
 
 # Só troca ou criação de branch interessa:
 #   git switch <b> | git switch -c <b> | git checkout <b> | git checkout -b <b>
 # `git checkout -- <path>` NÃO é troca de branch (é descarte, assunto do
 # mergex/git-perigoso): o `--` exclui.
 TROCA=0
-if printf '%s' "$CMD" | grep -Eq 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]+switch([[:space:]]|$)'; then
+if printf '%s' "$CMD" | grep -E 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]+switch([[:space:]]|$)' >/dev/null; then
   TROCA=1
-elif printf '%s' "$CMD" | grep -Eq 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]+checkout([[:space:]]|$)'; then
-  printf '%s' "$CMD" | grep -Eq 'checkout[^|;&]*[[:space:]]--([[:space:]]|$)' || TROCA=1
+elif printf '%s' "$CMD" | grep -E 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]+checkout([[:space:]]|$)' >/dev/null; then
+  printf '%s' "$CMD" | grep -E 'checkout[^|;&]*[[:space:]]--([[:space:]]|$)' >/dev/null || TROCA=1
 fi
 [ "$TROCA" = "1" ] || exit 0
 

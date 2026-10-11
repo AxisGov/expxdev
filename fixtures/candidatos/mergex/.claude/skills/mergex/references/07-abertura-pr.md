@@ -10,6 +10,31 @@ A regra que governa esta etapa inteira: **ferramenta ausente não é erro** (reg
 
 - O E6 devolveu `push_feito: true`. Sem push não há o que abrir.
 - `docs/entregas/<trabalho_id>/PR.md` existe (E4).
+- O portão ainda vale para o que foi **publicado** (DM-181, DM-186): a validade roda sobre o **SHA
+  publicado** — a ponta da ref remota da branch, buscada agora —, nunca sobre o `HEAD` do checkout,
+  e essa ponta tem de ser o **SHA enviado no E6**. O SHA enviado no E6 é o `HEAD` que o passo 4 do
+  E6 confirmou igual à ref remota; nada commita entre o E6 e o E7, então ele continua sendo
+  `git rev-parse HEAD`. O remoto e a ref vêm do **upstream da branch** (`@{u}`, o que o E6 gravou
+  com `--set-upstream`), nunca de um `origin` fixo; a busca é **conferida**, porque uma busca que
+  falha deixa a ref remota local com o SHA antigo e a comparação passaria sem ter olhado o remoto;
+  e a divergência **aborta**, não só avisa:
+
+```bash
+upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}')" || exit 1   # ex.: origin/<branch>
+remoto="${upstream%%/*}"; ref_remota="${upstream#*/}"
+git fetch "$remoto" "$ref_remota" || { echo "busca de $upstream falhou: o E7 não abre nem retoma o PR"; exit 1; }
+publicado="$(git rev-parse --verify "refs/remotes/$upstream^{commit}")" || exit 1
+enviado="$(git rev-parse HEAD)"
+[ "$publicado" = "$enviado" ] || { echo "a ponta remota ($publicado) não é o SHA enviado no E6 ($enviado): o E7 não abre nem retoma o PR"; exit 1; }
+bash .claude/skills/mergex/scripts/validade-do-portao.sh --verificar \
+  --entrega docs/entregas/<trabalho_id>/ENTREGA.md --rev "$publicado"
+```
+
+Sem upstream configurado, busca que falha, ponta remota diferente do SHA enviado (alguém empurrou
+na branch depois do E6), ou validade `ok=false`: o E7 **não abre nem retoma o PR**. Relate os dois
+SHAs (ou o erro da busca) e o `motivo` e mande rodar o E2 — e, se a ref avançou, o E6 de novo
+sobre o que o E2 aprovar. Abrir ou retomar o PR sobre uma ponta que não foi a validada seria
+afirmar um portão para código que ele não avaliou. A validade é a mesma que o `pre-push` do Git aplicou ao SHA enviado no E6 — ele é quem decide o push; o hook do Claude `pr-so-com-portao` é consultivo e não abre nem barra PR. O CI com proteção de merge repete a validade sobre o SHA da cabeça do PR quando o produto o ativar; esta skill não o ativa (`references/12-barreira-de-push.md`).
 
 Se `push_feito: false` (sem remoto, ou sem versionador), o E7 não roda: siga direto para o E8. `PR.md` fica como o documento da entrega.
 
@@ -61,7 +86,7 @@ Não adicione revisor, etiqueta, marco ou responsável por conta própria: nada 
 
 Qualquer falha — sem permissão, PR já existe, base inválida, rede fora — **não interrompe a entrega**. Vá para o passo 3, registre o erro literal do comando, e siga.
 
-Se a falha for "PR já existe para esta branch", recupere a URL existente (`gh pr view --json url`) e registre-a: é uma retomada, não uma falha.
+Se a falha for "PR já existe para esta branch", recupere a URL existente (`gh pr view --json url`) e registre-a: é uma retomada, não uma falha. É o caso normal depois de uma reconciliação de base (`references/11-reconciliacao-base.md`): o PR existente é retomado, **nunca um segundo PR**.
 
 ## Passo 3 — Quando a ferramenta não está disponível
 
@@ -119,19 +144,24 @@ Na retomada de um PR que já existia ("PR já existe para esta branch"), grave o
 que a ferramenta devolveu — é retomada, não abertura nova.
 
 O procedimento é o de `10-estado.md`: só se `.expx/` existir, preservando os campos das
-outras skills, com gravação em temporário e renomeação. Falha de gravação vai para o rastro
-e **não interrompe o E7**.
+outras skills, com gravação em temporário e renomeação. Falha de gravação é **silenciosa** e
+**não interrompe o E7** — sem linha de rastro, pela lacuna registrada em `10-estado.md`,
+"A lacuna".
 
 ### Grave o evento no rastro
 
 Acrescente uma linha em `docs/eventos/<trabalho_id>.jsonl`:
 
 ```json
-{"ts":"<ISO-8601 UTC>","expx_eventos":1,"trabalho_id":"<id>","ferramenta":"mergex","origem":"skill","evento":"pr_aberto","fase":"e7","task":null,"agente":null,"resultado":"ok","detalhe":"<url do PR>","arquivos":[]}
+{"ts":"<ISO-8601 UTC>","expx_eventos":1,"trabalho_id":"<id>","ferramenta":"mergex","origem":"skill","evento":"pr_aberto","fase":"e7","task":null,"agente":"principal","resultado":"ok","detalhe":"<url do PR>","arquivos":[]}
 ```
 
 É o `pr_aberto` que permite ao painel mostrar o que aguarda revisão e há quanto
 tempo. PR não aberto (ferramenta ausente): não grave `pr_aberto` — não houve.
+
+**`agente` nunca é `null`**: o E7 roda no modelo principal, e o valor é
+`principal`. A chave `task` é que vai `null` aqui — a abertura do PR é do
+trabalho, não de uma task.
 
 ## Critério de saída
 
@@ -152,6 +182,9 @@ Siga para o E8.
 | Comando falhou por permissão | Passo 3, com o erro literal registrado |
 | PR já existe | Recupere a URL e registre; é retomada |
 | Sem push | O E7 não roda; siga para o E8 |
+| Branch sem upstream (`@{u}` não resolve) ou `git fetch` do upstream falhou | O E7 não abre nem retoma o PR; relate o erro literal; a ref remota local não vale como prova do remoto |
+| Ponta da ref remota da branch diferente do SHA enviado no E6 (a ref avançou) | O E7 não abre nem retoma o PR; relate os dois SHAs; o E2 e o E6 de novo |
+| Portão vencido (`validade-do-portao.sh --rev <SHA publicado>` com `ok=false`) | O E7 não roda; relate o `motivo` e mande rodar o E2 |
 | Alguém pediu para forçar a abertura com credencial | Recuse: a skill nunca configura credencial nem armazena segredo |
 | `.expx/` não existe | Segue sem gravar o estado da barra, sem erro e sem aviso; **nunca cria o diretório** |
-| Gravação do `estado.json` falhou | Registra no rastro e segue; o E7 continua OK e o PR continua aberto |
+| Gravação do `estado.json` falhou | Segue **em silêncio**, sem rastro (`10-estado.md`, "A lacuna"); o E7 continua OK e o PR continua aberto |

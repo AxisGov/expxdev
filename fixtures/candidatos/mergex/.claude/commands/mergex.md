@@ -14,14 +14,14 @@ Descubra em que ponto o trabalho está e siga daí:
 
 | Estado | Rode |
 |---|---|
-| O trabalho vai começar | **E0** (`references/00-abertura.md`) — adota a branch e o worktree que a skill de origem já abriu, ou cria a branch quando não existe nenhuma — e devolva o controle para a skill de origem executar as tasks |
+| O trabalho vai começar | **E0** (`references/00-abertura.md`) — adota a branch e o worktree que a skill de origem já abriu, ou cria a branch quando não existe nenhuma; depois do `ENTREGA.md`, ativa o `pre-push` com `ativacao-pre-push.sh --instalar` (falhou: `mergex E0 BLOQUEADO — pre-push`, pare) — e devolva o controle para a skill de origem executar as tasks |
 | Há task concluída sem commit | **E1** (`references/01-commits.md`) para cada uma, na ordem em que fecharam |
 | A execução terminou | **E2 → E8**, nesta ordem |
 
 O fluxo do fim, com checkpoints explícitos:
 
 1. **pre-e2** — ação auditável: `persistir-metodo.sh --persistir ... --checkpoint pre-e2`.
-2. **E2** — chama apenas `persistir-metodo.sh --verificar ... --checkpoint pre-e2` e então roda o portão. `BLOQUEADO` pula E3–E7 e segue ao E8.
+2. **E2** — prova o `pre-push` com `ativacao-pre-push.sh --provar` (falhou: o E2 não começa; fora de um repositório Git a prova é dispensada, pelo Git real), chama apenas `persistir-metodo.sh --verificar ... --checkpoint pre-e2` e então roda o portão; grava o resultado só por `registrar-portao.sh`. `BLOQUEADO` pula E3–E7 e segue ao E8.
 3. **E3 → E5** — atenção, descrição do PR e pacote de QA.
 4. **pre-e6** — ação auditável: `persistir-metodo.sh --persistir ... --checkpoint pre-e6`.
 5. **E6** — chama apenas `persistir-metodo.sh --verificar ... --checkpoint pre-e6` antes do push.

@@ -8,7 +8,7 @@
 # evidência de cada critério. Este script faz as duas coisas que não podem
 # depender de leitura de prosa:
 #
-#   1. aplica a ORDEM — O1..O9, L1..L3, L4, D1..D3, D4, padrão — e para no
+#   1. aplica a ORDEM — O1..O10, L1..L3, L4, D1..D3, D4, padrão — e para no
 #      primeiro que bate. Critério O sempre vence: artefato de método nunca
 #      anula evidência de risco;
 #   2. RECONHECE artefato de método pelo catálogo fechado abaixo. L4 e D4 só
@@ -38,6 +38,15 @@
 #
 #   --base <ref>   base do diff (a mesma do E3); sem ela, D4 do HISTORICO não é provado
 #   --raiz <dir>   raiz do projeto (padrão: a que o versionador informa)
+#   --reconciliados <arquivo>
+#                  um caminho por linha, ou `caminho TAB NNN` (as colunas 2 e 3
+#                  das linhas `coberto` de `reconciliacao-base.sh --verificar`);
+#                  com NNN a justificativa cita RECONCILIACAO-BASE-NNN.md, e
+#                  NNN fora de 3 dígitos falha (rc 66). Todo caminho da lista
+#                  recebe O10 e fica em OLHO OBRIGATÓRIO, qualquer que seja a
+#                  evidência L/D, mesmo ausente da entrada (a linha dele é
+#                  emitida). Correspondência exata; linha vazia é ignorada.
+#                  Lista ausente ou ilegível => falha (rc 66), sem classificar.
 #   --ordem        imprime a ordem dos critérios e sai
 #   --catalogo     imprime o catálogo e sai
 #
@@ -49,7 +58,7 @@ FAIXA_OLHO='OLHO OBRIGATÓRIO'
 FAIXA_LEITURA='LEITURA RÁPIDA'
 FAIXA_DISPENSAVEL='DISPENSÁVEL'
 
-ORDEM='O1 O2 O3 O4 O5 O6 O7 O8 O9 L1 L2 L3 L4 D1 D2 D3 D4 PADRAO'
+ORDEM='O1 O2 O3 O4 O5 O6 O7 O8 O9 O10 L1 L2 L3 L4 D1 D2 D3 D4 PADRAO'
 
 # origem|caminho|kind|critério|função
 #   caminho sem `docs/` na frente é relativo à pasta do trabalho;
@@ -90,15 +99,43 @@ mergex|docs/entregas/<trabalho_id>/ATENCAO.md|-|D4|classificação, regravada pe
 
 BASE_REF=""
 RAIZ=""
+RECONC_ARQ=""
+RECONC=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --ordem)    printf '%s\n' "$ORDEM"; exit 0 ;;
     --catalogo) printf '%s\n' "$CATALOGO"; exit 0 ;;
     --base)     BASE_REF="${2:-}"; shift 2 ;;
     --raiz)     RAIZ="${2:-}"; shift 2 ;;
+    --reconciliados)
+      [ "$#" -ge 2 ] && [ -n "$2" ] || { printf 'classificar-atencao: --reconciliados exige um arquivo\n' >&2; exit 64; }
+      RECONC_ARQ="$2"; shift 2 ;;
     *) printf 'classificar-atencao: opção desconhecida: %s\n' "$1" >&2; exit 64 ;;
   esac
 done
+
+# Lista de reconciliados: falha fechada. Sem ela legível, seguir sem O10 deixaria
+# um arquivo reconciliado cair em faixa menor.
+if [ -n "$RECONC_ARQ" ]; then
+  if [ ! -f "$RECONC_ARQ" ] || [ ! -r "$RECONC_ARQ" ]; then
+    printf 'classificar-atencao: --reconciliados: lista ausente ou ilegível: %s\n' "$RECONC_ARQ" >&2
+    exit 66
+  fi
+  RECONC_RAW="$(tr -d '\r' < "$RECONC_ARQ")" || { # guarda:O10-crlf
+    printf 'classificar-atencao: --reconciliados: falha ao ler a lista: %s\n' "$RECONC_ARQ" >&2; exit 66; }
+  # Linha: <caminho> ou <caminho> TAB <NNN> (3 dígitos); outro formato falha fechado.
+  if ! printf '%s\n' "$RECONC_RAW" | awk -F'\t' 'NF > 2 || (NF == 2 && $2 !~ /^[0-9][0-9][0-9]$/) { exit 1 }'; then
+    printf 'classificar-atencao: --reconciliados: NNN fora do formato de 3 dígitos em %s\n' "$RECONC_ARQ" >&2
+    exit 66
+  fi
+  RECONC="$(printf '%s\n' "$RECONC_RAW" | cut -f1)"
+fi
+
+# Correspondência exata de linha inteira: nunca substring, nunca glob.
+e_reconciliado() { [ -n "$RECONC" ] && printf '%s\n' "$RECONC" | grep -Fxq -e "$1"; } # guarda:O10-exato
+
+# NNN do registro que reconciliou o caminho (vazio se a lista não o informou).
+num_do_registro() { printf '%s\n' "$RECONC_RAW" | P="$1" awk -F'\t' '$1 == ENVIRON["P"] && NF == 2 { print $2; exit }'; }
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_SH="$DIR/../../../hooks/comum/base.sh"
@@ -373,7 +410,7 @@ junta() { if [ -n "$1" ]; then printf '%s; %s' "$1" "$2"; else printf '%s' "$2";
 
 classifica() {
   local caminho="$1"; shift
-  local ev id o="" l="" d="" ignorados=""
+  local ev id nnn o="" l="" d="" ignorados=""
 
   for ev in "$@"; do
     [ -n "$ev" ] || continue
@@ -385,6 +422,14 @@ classifica() {
       *) ignorados="$ignorados $id" ;;   # L4 e D4 só vêm do reconhecedor
     esac
   done
+
+  # O10: arquivo reconciliado da base. Vem da lista, nunca da evidência recebida,
+  # e se junta a qualquer O anterior pelo mesmo padrão dos demais critérios O.
+  if e_reconciliado "$caminho"; then # guarda:O10
+    nnn="$(num_do_registro "$caminho")"
+    if [ -n "$nnn" ]; then o="$(junta "$o" "O10: arquivo reconciliado da base (RECONCILIACAO-BASE-$nnn.md)")"
+    else o="$(junta "$o" 'O10: arquivo reconciliado da base')"; fi
+  fi
 
   local nota=""
   [ -z "$ignorados" ] || nota=" [ignorado:$ignorados — L4 e D4 só vêm do reconhecimento]"
@@ -412,6 +457,7 @@ classifica() {
   printf '%s\t%s\tpadrão: nenhum critério bateu (%s)%s\n' "$caminho" "$FAIXA_OLHO" "$REC_MOTIVO" "$nota"
 }
 
+EMITIDOS=""
 while IFS= read -r entrada || [ -n "$entrada" ]; do
   entrada="$(printf '%s' "$entrada" | tr -d '\r')"
   [ -n "$entrada" ] || continue
@@ -421,5 +467,21 @@ while IFS= read -r entrada || [ -n "$entrada" ]; do
   set -- $entrada
   IFS="$OLDIFS"
   set +f
+  EMITIDOS="$EMITIDOS$1
+"
   classifica "$@"
 done
+
+# Todo reconciliado ausente da entrada sai mesmo assim, em OLHO OBRIGATÓRIO:
+# errar para o lado de mais atenção.
+if [ -n "$RECONC" ]; then
+  while IFS= read -r caminho_rec; do
+    [ -n "$caminho_rec" ] || continue
+    if printf '%s' "$EMITIDOS" | grep -Fxq -e "$caminho_rec"; then continue; fi # guarda:O10-ausentes
+    EMITIDOS="$EMITIDOS$caminho_rec
+"
+    classifica "$caminho_rec"
+  done <<EOF
+$RECONC
+EOF
+fi

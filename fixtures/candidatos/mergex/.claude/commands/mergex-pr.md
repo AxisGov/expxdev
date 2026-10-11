@@ -17,7 +17,7 @@ O pacote de QA (E5) precisa existir antes do push. Se não existir, rode o E5 an
 1. **E4** — `references/04-descricao-pr.md`. Monte a descrição a partir dos artefatos existentes, na ordem definida, e grave `docs/entregas/<trabalho_id>/PR.md` com `assets/TEMPLATE-PR.md`. A descrição **cabe em uma tela**; seção sem insumo é **omitida**, nunca preenchida com texto genérico. A lista de arquivos alterados vai em destaque no topo, completa.
 2. **pre-e6** — depois de E4 e E5, execute `persistir-metodo.sh --persistir ... --checkpoint pre-e6`. É uma ação explícita e auditável; sem mudanças, `noop=true`.
 3. **E6** — `references/06-push.md`. Confirme com `persistir-metodo.sh --verificar ... --checkpoint pre-e6` e só então suba a branch. Nunca forçado, nunca na principal.
-4. **E7** — `references/07-abertura-pr.md`. Detecte a ferramenta do serviço **antes de tentar**. Abra como rascunho quando o pacote de QA ainda não foi aprovado; como pronto para revisão quando já foi.
+4. **E7** — `references/07-abertura-pr.md`. Antes de tentar, busque a ref remota do **upstream da branch** (`@{u}`, nunca um `origin` fixo), **conferindo a busca** (falhou: o E7 não abre nem retoma o PR), e exija que a ponta dela seja o **SHA enviado no E6**; a validade do portão roda sobre esse SHA publicado (`validade-do-portao.sh --verificar ... --rev <SHA publicado>`). Sem upstream, busca falha, ponta diferente ou `ok=false`: o E7 **não abre nem retoma o PR**. Detecte a ferramenta do serviço **antes de tentar**. Abra como rascunho quando o pacote de QA ainda não foi aprovado; como pronto para revisão quando já foi.
 
 ## Regras
 

@@ -31,6 +31,11 @@
 #   ownership-da-task.sh --classificar <raiz> <origem> <trabalho> <T-NN.MM> [arquivo...]
 #       Sem arquivo na linha de comando, lê um caminho por linha da entrada
 #       padrão (`git diff --cached --name-only`, `git status --porcelain`).
+#   ownership-da-task.sh --uniao <raiz> <origem> <trabalho>
+#       A UNIÃO de `cria`+`altera` de todas as tasks do plano corrente, um
+#       caminho por linha, ordenada e sem repetição (consumida pela V9 e pela
+#       reconciliação de base). Mesma resolução de plano do --classificar; plano
+#       ausente ou ilegível → código 1, motivo no stderr. Origem n/a → código 1.
 #   ownership-da-task.sh --situacoes     # o enum fechado, `situacao|descrição`
 #   ownership-da-task.sh --condicao      # o nome da condição estruturada
 #
@@ -238,6 +243,30 @@ EOF
   return 0
 }
 
+# uniao <raiz> <origem> <trabalho> — a união de `cria`+`altera` de TODAS as tasks
+# do plano corrente, um caminho por linha, sem repetição. Mesma resolução de
+# contexto e de plano do `classificar`; a classificação unitária do E1 não muda.
+uniao() {
+  local raiz="$1" origem="$2" trabalho="$3" contexto_rc plano_rc
+
+  contexto "$raiz" "$origem" "$trabalho"; contexto_rc=$?
+  if [ "$contexto_rc" = 2 ]; then
+    ERRO="origem n/a: nao ha plano de tasks para unir"
+    return 1
+  fi
+  [ "$contexto_rc" = 0 ] || return 1
+
+  PLANO="$(plano "$PASTA_TRABALHO")"; plano_rc=$?
+  if [ "$plano_rc" != 0 ]; then
+    ERRO="${PLANO#__ERRO__}"
+    PLANO=""
+    return 1
+  fi
+  [ -n "$PLANO" ] || { ERRO="plano corrente ilegivel: nenhuma task com arquivos declarados em $PASTA_TRABALHO"; return 1; }
+
+  printf '%s\n' "$PLANO" | cut -f2 | LC_ALL=C sort -u
+}
+
 case "${1:-}" in
   --situacoes) printf '%s\n' "$SITUACOES"; exit 0 ;;
   --condicao)  printf '%s\n' "$CONDICAO"; exit 0 ;;
@@ -247,5 +276,11 @@ case "${1:-}" in
     classificar "$@"; rc=$?
     [ "$rc" = 1 ] && { printf 'ownership-da-task: %s\n' "$ERRO" >&2; exit 1; }
     exit "$rc" ;;
+  --uniao)
+    shift
+    [ "$#" -eq 3 ] || { printf 'ownership-da-task: --uniao <raiz> <origem> <trabalho>\n' >&2; exit 64; }
+    uniao "$@"; rc=$?
+    [ "$rc" = 0 ] || { printf 'ownership-da-task: %s\n' "$ERRO" >&2; exit 1; }
+    exit 0 ;;
   *) printf 'ownership-da-task: opção desconhecida: %s\n' "${1:-}" >&2; exit 64 ;;
 esac
