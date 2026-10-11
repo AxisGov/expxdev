@@ -6,7 +6,8 @@
 #
 # O par (arquivo_alterado, suite_executada) e o que da ao painel a linha do
 # tempo do trabalho — e, junto com task_iniciada/task_concluida gravados pela
-# skill, a duracao observada que alimenta a calibracao de estimativa.
+# skill, a duracao observada que entra no HISTORICO.md ao lado do real — fora da
+# calibracao, que agrega o desvio sobre o real (references/08-rastro.md).
 set -uo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -46,11 +47,16 @@ case "$FERRAMENTA" in
           RES="falha"
         elif printf '%s' "$SAIDA" | grep -qE '(^|[[:space:]])(FAILED|FAIL)([[:space:]]|$)'; then
           RES="falha"
+        elif printf '%s' "$SAIDA" | grep -qE '(^|[[:space:]])(\[ERROR\]|BUILD[[:space:]]+FAILURE)([[:space:]]|$)'; then
+          RES="falha"
         fi
-        # 120 bytes, sem partir caractere multibyte no fim: o jsonl tem de continuar
-        # UTF-8 valido (contrato expx-eventos), e `cut -c` nao garante nem uma coisa
-        # nem a outra. Sem subshell, que e um processo a menos no caminho do hook.
-        rastro_corta_utf8_em DETALHE "$CMD" 120
+        # `detalhe` e uma linha pelo contrato. Normalize quebras antes de cortar em 120 BYTES,
+        # sem partir caractere UTF-8 multibyte e sem depender da locale: `cut -c` faria o corte
+        # depender da locale e o repetiria por linha (ver rastro_corta_utf8_em).
+        DETALHE="${CMD//$'\r\n'/ }"
+        DETALHE="${DETALHE//$'\r'/ }"
+        DETALHE="${DETALHE//$'\n'/ }"
+        rastro_corta_utf8_em DETALHE "$DETALHE" 120
         rastro_grava "$RAIZ" suite_executada hook "$RES" "$DETALHE" '[]'
         ;;
     esac

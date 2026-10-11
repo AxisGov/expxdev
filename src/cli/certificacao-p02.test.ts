@@ -9,11 +9,12 @@ import {
   CANDIDATOS,
   fontesCandidatas,
   gitEm,
+  jqVisivelCom,
   larIsolado,
-  novaLinhaDoJq,
   novoProduto,
   pathControlado,
   pathDosHooks,
+  pathDosHooksSemJq,
   rodarExpx,
   rodarHook,
   rodarHookComPayload,
@@ -22,14 +23,16 @@ import {
 } from "../teste/candidatos.js";
 
 /**
- * Certificação P0.2: SprintX 253b592 + MergeX cab6d5f instaladas SÓ pelo
+ * Certificação P0.2: SprintX e0582cd + MergeX cab6d5f instaladas SÓ pelo
  * `expxdev init` real (o binário do `dist/`, num processo novo), a partir dos
  * snapshots fixados em `fixtures/candidatos/`. Nenhum arquivo é copiado,
  * nenhum settings ou hooks.json é montado à mão: o que está no produto é o que
  * o `init` escreveu.
  *
- * `253b592` é o commit BASE do snapshot da SprintX: o que está propagado por cima
- * dele está em `fixtures/candidatos/sprintx.PROPAGACOES.md`.
+ * `e0582cd` é o merge do PR AxisGov/sprintx#13 na `main` da SprintX, e descende
+ * tanto da antiga base `253b592` quanto de `1c629ea`: o corte UTF-8 que antes era
+ * propagado à mão por cima do snapshot está AGORA no próprio commit. Os dois
+ * snapshots são o commit, byte a byte — não há mais propagação a reaplicar.
  */
 
 type Json = Record<string, any>;
@@ -63,6 +66,34 @@ function produto(): string {
 
 function json(caminho: string): Json {
   return JSON.parse(readFileSync(caminho, "utf8")) as Json;
+}
+
+/** O rastro em que o `rastro-post.sh` grava quando a sessão não reivindica trabalho. */
+const RASTRO = "docs/eventos/sem-trabalho.jsonl";
+
+/**
+ * Entrega ao `rastro-post.sh` INSTALADO (pelo comando registrado no settings que
+ * o `init` escreveu) o PostToolUse de um comando de suíte, e devolve o evento
+ * `suite_executada` que ele gravou no jsonl.
+ *
+ * A leitura do jsonl é em UTF-8 ESTRITO: byte inválido lança aqui, como lança em
+ * consumidor estrito. O painel atual não lança — ele troca por U+FFFD.
+ */
+function eventoDaSuite(p: string, comando: string, resposta: string, path?: string): Json {
+  rmSync(join(p, RASTRO), { force: true });
+  const r = rodarHookComPayload(
+    p,
+    "rastro-post.sh",
+    { hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: comando }, tool_response: resposta, cwd: p },
+    path ?? pathDosHooks(),
+  );
+  expect(r.status, r.stderr).toBe(0);
+  const texto = new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(join(p, RASTRO)));
+  const linhas = texto.split("\n").filter((l) => l.trim() !== "");
+  expect(linhas).toHaveLength(1);
+  const evento = JSON.parse(linhas[0] as string) as Json;
+  expect(evento["evento"]).toBe("suite_executada");
+  return evento;
 }
 
 /** Todos os hooks do settings como (evento, matcher, definição). */
@@ -348,7 +379,6 @@ describe("P0.2 — o rastro do hook instalado é UTF-8 válido no corte do detal
    * A regressão observada em campo é `largura=2, k=1`: byte-líder `0xc3` de um
    * `ã` pendurado sozinho no fim do `detalhe`.
    */
-  const RASTRO = "docs/eventos/sem-trabalho.jsonl";
   let P = "";
 
   beforeAll(() => {
@@ -362,32 +392,15 @@ describe("P0.2 — o rastro do hook instalado é UTF-8 válido no corte do detal
     return `npm test -- ${"x".repeat(120 - k - 12)}`;
   }
 
-  /** Entrega ao hook real o PostToolUse de um comando de suíte e devolve o `detalhe` gravado. */
-  function detalheDaSuite(comando: string): string {
-    rmSync(join(P, RASTRO), { force: true });
-    const r = rodarHookComPayload(P, "rastro-post.sh", {
-      hook_event_name: "PostToolUse",
-      tool_name: "Bash",
-      tool_input: { command: comando },
-      tool_response: "Test Files  1 passed (1)",
-      cwd: P,
-    });
-    expect(r.status, r.stderr).toBe(0);
-    // Leitura em UTF-8 ESTRITO: byte inválido no jsonl lança aqui, como lança em
-    // consumidores estritos. O painel atual não lança — ele troca por U+FFFD.
-    const texto = new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(join(P, RASTRO)));
-    const linhas = texto.split("\n").filter((l) => l.trim() !== "");
-    expect(linhas).toHaveLength(1);
-    const evento = JSON.parse(linhas[0] as string) as Json;
-    expect(evento["evento"]).toBe("suite_executada");
-    return evento["detalhe"] as string;
+  function detalheDaSuite(comando: string, path?: string): string {
+    return eventoDaSuite(P, comando, "Test Files  1 passed (1)", path)["detalhe"] as string;
   }
 
   /** Uma fronteira da tabela: corte depois de `k` bytes de um caractere de `largura` bytes. */
-  function fronteira(char: string, largura: number, k: number): void {
+  function fronteira(char: string, largura: number, k: number, path?: string): void {
     const prefixo = prefixoDe(k);
     const esperado = k === largura ? `${prefixo}${char}` : prefixo;
-    const detalhe = detalheDaSuite(`${prefixo}${char.repeat(3)}`);
+    const detalhe = detalheDaSuite(`${prefixo}${char.repeat(3)}`, path);
     expect(detalhe).toBe(esperado);
     expect(Buffer.byteLength(detalhe, "utf8")).toBeLessThanOrEqual(120);
   }
@@ -417,30 +430,80 @@ describe("P0.2 — o rastro do hook instalado é UTF-8 válido no corte do detal
     fronteira("Z", 1, 1);
   });
 
-  it("funcional: comando de várias linhas é cortado como um texto só, não linha por linha", () => {
+  it("funcional: comando de várias linhas vira UMA linha no detalhe, e ainda cabe em 120 bytes", () => {
     // O `cut -c1-120` do defeito era orientado a LINHA: num comando multilinha ele
-    // cortava cada linha em 120 e devolvia todas, e o `detalhe` passava longe do
-    // limite. É a forma exata do registro corrompido observado em campo, onde o
-    // corte caiu no meio de um `ã` na 64ª linha de um heredoc.
+    // cortava cada linha em 120 e devolvia TODAS, e o `detalhe` passava longe do
+    // limite — e ainda ficava multilinha. É a forma exata do registro corrompido
+    // observado em campo, onde o corte caiu no meio de um `ã` na 64ª linha de um
+    // heredoc.
     //
-    // O comando ENTRA com LF, que é o que o agente escreve e o que o harness
-    // entrega. O que o hook corta é o que o jq devolveu, e o jq materializa esse
-    // LF conforme a plataforma: CRLF no Windows, LF em POSIX. O contrato do
-    // `detalhe` é byte (120) e UTF-8 válido; ele não escolhe representação de
-    // quebra de linha, e fixar LF no esperado reprovaria o Windows por uma regra
-    // que o contrato não tem. Por isso o esperado nasce da medição do jq — nunca
-    // do que o hook devolveu — e a comparação segue exata, byte a byte.
-    const nl = novaLinhaDoJq();
-    const enchimento = "x".repeat(120 - "npm test -- ".length - nl.length - 1);
-    const comando = `npm test -- \n${enchimento}`;
-    const esperado = `npm test -- ${nl}${enchimento}`;
-    // 119 bytes nas duas plataformas: o byte 120 é o byte-líder do `á` seguinte,
-    // e a sequência incompleta sai inteira. Um corte por LINHA devolveria as duas
-    // linhas — os 125 bytes do comando — e morreria aqui.
+    // `detalhe` é UMA linha pelo contrato: o hook normaliza CRLF, CR e LF para um
+    // espaço ANTES de cortar. Por isso o esperado é o mesmo nas duas plataformas,
+    // sem medir o jq: o LF que o jq materializa como CRLF no Windows e LF em POSIX
+    // some igual nos dois, virando um espaço só.
+    const prefixo = "npm test -- ";
+    // 12 (prefixo) + 1 (o LF virado espaço) + 106 = 119 bytes: o byte 120 é o
+    // byte-líder do `á` seguinte, e a sequência incompleta sai inteira.
+    const enchimento = "x".repeat(120 - prefixo.length - 1 - 1);
+    const esperado = `${prefixo} ${enchimento}`;
     expect(Buffer.byteLength(esperado, "utf8")).toBe(119);
-    const detalhe = detalheDaSuite(`${comando}${"á".repeat(3)}`);
+    const detalhe = detalheDaSuite(`${prefixo}\n${enchimento}${"á".repeat(3)}`);
     expect(detalhe).toBe(esperado);
+    expect(detalhe).not.toMatch(/[\r\n]/);
     expect(Buffer.byteLength(detalhe, "utf8")).toBe(119);
+  });
+
+  it("funcional: SEM jq no PATH do hook, o corte de 120 bytes continua sem sequência partida", () => {
+    // O fallback sem jq é contrato (`rastro_json_get`, `rastro_tool_input_get`): o
+    // hook roda em PostToolUse e não pode exigir jq para gravar o rastro. O corte
+    // é feito pelo bash, sem processo, então ele NÃO deveria depender do jq — e é
+    // isso que esta prova fixa, porque "não deveria" não é prova.
+    //
+    // A ausência do jq é afirmativa, não inferida da montagem do PATH: quem
+    // responde é o mesmo `command -v jq` que o hook usa para decidir.
+    const semJq = pathDosHooksSemJq();
+    expect(jqVisivelCom(semJq)).toBe("");
+    // Controle: o resto do ferramental do fallback ESTÁ lá. Sem isto, um hook que
+    // falhasse por falta de `grep` passaria por "fallback funcionando".
+    expect(jqVisivelCom(pathDosHooks())).not.toBe("");
+    // `largura=2, k=1` é a regressão observada em campo: o byte-líder `0xc3` de um
+    // `ã` pendurado sozinho no fim do `detalhe`.
+    fronteira("á", 2, 1, semJq);
+    fronteira("á", 2, 2, semJq);
+    fronteira("🚀", 4, 3, semJq);
+  });
+});
+
+describe("P0.2 — o resultado da suíte que o hook instalado grava", () => {
+  /**
+   * `suite_executada.resultado` é o que o painel lê para dizer se a suíte passou.
+   * Cada família de suíte anuncia a falha com o seu vocabulário, e o Maven é o
+   * caso que não usa nenhuma das palavras das outras: ele falha com `[ERROR]` nas
+   * linhas e com `BUILD FAILURE` no fim, nunca com `FAILED`, `FAIL` ou
+   * `N failed`. Sem reconhecer esses dois, uma suíte Maven vermelha entrava no
+   * rastro como `ok` — falso verde no painel.
+   */
+  let P = "";
+
+  beforeAll(() => {
+    P = produto();
+    expect(init(P, "sprintx,mergex").status).toBe(0);
+  }, 300000);
+
+  function resultado(resposta: string): string {
+    return eventoDaSuite(P, "mvn test", resposta)["resultado"] as string;
+  }
+
+  it("funcional: Maven com [ERROR] na saída é gravado como falha", () => {
+    expect(resultado("[ERROR] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0")).toBe("falha");
+  });
+
+  it("funcional: Maven com BUILD FAILURE é gravado como falha", () => {
+    expect(resultado("[INFO] ------------------------------------\n[INFO] BUILD FAILURE\n[INFO] ----")).toBe("falha");
+  });
+
+  it("funcional: controle — Maven verde (BUILD SUCCESS) continua ok", () => {
+    expect(resultado("[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0\n[INFO] BUILD SUCCESS")).toBe("ok");
   });
 });
 

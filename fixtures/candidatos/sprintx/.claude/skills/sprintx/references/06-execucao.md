@@ -67,7 +67,13 @@ recente. Se ele foi gravado por outra sessão e não há `task_concluida`/`task_
 depois, a task está reivindicada — não a abra. Pule para a próxima paralelizável cujas
 dependências estão satisfeitas; sem nenhuma, registre um bloqueio `task_reivindicada`.
 
-1. Marque `status: em_andamento` em `tasks.md` e grave `task_iniciada` no rastro (`references/08-rastro.md`). Grave `task: T-NN.MM` em `.expx/estado.json` (`references/09-estado.md`).
+1. Marque `status: em_andamento` em `tasks.md` e reivindique a task no rastro — **antes da primeira edição de teste ou de produto**, pelo escritor (`references/08-rastro.md`, "Como gravar"):
+
+   ```bash
+   bash <raiz-da-skill>/scripts/rastro.sh task-iniciada <slug> <T-NN.MM>
+   ```
+
+   O escritor grava `task_iniciada` com a identidade desta sessão, que ele mesmo deriva; é ela que faz o hook `escopo-da-task` aceitar as edições da task. Você não informa sessão nem harness, não copia identidade de mensagem nenhuma e não monta a linha à mão. Código diferente de `0`: nada foi gravado — siga a tabela de respostas de `references/08-rastro.md`. Grave `task: T-NN.MM` em `.expx/estado.json` (`references/09-estado.md`).
 
    **Passo 2.0 — obrigação de `fraco:teste`, antes de qualquer código de produto.** Liste as
    obrigações que a última F5 deixou:
@@ -101,7 +107,7 @@ dependências estão satisfeitas; sem nenhuma, registre um bloqueio `task_reivin
 4. Assuma os três papéis do ORQUESTRADOR, em sequência: implementador (passos 2–3), revisor de testes, auditor de aceite (o `criterio_aceite` é verdade agora? verifique de fato, não presuma).
 
    **O papel de revisor de testes é do agente `revisor-testes`, quando ele existir neste harness.** Acione-o sobre a task que está fechando: ele lê os testes e responde no formato determinístico (`T-NN.MM | solido`, ou `T-NN.MM | fraco | <tipo> | <cláusula> | <implementação errada>`). Passe a ele também as implementações erradas que a última F5 registrou como `[fraco:teste]` para esta task (`obrigacoes-f6`): além do julgamento normal, ele confere que **cada uma delas é discriminada** pelo teste escrito. **A task não conclui se alguma delas continuar passando.** Um `fraco` significa que o teste passaria com a implementação errada — e teste fraco é pior que teste ausente, porque produz suíte verde e falsa confiança. Task com teste `fraco` NÃO fecha: corrija o teste até ele discriminar, e só então siga. Sem o agente disponível, faça você mesma a pergunta, com o mesmo rigor.
-5. Só então marque `status: concluida` em `tasks.md` e grave `task_concluida` no rastro, acrescentando na linha da task: data (obtenha com `date +%Y-%m-%d` do sistema) e resultado da suíte (ex.: `2026-08-26 · suíte: 42 passed, 0 failed`). Em seguida grave em `.expx/estado.json` (`references/09-estado.md`) o novo `tasks_concluidas` e o campo `task`: o id da próxima task que você vai abrir, ou `null` se não houver próxima.
+5. Só então marque `status: concluida` em `tasks.md` e grave `task_concluida` no rastro pelo escritor — `bash <raiz-da-skill>/scripts/rastro.sh task-concluida <slug> <T-NN.MM> "<resultado da suíte>" <arquivos da task>` —, acrescentando na linha da task: data (obtenha com `date +%Y-%m-%d` do sistema) e resultado da suíte (ex.: `2026-08-26 · suíte: 42 passed, 0 failed`). Em seguida grave em `.expx/estado.json` (`references/09-estado.md`) o novo `tasks_concluidas` e o campo `task`: o id da próxima task que você vai abrir, ou `null` se não houver próxima.
 6. **Registre o esforço real da task**, em horas de trabalho focado, na mesma linha (ex.: `2026-08-26 · suíte: 42 passed, 0 failed · real: 3,5 h`). O real cobre o que a task de fato custou — escrever os dois testes, implementar, rodar a suíte e verificar o critério de aceite — e NÃO inclui reunião, revisão de código, deploy nem ida e volta com o cliente. Isso alimenta a calibração das estimativas futuras (ver "Passo 4"); anote no momento de concluir, não reconstrua de memória no fim do trabalho.
 7. Critério de aceite não atendido ou teste não passando: a task NÃO é concluída. Não existe "concluído com ressalva".
 8. **Atualize a cor daquele nó no diagrama**, quando a sprint tiver diagrama. **Sprint condensada (`tasks.md` com `kind: plano`) não tem `fases.md` e não tem diagrama** — a F3 só gera o bloco Mermaid quando grava `fases.md`. Nesse caso pule este passo inteiro, **sem registrar aviso**: não há diagrama ausente, há um formato que não usa diagrama. Tendo `fases.md`: troque a classe na linha `class` do nó da task, e nada mais (`concluida`, `em_andamento` ou `bloqueada`, conforme `references/09-diagrama.md`). Não recalcule o caminho crítico, não reordene, não reescreva o bloco — durante a execução a estrutura do grafo não muda, só a cor. Se a atualização falhar, ou se `fases.md` não tiver bloco Mermaid (plano de uma versão anterior da skill), registre no rastro com `resultado: aviso` e siga: o diagrama é derivado e **nunca** impede uma task de fechar.
@@ -165,7 +171,7 @@ Surgiu algo que impede a task de seguir. **O caminho que te trouxe aqui fixa a c
    ```
 
    Ele grava o item no frontmatter `kind: bloqueios` de `00-BLOQUEIOS.md` (`id`, `task`, `classe`, `aberto_em` com a data do sistema, `resolvido_em: null`, `descricao`), a linha `B-NN | task | descrição do bloqueio | o que destravaria` da prosa e `atualizado_em`. Classe vazia ou fora do enum: código `4`, nada gravado — escolha a linha da tabela e registre de novo. Arquivo antigo sem frontmatter: migre o frontmatter antes (`references/00-schema.md`, regra de migração — sem inventar classe para os B-NN antigos). `task` é `null` só quando o bloqueio não é de uma task (portão da sprint).
-2. Marque a task como `status: bloqueada` em `tasks.md` e grave `task_bloqueada` no rastro, e grave `bloqueios` em `.expx/estado.json` com a nova contagem de bloqueios **abertos** (`references/09-estado.md`). Um bloqueio resolvido depois diminui essa contagem, na mesma gravação em que `resolvido_em` deixa de ser `null`; a `classe` dele não muda. A task muda para `bloqueada` no frontmatter e na prosa de `tasks.md`.
+2. Marque a task como `status: bloqueada` em `tasks.md` e grave `task_bloqueada` no rastro pelo escritor — `bash <raiz-da-skill>/scripts/rastro.sh task-bloqueada <slug> <T-NN.MM> "<B-NN>"` —, e grave `bloqueios` em `.expx/estado.json` com a nova contagem de bloqueios **abertos** (`references/09-estado.md`). Um bloqueio resolvido depois diminui essa contagem, na mesma gravação em que `resolvido_em` deixa de ser `null`; a `classe` dele não muda. A task muda para `bloqueada` no frontmatter e na prosa de `tasks.md`.
 3. **Classe `defeito_de_plano`: devolva o plano ao planejamento agora**, sem abrir task nova e sem esperar o fim das outras — continuar executando sobre um plano que já se sabe errado só produz mais trabalho para desfazer. Com o B-NN registrado (passo 1) e a task gravada como `bloqueada` (passo 2):
 
    ```bash
@@ -247,15 +253,18 @@ nunca é trabalho desta skill na F6 — a única exceção são os checkpoints d
 terminam antes dela (`references/02-descoberta.md`). Um `HISTORICO.md` não rastreado ao fim de uma execução standalone
 é o resultado esperado, não uma pendência.
 
-Uma entrada por task **concluída**, com: `trabalho_id`, `task_id`, `tipo_task`, `area`, `sinais`, `estimado_min`, `estimado_max`, `estimado_media`, `real` e `desvio`. Task `bloqueada` não entra — ela não tem real completo a registrar.
+Uma entrada por task **concluída**, com: `trabalho_id`, `task_id`, `tipo_task`, `area`, `sinais`, `estimado_min`, `estimado_max`, `estimado_media`, `real`, `desvio` e `duracao_observada`. Task `bloqueada` não entra — ela não tem real completo a registrar.
 
 **O desvio.** Se `docs/sprintx/features/<slug>/00-ESTIMATIVA.md` existe, cada entrada traz o estimado daquela task e o desvio entre estimado e real:
 
 ```
-desvio_task = real / estimado_media          # estimado_media = (o + 4m + p) / 6
+desvio_calibracao_task = arredonda( real / estimado_media )   # estimado_media = (o + 4m + p) / 6
+arredonda(x)           = duas casas decimais, meio para cima (half-up)
 ```
 
-`1,0` é o alvo; `1,4` significa que levou 40% a mais que o previsto.
+`1,00` é o alvo; `1,40` significa que levou 40% a mais que o previsto.
+
+**Precisão e desempate (DS-160).** São **duas casas decimais**, com desempate **half-up**: terceira casa exatamente `5`, a segunda sobe. A razão `1,125` vira `1,13`, nunca `1,12`. As duas casas são **fixas**: a razão `1,2` grava-se `1.20` no YAML e escreve-se `1,20` na prosa — nunca `1.2`. O arredondamento tem **estágio**: cada `desvio` é arredondado **antes** de ser persistido, e é o valor persistido que a calibração agrega. Sem a precisão fixa, dois executores honestos gravam números diferentes do mesmo histórico, e a unicidade do agregador (DS-37) não basta para fechar a conta.
 
 **A duração observada, vinda do rastro.** O rastro registra o instante de `task_iniciada` e de `task_concluida`, o que dá a duração de cada task **sem ninguém anotar nada** (`references/08-rastro.md`). Use-a para conferir o `real` que você anotou no Passo 2 — mas **não a confunda com esforço**:
 
@@ -263,11 +272,13 @@ desvio_task = real / estimado_media          # estimado_media = (o + 4m + p) / 6
 
 Por isso a duração vinda do rastro entra no `HISTORICO.md` como `duracao_observada`, um campo distinto de `real`, e **nunca a substitui**. Quando as duas divergirem muito, vale o `real` — e a divergência é, ela própria, um sinal de que a task teve interrupção.
 
-Pela mesma razão, a calibração usa **mediana**, não média: um único intervalo com pausa no meio distorce uma média e quase não move uma mediana.
+Pela mesma razão, a `duracao_observada` **não entra na calibração** — e, por não alimentá-la, **não escolhe o agregador** dela. O que a calibração agrega é o `desvio_calibracao_task`, nunca o `desvio_padrao_task` — razão adimensional, não dispersão em horas —, calculado sobre o `real` anotado por quem executou, que já deixa pausa, reunião e espera de fora: a pausa que distorceria uma média de tempo de parede não chega ao número que calibra, porque tempo de parede não entra nele. Por isso o agregado por tipo é a **média** dos `desvio_calibracao_task`, nunca a mediana.
 
 Se a F3.5 não rodou (não existe `00-ESTIMATIVA.md`), registre o real mesmo assim, com `estimado_min`, `estimado_max`, `estimado_media` e `desvio` em `null`: o real continua alimentando a comparabilidade por tipo e área nas estimativas futuras.
 
-**Recalcule a tabela de calibração por tipo** ao acrescentar as entradas: para cada `tipo_task`, `desvio_medio` é a média dos `desvio_task` de todas as entradas encerradas daquele tipo, e `fator_ativo` é `true` a partir de 3 entradas. Esse desvio é o que vira fator de correção nas estimativas seguintes — e ele é sempre declarado na saída da estimativa, nunca embutido em silêncio (`references/07-estimativa.md`).
+**Recalcule a tabela de calibração por tipo** ao acrescentar as entradas. A calibração agrega somente **entrada calibrável** (DS-164), a entrada encerrada cujo `desvio` persistido é número: para cada `tipo_task`, `entradas` conta somente as entradas daquele tipo com `desvio` numérico (não nulo), e `desvio_medio` é a média somente dessas entradas elegíveis — os `desvio_calibracao_task` **já persistidos**, a chave `desvio` como ela está gravada, nunca a média das razões brutas —, **arredondada de novo** a duas casas com half-up. O divisor é o número de entradas elegíveis, e cada entrada com `desvio: null` fica fora dele — nunca como zero. E `fator_ativo` é `true` com **3 ou mais entradas elegíveis** daquele tipo; com 1 ou 2, o item do tipo existe na `calibracao` com `fator_ativo: false`. Exemplo: `desvio` persistidos `1.13`, `1.13`, `1.17` e `1.20` dão média `1,1575`, que se grava `desvio_medio: 1.16` com `entradas: 4`; acrescentar três entradas do mesmo tipo com `desvio: null` não muda nem o contador nem a média. Esse desvio é o que vira fator de correção nas estimativas seguintes — e ele é sempre declarado na saída da estimativa, nunca embutido em silêncio (`references/07-estimativa.md`).
+
+**Calibração vazia tem forma própria.** Se o recálculo não encontrar **nenhuma entrada elegível** em tipo nenhum — o caso do primeiro trabalho do projeto, e de todo trabalho que rodou sem a F3.5, em que `desvio` é `null` em cada entrada —, grave `calibracao: []` e a tabela `Calibração por tipo de task` **só com cabeçalho e separador, sem nenhuma linha de dados**. Uma linha de dados por item de `calibracao`, e nenhuma linha fabricada para a tabela não ficar vazia: `—` é a regra de célula ausente de uma linha real (`assets/TEMPLATE-HISTORICO.md`), e `| — | — | — | — |` declara um `tipo_task` fora do enum — tabela sem linha de dados é o que diz a verdade sobre `calibracao: []`.
 
 Se houve estimativa, inclua no relatório final (Passo 4) uma linha por sprint com estimado × real e o desvio, para que a divergência fique visível junto com as demais.
 
@@ -378,7 +389,7 @@ quais módulos ele declara — é assim que o usuário sabe que a feature entrou
 - [ ] Se o trabalho inteiro foi entregue, `ORQUESTRADOR.md` teve `estagio`, `status`, `concluido_em` e `atualizado_em` reescritos; sprints e fases concluídas tiveram `status` atualizado onde o formato daquela sprint o guarda — `sprint.md` e `fases.md` nos três arquivos, `sprint.status` e `fases[].status` do `tasks.md` no condensado.
 - [ ] Toda task concluída tem o esforço real registrado em `tasks.md`.
 - [ ] Toda task que chegou da F5 com `[fraco:teste]` teve o teste endurecido e vermelho pelo motivo esperado antes do primeiro código de produto, e o `revisor-testes` confirmou que cada implementação errada registrada é discriminada — ou a task está `bloqueada` sem implementação.
-- [ ] `docs/sprintx/estimativas/HISTORICO.md` recebeu uma entrada por task concluída, com o desvio calculado (ou `null` quando não houve estimativa), e a tabela de calibração por tipo foi recalculada.
+- [ ] `docs/sprintx/estimativas/HISTORICO.md` recebeu uma entrada por task concluída, com o desvio calculado (ou `null` quando não houve estimativa), e a tabela de calibração por tipo foi recalculada — com uma linha de dados por item de `calibracao`, ou apenas cabeçalho e separador quando `calibracao` é `[]`.
 - [ ] `ORQUESTRADOR.md` teve `arquivos_alterados` agregado (união sem repetição dos `arquivos` das tasks concluídas) e `modulo_afetado` conferido contra o que a execução de fato tocou.
 - [ ] `FECHAMENTO.md` existe em `docs/sprintx/features/<slug>/` com frontmatter `kind: fechamento` válido e a prosa correspondente abaixo dele.
 - [ ] Relatório final entregue com as 4 seções — 5 quando a `mergex` estiver instalada, com a seção **Entrega**.

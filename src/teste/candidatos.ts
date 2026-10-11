@@ -18,11 +18,11 @@ export const RAIZ_DO_REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..
 export const BINARIO = join(RAIZ_DO_REPO, "dist", "cli", "expx-bin.js");
 
 /**
- * As candidatas fixadas. `sha` é o commit BASE do snapshot — a SprintX tem correção
- * propagada por cima dele, registrada em `fixtures/candidatos/sprintx.PROPAGACOES.md`.
+ * As candidatas fixadas. `sha` é o commit do snapshot, e nada é propagado por cima
+ * dele: cada snapshot é o commit, byte a byte.
  */
 export const CANDIDATOS = {
-  sprintx: { pasta: "SprintX", sha: "253b59233e6d7a225a05f011cf52668b708e448b" },
+  sprintx: { pasta: "SprintX", sha: "e0582cdf31601ca1970ee49177e2878207bb4b87" },
   mergex: { pasta: "MergeX", sha: "cab6d5f13807a50f65abaa359238868c56933077" },
 } as const;
 
@@ -233,31 +233,58 @@ export function larIsolado(): { lar: string; env: Record<string, string> } {
   };
 }
 
-/**
- * Como o `jq` dos hooks MATERIALIZA, no stdout, o `\n` de dentro de uma string
- * JSON: `\r\n` no Windows — onde o stdout do jq abre em modo texto e a CRT
- * traduz cada LF — e `\n` em POSIX.
- *
- * Quem corta o `detalhe` não vê o payload: vê o comando já decodificado pelo jq.
- * É aqui, e não no hook, que a representação da quebra de linha é decidida — por
- * isso a medição é feita no próprio jq. Um teste que perguntasse ao hook qual
- * quebra esperar seria o hook se auditando.
- */
-export function novaLinhaDoJq(): string {
-  const r = spawnSync(obrigatorio("jq"), ["-r", ".n"], {
-    input: Buffer.from(JSON.stringify({ n: "a\nb" }), "utf8"),
-    encoding: "utf8",
-    timeout: 60000,
-  });
-  const m = /^a(\r?\n)b/.exec(r.stdout ?? "");
-  if (m === null) throw new Error(`jq nao devolveu 'a<quebra>b': ${JSON.stringify(r.stdout)}`);
-  return m[1] as string;
-}
-
 /** O PATH em que os hooks instalados rodam: o do processo, com jq garantido. */
 export function pathDosHooks(): string {
   const jq = obrigatorio("jq");
   return [dirname(jq), process.env["PATH"] ?? process.env["Path"] ?? ""].join(delimiter);
+}
+
+/**
+ * Os externos que os hooks do rastro usam quando NÃO há jq — o caminho de
+ * fallback do contrato (`rastro_json_get`, `rastro_tool_input_get`) e o que
+ * `rastro_grava` precisa para escrever o jsonl. `bash` entra porque o hook é
+ * executado pelo próprio shebang (`#!/usr/bin/env bash`), que resolve `bash`
+ * no PATH.
+ *
+ * A lista é NOMEADA de propósito: ferramenta que falte reprova alto, em vez de
+ * fazer o hook cair calado num resultado que pareceria o do fallback.
+ */
+const EXTERNOS_DOS_HOOKS = [
+  "bash", "git", "grep", "sed", "head", "tail", "awk", "sort",
+  "mkdir", "date", "mv", "wc", "tr", "cut", "od", "ps", "cat", "dirname",
+] as const;
+
+/**
+ * Um PATH para os hooks instalados em que o jq NÃO existe.
+ *
+ * Filtrar o PATH do processo não serve: o jq mora junto do `grep`, do `sed` e
+ * do `date` (`/usr/bin`), e tirar a pasta tiraria também eles — o hook falharia
+ * por falta de ferramenta em vez de exercitar o fallback sem jq. Aqui a pasta é
+ * montada por adição, com links só para o que está declarado acima.
+ *
+ * No Windows link exige privilégio: ali o PATH controlado do `init` já é, por
+ * construção, as pastas da instalação do Git CONFERIDAS sem jq — e são elas que
+ * trazem o mesmo conjunto POSIX.
+ */
+export function pathDosHooksSemJq(): string {
+  if (ehWindows) return pathControlado(false);
+  const bin = mkdtempSync(join(tmpdir(), "expx-sem-jq-"));
+  for (const nome of EXTERNOS_DOS_HOOKS) symlinkSync(obrigatorio(nome), join(bin, nome));
+  return bin;
+}
+
+/**
+ * O `jq` que um processo com este PATH vê, pelo mesmo `command -v` que os hooks
+ * usam para decidir. Vazio quando não há — e é isso que torna a ausência do jq
+ * uma garantia AFIRMATIVA, e não inferida da montagem do PATH.
+ */
+export function jqVisivelCom(path: string): string {
+  const r = spawnSync(bashDosHooks(), ["-c", "command -v jq || true"], {
+    encoding: "utf8",
+    env: ambienteCom(path),
+    timeout: 60000,
+  });
+  return (r.stdout ?? "").trim();
 }
 
 /** Roda o `expxdev` REAL (o `dist/`) num processo novo. */
@@ -290,12 +317,17 @@ export function comandoRegistrado(produto: string, script: string): string {
  * no stdin. O payload vai em UTF-8, que é o que o harness entrega: hook que corta
  * texto precisa receber os mesmos bytes que receberia em uso.
  */
-export function rodarHookComPayload(produto: string, script: string, payload: unknown): SpawnSyncReturns<string> {
+export function rodarHookComPayload(
+  produto: string,
+  script: string,
+  payload: unknown,
+  path: string = pathDosHooks(),
+): SpawnSyncReturns<string> {
   return spawnSync(bashDosHooks(), ["-c", comandoRegistrado(produto, script)], {
     cwd: produto,
     input: Buffer.from(JSON.stringify(payload), "utf8"),
     encoding: "utf8",
-    env: ambienteCom(pathDosHooks(), { CLAUDE_PROJECT_DIR: produto }),
+    env: ambienteCom(path, { CLAUDE_PROJECT_DIR: produto }),
     timeout: 60000,
   });
 }
