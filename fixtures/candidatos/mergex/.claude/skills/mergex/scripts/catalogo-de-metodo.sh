@@ -204,7 +204,7 @@ catalogo_metodo() { # <raiz> <origem> <trabalho> <pasta> <checkpoint>
   fi
   case "$origem" in
     sprintx)
-      for nome in 00-DECISOES.md BUILDX-PREMISSAS.md 00-ESTIMATIVA.md ORQUESTRADOR.md \
+      for nome in 00-DECISOES.md BUILDX-PREMISSAS.md 00-ESTIMATIVA.md PREFLIGHT.md ORQUESTRADOR.md \
         00-AUDITORIA.md FECHAMENTO.md 00-PLANEJAMENTO.md 00-BLOQUEIOS.md; do
         printf '%s\n' "$pasta/$nome"
       done ;;
