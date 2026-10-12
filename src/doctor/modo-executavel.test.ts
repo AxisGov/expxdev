@@ -1,6 +1,5 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { describe, it, expect, afterAll } from "vitest";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
   avisoDeFilemode,
@@ -11,7 +10,7 @@ import {
 } from "../nucleo/modo-executavel.js";
 import { verificarModoExecutavel, type Achado } from "./verificadores.js";
 import type { ConsultaAoHead } from "../nucleo/modo-executavel.js";
-import { gitEm, novoProduto } from "../teste/candidatos.js";
+import { gitEm, novoProduto, temporarios } from "../teste/candidatos.js";
 import { suportaBitExecutavel } from "../teste/fs-capacidades.js";
 
 /**
@@ -32,15 +31,17 @@ import { suportaBitExecutavel } from "../teste/fs-capacidades.js";
  * caso cujo assunto É o bit presente fica condicionado, e um por um.
  */
 
-const criados: string[] = [];
-afterEach(() => {
-  for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true });
+/**
+ * O ciclo oficial da bancada: ver `temporarios` em `src/teste/candidatos.ts`.
+ * Toda pasta daqui nasce sob o ciclo — `temporarios.novo` e `novoProduto` a
+ * registram no nascimento —, e o recolhimento é no fim do arquivo.
+ */
+afterAll(() => {
+  temporarios.descartar();
 });
 
 function temporario(prefixo = "expx-modo-"): string {
-  const d = mkdtempSync(join(tmpdir(), prefixo));
-  criados.push(d);
-  return d;
+  return temporarios.novo(prefixo);
 }
 
 function arquivo(raiz: string, rel: string, modo: number): void {
@@ -294,7 +295,6 @@ describe("consulta ao git", () => {
 
   it("integração: com core.filemode=false, o índice registra 100644 e o aviso separa os dois casos", () => {
     const p = novoProduto("expx-modo-produto-");
-    criados.push(p);
     gitEm(p, "config", "core.filemode", "false");
     arquivo(p, ".claude/hooks/a.sh", 0o755);
 
@@ -321,7 +321,6 @@ describe("consulta ao git", () => {
 
   it("integração: com core.filemode=true o aviso não aparece", () => {
     const p = novoProduto("expx-modo-produto-");
-    criados.push(p);
     gitEm(p, "config", "core.filemode", "true");
     arquivo(p, ".claude/hooks/a.sh", 0o755);
     expect(filemodeDesligado(p)).toBe(false);

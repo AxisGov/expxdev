@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // @ts-expect-error The runtime helper is intentionally shipped as a Node module beside the harness adapters.
@@ -18,6 +18,7 @@ import {
   RAIZ_DO_REPO,
   rodarExpx,
   sha256,
+  temporarios,
 } from "../teste/candidatos.js";
 
 /**
@@ -38,16 +39,10 @@ import {
 const LOCK_P02 = join(RAIZ_DO_REPO, "fixtures", "sessao-local", "expx-lock.json");
 const PROIBIDO = ["clone", "fetch", "npm", "expx-bin.js", "update"];
 
-const criados: string[] = [];
+/** O ciclo oficial da bancada: ver `temporarios` em `src/teste/candidatos.ts`. */
 afterAll(() => {
-  for (const c of criados) rmSync(c, { recursive: true, force: true });
+  temporarios.descartar();
 });
-
-function temporario(prefixo: string): string {
-  const d = mkdtempSync(join(tmpdir(), prefixo));
-  criados.push(d);
-  return d;
-}
 
 /** Git sem acesso ao GitHub: qualquer URL `https://github.com/` vira caminho inexistente. */
 function ambienteHermetico(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
@@ -99,12 +94,11 @@ describe("certificação D-03: freeze local no SessionStart", () => {
     expect(lock.skills["mergex"]?.commit).toBe("d3ca3aa687bd-local");
 
     const produto = novoProduto("expx-d03-produto-");
-    criados.push(produto);
     mkdirSync(join(produto, ".expx"));
     cpSync(LOCK_P02, join(produto, ".expx", "expx-lock.json"));
     commitarTudo(produto, "instalacao p02 congelada");
 
-    const fora = temporario("expx-d03-cache-");
+    const fora = temporarios.novo("expx-d03-cache-");
     const cache = join(fora, "axisgov", "expxdev");
     const env = ambienteHermetico();
     const antes = bytesDoProjeto(produto);
@@ -134,16 +128,13 @@ describe("certificação D-03: freeze local no SessionStart", () => {
     // Fontes locais pelo mecanismo oficial (EXPX_SKILLS_LOCAIS). SprintX ganha
     // a tag v1.0.0 para o update explícito ter para onde ir depois.
     const fontes = fontesCandidatas();
-    criados.push(fontes);
     const sprintx = join(fontes, CANDIDATOS.sprintx.pasta);
     gitEm(sprintx, "tag", "v1.0.0");
 
     const produto = novoProduto("expx-d03-update-");
-    criados.push(produto);
     // HOME descartável também no CLI: o init desta bancada não pode registrar
     // plugin na configuração de quem a roda (ver `larIsolado`).
     const isolado = larIsolado();
-    criados.push(isolado.lar);
     const envCli = ambienteCom(pathControlado(true), { ...isolado.env, EXPX_SKILLS_LOCAIS: fontes });
     const init = rodarExpx(["init", "--skills", "sprintx,mergex", "--yes"], produto, envCli);
     expect(init.status, `${init.stdout}${init.stderr}`).toBe(0);
@@ -160,7 +151,7 @@ describe("certificação D-03: freeze local no SessionStart", () => {
     // novo, payload no stdin, CLAUDE_PROJECT_DIR apontando o produto.
     const hook = join(produto, ".claude", "hooks", "expx-session-sync.mjs");
     expect(sha256(hook)).toBe(sha256(join(RAIZ_DO_REPO, "nucleo", "hooks", "expx-session-sync.mjs")));
-    const fora = temporario("expx-d03-cache-hook-");
+    const fora = temporarios.novo("expx-d03-cache-hook-");
     const cache = join(fora, "axisgov", "expxdev");
     const antes = bytesDoProjeto(produto);
     for (const source of ["startup", "resume"]) {

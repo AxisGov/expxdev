@@ -1,9 +1,8 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { describe, it, expect, afterAll } from "vitest";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { modosNoHead, modosNoIndice } from "./modo-executavel.js";
-import { gitEm, novoProduto } from "../teste/candidatos.js";
+import { gitEm, novoProduto, temporarios } from "../teste/candidatos.js";
 import { suportaNomeComCaractereReservado } from "../teste/fs-capacidades.js";
 
 /**
@@ -30,15 +29,20 @@ const NOMES_LIVRES = suportaNomeComCaractereReservado();
  *   diz 100644.
  */
 
-const criados: string[] = [];
-afterEach(() => {
-  for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true });
+/**
+ * O ciclo oficial da bancada: ver `temporarios` em `src/teste/candidatos.ts`.
+ *
+ * O recolhimento é no FIM do arquivo, e não a cada teste: `novoProduto` registra
+ * o produto no ciclo no instante em que ele nasce, e um `descartar()` por teste
+ * removeria também o que um `beforeAll` tivesse criado para todos. Quem cria tem
+ * dono desde o nascimento; quem fecha o ciclo é aqui.
+ */
+afterAll(() => {
+  temporarios.descartar();
 });
 
 function produto(): string {
-  const p = novoProduto("expx-modo-git-");
-  criados.push(p);
-  return p;
+  return novoProduto("expx-modo-git-");
 }
 
 function arquivo(raiz: string, rel: string, modo = 0o755): void {
@@ -191,8 +195,7 @@ describe("modosNoHead — o que está COMMITADO", () => {
   });
 
   it("funcional: repositório sem nenhum commit é sem-head, não erro", () => {
-    const p = mkdtempSync(join(tmpdir(), "expx-sem-head-"));
-    criados.push(p);
+    const p = temporarios.novo("expx-sem-head-");
     gitEm(p, "init", "-q", "-b", "main");
     arquivo(p, "h/a.sh");
     gitEm(p, "add", "-A");
@@ -201,8 +204,7 @@ describe("modosNoHead — o que está COMMITADO", () => {
   });
 
   it("funcional: pasta que não é repositório é indisponível, e não lança", () => {
-    const p = mkdtempSync(join(tmpdir(), "expx-sem-git-"));
-    criados.push(p);
+    const p = temporarios.novo("expx-sem-git-");
     arquivo(p, "h/a.sh");
 
     const r = modosNoHead(p, ["h/a.sh"]);

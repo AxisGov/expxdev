@@ -9,32 +9,39 @@ import {
   CANDIDATOS,
   fontesCandidatas,
   gitEm,
+  jqVisivelCom,
   larIsolado,
-  novaLinhaDoJq,
   novoProduto,
   pathControlado,
   pathDosHooks,
+  pathDosHooksSemJq,
   rodarExpx,
   rodarHook,
   rodarHookComPayload,
   sha256,
   snapshot,
+  temporarios,
 } from "../teste/candidatos.js";
 
 /**
- * Certificação P0.2: SprintX 253b592 + MergeX cab6d5f instaladas SÓ pelo
+ * Certificação P0.2: SprintX 796895a + MergeX cab6d5f instaladas SÓ pelo
  * `expxdev init` real (o binário do `dist/`, num processo novo), a partir dos
  * snapshots fixados em `fixtures/candidatos/`. Nenhum arquivo é copiado,
  * nenhum settings ou hooks.json é montado à mão: o que está no produto é o que
  * o `init` escreveu.
  *
- * `253b592` é o commit BASE do snapshot da SprintX: o que está propagado por cima
- * dele está em `fixtures/candidatos/sprintx.PROPAGACOES.md`.
+ * `796895a` é o merge do PR AxisGov/sprintx#14 na `p0.2/sprintx-rastro-identidade`,
+ * e descende de `e0582cd` — o pin anterior, que já trazia no próprio commit o corte
+ * UTF-8 antes propagado à mão. O que o commit novo acrescenta é a correção dos
+ * achados que a auditoria levantou sobre o candidato: entre eles, a saída de suíte
+ * COLORIDA classificada certo (a cor colava a sequência ANSI em `[ERROR]` e em
+ * `BUILD FAILURE`, e a suíte vermelha entrava no rastro como `ok`).
+ *
+ * Os dois snapshots são o commit, byte a byte — não há propagação a reaplicar.
  */
 
 type Json = Record<string, any>;
 
-const criados: string[] = [];
 let fontes = "";
 /** O HOME descartável de TODO init e doctor desta bancada. */
 let lar = "";
@@ -56,13 +63,63 @@ function doctor(produto: string): ReturnType<typeof rodarExpx> {
 }
 
 function produto(): string {
-  const p = novoProduto();
-  criados.push(p);
-  return p;
+  return novoProduto();
 }
 
 function json(caminho: string): Json {
   return JSON.parse(readFileSync(caminho, "utf8")) as Json;
+}
+
+/**
+ * O byte ESC, escrito como sequência de escape e não cru.
+ *
+ * Ele é o assunto de duas provas daqui — a cor de terminal que a classificação
+ * da suíte tem de apagar, e o controle que o `detalhe` tem de escapar para a
+ * linha continuar JSON —, e nas duas o que importa é o byte que CHEGA ao hook,
+ * não como o fonte o escreve. Cru no fonte, ele é invisível em diff, em revisão
+ * e no terminal de quem lê o teste.
+ */
+const ESC = "\u001b";
+
+/** O rastro em que o `rastro-post.sh` grava quando a sessão não reivindica trabalho. */
+const RASTRO = "docs/eventos/sem-trabalho.jsonl";
+
+/**
+ * Entrega ao `rastro-post.sh` INSTALADO (pelo comando registrado no settings que
+ * o `init` escreveu) o PostToolUse de um comando de suíte, e devolve a LINHA crua
+ * que ele gravou no jsonl junto com o evento `suite_executada` lido dela.
+ *
+ * `resposta` vai para `tool_response` na forma em que for dada: string, e também
+ * OBJETO — no Bash o Claude Code entrega `{stdout, stderr, interrupted}`, e é
+ * essa a forma real que o hook tem de classificar.
+ *
+ * Duas conferências acontecem aqui, e as duas são prova:
+ *
+ * - a leitura do jsonl é em UTF-8 ESTRITO: byte inválido lança aqui, como lança
+ *   em consumidor estrito. O painel atual não lança — ele troca por U+FFFD;
+ * - o `JSON.parse` da linha é estrito quanto a CONTROLE: JSON proíbe
+ *   U+0000..U+001F cru dentro de string, e uma linha com ESC cru morre aqui.
+ */
+function linhaDaSuite(p: string, comando: string, resposta: unknown, path?: string): { linha: string; evento: Json } {
+  rmSync(join(p, RASTRO), { force: true });
+  const r = rodarHookComPayload(
+    p,
+    "rastro-post.sh",
+    { hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: comando }, tool_response: resposta, cwd: p },
+    path ?? pathDosHooks(),
+  );
+  expect(r.status, r.stderr).toBe(0);
+  const texto = new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(join(p, RASTRO)));
+  const linhas = texto.split("\n").filter((l) => l.trim() !== "");
+  expect(linhas).toHaveLength(1);
+  const linha = linhas[0] as string;
+  const evento = JSON.parse(linha) as Json;
+  expect(evento["evento"]).toBe("suite_executada");
+  return { linha, evento };
+}
+
+function eventoDaSuite(p: string, comando: string, resposta: unknown, path?: string): Json {
+  return linhaDaSuite(p, comando, resposta, path).evento;
 }
 
 /** Todos os hooks do settings como (evento, matcher, definição). */
@@ -96,19 +153,22 @@ function gerenciado(p: string): Record<string, string> {
 
 beforeAll(() => {
   fontes = fontesCandidatas();
-  criados.push(fontes);
   const isolado = larIsolado();
   lar = isolado.lar;
   envLar = isolado.env;
-  criados.push(lar);
   A = produto();
   saidaA = init(A, "sprintx,mergex");
   B = produto();
   init(B, "mergex,sprintx");
 }, 600000);
 
+/**
+ * O ciclo oficial da bancada: tudo que os helpers de `candidatos.ts` criaram
+ * nesta execução — fontes, produtos, lar, e TODA pasta de links de PATH montada
+ * pelos `init` e `doctor` daqui — sai junto.
+ */
 afterAll(() => {
-  for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true });
+  temporarios.descartar();
 });
 
 describe("P0.2 — init real de SprintX + MergeX", () => {
@@ -348,7 +408,6 @@ describe("P0.2 — o rastro do hook instalado é UTF-8 válido no corte do detal
    * A regressão observada em campo é `largura=2, k=1`: byte-líder `0xc3` de um
    * `ã` pendurado sozinho no fim do `detalhe`.
    */
-  const RASTRO = "docs/eventos/sem-trabalho.jsonl";
   let P = "";
 
   beforeAll(() => {
@@ -362,32 +421,15 @@ describe("P0.2 — o rastro do hook instalado é UTF-8 válido no corte do detal
     return `npm test -- ${"x".repeat(120 - k - 12)}`;
   }
 
-  /** Entrega ao hook real o PostToolUse de um comando de suíte e devolve o `detalhe` gravado. */
-  function detalheDaSuite(comando: string): string {
-    rmSync(join(P, RASTRO), { force: true });
-    const r = rodarHookComPayload(P, "rastro-post.sh", {
-      hook_event_name: "PostToolUse",
-      tool_name: "Bash",
-      tool_input: { command: comando },
-      tool_response: "Test Files  1 passed (1)",
-      cwd: P,
-    });
-    expect(r.status, r.stderr).toBe(0);
-    // Leitura em UTF-8 ESTRITO: byte inválido no jsonl lança aqui, como lança em
-    // consumidores estritos. O painel atual não lança — ele troca por U+FFFD.
-    const texto = new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(join(P, RASTRO)));
-    const linhas = texto.split("\n").filter((l) => l.trim() !== "");
-    expect(linhas).toHaveLength(1);
-    const evento = JSON.parse(linhas[0] as string) as Json;
-    expect(evento["evento"]).toBe("suite_executada");
-    return evento["detalhe"] as string;
+  function detalheDaSuite(comando: string, path?: string): string {
+    return eventoDaSuite(P, comando, "Test Files  1 passed (1)", path)["detalhe"] as string;
   }
 
   /** Uma fronteira da tabela: corte depois de `k` bytes de um caractere de `largura` bytes. */
-  function fronteira(char: string, largura: number, k: number): void {
+  function fronteira(char: string, largura: number, k: number, path?: string): void {
     const prefixo = prefixoDe(k);
     const esperado = k === largura ? `${prefixo}${char}` : prefixo;
-    const detalhe = detalheDaSuite(`${prefixo}${char.repeat(3)}`);
+    const detalhe = detalheDaSuite(`${prefixo}${char.repeat(3)}`, path);
     expect(detalhe).toBe(esperado);
     expect(Buffer.byteLength(detalhe, "utf8")).toBeLessThanOrEqual(120);
   }
@@ -417,30 +459,203 @@ describe("P0.2 — o rastro do hook instalado é UTF-8 válido no corte do detal
     fronteira("Z", 1, 1);
   });
 
-  it("funcional: comando de várias linhas é cortado como um texto só, não linha por linha", () => {
+  it("funcional: comando de várias linhas vira UMA linha no detalhe, e ainda cabe em 120 bytes", () => {
     // O `cut -c1-120` do defeito era orientado a LINHA: num comando multilinha ele
-    // cortava cada linha em 120 e devolvia todas, e o `detalhe` passava longe do
-    // limite. É a forma exata do registro corrompido observado em campo, onde o
-    // corte caiu no meio de um `ã` na 64ª linha de um heredoc.
+    // cortava cada linha em 120 e devolvia TODAS, e o `detalhe` passava longe do
+    // limite — e ainda ficava multilinha. É a forma exata do registro corrompido
+    // observado em campo, onde o corte caiu no meio de um `ã` na 64ª linha de um
+    // heredoc.
     //
-    // O comando ENTRA com LF, que é o que o agente escreve e o que o harness
-    // entrega. O que o hook corta é o que o jq devolveu, e o jq materializa esse
-    // LF conforme a plataforma: CRLF no Windows, LF em POSIX. O contrato do
-    // `detalhe` é byte (120) e UTF-8 válido; ele não escolhe representação de
-    // quebra de linha, e fixar LF no esperado reprovaria o Windows por uma regra
-    // que o contrato não tem. Por isso o esperado nasce da medição do jq — nunca
-    // do que o hook devolveu — e a comparação segue exata, byte a byte.
-    const nl = novaLinhaDoJq();
-    const enchimento = "x".repeat(120 - "npm test -- ".length - nl.length - 1);
-    const comando = `npm test -- \n${enchimento}`;
-    const esperado = `npm test -- ${nl}${enchimento}`;
-    // 119 bytes nas duas plataformas: o byte 120 é o byte-líder do `á` seguinte,
-    // e a sequência incompleta sai inteira. Um corte por LINHA devolveria as duas
-    // linhas — os 125 bytes do comando — e morreria aqui.
+    // `detalhe` é UMA linha pelo contrato: o hook normaliza CRLF, CR e LF para um
+    // espaço ANTES de cortar. Por isso o esperado é o mesmo nas duas plataformas,
+    // sem medir o jq: o LF que o jq materializa como CRLF no Windows e LF em POSIX
+    // some igual nos dois, virando um espaço só.
+    const prefixo = "npm test -- ";
+    // 12 (prefixo) + 1 (o LF virado espaço) + 106 = 119 bytes: o byte 120 é o
+    // byte-líder do `á` seguinte, e a sequência incompleta sai inteira.
+    const enchimento = "x".repeat(120 - prefixo.length - 1 - 1);
+    const esperado = `${prefixo} ${enchimento}`;
     expect(Buffer.byteLength(esperado, "utf8")).toBe(119);
-    const detalhe = detalheDaSuite(`${comando}${"á".repeat(3)}`);
+    const detalhe = detalheDaSuite(`${prefixo}\n${enchimento}${"á".repeat(3)}`);
     expect(detalhe).toBe(esperado);
+    expect(detalhe).not.toMatch(/[\r\n]/);
     expect(Buffer.byteLength(detalhe, "utf8")).toBe(119);
+  });
+
+  /**
+   * O `detalhe` é texto que o USUÁRIO escolheu — o comando de suíte —, e JSON
+   * proíbe caractere de controle CRU dentro de string (U+0000..U+001F). Um
+   * `npm test` com cor de terminal (ESC), com barra de progresso ou com separador
+   * de registro no meio punha o byte cru na linha, e a linha deixava de ser JSON:
+   * o mesmo estrago do byte UTF-8 partido que o corte evita — o leitor do rastro
+   * perde o arquivo a partir dali.
+   *
+   * Escapar só TAB, CR e LF deixava todo o resto passar inteiro. A prova é
+   * CAUSAL pelo parser: `JSON.parse` de uma linha com ESC cru é SyntaxError
+   * (`linhaDaSuite` o faz), então a linha só nasce legível se o hook escapar o
+   * controle. E a volta pelo `detalhe` prova que o escape é reversível: o que o
+   * comando dizia não foi trocado nem perdido no caminho.
+   *
+   * As duas rotas de leitura entram, porque elas NÃO são a mesma: sem jq, quem lê
+   * o comando é `rastro_json_campo_em`, que esconde a barra escapada atrás do byte
+   * 0x01 enquanto decodifica — e `` do payload decodifica para exatamente
+   * esse byte. É o caso em que marcador interno e dado do usuário colidem, e por
+   * isso o comando abaixo traz 0x01, barra invertida e aspas juntos.
+   */
+  const CONTROLES_CRUS = `${ESC}[1;31m\b\f\t\\"fim`;
+
+  function controleNoDetalhe(path?: string): void {
+    const comando = `npm test -- ${CONTROLES_CRUS}`;
+    expect(Buffer.byteLength(comando, "utf8")).toBeLessThanOrEqual(120);
+    const { linha, evento } = linhaDaSuite(P, comando, "Test Files  1 passed (1)", path);
+    // o detalhe volta IGUAL ao comando: nada foi trocado nem perdido
+    expect(evento["detalhe"]).toBe(comando);
+    // e no disco não há controle cru nenhum — o que está lá é o escape
+    expect(/[ -]/.test(linha), linha).toBe(false);
+    for (const escapado of ["\\u001b", "\\u0001", "\\u0007", "\\u000b", "\\u001f", "\\b", "\\f", "\\t", "\\\\", '\\"']) {
+      expect(linha, escapado).toContain(escapado);
+    }
+  }
+
+  it("funcional: comando com ESC e controle crus grava jsonl parseável, e o detalhe volta inteiro", () => {
+    controleNoDetalhe();
+  });
+
+  it("funcional: SEM jq, o mesmo comando — e o 0x01 do payload não vira a barra do marcador", () => {
+    const semJq = pathDosHooksSemJq();
+    expect(jqVisivelCom(semJq)).toBe("");
+    expect(jqVisivelCom(pathDosHooks())).not.toBe("");
+    controleNoDetalhe(semJq);
+  });
+
+  it("funcional: SEM jq no PATH do hook, o corte de 120 bytes continua sem sequência partida", () => {
+    // O fallback sem jq é contrato (`rastro_json_get`, `rastro_tool_input_get`): o
+    // hook roda em PostToolUse e não pode exigir jq para gravar o rastro. O corte
+    // é feito pelo bash, sem processo, então ele NÃO deveria depender do jq — e é
+    // isso que esta prova fixa, porque "não deveria" não é prova.
+    //
+    // A ausência do jq é afirmativa, não inferida da montagem do PATH: quem
+    // responde é o mesmo `command -v jq` que o hook usa para decidir.
+    const semJq = pathDosHooksSemJq();
+    expect(jqVisivelCom(semJq)).toBe("");
+    // Controle: o resto do ferramental do fallback ESTÁ lá. Sem isto, um hook que
+    // falhasse por falta de `grep` passaria por "fallback funcionando".
+    expect(jqVisivelCom(pathDosHooks())).not.toBe("");
+    // `largura=2, k=1` é a regressão observada em campo: o byte-líder `0xc3` de um
+    // `ã` pendurado sozinho no fim do `detalhe`.
+    fronteira("á", 2, 1, semJq);
+    fronteira("á", 2, 2, semJq);
+    fronteira("🚀", 4, 3, semJq);
+  });
+});
+
+describe("P0.2 — o resultado da suíte que o hook instalado grava", () => {
+  /**
+   * `suite_executada.resultado` é o que o painel lê para dizer se a suíte passou.
+   * Cada família de suíte anuncia a falha com o seu vocabulário, e o Maven é o
+   * caso que não usa nenhuma das palavras das outras: ele falha com `[ERROR]` nas
+   * linhas e com `BUILD FAILURE` no fim, nunca com `FAILED`, `FAIL` ou
+   * `N failed`. Sem reconhecer esses dois, uma suíte Maven vermelha entrava no
+   * rastro como `ok` — falso verde no painel.
+   */
+  let P = "";
+
+  beforeAll(() => {
+    P = produto();
+    expect(init(P, "sprintx,mergex").status).toBe(0);
+  }, 300000);
+
+  function resultado(resposta: unknown, path?: string): string {
+    return eventoDaSuite(P, "mvn test", resposta, path)["resultado"] as string;
+  }
+
+  /**
+   * A resposta como o Claude Code a entrega na ferramenta Bash: um OBJETO, não
+   * uma string.
+   *
+   * `interrupted` entra junto de propósito: é campo que não é texto, e as duas
+   * rotas de leitura têm de passar por cima dele sem tropeçar — com jq, a
+   * recursão seleciona só `type == "string"`; sem jq, só as chaves de texto que o
+   * contrato nomeia são lidas.
+   */
+  function respostaDoBash(stdout: string, stderr = ""): Json {
+    return { stdout, stderr, interrupted: false };
+  }
+
+  it("funcional: Maven com [ERROR] na saída é gravado como falha", () => {
+    expect(resultado("[ERROR] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0")).toBe("falha");
+  });
+
+  it("funcional: Maven com BUILD FAILURE é gravado como falha", () => {
+    expect(resultado("[INFO] ------------------------------------\n[INFO] BUILD FAILURE\n[INFO] ----")).toBe("falha");
+  });
+
+  it("funcional: controle — Maven verde (BUILD SUCCESS) continua ok", () => {
+    expect(resultado("[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0\n[INFO] BUILD SUCCESS")).toBe("ok");
+  });
+
+  /**
+   * O achado do candidato anterior, certificado no pin novo (SprintX 796895a):
+   * os dois padrões de Maven exigem fronteira de ESPAÇO em branco ao redor do
+   * marcador, e Maven colorido cola a sequência ANSI nos dois lados — `…[1;31m`
+   * imediatamente antes de `[ERROR]`, `…[m` imediatamente depois. Sem apagar a
+   * cor ANTES de classificar, nenhum dos dois padrões casa e a suíte vermelha
+   * entra no rastro como `ok`: falso verde no painel, exatamente o defeito que
+   * o reconhecimento do Maven existia para fechar.
+   */
+
+  it("funcional: Maven COLORIDO com [ERROR] é gravado como falha — a cor não apaga o marcador", () => {
+    expect(resultado(`${ESC}[1;31m[ERROR]${ESC}[m Tests run: 3, Failures: 1, Errors: 0, Skipped: 0`)).toBe("falha");
+  });
+
+  it("funcional: Maven COLORIDO com BUILD FAILURE é gravado como falha", () => {
+    expect(resultado(`${ESC}[1;34m[INFO]${ESC}[m ----\n${ESC}[1;31mBUILD FAILURE${ESC}[m\n${ESC}[1;34m[INFO]${ESC}[m ----`)).toBe("falha");
+  });
+
+  it("funcional: controle — Maven verde COLORIDO continua ok: a cor não inventa falha", () => {
+    expect(resultado(`${ESC}[1;34m[INFO]${ESC}[m Tests run: 3, Failures: 0\n${ESC}[1;32mBUILD SUCCESS${ESC}[m`)).toBe("ok");
+  });
+
+  /**
+   * As provas acima entregam `tool_response` como STRING, e nenhuma suíte real
+   * chega assim pela ferramenta Bash: ali o Claude Code entrega um OBJETO
+   * (`{"stdout":…,"stderr":…,"interrupted":…}`). Lido como string, o objeto dava
+   * dois desfechos — e os dois eram falso verde:
+   *
+   *   - com jq, `.tool_response` de um objeto sai IMPRESSO como JSON, onde a
+   *     quebra de linha aparece escapada (`\n` literal) e o marcador perde a
+   *     fronteira de espaço em branco que os padrões do Maven exigem;
+   *   - sem jq, NADA: o casamento de `"chave": "valor"` não casa objeto, e a
+   *     saída vinha vazia — nenhuma suíte era classificada como falha nessa rota.
+   *
+   * Por isso o objeto é provado nas DUAS rotas, com o Maven colorido (que soma a
+   * cor ao problema da forma) e com o verde como controle: sem o controle, um
+   * classificador que respondesse `falha` para tudo passaria por "corrigido".
+   *
+   * O `stderr` entra num caso de propósito: é onde a saída vermelha costuma
+   * estar, e um leitor que só olhasse `stdout` ficaria verde nos outros casos.
+   */
+  const COLORIDO_ERROR = `${ESC}[1;31m[ERROR]${ESC}[m Tests run: 3, Failures: 1, Errors: 0, Skipped: 0`;
+  const COLORIDO_FAILURE = `${ESC}[1;34m[INFO]${ESC}[m ----\n${ESC}[1;31mBUILD FAILURE${ESC}[m\n${ESC}[1;34m[INFO]${ESC}[m ----`;
+  const COLORIDO_VERDE = `${ESC}[1;34m[INFO]${ESC}[m Tests run: 3, Failures: 0\n${ESC}[1;32mBUILD SUCCESS${ESC}[m`;
+
+  /** As três classificações do objeto, na rota de leitura dada. */
+  function objetoDoBash(path?: string): void {
+    expect(resultado(respostaDoBash(COLORIDO_ERROR), path), "[ERROR] colorido no stdout").toBe("falha");
+    expect(resultado(respostaDoBash(COLORIDO_FAILURE), path), "BUILD FAILURE colorido no stdout").toBe("falha");
+    expect(resultado(respostaDoBash("", COLORIDO_ERROR), path), "[ERROR] colorido no stderr").toBe("falha");
+    expect(resultado(respostaDoBash(COLORIDO_VERDE), path), "controle verde").toBe("ok");
+  }
+
+  it("funcional: tool_response no formato OBJETO do Bash classifica o Maven colorido — com jq", () => {
+    expect(jqVisivelCom(pathDosHooks())).not.toBe("");
+    objetoDoBash();
+  });
+
+  it("funcional: o mesmo objeto SEM jq no PATH do hook — a rota em que a saída vinha vazia", () => {
+    const semJq = pathDosHooksSemJq();
+    expect(jqVisivelCom(semJq)).toBe("");
+    objetoDoBash(semJq);
   });
 });
 
@@ -605,7 +820,7 @@ describe("P0.2 — E1 da MergeX na instalação feita só pelo ExpxDev", () => {
     writeFileSync(join(p, "src/a.js"), "base a\nalterado\n");
     const msg = join(p, "..", `${p.split(/[\\/]/).pop() ?? "p"}.msg`);
     writeFileSync(msg, "fix(src): fecha T-01.01\n\nObjetivo da task.\n\nTask: T-01.01\nTrabalho: ft-m4\n");
-    criados.push(msg);
+    temporarios.adotar(msg);
     const r = spawnSync(
       bashDosHooks(),
       [join(p, ".claude/skills/mergex/scripts/fechamento-do-e1.sh"), "--fechar", "--entrega", ENTREGA, "--task", "T-01.01", "--mensagem", msg, "--", "src/a.js"],

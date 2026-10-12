@@ -6,7 +6,8 @@
 #
 # O par (arquivo_alterado, suite_executada) e o que da ao painel a linha do
 # tempo do trabalho — e, junto com task_iniciada/task_concluida gravados pela
-# skill, a duracao observada que alimenta a calibracao de estimativa.
+# skill, a duracao observada que entra no HISTORICO.md ao lado do real — fora da
+# calibracao, que agrega o desvio sobre o real (references/08-rastro.md).
 set -uo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -38,7 +39,14 @@ case "$FERRAMENTA" in
       *"npm test"*|*"npm run test"*|*"yarn test"*|*"pnpm test"*|\
       *pytest*|*"go test"*|*"cargo test"*|*jest*|*vitest*|*rspec*|*phpunit*|*"dotnet test"*|*"mvn test"*)
         # resultado da suite: o painel quer saber se passou.
-        SAIDA="$(rastro_json_get "$ENTRADA" tool_response)"
+        #
+        # O texto sai pelo helper que aceita `tool_response` como string E como objeto (no Bash o
+        # Claude Code entrega `{"stdout":...,"stderr":...}`), nas duas rotas de leitura; e a cor
+        # do terminal e removida ANTES de classificar, porque Maven e Surefire colam a sequencia
+        # ANSI nos dois lados de `[ERROR]` e de `BUILD FAILURE` e assim apagam a fronteira de
+        # espaco em branco que os padroes abaixo procuram — suite vermelha gravada como `ok`.
+        rastro_tool_response_em SAIDA "$ENTRADA"
+        rastro_sem_ansi_em SAIDA "$SAIDA"
         RES="ok"
         # Cuidado com "0 failed", que e o caso VERDE e aparece em quase toda
         # saida de suite: o [1-9] no inicio do numero e o que separa os dois.
@@ -46,11 +54,16 @@ case "$FERRAMENTA" in
           RES="falha"
         elif printf '%s' "$SAIDA" | grep -qE '(^|[[:space:]])(FAILED|FAIL)([[:space:]]|$)'; then
           RES="falha"
+        elif printf '%s' "$SAIDA" | grep -qE '(^|[[:space:]])(\[ERROR\]|BUILD[[:space:]]+FAILURE)([[:space:]]|$)'; then
+          RES="falha"
         fi
-        # 120 bytes, sem partir caractere multibyte no fim: o jsonl tem de continuar
-        # UTF-8 valido (contrato expx-eventos), e `cut -c` nao garante nem uma coisa
-        # nem a outra. Sem subshell, que e um processo a menos no caminho do hook.
-        rastro_corta_utf8_em DETALHE "$CMD" 120
+        # `detalhe` e uma linha pelo contrato. Normalize quebras antes de cortar em 120 BYTES,
+        # sem partir caractere UTF-8 multibyte e sem depender da locale: `cut -c` faria o corte
+        # depender da locale e o repetiria por linha (ver rastro_corta_utf8_em).
+        DETALHE="${CMD//$'\r\n'/ }"
+        DETALHE="${DETALHE//$'\r'/ }"
+        DETALHE="${DETALHE//$'\n'/ }"
+        rastro_corta_utf8_em DETALHE "$DETALHE" 120
         rastro_grava "$RAIZ" suite_executada hook "$RES" "$DETALHE" '[]'
         ;;
     esac

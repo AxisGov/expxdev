@@ -14,11 +14,15 @@ import { perguntadorDeRoteiro, perguntadorDeTerminal } from "./perguntar.js";
 
 const tty = { entrada: process.stdin.isTTY, saida: process.stdout.isTTY };
 const cwdOriginal = process.cwd();
+/** O temporário em que o teste entrou — removido depois de voltar para o cwd original. */
+let temporarioDoTeste = "";
 afterEach(() => {
   process.chdir(cwdOriginal);
   process.stdin.isTTY = tty.entrada;
   process.stdout.isTTY = tty.saida;
   usarPerguntador(() => perguntadorDeTerminal());
+  if (temporarioDoTeste !== "") rmSync(temporarioDoTeste, { recursive: true, force: true });
+  temporarioDoTeste = "";
 });
 
 function capturar(): { saida: () => string; erro: () => string; alvo: Parameters<typeof executarExpx>[1] } {
@@ -44,7 +48,8 @@ describe("init sem flags", () => {
     process.stdout.isTTY = true;
     // Num diretório limpo: rodando dentro do próprio repo, o `init` encontra o
     // .expx/ de verdade e pergunta "reconfigurar?" antes de chegar às skills.
-    process.chdir(mkdtempSync(join(tmpdir(), "expx-init-")));
+    temporarioDoTeste = mkdtempSync(join(tmpdir(), "expx-init-"));
+    process.chdir(temporarioDoTeste);
     // Recusa a confirmação final: o teste comprova que PERGUNTOU, sem tocar
     // na rede nem no disco para instalar de verdade.
     const q = perguntadorDeRoteiro(["1", "", "n", "n"]);

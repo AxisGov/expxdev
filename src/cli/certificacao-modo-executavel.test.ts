@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   ambienteCom,
@@ -11,6 +10,7 @@ import {
   rodarExpx,
   rodarHook,
   fontesCandidatas,
+  temporarios,
 } from "../teste/candidatos.js";
 import { suportaBitExecutavel } from "../teste/fs-capacidades.js";
 
@@ -31,7 +31,6 @@ import { suportaBitExecutavel } from "../teste/fs-capacidades.js";
  * nunca roda `git add` nem `git update-index`.
  */
 
-const criados: string[] = [];
 let fontes = "";
 /** O HOME descartável de todo init e doctor desta bancada (ver `larIsolado`). */
 let envLar: Record<string, string> = {};
@@ -61,12 +60,6 @@ const BIT_NO_DISCO = suportaBitExecutavel();
 /** Asserção que só existe onde o filesystem expressa o bit de execução. */
 function soComBitNoDisco(f: () => void): void {
   if (BIT_NO_DISCO) f();
-}
-
-function temporario(prefixo: string): string {
-  const d = mkdtempSync(join(tmpdir(), prefixo));
-  criados.push(d);
-  return d;
 }
 
 function init(produto: string): ReturnType<typeof rodarExpx> {
@@ -112,12 +105,8 @@ function comandoSugerido(saida: string): string[] {
 
 beforeAll(() => {
   fontes = fontesCandidatas();
-  criados.push(fontes);
-  const isolado = larIsolado();
-  envLar = isolado.env;
-  criados.push(isolado.lar);
+  envLar = larIsolado().env;
   A = novoProduto("expx-modo-A-");
-  criados.push(A);
   // o produto real que reproduz o defeito: o git deste repositório ignora o bit
   gitEm(A, "config", "core.filemode", "false");
   const r = init(A);
@@ -127,8 +116,9 @@ beforeAll(() => {
   indiceAposCommit = indice(A);
 }, 600000);
 
+/** O ciclo oficial da bancada: ver `temporarios` em `src/teste/candidatos.ts`. */
 afterAll(() => {
-  for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true });
+  temporarios.descartar();
 });
 
 describe("modo executável — o defeito, medido", () => {
@@ -155,9 +145,9 @@ describe("modo executável — o defeito, medido", () => {
   });
 
   it("funcional: checkout novo acusa no doctor, e em POSIX materializa 0644 com o hook em 126", () => {
-    const nova = join(temporario("expx-modo-wt-"), "checkout");
+    const nova = join(temporarios.novo("expx-modo-wt-"), "checkout");
     gitEm(A, "worktree", "add", "-q", "-b", "checkout-quebrado", nova);
-    criados.push(nova);
+    temporarios.adotar(nova);
 
     soComBitNoDisco(() => {
       expect(statSync(join(nova, SPRINTX)).mode & 0o111).toBe(0);
@@ -220,9 +210,9 @@ describe("modo executável — o reparo explícito", () => {
     expect(r.stdout).not.toContain("update-index");
 
     // e a prova de que o doctor está certo: o clone materializa do HEAD
-    const nova = join(temporario("expx-modo-wt-indice-"), "checkout");
+    const nova = join(temporarios.novo("expx-modo-wt-indice-"), "checkout");
     gitEm(A, "worktree", "add", "-q", "-b", "checkout-so-indice", nova);
-    criados.push(nova);
+    temporarios.adotar(nova);
     soComBitNoDisco(() => {
       expect(statSync(join(nova, SPRINTX)).mode & 0o111).toBe(0);
       expect(rodarHook(nova, SPRINTX, "git branch -D velha").status).toBe(126);
@@ -238,9 +228,9 @@ describe("modo executável — o reparo explícito", () => {
     expect(verde.status, verde.stdout).toBe(0);
     expect(verde.stdout).not.toContain("update-index");
 
-    const nova = join(temporario("expx-modo-wt-ok-"), "checkout");
+    const nova = join(temporarios.novo("expx-modo-wt-ok-"), "checkout");
     gitEm(A, "worktree", "add", "-q", "-b", "checkout-reparado", nova);
-    criados.push(nova);
+    temporarios.adotar(nova);
 
     soComBitNoDisco(() => {
       expect(statSync(join(nova, SPRINTX)).mode & 0o111).not.toBe(0);
