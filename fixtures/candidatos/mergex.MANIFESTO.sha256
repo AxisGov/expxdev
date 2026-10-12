@@ -48,7 +48,7 @@ f989166d9f1bceef50374649e9d154c32c90431a9595f97066d1ca33cb040180  .claude/skills
 e44818977e1257fad2c39b14ce51b5aa3ea807348e899c1783493869954f9c52  .claude/skills/mergex/references/integracao/sprintx.md
 4e49d081c67e9f98f2e0712424a57fd6ac9462154336b6239c150002c0576cb1  .claude/skills/mergex/references/integracao/stackx.md
 7555e04805978bdc2659dcd2915f2aa0bb7f47c52fe0571bf6e246d26698ba8f  .claude/skills/mergex/scripts/ativacao-pre-push.sh
-b4ec32dbc594727c155a19621530d831c8255c46891831d7b0cd48197da924e3  .claude/skills/mergex/scripts/catalogo-de-metodo.sh
+28e68403f333d83217f7b94ef1b176f9d2c39d562a0957b65ef2556f518f24cc  .claude/skills/mergex/scripts/catalogo-de-metodo.sh
 d71b6f0084d6921ea5252a3a7c28b2bc84ca657aa10f66aacd11e7e87a4b308a  .claude/skills/mergex/scripts/causa-do-portao.sh
 fb81a32b1429b0f9bda5f91b71fac77d66d2d9fcc42bd60088296d44f660b1db  .claude/skills/mergex/scripts/classificar-atencao.sh
 4195328d532d7ccc645a1b06b6abe37d48052d8f11ade143be0ec7ca965a1d89  .claude/skills/mergex/scripts/contrato-de-commit.sh

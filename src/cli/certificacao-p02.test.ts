@@ -24,7 +24,7 @@ import {
 } from "../teste/candidatos.js";
 
 /**
- * Certificação P0.2: SprintX 796895a + MergeX cab6d5f instaladas SÓ pelo
+ * Certificação P0.2: SprintX 796895a + MergeX bda918a instaladas SÓ pelo
  * `expxdev init` real (o binário do `dist/`, num processo novo), a partir dos
  * snapshots fixados em `fixtures/candidatos/`. Nenhum arquivo é copiado,
  * nenhum settings ou hooks.json é montado à mão: o que está no produto é o que
@@ -240,7 +240,9 @@ describe("P0.2 — init real de SprintX + MergeX", () => {
 
   it("funcional: 8 — o catálogo de método da MergeX está instalado pelo mecanismo normal", () => {
     const rel = ".claude/skills/mergex/scripts/catalogo-de-metodo.sh";
+    expect(CANDIDATOS.mergex.sha).toBe("bda918a62171bc22affb57131cc0ef44d2958d25");
     expect(sha256(join(A, rel))).toBe(sha256(join(snapshot("mergex"), rel)));
+    expect(readFileSync(join(A, rel), "utf8")).toContain("PREFLIGHT.md");
   });
 
   it("funcional: 9 — os hooks do núcleo continuam instalados e registrados", () => {
