@@ -155,12 +155,13 @@ TMP_ARQ="$(mktemp "$(dirname "$ENTREGA")/.ENTREGA.md.retomar.XXXXXX")" \
   || { rm -f "$TMP_ARQ"; TMP_ARQ=""; recusa 'gravacao atomica falhou' 1; }
 TMP_ARQ=""
 
-# O checkpoint oficial tem a própria trava e repete stage/contexto. Liberamos
-# somente depois da gravação e antes de chamá-lo; falha deixa o diff pendente.
-liberar "$TOKEN" >/dev/null 2>&1 || recusa 'nao foi possivel liberar a trava para o checkpoint' 1
-LIBERA=0; TOKEN=""
-bash "$PERSISTE_SH" --persistir --entrega "$ENTREGA" --origem sprintx \
+# O checkpoint oficial adota a mesma trava: não existe janela entre provar,
+# gravar e persistir. O filho confere o token, mas o dono continua sendo este
+# processo, que só libera depois do checkpoint concluído.
+bash "$PERSISTE_SH" --persistir --trava-token "$TOKEN" --entrega "$ENTREGA" --origem sprintx \
   --trabalho "$TRABALHO" --checkpoint retomar-v9-predecessores \
   || recusa 'checkpoint retomar-v9-predecessores falhou; alteracao ficou pendente' 1
+liberar "$TOKEN" >/dev/null 2>&1 || recusa 'nao foi possivel liberar a trava apos o checkpoint' 1
+LIBERA=0; TOKEN=""
 printf 'ok=true\nproxima=E2\n'
 exit 0

@@ -12,8 +12,8 @@
 
 ## Global Constraints
 
-- SprintX deve ficar em `8e2547c6a7f43f3cdb6d5d01845a4ce61b10ba36`.
-- MergeX deve ficar em `ccee68c5c11b530836cc26efc6058aba150e0436`.
+- SprintX deve ficar em `c26185429a4545057ce019a4609d31d18f349168`.
+- MergeX deve ficar em `32d9b929572228790a9b2072bf187c0d23174c89`.
 - Snapshots vêm somente de `scripts/fixture-candidatos.sh`.
 - A prova usa `expxdev init` real, HOME isolado e scripts instalados.
 - BuildX, produto, cache, marketplace e instalação global ficam fora do escopo.

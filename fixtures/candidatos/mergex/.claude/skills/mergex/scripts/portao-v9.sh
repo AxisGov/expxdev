@@ -420,7 +420,9 @@ printf 'base=%s\norigem_base=%s\n' "$BASE" "$ORIGEM_BASE"
 cat "$AVISOS"
 if [ -s "$TMP_DIR/fora" ]; then
   printf 'resultado=v9\n'
-  LC_ALL=C sort -u "$TMP_DIR/fora"
+  # O terceiro campo é detalhe interno da reconciliação de predecessores. O
+  # contrato público da V9 expõe somente o diagnóstico e o caminho.
+  LC_ALL=C sort -u "$TMP_DIR/fora" | awk -F'\t' '{ print $1 "\t" $2 }' | LC_ALL=C sort -u
   exit 1
 fi
 printf 'resultado=ok\n'
