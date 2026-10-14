@@ -8,7 +8,7 @@ Certificar no ExpxDev, como um único par compatível, os merges que introduzem 
 
 Uma única PR atualiza os dois candidatos:
 
-- SprintX `08d61730e3280a92837083ff0271fb89d167380c`;
+- SprintX `8e2547c6a7f43f3cdb6d5d01845a4ce61b10ba36`;
 - MergeX `ccee68c5c11b530836cc26efc6058aba150e0436`.
 
 Os dois pins mudam juntos porque formam um contrato produtor/consumidor. A SprintX registra `00-PREDECESSORES.md`; a MergeX prova o manifesto na V9 e oferece a retomada de uma entrega bloqueada exclusivamente por predecessores. Não haverá estado intermediário certificado com apenas um lado novo.
