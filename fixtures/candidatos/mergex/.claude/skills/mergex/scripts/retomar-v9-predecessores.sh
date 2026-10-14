@@ -75,7 +75,7 @@ lista_topo() { # <arquivo> <chave>; somente lista inline [] ou bloco simples
 }
 
 prova() {
-  local head modo out rc pred desv
+  local head modo out rc pred desv branch_ativa branch_entrega
   [ -z "$(git status --porcelain=v1 --untracked-files=all 2>/dev/null)" ] \
     || { RET_ERRO='arvore ou stage sujo'; return 1; }
   head="$(git rev-parse --verify -q 'HEAD^{commit}' 2>/dev/null)" \
@@ -90,6 +90,11 @@ prova() {
     && [ "$(catalogo_fm "$TMP_DIR/entrega-head" trabalho_id)" = "$TRABALHO" ] \
     && [ "$(catalogo_fm "$TMP_DIR/entrega-head" expx_tool)" = sprintx ] \
     || { RET_ERRO='contexto da entrega diverge'; return 1; }
+  branch_ativa="$(git symbolic-ref --quiet --short HEAD 2>/dev/null)" \
+    || { RET_ERRO='HEAD destacado nao corresponde a branch da entrega'; return 1; }
+  branch_entrega="$(catalogo_fm "$TMP_DIR/entrega-head" branch)"
+  [ -n "$branch_entrega" ] && [ "$branch_ativa" = "$branch_entrega" ] \
+    || { RET_ERRO='branch ativa diverge da entrega'; return 1; }
   [ "$(catalogo_fm "$TMP_DIR/entrega-head" estado)" = bloqueado ] \
     && [ "$(catalogo_fm "$TMP_DIR/entrega-head" portao)" = bloqueado ] \
     && [ "$(catalogo_fm "$TMP_DIR/entrega-head" falhas_portao)" = '[v9]' ] \

@@ -138,7 +138,13 @@ adquirir() {
     printf 'instante=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf 'raiz=%s\n' "$(raiz_da_worktree)"
     printf 'indice=%s\n' "$(indice_da_worktree)"
-  } > "$trava/dono" || { ERRO="trava criada sem diagnóstico em $trava"; return 1; }
+  } > "$trava/dono" || {
+    rm -f "$trava/dono" 2>/dev/null || true
+    if ! rmdir "$trava" 2>/dev/null; then
+      ERRO="trava criada sem diagnóstico e não pôde ser removida: $trava"; return 1
+    fi
+    ERRO="trava criada sem diagnóstico; aquisição desfeita em $trava"; return 1
+  }
   printf 'trava=%s\n' "$trava"
   printf 'token=%s\n' "$token"
 }
