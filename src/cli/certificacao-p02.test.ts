@@ -24,18 +24,16 @@ import {
 } from "../teste/candidatos.js";
 
 /**
- * Certificação P0.2: SprintX 796895a + MergeX bda918a instaladas SÓ pelo
+ * Certificação P0.2: SprintX 08d6173 + MergeX ccee68c instaladas SÓ pelo
  * `expxdev init` real (o binário do `dist/`, num processo novo), a partir dos
  * snapshots fixados em `fixtures/candidatos/`. Nenhum arquivo é copiado,
  * nenhum settings ou hooks.json é montado à mão: o que está no produto é o que
  * o `init` escreveu.
  *
- * `796895a` é o merge do PR AxisGov/sprintx#14 na `p0.2/sprintx-rastro-identidade`,
- * e descende de `e0582cd` — o pin anterior, que já trazia no próprio commit o corte
- * UTF-8 antes propagado à mão. O que o commit novo acrescenta é a correção dos
- * achados que a auditoria levantou sobre o candidato: entre eles, a saída de suíte
- * COLORIDA classificada certo (a cor colava a sequência ANSI em `[ERROR]` e em
- * `BUILD FAILURE`, e a suíte vermelha entrava no rastro como `ok`).
+ * Os dois commits são os merges coordenados dos PRs AxisGov/sprintx#17 e
+ * AxisGov/mergex#8. A SprintX produz `00-PREDECESSORES.md` com prova pela
+ * história Git; a MergeX consome essa prova na V9 e permite retomar uma entrega
+ * bloqueada exclusivamente pelos predecessores demonstrados.
  *
  * Os dois snapshots são o commit, byte a byte — não há propagação a reaplicar.
  */
@@ -240,9 +238,53 @@ describe("P0.2 — init real de SprintX + MergeX", () => {
 
   it("funcional: 8 — o catálogo de método da MergeX está instalado pelo mecanismo normal", () => {
     const rel = ".claude/skills/mergex/scripts/catalogo-de-metodo.sh";
-    expect(CANDIDATOS.mergex.sha).toBe("bda918a62171bc22affb57131cc0ef44d2958d25");
+    expect(CANDIDATOS.sprintx.sha).toBe("08d61730e3280a92837083ff0271fb89d167380c");
+    expect(CANDIDATOS.mergex.sha).toBe("ccee68c5c11b530836cc26efc6058aba150e0436");
     expect(sha256(join(A, rel))).toBe(sha256(join(snapshot("mergex"), rel)));
     expect(readFileSync(join(A, rel), "utf8")).toContain("PREFLIGHT.md");
+  });
+
+  it("integração: o produtor SprintX instalado gera predecessores que a MergeX instalada prova", () => {
+    const p = produto();
+    expect(init(p, "sprintx,mergex").status).toBe(0);
+
+    const produtor = join(p, ".claude/skills/sprintx/scripts/predecessores.sh");
+    const consumidor = join(p, ".claude/skills/mergex/scripts/predecessores-sprintx.sh");
+    expect(existsSync(produtor)).toBe(true);
+    expect(existsSync(consumidor)).toBe(true);
+
+    mkdirSync(join(p, "docs/superpowers/specs"), { recursive: true });
+    mkdirSync(join(p, "docs/superpowers/plans"), { recursive: true });
+    mkdirSync(join(p, "docs/sprintx/features/protocolo-predecessores"), { recursive: true });
+    writeFileSync(join(p, "docs/superpowers/specs/protocolo-design.md"), "# Especificacao\n");
+    writeFileSync(join(p, "docs/superpowers/plans/protocolo.md"), "# Plano\n");
+    gitEm(p, "add", "docs/superpowers");
+    gitEm(p, "commit", "-q", "-m", "docs: registra predecessores");
+    writeFileSync(join(p, "docs/sprintx/features/protocolo-predecessores/00-PLANEJAMENTO.md"), "# Planejamento\n");
+
+    for (const [papel, caminho] of [
+      ["especificacao", "docs/superpowers/specs/protocolo-design.md"],
+      ["plano", "docs/superpowers/plans/protocolo.md"],
+    ] as const) {
+      const registro = spawnSync(
+        bashDosHooks(),
+        [produtor, "--registrar", "protocolo-predecessores", "--origem", "superpowers", "--papel", papel, "--caminho", caminho],
+        { cwd: p, encoding: "utf8" },
+      );
+      expect(registro.status, registro.stderr).toBe(0);
+    }
+
+    gitEm(p, "add", "docs/sprintx/features/protocolo-predecessores");
+    gitEm(p, "commit", "-q", "-m", "chore(sprintx): nasce planejamento");
+    const head = gitEm(p, "rev-parse", "HEAD").trim();
+    const prova = spawnSync(
+      bashDosHooks(),
+      [consumidor, "--verificar", "--rev", head, "--trabalho", "protocolo-predecessores"],
+      { cwd: p, encoding: "utf8" },
+    );
+    expect(prova.status, prova.stderr).toBe(0);
+    expect(prova.stdout.split("\n").filter((linha) => linha.startsWith("predecessor\t"))).toHaveLength(2);
+    expect(prova.stdout).toContain("resultado=ok\n");
   });
 
   it("funcional: 9 — os hooks do núcleo continuam instalados e registrados", () => {

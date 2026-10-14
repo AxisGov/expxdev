@@ -135,6 +135,24 @@ Antes do E2, a sprintx entrega explicitamente id/origem/`ENTREGA.md` à ação `
 
 **Auditoria reprovada na F5 faz o E2 barrar** (verificação V6). Se o `00-AUDITORIA.md` do trabalho existe e não contém `VEREDITO: SIM`, ou tem achado ALTA em aberto, o portão devolve `BLOQUEADO` e o fluxo encerra. Achado ALTA manda voltar para a F3 — e um plano que voltou para a F3 não tem entrega a fazer.
 
+### Predecessores verificáveis e retomada estreita da V9
+
+Quando a SprintX publica `00-PREDECESSORES.md`, ele é uma fonte adicional e exata da V9. A MergeX valida o manifesto com `predecessores-sprintx.sh`: conteúdo e código de saída formam um protocolo único. Código zero sem `resultado=`, resultado duplicado, saída truncada ou divergência entre texto e código é `v9_sem_prova`; nunca é aprovação por código de saída isolado.
+Os caminhos aceitos ficam sob `docs/superpowers/`, usam scalar YAML seguro (ASCII imprimível,
+sem espaço final) e carregam OIDs
+completos conforme o formato Git do repositório (SHA-1 ou SHA-256).
+
+A ordem operacional é fechada:
+
+```text
+registrar → validar → checkpoint predecessores → verificar retomada →
+aplicar/checkpoint retomada → pre-e2 → E2 completo
+```
+
+O checkpoint `predecessores` persiste somente o manifesto. A retomada pós-E8 existe apenas quando a entrega terminou sem publicação, com `estado: bloqueado`, `portao: bloqueado`, `falhas_portao: [v9]` e `causa: arquivo_fora_do_plano`, e quando a V9 agora fica verde exclusivamente pelos predecessores comprovados. `retomar-v9-predecessores` limpa somente o estado terminal da entrega, não altera task concluída, plano, base, reconciliação nem `ENTREGA.commits`, não cria `seq` e manda executar o E2 inteiro novamente. O contrato detalhado está em `references/13-predecessores-sprintx.md`.
+
+Versões anteriores da MergeX não entendem esse manifesto e continuam barrando os arquivos predecessores como fora do plano. O ExpxDev só pode instalar a combinação depois de os PRs correspondentes da SprintX e da MergeX estarem integrados e certificados juntos.
+
 ## O que a mergex consome da sprintx
 
 A coluna "Onde" vale para as duas formas: `docs/sprintx/features/<slug>/` (canônico) e `docs/<slug>/` (formato antigo).

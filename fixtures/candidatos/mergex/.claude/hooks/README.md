@@ -59,7 +59,7 @@ A mensagem (`-m` ou arquivo de `-F`) declara uma de três classes mecânicas:
 
 - **E1:** exatamente um `Task:` e um `Trabalho:`, sem `Metodo:`;
 - **método:** exatamente um `Trabalho:` e um `Metodo:`, do enum fechado
-  `pre-e2 | reconciliacao-base | pre-e6 | e8`, sem `Task:`;
+  `pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | pre-e6 | e8`, sem `Task:`;
 - **integração de base:** exatamente um `Trabalho:` e um `Integra-base:` com o
   SHA completo do segundo pai, sem `Task:` nem `Metodo:` — o merge que integra
   uma base que avançou depois do E8

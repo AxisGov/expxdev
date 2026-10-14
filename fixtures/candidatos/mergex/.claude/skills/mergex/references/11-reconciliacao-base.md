@@ -248,7 +248,7 @@ Os mesmos nos dois modos:
 ## Checkpoint de método `reconciliacao-base`
 
 O enum de `persistir-metodo.sh`, `contrato-de-commit.sh` e `catalogo-de-metodo.sh` é
-`pre-e2 | reconciliacao-base | pre-e6 | e8`.
+`pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | pre-e6 | e8`.
 
 - Catálogo do checkpoint: `docs/entregas/<trabalho_id>/ENTREGA.md` e os
   `RECONCILIACAO-BASE-NNN.md` de `ENTREGA.reconciliacoes`, sujos. Nada de produto, de teste ou de

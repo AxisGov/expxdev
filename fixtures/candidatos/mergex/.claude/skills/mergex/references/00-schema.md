@@ -398,6 +398,16 @@ ela não inventa.
 
 ## A causa do bloqueio — `falhas_portao` e `causa`
 
+### Retomada estreita de predecessores SprintX
+
+O estado terminal `bloqueado` só pode voltar a `aberto` pelo protocolo de
+`references/13-predecessores-sprintx.md`: bloqueio exclusivo `[v9]`, causa
+`arquivo_fora_do_plano`, sem push nem PR, e `desvios` exatamente iguais aos
+predecessores historicamente provados. A transição limpa apenas `portao`,
+`portao_sha`, `falhas_portao`, `causa` e `desvios`; não altera tasks,
+`commits`, base, reconciliações nem datas históricas. O checkpoint
+`retomar-v9-predecessores` torna essa reabertura durável antes de um novo E2.
+
 Quando o portão barra, quem vem depois (a buildx, uma sessão futura, uma pessoa) precisa saber
 **por que** — lendo o `ENTREGA.md` commitado (`git show <branch>:docs/entregas/<trabalho_id>/ENTREGA.md`),
 sem depender da memória da sessão nem da prosa. Duas chaves respondem isso, e as duas seguem a

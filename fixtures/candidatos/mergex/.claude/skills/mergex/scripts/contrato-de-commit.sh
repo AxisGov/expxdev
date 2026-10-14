@@ -83,7 +83,7 @@ case "$ACAO" in
     ;;
   --validar-metodo)
     [ -z "$TASK" ] || uso '--validar-metodo não recebe --task'
-    case "$CHECKPOINT" in pre-e2|reconciliacao-base|pre-e6|e8) ;; *) uso "checkpoint inválido: ${CHECKPOINT:-ausente}" ;; esac
+    case "$CHECKPOINT" in pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|pre-e6|e8) ;; *) uso "checkpoint inválido: ${CHECKPOINT:-ausente}" ;; esac
     [ "$Q_TASK" = 0 ] || invalido "commit de método não aceita Task; encontrou $Q_TASK"
     [ "$Q_TRABALHO" = 1 ] || invalido "método exige exatamente um Trabalho; encontrou $Q_TRABALHO"
     [ "$Q_METODO" = 1 ] || invalido "método exige exatamente um Metodo; encontrou $Q_METODO"

@@ -21,12 +21,14 @@ Descubra em que ponto o trabalho está e siga daí:
 O fluxo do fim, com checkpoints explícitos:
 
 1. **pre-e2** — ação auditável: `persistir-metodo.sh --persistir ... --checkpoint pre-e2`.
-2. **E2** — prova o `pre-push` com `ativacao-pre-push.sh --provar` (falhou: o E2 não começa; fora de um repositório Git a prova é dispensada, pelo Git real), chama apenas `persistir-metodo.sh --verificar ... --checkpoint pre-e2` e então roda o portão; grava o resultado só por `registrar-portao.sh`. `BLOQUEADO` pula E3–E7 e segue ao E8.
+2. **E2** — prova o `pre-push` com `ativacao-pre-push.sh --provar` (falhou: o E2 não começa; fora de um repositório Git a prova é dispensada, pelo Git real), chama apenas `persistir-metodo.sh --verificar ... --checkpoint pre-e2` e então roda o portão; em trabalho SprintX, a V9 inclui `00-PREDECESSORES.md` por `predecessores-sprintx.sh` e exige conteúdo+código coerentes (`resultado=v9_sem_prova` falha fechado); grava o resultado só por `registrar-portao.sh`. `BLOQUEADO` pula E3–E7 e segue ao E8.
 3. **E3 → E5** — atenção, descrição do PR e pacote de QA.
 4. **pre-e6** — ação auditável: `persistir-metodo.sh --persistir ... --checkpoint pre-e6`.
 5. **E6** — chama apenas `persistir-metodo.sh --verificar ... --checkpoint pre-e6` antes do push.
 6. **E7** — abertura do pull request.
 7. **E8** — grava o terminal e chama `persistir-metodo.sh --persistir ... --checkpoint e8`; só depois publica o commit final no caminho entregue.
+
+Se um E8 sem publicação foi bloqueado exclusivamente por `[v9]`/`arquivo_fora_do_plano` e o manifesto de predecessores tornou a V9 verde, a única retomada é explícita: siga `references/13-predecessores-sprintx.md` e rode `retomar-v9-predecessores.sh --verificar --entrega docs/entregas/<trabalho>/ENTREGA.md --origem sprintx --trabalho <trabalho>`; só com `ok=true`, repita todos os argumentos com `--aplicar` e reexecute o E2 completo. Nunca edite task concluída, fabrique `seq` ou reabra a entrega à mão.
 
 Leia o reference da etapa atual antes de agir, e somente o dela.
 

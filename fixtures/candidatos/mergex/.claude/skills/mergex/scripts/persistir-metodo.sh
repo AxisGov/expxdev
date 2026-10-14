@@ -38,7 +38,7 @@ CHECKPOINT=""
 
 uso() {
   printf '%s\n' \
-    'uso: persistir-metodo.sh --listar|--persistir|--verificar --entrega <ENTREGA.md> --origem <sprintx|runx> --trabalho <id> --checkpoint <pre-e2|reconciliacao-base|pre-e6|e8>' >&2
+    'uso: persistir-metodo.sh --listar|--persistir|--verificar --entrega <ENTREGA.md> --origem <sprintx|runx> --trabalho <id> --checkpoint <pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|pre-e6|e8>' >&2
   exit 64
 }
 
@@ -57,7 +57,7 @@ done
 
 case "$MODO" in listar|persistir|verificar) ;; *) uso ;; esac
 case "$ORIGEM" in sprintx|runx) ;; *) uso ;; esac
-case "$CHECKPOINT" in pre-e2|reconciliacao-base|pre-e6|e8) ;; *) uso ;; esac
+case "$CHECKPOINT" in pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|pre-e6|e8) ;; *) uso ;; esac
 case "$TRABALHO" in
   ''|*[!A-Za-z0-9._-]*|.*|sprintx|manutencao|entregas|eventos|relatorios|legado|stack|projeto) uso ;;
 esac
@@ -80,6 +80,7 @@ TMP_LISTA=""
 TMP_MSG=""
 TMP_CATALOGO=""
 TMP_HIST=""
+TMP_STATUS=""
 
 encerrar() {
   local rc="$1"
@@ -87,6 +88,7 @@ encerrar() {
   [ -z "$TMP_MSG" ] || rm -f "$TMP_MSG"
   [ -z "$TMP_CATALOGO" ] || rm -f "$TMP_CATALOGO"
   [ -z "$TMP_HIST" ] || rm -rf "$TMP_HIST"
+  [ -z "$TMP_STATUS" ] || rm -f "$TMP_STATUS"
   [ -z "${TMP_PROVA:-}" ] || rm -f "$TMP_PROVA"
   if [ "$LIBERAR_NA_SAIDA" = 1 ] && [ -n "$TOKEN" ]; then
     liberar "$TOKEN" >/dev/null 2>&1
@@ -686,8 +688,10 @@ confere_historico_corrente() {
 # existe, é arquivo regular e está dirty.
 TMP_CATALOGO="$(mktemp "${TMPDIR:-/tmp}/mergex-catalogo.XXXXXX")" || para 'não foi possível criar catálogo temporário'
 catalogo_metodo "$RAIZ" "$ORIGEM" "$TRABALHO" "$PASTA" "$CHECKPOINT" > "$TMP_CATALOGO" || para "$CATALOGO_ERRO"
-# O checkpoint reconciliacao-base nunca leva o HISTORICO global.
-[ "$ORIGEM" = sprintx ] && [ "$CHECKPOINT" != reconciliacao-base ] && confere_historico_corrente
+# Os checkpoints estreitos de recuperação nunca levam o HISTORICO global.
+case "$ORIGEM:$CHECKPOINT" in
+  sprintx:pre-e2|sprintx:pre-e6|sprintx:e8) confere_historico_corrente ;;
+esac
 while IFS= read -r caminho; do
   [ -n "$caminho" ] || continue
   adiciona "$caminho"
@@ -698,6 +702,40 @@ LC_ALL=C sort -u -o "$TMP_LISTA" "$TMP_LISTA"
 if [ "$MODO" = listar ]; then
   cat "$TMP_LISTA"
   exit 0
+fi
+
+# O checkpoint de predecessores é atômico e estreito: enquanto ele prepara ou
+# verifica o manifesto, nenhum outro caminho pode estar dirty. O status em NUL
+# preserva nomes arbitrários; o prefixo XY e o espaço são removidos sem
+# interpretar o caminho. O stage já foi recusado acima, antes desta leitura.
+if [ "$CHECKPOINT" = predecessores ]; then
+  MANIFESTO_PREDECESSORES="$PASTA/00-PREDECESSORES.md"
+  [ -f "$RAIZ/$MANIFESTO_PREDECESSORES" ] && [ ! -L "$RAIZ/$MANIFESTO_PREDECESSORES" ] \
+    || para "$MANIFESTO_PREDECESSORES deve existir como arquivo regular"
+
+  # `--verificar` prova o checkpoint já persistido. `--persistir` aceita um
+  # manifesto novo somente enquanto ele está dirty; um noop só é válido quando
+  # HEAD já contém o artefato como blob regular. Isso impede que ausência,
+  # remoção ou troca por symlink sejam tratadas como lista vazia bem-sucedida.
+  MANIFESTO_EM_HEAD="$(git -C "$RAIZ" ls-tree HEAD -- "$MANIFESTO_PREDECESSORES" 2>/dev/null \
+    | awk '$1 != "120000" && $2 == "blob" { print "sim" }')"
+  if [ "$MODO" = verificar ]; then
+    [ "$MANIFESTO_EM_HEAD" = sim ] \
+      || para "$MANIFESTO_PREDECESSORES ainda não foi persistido em HEAD"
+  elif ! sujo "$MANIFESTO_PREDECESSORES"; then
+    [ "$MANIFESTO_EM_HEAD" = sim ] \
+      || para "$MANIFESTO_PREDECESSORES ausente de HEAD e sem mudança para persistir"
+  fi
+
+  TMP_STATUS="$(mktemp "${TMPDIR:-/tmp}/mergex-status.XXXXXX")" \
+    || para 'não foi possível preparar a prova da árvore'
+  git -C "$RAIZ" status --porcelain=v1 -z --untracked-files=all > "$TMP_STATUS" 2>/dev/null \
+    || para 'não foi possível provar a árvore do checkpoint predecessores'
+  while IFS= read -r -d '' registro; do
+    caminho_sujo="${registro#???}"
+    [ "$caminho_sujo" = "$PASTA/00-PREDECESSORES.md" ] \
+      || para "árvore suja fora do artefato esperado: $caminho_sujo"
+  done < "$TMP_STATUS"
 fi
 
 # DM-184: nos checkpoints pre-e6 e e8, um ENTREGA.md com `portao: pronto` (lido
