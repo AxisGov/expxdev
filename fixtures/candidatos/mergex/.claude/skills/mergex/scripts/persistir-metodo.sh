@@ -846,5 +846,9 @@ bash "$CONTRATO_SH" --validar-metodo --trabalho "$TRABALHO" \
   || para 'commit criado não satisfaz o contrato de método'
 
 SHA="$(git rev-parse HEAD 2>/dev/null)"
-printf '%s\n' "$SHA" | grep -Eq '^[0-9a-f]{40}$' || para 'commit criado sem SHA completo legível'
+FORMATO_OBJETOS="$(git rev-parse --show-object-format 2>/dev/null)" \
+  || para 'formato de objetos Git ilegível depois do commit'
+case "$FORMATO_OBJETOS" in sha1) OID_LEN=40 ;; sha256) OID_LEN=64 ;; *) para "formato de objetos Git não suportado: $FORMATO_OBJETOS" ;; esac
+[ "${#SHA}" -eq "$OID_LEN" ] && case "$SHA" in *[!0-9a-f]*) false ;; *) true ;; esac \
+  || para 'commit criado sem OID completo legível'
 printf 'commit=%s\n' "$SHA"

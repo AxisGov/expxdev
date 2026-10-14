@@ -400,14 +400,16 @@ g diff --raw -z --no-abbrev --no-renames --ignore-submodules=none "$BASE...$HEAD
   || sem_prova "diff $BASE...HEAD não calculável" # guarda:SUB
 contem() { grep -Fxq -e "$2" "$1"; }
 : > "$TMP_DIR/fora"
-cat "$TMP_DIR/predecessores-fora" >> "$TMP_DIR/fora"
 while IFS= read -r -d '' cab <&3 && IFS= read -r -d '' p <&3; do
   case "$p" in
     *"$NL"*|*"$TAB"*) printf 'fora_do_plano\t%s\n' "$(printf '%s' "$p" | tr '\t\n' '??')" >> "$TMP_DIR/fora"; continue ;;
   esac
   contem "$TMP_DIR/uniao" "$p" && continue
   contem "$TMP_DIR/predecessores-aceitos" "$p" && continue
-  if awk -F'\t' -v p="$p" '$1 == "fora_do_plano" && $2 == p { achou=1 } END { exit !achou }' "$TMP_DIR/predecessores-fora"; then continue; fi
+  if awk -F'\t' -v p="$p" '$1 == "fora_do_plano" && $2 == p { achou=1 } END { exit !achou }' "$TMP_DIR/predecessores-fora"; then
+    printf 'fora_do_plano\t%s\tblob_divergente\n' "$p" >> "$TMP_DIR/fora"
+    continue
+  fi
   # submódulo (gitlink) fora da união: nunca isento nem coberto
   case "$cab" in ':160000 '*|':'*' 160000 '*) printf 'fora_do_plano\t%s\n' "$p" >> "$TMP_DIR/fora"; continue ;; esac # guarda:SUB
   case "$p" in "$PASTA"/*|"$DIR_E"/*) continue ;; esac

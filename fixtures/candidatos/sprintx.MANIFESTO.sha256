@@ -22,7 +22,7 @@ af8642903f504cb832d59576686c23d374a982c27c7c20f119aa4eded7419703  .claude/hooks/
 5bb2e6bdc53159876b260434dd6e385c5f3f184f56cf941ef2fd5c22016b01c4  .claude/hooks/sprintx/task-so-fecha-verde.sh
 b1323d31872393330339d3f09f46a5f0d7cfa4a880dc54a52be9d2863befb1f3  .claude/hooks/sprintx/tdd-teste-antes.sh
 c79f5061a97281b6b82f4593df8aded01adb631e356dae9d1594c5c0c6fd5da1  .claude/hooks/testes/agente-real-rastro.sh
-dfff697f9f7f07ecf3d2c9df9c7d42969d939dd0f6f6107e414e4eef928ba5e1  .claude/hooks/testes/bancada.sh
+d42e8f4fe286b6f587bf6ffc229c6ee28a48d2fc0f9343da7c5415249aa0ba38  .claude/hooks/testes/bancada.sh
 00dc2c2d5319710f73f5f54616c5b652aa3f99879f8c75444c8002abeeb13483  .claude/hooks/testes/transcrito-agente.sh
 0354c304ed52b1d41becc8df83b36f4a3bf0b3543316bf0e569347ca719fe43d  .claude/settings.json
 74f20f25871def773f8651519ece4f5a0d812c2a4b69d287e175a4e02809a893  .claude/skills/sprintx/DECISOES-DA-SKILL.md
@@ -54,7 +54,7 @@ c4267a0df409dfc4f06c668640c7e135cdf7237ebbea0c8d88278ac792ec9129  .claude/skills
 ddad9ed6cc45e9ddb885698d7f49cf45898c21deb70f6686993fc85f47982040  .claude/skills/sprintx/references/09-estado.md
 005ab46866a819c83a2c19acdd5a2459e13141dbc0f0148a644c591efda7af07  .claude/skills/sprintx/scripts/bloqueios.sh
 a85f685e523ba0324e1956eff60486005afb7904943036b97faa1ff01c24ad54  .claude/skills/sprintx/scripts/caminho-git.sh
-4927b333421f68d5ec3014feafd42a43d3d20eb2b2bce94bfdace74a7544b13f  .claude/skills/sprintx/scripts/lib/trava-autorizacao-f6.sh
+f0c8b51ec6ea3d8f6e91c7d619b004cc5a1f85b3f88c9f3bd88bfe5c4cde9f6d  .claude/skills/sprintx/scripts/lib/trava-autorizacao-f6.sh
 e9f2f714d6613dcd4f226bcf0f4b4dc581fea62291f27ef277a4af85e01e7da6  .claude/skills/sprintx/scripts/planejamento.sh
 13303e6a43bdf0547447fe5aeedbfcaa63c7a36a27045bd3fdbca8230663e9d3  .claude/skills/sprintx/scripts/predecessores.sh
 c24c5ae625245addb7ab75a77a2ae7311d2533c88c6c48c4f209df7dd978ebbe  .claude/skills/sprintx/scripts/rastro.sh
