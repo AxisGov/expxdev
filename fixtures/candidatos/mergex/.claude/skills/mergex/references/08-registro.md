@@ -20,7 +20,7 @@ Ao longo do trabalho, sempre no mesmo arquivo — e **nunca recriado do zero**:
 
 O resultado do E2 (`portao`, `portao_sha`, `falhas_portao`) é gravado só por `registrar-portao.sh`
 (`references/02-prontidao.md`). Os checkpoints de método que levam o arquivo ao histórico formam o
-enum fechado `pre-e2 | reconciliacao-base | pre-e6 | e8`.
+enum fechado `pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | pre-e6 | e8`.
 
 ## O contrato — `kind: entrega`
 
@@ -465,3 +465,13 @@ Avisos: <lista, ou "nenhum">
 | Remoto à frente na publicação final | Não publica, não reconcilia, não força; relata literal; branch local guarda o registro final |
 | Push final rejeitado (permissão, hook, proteção) | Erro literal no relatório; sem novo push automático; `push_feito: false` por commit corretivo quando ele estava `true` |
 | Sem remoto | Commit final local, `push_feito: false`; não é erro |
+
+## Reabertura por predecessores SprintX
+
+O E8 bloqueado não é reaberto por edição manual. A exceção estreita de
+`references/13-predecessores-sprintx.md` exige que `[v9]` seja a única falha,
+que não exista publicação nem PR e que cada desvio seja um predecessor
+historicamente provado. `retomar-v9-predecessores.sh --aplicar` altera somente
+as sete chaves da retomada — incluindo a atualização obrigatória de `atualizado_em` —,
+persiste `Metodo: retomar-v9-predecessores` e
+informa `proxima=E2`. O registro de tasks e a sequência E1 permanecem intactos.

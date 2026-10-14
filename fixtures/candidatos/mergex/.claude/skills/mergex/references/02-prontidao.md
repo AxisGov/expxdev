@@ -341,6 +341,13 @@ O `--resultado bloqueado` também grava `portao_sha` = `HEAD` avaliado, junto co
 
 O E8 roda em **fechamento bloqueado** (`references/08-registro.md`): grava `estado: bloqueado`, preserva `portao: bloqueado`, e commita esse registro para que o bloqueio sobreviva ao worktree. Ele **não publica a branch** — o portão proibiu o E6, e o fechamento não fura essa proibição. Ir ao E8 **não é continuar a entrega**: é finalizar e persistir o bloqueio.
 
+Quando o único bloqueio é V9 e os caminhos são predecessores SprintX consumidos
+antes do planejamento, a única retomada admitida é a de
+`references/13-predecessores-sprintx.md`. Depois dos checkpoints
+`predecessores` e `retomar-v9-predecessores`, recomece pela barreira
+`persistir-metodo.sh --verificar --checkpoint pre-e2` e rode **todas** as V1–V11.
+A retomada nunca reutiliza o resultado anterior e nunca salta diretamente para E3.
+
 O trabalho fica na branch, commitado até onde estava correto. Nada é desfeito, nada é descartado, nada é maquiado.
 
 ## Quando falha

@@ -298,6 +298,10 @@ Dois agentes rodam em contexto próprio, somente leitura: **`revisor-diff`** cla
 | [`legadox`](https://github.com/bittencourtthulio/legadox) | Sem acionamento próprio: raio, caracterização, reversão e dívida alimentam o portão, a classificação e o PR — [patch](docs/integracao/patch-legadox.md) |
 | [`stackx`](https://github.com/bittencourtthulio/stackx) | Convenções de branch, commit e teste vêm do `CONVENCOES.md` — [patch](docs/integracao/patch-stackx.md) |
 
+Na integração com a SprintX, `00-PREDECESSORES.md` pode provar spec e plano consumidos antes de o planejamento nascer. A MergeX valida o manifesto por conteúdo e código de saída, inclui somente esses caminhos exatos na V9 e falha fechado quando o protocolo é inconclusivo. Uma entrega encerrada sem publicação apenas por essa V9 pode usar a retomada estreita descrita em `references/13-predecessores-sprintx.md`; ela não altera tasks concluídas nem a sequência E1 e sempre volta ao E2 completo.
+
+Essa capacidade exige versões compatíveis das duas skills. MergeX anterior não entende o manifesto; o ExpxDev só deve instalar a combinação depois de os PRs de SprintX e MergeX estarem integrados e certificados juntos.
+
 Os patches em [`docs/integracao/`](docs/integracao/) são prompts prontos para colar no repositório de cada skill irmã. Nenhum deles altera comportamento quando a `mergex` não está instalada.
 
 ---

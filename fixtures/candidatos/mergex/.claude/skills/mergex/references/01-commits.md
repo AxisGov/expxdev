@@ -351,7 +351,7 @@ Eles **nunca contam como desvio** e **não entram no commit de uma task**: o inv
 
 ### Lifecycle dos artefatos de método
 
-O lifecycle tem três checkpoints executáveis e cumulativos: `pre-e2`, `pre-e6` e `e8`. Um quarto, `reconciliacao-base`, fica fora da cadeia cumulativa e só existe depois de um merge de base integrado após o E8 (`references/11-reconciliacao-base.md`). O enum fechado, na ordem do fluxo, é `pre-e2 | reconciliacao-base | pre-e6 | e8`.
+O lifecycle tem três checkpoints executáveis e cumulativos: `pre-e2`, `pre-e6` e `e8`. Três checkpoints estreitos ficam fora da cadeia cumulativa: `reconciliacao-base`, depois de um merge de base integrado após o E8 (`references/11-reconciliacao-base.md`); `predecessores`, que persiste somente o manifesto SprintX; e `retomar-v9-predecessores`, que persiste somente a reabertura da entrega. O enum fechado, na ordem do fluxo, é `pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | pre-e6 | e8`.
 
 **O `HISTORICO.md` não entra no commit de uma task.** Se estiver dirty, o catálogo `pre-e2` o seleciona pelo caminho global exato e prova, contra HEAD, que a mudança pertence ao trabalho explícito.
 
@@ -393,14 +393,34 @@ Trabalho: <trabalho_id>
 Metodo: reconciliacao-base
 ```
 
-**Commit de método é classe de primeira classe e não é E1.** A gramática da DM-162/163 era `Metodo: pre-e2 | pre-e6 | e8`; com a DM-178 ela é exatamente `Trabalho: <trabalho_id>` + `Metodo: pre-e2 | reconciliacao-base | pre-e6 | e8`, sem `Task:`. Ele não entra em `ENTREGA.commits`, não consome `seq` e não satisfaz V11.
+**5. `predecessores`, na recuperação estreita de uma V9 bloqueada.** Persiste somente `docs/sprintx/features/<trabalho_id>/00-PREDECESSORES.md`, sem adotar a entrega, tasks, plano, produto ou testes:
 
-**Por que três checkpoints cumulativos, e um quarto à parte.** Eles carregam estados diferentes do mesmo trabalho.
+```
+chore(mergex): persiste metodo predecessores
+
+Trabalho: <trabalho_id>
+Metodo: predecessores
+```
+
+**6. `retomar-v9-predecessores`, depois de a prova da V9 ser refeita.** Persiste somente `docs/entregas/<trabalho_id>/ENTREGA.md`, com a reabertura autorizada pelo protocolo de predecessores:
+
+```
+chore(mergex): persiste metodo retomar-v9-predecessores
+
+Trabalho: <trabalho_id>
+Metodo: retomar-v9-predecessores
+```
+
+**Commit de método é classe de primeira classe e não é E1.** A gramática é exatamente `Trabalho: <trabalho_id>` + `Metodo: pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | pre-e6 | e8`, sem `Task:`. Ele não entra em `ENTREGA.commits`, não consome `seq` e não satisfaz V11.
+
+**Por que três checkpoints cumulativos e três estreitos.** Eles carregam estados diferentes do mesmo trabalho.
 
 1. **pre-e2** — torna duráveis as provas que o portão vai avaliar.
 2. **pre-e6** — torna duráveis descrição, atenção e pacote de QA antes da publicação.
 3. **e8** — leva o estado que só existe depois do push e do PR.
 4. **reconciliacao-base** — torna durável o registro de uma base integrada depois do E8, para que o E2 seguinte o avalie. Não é cumulativo: o catálogo dele é só o `ENTREGA.md` e os artefatos de reconciliação (que `pre-e6` e `e8` também incluem).
+5. **predecessores** — torna durável somente o manifesto que prova os documentos consumidos antes do nascimento SprintX.
+6. **retomar-v9-predecessores** — torna durável somente a reabertura terminal autorizada; não reescreve tasks concluídas.
 
 Nenhum deles é task e nenhum deles entra na lista `commits`. **Ao retornar do E8, nenhuma atualização final da entrega fica dependendo de um trabalho futuro**: o que a entrega afirma está no commit para o qual a branch aponta.
 
@@ -410,7 +430,7 @@ O executor é o único escritor desses commits:
 bash .claude/skills/mergex/scripts/persistir-metodo.sh --persistir \
   --entrega docs/entregas/<trabalho_id>/ENTREGA.md \
   --origem <sprintx|runx> --trabalho <trabalho_id> \
-  --checkpoint <pre-e2|reconciliacao-base|pre-e6|e8>
+  --checkpoint <pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|pre-e6|e8>
 ```
 
 Ele deriva paths exatos, só inclui os que existem e estão dirty, usa a mesma trava C5, exige stage vazio, roda o gate de segredo e não cria commit vazio. E2 e E6 chamam somente `--verificar`; nunca usam gravação para corrigir o lifecycle por trás.
@@ -484,7 +504,7 @@ Testes: <o que os dois testes cobrem, resumido>
 | Classe | Trailers de controle | Quem cria |
 |---|---|---|
 | **E1** | exatamente um `Task:` e um `Trabalho:`; nenhum `Metodo:` | o E1, uma task por commit |
-| **método** | exatamente um `Trabalho:` e um `Metodo:` (`pre-e2`, `reconciliacao-base`, `pre-e6` ou `e8`); nenhum `Task:` | `persistir-metodo.sh` |
+| **método** | exatamente um `Trabalho:` e um `Metodo:` (`pre-e2`, `reconciliacao-base`, `predecessores`, `retomar-v9-predecessores`, `pre-e6` ou `e8`); nenhum `Task:` | `persistir-metodo.sh` |
 | **integração de base** | exatamente um `Trabalho:` e um `Integra-base:` com o SHA completo (40 hex) da base integrada; nenhum `Task:`, nenhum `Metodo:` | a pessoa (ou o agente, sob autorização) que concluiu o merge da base |
 
 O commit de integração da base é o merge `M` da reconciliação (`references/11-reconciliacao-base.md`): tem **exatamente dois pais**, e o segundo é o `Integra-base:`. Não é E1, não entra em `ENTREGA.commits`, não consome `seq` e não satisfaz V11. A MergeX não o cria — valida e registra.

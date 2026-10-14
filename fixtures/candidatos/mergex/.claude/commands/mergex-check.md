@@ -39,6 +39,8 @@ bash .claude/skills/mergex/scripts/reconciliacao-base.sh --verificar \
 
 Sem `ok=true`, o portão não emite `PRONTO`; relate os `motivo` (`references/11-reconciliacao-base.md`).
 
+Em trabalho SprintX, a V9 também lê o manifesto exato `00-PREDECESSORES.md` por `predecessores-sprintx.sh`. Valide conteúdo e código de saída juntos: `resultado=v9_sem_prova`, resultado ausente ou duplicado, saída truncada ou texto divergente do código falham fechado. Se a entrega já terminou sem publicação e foi bloqueada exclusivamente por `[v9]`/`arquivo_fora_do_plano`, não edite o terminal: use somente `retomar-v9-predecessores.sh --verificar --entrega docs/entregas/<trabalho>/ENTREGA.md --origem sprintx --trabalho <trabalho>` e, com `ok=true`, os mesmos argumentos com `--aplicar`, conforme `references/13-predecessores-sprintx.md`; depois rode novamente todas as V1–V11.
+
 Rode **todas as onze verificações**, mesmo depois de a primeira falhar — o usuário precisa da lista completa do que falta, não do primeiro erro. Verificação que não se aplica é marcada `n/a`, nunca omitida.
 
 | # | Verificação |

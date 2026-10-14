@@ -35,10 +35,11 @@ ENTREGA=""
 ORIGEM=""
 TRABALHO=""
 CHECKPOINT=""
+TRAVA_TOKEN_RECEBIDO=""
 
 uso() {
   printf '%s\n' \
-    'uso: persistir-metodo.sh --listar|--persistir|--verificar --entrega <ENTREGA.md> --origem <sprintx|runx> --trabalho <id> --checkpoint <pre-e2|reconciliacao-base|pre-e6|e8>' >&2
+    'uso: persistir-metodo.sh --listar|--persistir|--verificar --entrega <ENTREGA.md> --origem <sprintx|runx> --trabalho <id> --checkpoint <pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|pre-e6|e8> [--trava-token <token>]' >&2
   exit 64
 }
 
@@ -51,13 +52,17 @@ while [ "$#" -gt 0 ]; do
     --origem) [ "$#" -ge 2 ] || uso; ORIGEM="$2"; shift 2 ;;
     --trabalho) [ "$#" -ge 2 ] || uso; TRABALHO="$2"; shift 2 ;;
     --checkpoint) [ "$#" -ge 2 ] || uso; CHECKPOINT="$2"; shift 2 ;;
+    --trava-token) [ "$#" -ge 2 ] || uso; TRAVA_TOKEN_RECEBIDO="$2"; shift 2 ;;
     *) uso ;;
   esac
 done
 
 case "$MODO" in listar|persistir|verificar) ;; *) uso ;; esac
 case "$ORIGEM" in sprintx|runx) ;; *) uso ;; esac
-case "$CHECKPOINT" in pre-e2|reconciliacao-base|pre-e6|e8) ;; *) uso ;; esac
+case "$CHECKPOINT" in pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|pre-e6|e8) ;; *) uso ;; esac
+[ -z "$TRAVA_TOKEN_RECEBIDO" ] \
+  || { [ "$MODO" = persistir ] && [ "$CHECKPOINT" = retomar-v9-predecessores ]; } \
+  || uso
 case "$TRABALHO" in
   ''|*[!A-Za-z0-9._-]*|.*|sprintx|manutencao|entregas|eventos|relatorios|legado|stack|projeto) uso ;;
 esac
@@ -80,6 +85,8 @@ TMP_LISTA=""
 TMP_MSG=""
 TMP_CATALOGO=""
 TMP_HIST=""
+TMP_STATUS=""
+TMP_INDEX=""
 
 encerrar() {
   local rc="$1"
@@ -87,6 +94,8 @@ encerrar() {
   [ -z "$TMP_MSG" ] || rm -f "$TMP_MSG"
   [ -z "$TMP_CATALOGO" ] || rm -f "$TMP_CATALOGO"
   [ -z "$TMP_HIST" ] || rm -rf "$TMP_HIST"
+  [ -z "$TMP_STATUS" ] || rm -f "$TMP_STATUS"
+  [ -z "$TMP_INDEX" ] || rm -f "$TMP_INDEX" "$TMP_INDEX.lock"
   [ -z "${TMP_PROVA:-}" ] || rm -f "$TMP_PROVA"
   if [ "$LIBERAR_NA_SAIDA" = 1 ] && [ -n "$TOKEN" ]; then
     liberar "$TOKEN" >/dev/null 2>&1
@@ -96,15 +105,21 @@ encerrar() {
 trap 'encerrar $?' EXIT
 
 if [ "$MODO" = persistir ]; then
-  SAIDA_TRAVA="$(adquirir "metodo:$CHECKPOINT")"; RC_TRAVA=$?
-  if [ "$RC_TRAVA" = 2 ]; then
-    printf 'persistir-metodo: índice ocupado pela trava C5\n' >&2
-    exit 2
+  if [ -n "$TRAVA_TOKEN_RECEBIDO" ]; then
+    TOKEN="$TRAVA_TOKEN_RECEBIDO"
+    conferir "$TOKEN" >/dev/null 2>&1 \
+      || para 'a trava C5 herdada não existe ou pertence a outra execução'
+  else
+    SAIDA_TRAVA="$(adquirir "metodo:$CHECKPOINT")"; RC_TRAVA=$?
+    if [ "$RC_TRAVA" = 2 ]; then
+      printf 'persistir-metodo: índice ocupado pela trava C5\n' >&2
+      exit 2
+    fi
+    [ "$RC_TRAVA" = 0 ] || para 'não foi possível adquirir a trava C5 do índice'
+    TOKEN="$(printf '%s\n' "$SAIDA_TRAVA" | awk -F= '$1 == "token" { print $2 }')"
+    [ -n "$TOKEN" ] || para 'a trava C5 foi criada sem token'
+    LIBERAR_NA_SAIDA=1
   fi
-  [ "$RC_TRAVA" = 0 ] || para 'não foi possível adquirir a trava C5 do índice'
-  TOKEN="$(printf '%s\n' "$SAIDA_TRAVA" | awk -F= '$1 == "token" { print $2 }')"
-  [ -n "$TOKEN" ] || para 'a trava C5 foi criada sem token'
-  LIBERAR_NA_SAIDA=1
 fi
 
 if [ "$MODO" = persistir ] || [ "$MODO" = verificar ]; then
@@ -686,8 +701,10 @@ confere_historico_corrente() {
 # existe, é arquivo regular e está dirty.
 TMP_CATALOGO="$(mktemp "${TMPDIR:-/tmp}/mergex-catalogo.XXXXXX")" || para 'não foi possível criar catálogo temporário'
 catalogo_metodo "$RAIZ" "$ORIGEM" "$TRABALHO" "$PASTA" "$CHECKPOINT" > "$TMP_CATALOGO" || para "$CATALOGO_ERRO"
-# O checkpoint reconciliacao-base nunca leva o HISTORICO global.
-[ "$ORIGEM" = sprintx ] && [ "$CHECKPOINT" != reconciliacao-base ] && confere_historico_corrente
+# Os checkpoints estreitos de recuperação nunca levam o HISTORICO global.
+case "$ORIGEM:$CHECKPOINT" in
+  sprintx:pre-e2|sprintx:pre-e6|sprintx:e8) confere_historico_corrente ;;
+esac
 while IFS= read -r caminho; do
   [ -n "$caminho" ] || continue
   adiciona "$caminho"
@@ -699,6 +716,62 @@ if [ "$MODO" = listar ]; then
   cat "$TMP_LISTA"
   exit 0
 fi
+
+# Os checkpoints estreitos são atômicos: enquanto preparam ou verificam o
+# artefato, nenhum outro caminho pode estar dirty. A prova usa um índice
+# temporário reconstruído de HEAD; assim assume-unchanged e skip-worktree no
+# índice real não escondem alterações da working tree. O status em NUL e sem
+# renames preserva nomes arbitrários em um registro por caminho.
+case "$CHECKPOINT" in
+predecessores|retomar-v9-predecessores)
+  if [ "$CHECKPOINT" = predecessores ]; then
+    ARTEFATO_ESTREITO="$PASTA/00-PREDECESSORES.md"
+  else
+    ARTEFATO_ESTREITO="$ENTREGA"
+  fi
+
+  if [ "$CHECKPOINT" = predecessores ]; then
+  MANIFESTO_PREDECESSORES="$PASTA/00-PREDECESSORES.md"
+  [ -f "$RAIZ/$MANIFESTO_PREDECESSORES" ] && [ ! -L "$RAIZ/$MANIFESTO_PREDECESSORES" ] \
+    || para "$MANIFESTO_PREDECESSORES deve existir como arquivo regular"
+
+  # `--verificar` prova o checkpoint já persistido. `--persistir` aceita um
+  # manifesto novo somente enquanto ele está dirty; um noop só é válido quando
+  # HEAD já contém o artefato como blob regular. Isso impede que ausência,
+  # remoção ou troca por symlink sejam tratadas como lista vazia bem-sucedida.
+  MANIFESTO_EM_HEAD="$(git -C "$RAIZ" ls-tree HEAD -- "$MANIFESTO_PREDECESSORES" 2>/dev/null \
+    | awk '$1 != "120000" && $2 == "blob" { print "sim" }')"
+  if [ "$MODO" = verificar ]; then
+    [ "$MANIFESTO_EM_HEAD" = sim ] \
+      || para "$MANIFESTO_PREDECESSORES ainda não foi persistido em HEAD"
+  elif ! sujo "$MANIFESTO_PREDECESSORES"; then
+    [ "$MANIFESTO_EM_HEAD" = sim ] \
+      || para "$MANIFESTO_PREDECESSORES ausente de HEAD e sem mudança para persistir"
+  fi
+  fi
+
+  TMP_INDEX="$(mktemp "${TMPDIR:-/tmp}/mergex-index.XXXXXX")" \
+    || para 'não foi possível preparar o índice temporário da prova'
+  rm -f "$TMP_INDEX"
+  GIT_INDEX_FILE="$TMP_INDEX" git -C "$RAIZ" read-tree HEAD 2>/dev/null \
+    || para 'não foi possível reconstruir HEAD para provar a árvore'
+  TMP_STATUS="$(mktemp "${TMPDIR:-/tmp}/mergex-status.XXXXXX")" \
+    || para 'não foi possível preparar a prova da árvore'
+  GIT_INDEX_FILE="$TMP_INDEX" git -C "$RAIZ" status --porcelain=v1 -z \
+    --untracked-files=all --no-renames --ignore-submodules=none > "$TMP_STATUS" 2>/dev/null \
+    || para "não foi possível provar a árvore do checkpoint $CHECKPOINT"
+  ARTEFATO_VISTO=0
+  while IFS= read -r -d '' registro; do
+    caminho_sujo="${registro#???}"
+    [ "$caminho_sujo" = "$ARTEFATO_ESTREITO" ] \
+      || para "árvore suja fora do artefato esperado: $caminho_sujo"
+    ARTEFATO_VISTO=1
+  done < "$TMP_STATUS"
+  if [ "$ARTEFATO_VISTO" = 1 ] && ! sujo "$ARTEFATO_ESTREITO"; then
+    para "mudança oculta por bits do índice: $ARTEFATO_ESTREITO"
+  fi
+  ;;
+esac
 
 # DM-184: nos checkpoints pre-e6 e e8, um ENTREGA.md com `portao: pronto` (lido
 # como a validade do portão o lê) só é persistido — ou aceito pelo --verificar
