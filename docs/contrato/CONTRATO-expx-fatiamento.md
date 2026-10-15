@@ -107,8 +107,12 @@ Duas, e só elas:
   e F3 a aviso e imprime o motivo;
 - **artefato gerado**: snapshot e fixture regenerados por script, em commit
   separado do código que os motivou, com o comando que os gerou no corpo da PR.
+  O que casa com `FATIA_IGNORAR` fica fora de F2, F3 **e F4**, e também fora da
+  revisão automática (`exclude_files` em `.codeant/configuration.json`): ninguém
+  revisa a cópia, então o limite do revisor não se aplica a ela. O tamanho do
+  original é conferido no repositório de onde ele vem.
 
-F4 não tem exceção: o limite de arquivo é do revisor, não nosso.
+Fora disso, F4 não tem exceção: o limite de arquivo é do revisor, não nosso.
 
 ## Como verificar
 
