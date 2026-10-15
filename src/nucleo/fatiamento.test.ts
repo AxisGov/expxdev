@@ -179,6 +179,29 @@ describe("verificar-fatiamento.sh", () => {
     expect(r.saida).toMatch(/aviso\s+F4: medio\.txt tem \d+ KB e 3500 linhas, perto do limite/);
   });
 
+  it("funcional: F4 — a última linha sem quebra conta (4.001 linhas, não 4.000)", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "sem-quebra.txt", "a\n".repeat(4000) + "b");
+    commita(d, "feat: arquivo sem quebra no fim");
+    const r = verifica(d, { FATIA_MAX_LINHAS_PR: "9000", FATIA_MAX_LINHAS_COMMIT: "9000" });
+    expect(r.codigo).toBe(1);
+    expect(r.saida).toMatch(/cresceram \d+ bytes e 4001 linhas.*sem-quebra\.txt/);
+  });
+
+  it("funcional: snapshot gerado acima do limite que cresce não viola F4 (fora da revisão)", () => {
+    const d = repo();
+    escreve(d, "fixtures/candidatos/x/DECISOES.md", "x".repeat(160 * 1024) + "\n");
+    commita(d, "chore: snapshot grande ja existente");
+    git(d, "switch", "-q", "-c", "feature");
+    git(d, "branch", "-f", "main", "HEAD");
+    escreve(d, "fixtures/candidatos/x/DECISOES.md", "x".repeat(190 * 1024) + "\n");
+    commita(d, "chore: snapshot regenerado");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(0);
+    expect(r.saida).not.toContain("DECISOES.md");
+  });
+
   it("funcional: arquivo gerado em caminho com espaço também não conta (FATIA_IGNORAR)", () => {
     const d = repo();
     git(d, "switch", "-q", "-c", "feature");
