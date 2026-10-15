@@ -108,9 +108,20 @@ Duas, e só elas:
 - **artefato gerado**: snapshot e fixture regenerados por script, em commit
   separado do código que os motivou, com o comando que os gerou no corpo da PR.
   O que casa com `FATIA_IGNORAR` fica fora de F2, F3 **e F4**, e também fora da
-  revisão automática (`.codeant/configuration.json` declara `review_configuration.exclude` e `file_filters.config.exclude_files`, as duas chaves que a documentação do CodeAnt cita; na revisão de PR nenhuma das duas bastou — a #24 teve achados em `fixtures/candidatos/` com as duas no `main` —, e a exclusão efetiva depende da configuração do repositório no painel do CodeAnt): ninguém
-  revisa a cópia, então o limite do revisor não se aplica a ela. O tamanho do
-  original é conferido no repositório de onde ele vem.
+  revisão automática: ninguém revisa a cópia, então o limite do revisor não se
+  aplica a ela. O tamanho do original é conferido no repositório de onde ele vem.
+
+  A exclusão que vale na revisão de PR é a do **painel do CodeAnt**: app.codeant.ai →
+  Code Review → Configuration → aba Exclusions → Exclude Files, com o repositório
+  selecionado, um padrão por "Add": `fixtures/candidatos/**` e `**/package-lock.json`.
+  O "Test a Value" da mesma tela usa o matcher da revisão de PR. O
+  `.codeant/configuration.json` (`review_configuration.exclude` e
+  `file_filters.config.exclude_files`, as chaves que a documentação cita) não é lido
+  na PR: com as duas no `main`, a #24 ainda teve achados em `fixtures/candidatos/`.
+  Ele fica no repositório para a revisão no IDE e cobre os mesmos caminhos, cada
+  chave na sua sintaxe (`file_filters` é fnmatch, sem `**`: `fixtures/candidatos/*`,
+  `*package-lock.json`); padrão novo em `FATIA_IGNORAR` vai para o painel e para as
+  duas chaves.
 
 Fora disso, F4 não tem exceção: o limite de arquivo é do revisor, não nosso.
 
