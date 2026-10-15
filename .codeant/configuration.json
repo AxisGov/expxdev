@@ -1,4 +1,10 @@
 {
+  "review_configuration": {
+    "exclude": [
+      "fixtures/candidatos/**",
+      "**/package-lock.json"
+    ]
+  },
   "file_filters": {
     "config": {
       "include_files": [],
