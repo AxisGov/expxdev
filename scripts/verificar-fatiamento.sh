@@ -4,24 +4,10 @@
 #
 #   bash scripts/verificar-fatiamento.sh <base> <head>
 #
-# Compara <base>..<head> (a base é o ponto de partida da PR) e falha, com a lista
-# de violações, quando:
-#   F2  a PR passa de FATIA_MAX_LINHAS_PR linhas alteradas ou de FATIA_MAX_ARQUIVOS arquivos;
-#   F3  um commit passa de FATIA_MAX_LINHAS_COMMIT linhas alteradas;
-#   F4  um arquivo de texto passa de FATIA_MAX_KB_ARQUIVO KB ou de FATIA_MAX_LINHAS_ARQUIVO
-#       linhas, ou a PR faz crescer arquivos que já estão acima de um dos dois.
-# Entre FATIA_AVISO_KB (ou FATIA_AVISO_LINHAS) e o limite, F4 só avisa. Acima do
-# limite o arquivo não cresce: a tolerância (FATIA_TOLERANCIA_B bytes e
-# FATIA_TOLERANCIA_LINHAS linhas) é POR PR, somada sobre todos os arquivos acima
-# do limite, para a edição inevitável (uma linha de tabela).
-#
-# Arquivos gerados (FATIA_IGNORAR, uma regex de caminho) não contam para F2 e F3:
-# a regra é sobre o que uma pessoa precisa revisar. Eles continuam sujeitos a F4.
-#
-# Exceção declarada: FATIA_EXCECAO=<motivo> transforma as violações de F2 e F3 em
-# aviso e imprime o motivo. Existe para o movimento mecânico (F6); F4 não tem exceção.
-#
-# Saída: 0 sem violação; 1 com violação; 2 uso incorreto.
+# Compara <base>...<head> e falha, com a lista de violações, em F2 (PR: linhas e
+# arquivos), F3 (linhas por commit) e F4 (tamanho de arquivo, em KB e em linhas;
+# acima do limite o arquivo não cresce, com tolerância POR PR). Os limites e as
+# exceções (FATIA_*) estão no contrato. Saída: 0 sem violação, 1 com, 2 uso.
 
 set -uo pipefail
 
