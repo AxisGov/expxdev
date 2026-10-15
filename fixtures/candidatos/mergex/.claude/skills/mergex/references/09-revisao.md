@@ -42,7 +42,7 @@ Para cada PR, junte **o que estiver disponível**. Fonte ausente vira "não disp
 | Registro de entrega da mergex | `docs/entregas/<trabalho_id>/ENTREGA.md` na branch do PR | "sem registro da mergex" — PR aberto por fora do método |
 | Faixa de raio da legadox | `raio` do `ENTREGA.md` | "raio não calculado" |
 | Classificação de atenção | `atencao` do `ENTREGA.md`, ou `ATENCAO.md` na branch | "não classificado" |
-| Resultado da integração contínua | `statusCheckRollup` do HEAD autoritativo (GitHub); `head_pipeline` do merge request (GitLab) | "sem integração contínua configurada" |
+| Resultado da integração contínua | `statusCheckRollup` do HEAD autoritativo (GitHub); `head_pipeline` do merge request (GitLab) | Resultado ausente **não** é CI ausente. Com configuração de CI no HEAD (`.github/workflows/*.yml` ou `*.yaml`, `.gitlab-ci.yml`), o CI está configurado: `head_pipeline` nulo ou rollup vazio é pipeline que ainda não anexou, e R1 é `NÃO VERIFICÁVEL`, nunca `n/a`. "sem integração contínua configurada" (`n/a`) só sem nenhuma configuração de CI no HEAD |
 | Conflito com a base | `mergeable` do PR | Verifique localmente (passo 5) |
 | Arquivos tocados | `files` do PR | `git diff --name-only <base>...<head>` |
 | Aberto pela mergex nesta máquina | `pr_url` do `ENTREGA.md` local casa com a URL do PR | Assuma que não |
@@ -360,7 +360,7 @@ outro ponto da skill que cite R1–R6 está referenciando esta tabela, não rede
 
 | # | Critério | Satisfeito quando |
 |---|---|---|
-| R1 | CI | O HEAD autoritativo atual do PR (ver "HEAD autoritativo") está com CI verde. Valores: `OK` (CI configurado, HEAD atual verde), `FALHOU` (CI configurado, HEAD atual não verde), `n/a` (sem CI configurado), `NÃO VERIFICÁVEL` (CI configurado, mas o resultado do HEAD atual não pôde ser obtido). |
+| R1 | CI | O HEAD autoritativo atual do PR (ver "HEAD autoritativo") está com CI verde. Valores: `OK` (CI configurado, HEAD atual verde), `FALHOU` (CI configurado, HEAD atual não verde), `n/a` (sem CI configurado: nenhuma configuração de CI no HEAD), `NÃO VERIFICÁVEL` (CI configurado, mas o resultado do HEAD atual não pôde ser obtido — inclusive o pipeline que ainda não anexou ao HEAD). |
 | R2 | Blocking reviews | Nenhum pedido de mudança está ativo no estado bloqueante efetivo da plataforma (ver "R2 usa o ESTADO BLOQUEANTE EFETIVO", acima). |
 | R3 | Actionable threads | Zero findings válidos em `ACTIONABLE_UNRESOLVED`. |
 | R4 | Fix evidence | Todo finding corrigido tem evidência mínima: commit existente e ancestral do HEAD autoritativo atual, resumo preciso da correção, cobertura de regressão relevante, e a validação executada. |

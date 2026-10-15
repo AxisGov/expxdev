@@ -99,7 +99,41 @@ copy_hooks_claude() {
   # So os arquivos que ESTA skill publica sao trocados; nada mais e apagado.
   run "mkdir -p '$root/.claude/agents'"
   copy_hooks_tree "$root"
-  run "cp '$AGENTS_SRC'/*.md '$root/.claude/agents/'"
+  # Um agente de mesmo nome que DIFERE do publicado (editado no projeto, ou de
+  # outra skill) nao some: vira `<nome>.md.bak-<data>` antes da troca. O
+  # Claude Code so carrega `*.md`, entao a copia nao compete com o agente novo.
+  local a dest bak n
+  for a in "$AGENTS_SRC"/*.md; do
+    dest="$root/.claude/agents/${a##*/}"
+    # Destino que e link simbolico NAO e escrito: o `cp` seguiria o link e
+    # sobrescreveria o arquivo de destino dele, que pode estar fora do projeto.
+    # Vale tambem para as pastas: `.claude/agents` ou `.claude` como link levaria
+    # a copia para onde ele aponta.
+    if [ -L "$dest" ] || [ -L "${dest%/*}" ] || [ -L "$root/.claude" ]; then
+      say "agente   ${a##*/} NAO instalado: $dest ou a pasta dele e um link simbolico; remova o link e rode de novo"
+      continue
+    fi
+    # Hard link tambem: o `cp` reescreveria o conteudo compartilhado com o outro
+    # nome, que pode estar fora do projeto. `find -links +1` vale em GNU e BSD.
+    if [ -f "$dest" ] && [ -n "$(find "$dest" -links +1 2>/dev/null)" ]; then
+      say "agente   ${a##*/} NAO instalado: $dest tem outro nome (hard link); copie-o para um arquivo proprio e rode de novo"
+      continue
+    fi
+    if [ -f "$dest" ] && ! cmp -s "$a" "$dest"; then
+      # O nome do backup e RESERVADO pelo mktemp, que cria o arquivo de forma
+      # exclusiva (O_EXCL, em GNU e BSD): dois instaladores ao mesmo tempo, dois
+      # backups no mesmo segundo ou um link quebrado com o nome nunca levam ao
+      # mesmo arquivo. Uma checagem `-e` antes do `cp` nao reserva nada.
+      if [ "$DRY" = 1 ]; then
+        bak="$dest.bak-$(date +%Y%m%d%H%M%S)-XXXXXX"
+      else
+        bak="$(mktemp "$dest.bak-$(date +%Y%m%d%H%M%S)-XXXXXX")"
+      fi
+      run "cp -p '$dest' '$bak'"
+      say "agente   ${a##*/} existia diferente: copia de seguranca em ${bak##*/}"
+    fi
+    run "cp '$a' '$dest'"
+  done
   say "hooks    -> $root/.claude/hooks/ (sprintx/ e os arquivos da sprintx em comum/)"
   say "agentes  -> $root/.claude/agents/"
 
