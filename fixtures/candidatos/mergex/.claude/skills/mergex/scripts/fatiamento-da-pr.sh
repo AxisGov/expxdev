@@ -17,7 +17,7 @@
 set -uo pipefail
 
 if [ "$#" -ne 2 ]; then
-  echo "uso: verificar-fatiamento.sh <base> <head>" >&2
+  echo "uso: ${0##*/} <base> <head>" >&2
   exit 2
 fi
 base="$1"; head="$2"
