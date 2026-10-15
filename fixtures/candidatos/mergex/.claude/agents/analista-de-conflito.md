@@ -2,7 +2,8 @@
 name: analista-de-conflito
 description: Explica, por trecho em conflito, o que cada lado pretendia segundo a mensagem de commit e o plano de cada trabalho, e o que perguntar a quem decidir. Usado APENAS pelo comando manual /mergex-revisar. Nunca resolve o conflito.
 tools: Read, Grep, Glob
-model: inherit
+model: opus
+effort: high
 ---
 
 # analista-de-conflito — a intenção de cada lado

@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { executarInit } from "./init.js";
@@ -216,5 +217,22 @@ describe("init com agentes — proteção do que não é do expx", () => {
     expect(r.ok).toBe(false);
     expect(JSON.stringify(r.falhas)).toContain("link simbolico");
     expect(existsSync(join(p, ".claude/agents/vazado.md"))).toBe(false);
+  });
+});
+
+describe("candidatas fixadas", () => {
+  const raiz = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "fixtures", "candidatos");
+  const esperado: Array<[string, string, string, string]> = [
+    ["sprintx", "auditor-plano", "opus", "high"],
+    ["sprintx", "revisor-testes", "opus", "high"],
+    ["sprintx", "investigador", "sonnet", "medium"],
+    ["mergex", "revisor-diff", "opus", "high"],
+    ["mergex", "analista-de-conflito", "opus", "high"],
+  ];
+  it.each(esperado)("%s/%s declara o piso de modelo e esforco", (skill, agente, model, effort) => {
+    const texto = readFileSync(join(raiz, skill, ".claude", "agents", `${agente}.md`), "utf8");
+    const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(texto)?.[1] ?? "";
+    expect(fm).toMatch(new RegExp(`^model: ${model}\\s*$`, "m"));
+    expect(fm).toMatch(new RegExp(`^effort: ${effort}\\s*$`, "m"));
   });
 });
