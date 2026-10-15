@@ -43,6 +43,7 @@ import {
 import { comporModos, consolidarModos, lerModosDaSkill, type ModosPublicados } from "../harness/modos.js";
 import { ORIGEM_DO_PLUGIN } from "../plugin/manifestos.js";
 import { materializarCodex } from "../harness/codex.js";
+import { lerOverridesDoProjeto, planejarAgentes, planejarLimpeza } from "../harness/agentes.js";
 
 /**
  * O fluxo do `init`: busca, PLANEJA, VALIDA, aplica e trava.
@@ -130,6 +131,10 @@ type Plano = {
   modos?: { texto: string; publicados: ModosPublicados };
   /** Os hooks registrados vêm de alguma skill: exigem git e jq no runtime. */
   hooksDeSkill: boolean;
+  /** Avisos de plano (override de agente sem agente correspondente). */
+  avisos: string[];
+  /** Agentes de instalação anterior que saíram do plano (relativos à raiz). */
+  remover: string[];
 };
 
 /** O que a instalação anterior gerenciava, segundo o lock dela. */
@@ -199,14 +204,35 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
   if (!plugin.ok) erros.push(plugin.erro);
 
   const candidatos: Artefato[] = [];
-  if (claude) candidatos.push(...artefatosDeHooks(montaveis));
+  const avisosDoPlano: string[] = [];
+  const agentesDoPlano: Artefato[] = [];
+  if (claude) {
+    candidatos.push(...artefatosDeHooks(montaveis));
+    // Agentes com o override do projeto (`.expx/agentes.json`) aplicado.
+    const ov = lerOverridesDoProjeto(op.raiz);
+    if (!ov.ok) erros.push(ov.erro);
+    else {
+      const ag = planejarAgentes(montaveis, ov.overrides);
+      candidatos.push(...ag.artefatos);
+      agentesDoPlano.push(...ag.artefatos);
+      avisosDoPlano.push(...ag.avisos);
+    }
+  }
   if (op.harness.includes("opencode")) candidatos.push(...artefatosOpenCode(montaveis));
   const c = consolidar(candidatos);
   if (!c.ok) {
     erros.push(descreverColisoes(c.colisoes));
     return { ok: false, erros };
   }
-  const plano: Plano = { projeto: c.artefatos, plugin: plugin.ok ? plugin.artefatos : [], hooksDeSkill: false };
+  const plano: Plano = { projeto: c.artefatos, plugin: plugin.ok ? plugin.artefatos : [], hooksDeSkill: false, avisos: avisosDoPlano, remover: [] };
+  if (claude) {
+    const lk = lerLock(op.raiz);
+    const anteriores = lk.ok ? (lk.lock.instalacao?.arquivos ?? {}) : {};
+    const lim = planejarLimpeza(op.raiz, agentesDoPlano, new Set(c.artefatos.map((a) => a.destino)), anteriores);
+    erros.push(...lim.erros);
+    plano.avisos.push(...lim.avisos);
+    plano.remover = lim.remover;
+  }
 
   // Destino bloqueado (arquivo onde precisa haver pasta) é previsível: falha aqui.
   const bloqueados = verificarDestinos(op.raiz, [
@@ -338,6 +364,7 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
       ...(layout.arvoreHooks !== undefined ? { arvoreHooks: layout.arvoreHooks } : {}),
       ...(layout.settings !== undefined ? { settings: layout.settings } : {}),
       ...(layout.modos !== undefined ? { modos: layout.modos } : {}),
+      ...(layout.agentes !== undefined ? { agentes: layout.agentes } : {}),
     });
     travadas[nome] = {
       repositorio,
@@ -369,6 +396,8 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     if (!rt.ok) return { ok: false, instaladas: [], falhas, erros: [rt.erro], naoTravadas, avisos };
   }
 
+  avisos.push(...p.plano.avisos);
+
   // APLICAR e TRAVAR.
   const lock: Lock = {
     lock_version: VERSAO_LOCK,
@@ -382,6 +411,7 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
   });
   try {
     aplicarArtefatos(op.raiz, p.plano.projeto);
+    for (const rel of p.plano.remover) rmSync(join(op.raiz, ...rel.split("/")), { force: true });
     if (p.plano.settings !== undefined) gravarSettings(p.plano.settings);
     if (op.harness.includes("codex")) {
       try {
