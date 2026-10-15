@@ -108,7 +108,7 @@ Duas, e só elas:
 - **artefato gerado**: snapshot e fixture regenerados por script, em commit
   separado do código que os motivou, com o comando que os gerou no corpo da PR.
   O que casa com `FATIA_IGNORAR` fica fora de F2, F3 **e F4**, e também fora da
-  revisão automática (`.codeant/configuration.json`: `review_configuration.exclude`, a chave da configuração de repositório, e `file_filters.config.exclude_files`, a da página de configuração do IDE — a documentação do CodeAnt cita as duas, e só a segunda não bastou na revisão de PR): ninguém
+  revisão automática (`.codeant/configuration.json` declara `review_configuration.exclude` e `file_filters.config.exclude_files`, as duas chaves que a documentação do CodeAnt cita; na revisão de PR nenhuma das duas bastou — a #24 teve achados em `fixtures/candidatos/` com as duas no `main` —, e a exclusão efetiva depende da configuração do repositório no painel do CodeAnt): ninguém
   revisa a cópia, então o limite do revisor não se aplica a ela. O tamanho do
   original é conferido no repositório de onde ele vem.
 
