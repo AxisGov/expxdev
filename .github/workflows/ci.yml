@@ -50,3 +50,23 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+  fatiamento:
+    name: fatiamento (CONTRATO-expx-fatiamento)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify the change is sliced
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash scripts/verificar-fatiamento.sh "origin/$BASE_REF" "$HEAD_SHA"
