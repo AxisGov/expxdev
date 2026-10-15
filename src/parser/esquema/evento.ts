@@ -107,6 +107,11 @@ export const EventoNome = z.enum([
   "veredito_emitido",
   "commit_criado",
   "pr_aberto",
+  // mergex (DM-227): a gravação de um artefato DERIVADO falhou — hoje o
+  // `.expx/estado.json` da barra, no E0, E7, E8 e E9. Sai com `resultado: falha`
+  // e `agente: principal`, e nunca interrompe a etapa. Entrou aqui para que o
+  // rastro legítimo da mergex não seja contado como fora do contrato.
+  "artefato_gravado",
 ]);
 
 export const Agente = z.enum([
