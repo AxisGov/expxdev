@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { bashDosHooks } from "../teste/candidatos.js";
 
 /**
  * `scripts/verificar-fatiamento.sh` (CONTRATO-expx-fatiamento.md): cada regra
@@ -10,6 +11,8 @@ import { dirname, join } from "node:path";
  * existe" seria afirmação sem prova.
  */
 
+// o bash do Git, nunca o primeiro do PATH: no Windows ele pode ser o do WSL
+const BASH = bashDosHooks();
 const SCRIPT = join(process.cwd(), "scripts", "verificar-fatiamento.sh");
 const criados: string[] = [];
 afterEach(() => {
@@ -47,7 +50,7 @@ function commita(d: string, msg: string): void {
 const linhas = (n: number, prefixo = "linha"): string => Array.from({ length: n }, (_, i) => `${prefixo} ${String(i)}\n`).join("");
 
 function verifica(d: string, env: Record<string, string> = {}) {
-  const r = spawnSync("bash", [SCRIPT, "main", "HEAD"], { cwd: d, encoding: "utf8", env: { ...process.env, ...env } });
+  const r = spawnSync(BASH, [SCRIPT, "main", "HEAD"], { cwd: d, encoding: "utf8", env: { ...process.env, ...env } });
   return { codigo: r.status, saida: `${r.stdout}${r.stderr}` };
 }
 
@@ -116,7 +119,8 @@ describe("verificar-fatiamento.sh", () => {
     commita(d, "feat: engorda");
     const r = verifica(d, { FATIA_MAX_LINHAS_PR: "1000" });
     expect(r.codigo).toBe(1);
-    expect(r.saida).toMatch(/F4: enorme\.md tem 1\d\d KB \(limite 150\)/);
+    expect(r.saida).toMatch(/F4: os arquivos acima do limite cresceram \d+ bytes/);
+    expect(r.saida).toContain("enorme.md");
   });
 
   it("funcional: F4 — arquivo acima do limite que NÃO cresce só avisa", () => {
@@ -129,7 +133,7 @@ describe("verificar-fatiamento.sh", () => {
     commita(d, "fix: troca conteudo sem crescer");
     const r = verifica(d);
     expect(r.codigo, r.saida).toBe(0);
-    expect(r.saida).toMatch(/aviso\s+F4: enorme\.md/);
+    expect(r.saida).toMatch(/aviso\s+F4: enorme\.md tem 1\d\d KB .*acima do limite/);
   });
 
   it("funcional: F4 — arquivo novo acima do limite reprova", () => {
@@ -139,7 +143,7 @@ describe("verificar-fatiamento.sh", () => {
     commita(d, "feat: arquivo novo enorme");
     const r = verifica(d);
     expect(r.codigo).toBe(1);
-    expect(r.saida).toMatch(/F4: novo-enorme\.md/);
+    expect(r.saida).toMatch(/F4: os arquivos acima do limite cresceram.*novo-enorme\.md/);
   });
 
   it("funcional: F4 — entre 100 e 150 KB só avisa", () => {
@@ -149,7 +153,7 @@ describe("verificar-fatiamento.sh", () => {
     commita(d, "feat: arquivo medio");
     const r = verifica(d);
     expect(r.codigo, r.saida).toBe(0);
-    expect(r.saida).toMatch(/aviso\s+F4: medio\.md tem 120 KB, perto do limite/);
+    expect(r.saida).toMatch(/aviso\s+F4: medio\.md tem 12[01] KB .*perto do limite/);
   });
 
   it("funcional: F4 — arquivo com mais de 4000 linhas reprova ao crescer, mesmo pequeno em KB", () => {
@@ -162,7 +166,7 @@ describe("verificar-fatiamento.sh", () => {
     commita(d, "feat: engorda em linhas");
     const r = verifica(d);
     expect(r.codigo).toBe(1);
-    expect(r.saida).toMatch(/F4: longo\.txt tem 4160 linhas \(limite 4000\)/);
+    expect(r.saida).toMatch(/F4: os arquivos acima do limite cresceram \d+ bytes e 60 linhas.*longo\.txt/);
   });
 
   it("funcional: F4 — entre 3000 e 4000 linhas só avisa", () => {
@@ -172,7 +176,59 @@ describe("verificar-fatiamento.sh", () => {
     commita(d, "feat: arquivo medio em linhas");
     const r = verifica(d, { FATIA_MAX_LINHAS_PR: "5000", FATIA_MAX_LINHAS_COMMIT: "5000" });
     expect(r.codigo, r.saida).toBe(0);
-    expect(r.saida).toMatch(/aviso\s+F4: medio\.txt tem 3500 linhas, perto do limite/);
+    expect(r.saida).toMatch(/aviso\s+F4: medio\.txt tem \d+ KB e 3500 linhas, perto do limite/);
+  });
+
+  it("funcional: arquivo gerado em caminho com espaço também não conta (FATIA_IGNORAR)", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "fixtures/candidatos/pasta com espaco/gerado.txt", linhas(900));
+    escreve(d, "src.md", linhas(10));
+    commita(d, "chore: snapshot em pasta com espaco");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(0);
+    expect(r.saida).toContain("PR com 10 linhas em 1 arquivo");
+  });
+
+  it("funcional: F4 — arquivo grande só renomeado não conta como crescimento", () => {
+    const d = repo();
+    escreve(d, "enorme.md", "x".repeat(160 * 1024) + "\n");
+    commita(d, "chore: arquivo grande ja existente");
+    git(d, "switch", "-q", "-c", "feature");
+    git(d, "branch", "-f", "main", "HEAD");
+    git(d, "mv", "enorme.md", "movido.md");
+    commita(d, "refactor: so renomeia");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(0);
+    expect(r.saida).toMatch(/aviso\s+F4: movido\.md/);
+  });
+
+  it("funcional: F4 — a tolerância é por PR, somada entre os arquivos acima do limite", () => {
+    const d = repo();
+    escreve(d, "a.md", "x".repeat(160 * 1024) + "\n");
+    escreve(d, "b.md", "y".repeat(160 * 1024) + "\n");
+    commita(d, "chore: dois arquivos grandes ja existentes");
+    git(d, "switch", "-q", "-c", "feature");
+    git(d, "branch", "-f", "main", "HEAD");
+    escreve(d, "a.md", "x".repeat(160 * 1024) + "\n" + "n".repeat(1500) + "\n");
+    escreve(d, "b.md", "y".repeat(160 * 1024) + "\n" + "n".repeat(1500) + "\n");
+    commita(d, "feat: cada um cresce menos que a tolerancia, juntos passam");
+    const r = verifica(d);
+    expect(r.codigo).toBe(1);
+    expect(r.saida).toMatch(/F4: os arquivos acima do limite cresceram 3\d\d\d bytes/);
+  });
+
+  it("funcional: F4 — um byte acima de 150 KiB já é acima do limite", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "no-limite.md", "x".repeat(150 * 1024 - 1) + "\n");
+    escreve(d, "um-acima.md", "x".repeat(150 * 1024) + "\n");
+    commita(d, "feat: exatamente no limite e um byte acima");
+    const r = verifica(d);
+    expect(r.codigo).toBe(1);
+    expect(r.saida).toMatch(/aviso\s+F4: no-limite\.md .*perto do limite/);
+    expect(r.saida).toMatch(/F4: os arquivos acima do limite cresceram.*um-acima\.md/);
+    expect(r.saida).not.toMatch(/cresceram.*no-limite\.md/);
   });
 
   it("funcional: F6 — a exceção declarada rebaixa F2 e F3 a aviso e imprime o motivo", () => {
@@ -195,7 +251,7 @@ describe("verificar-fatiamento.sh", () => {
   });
 
   it("funcional: uso incorreto sai com 2", () => {
-    const r = spawnSync("bash", [SCRIPT], { encoding: "utf8" });
+    const r = spawnSync(BASH, [SCRIPT], { encoding: "utf8" });
     expect(r.status).toBe(2);
   });
 });

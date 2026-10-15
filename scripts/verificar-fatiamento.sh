@@ -9,10 +9,11 @@
 #   F2  a PR passa de FATIA_MAX_LINHAS_PR linhas alteradas ou de FATIA_MAX_ARQUIVOS arquivos;
 #   F3  um commit passa de FATIA_MAX_LINHAS_COMMIT linhas alteradas;
 #   F4  um arquivo de texto passa de FATIA_MAX_KB_ARQUIVO KB ou de FATIA_MAX_LINHAS_ARQUIVO
-#       linhas, ou cresce estando acima de um dos dois.
-# Entre FATIA_AVISO_KB e o limite, F4 só avisa. Acima do limite o arquivo não cresce,
-# com tolerância de FATIA_TOLERANCIA_B bytes por PR para a edição inevitável (uma
-# linha de tabela); passou disso, a PR divide o arquivo ou não mexe nele.
+#       linhas, ou a PR faz crescer arquivos que já estão acima de um dos dois.
+# Entre FATIA_AVISO_KB (ou FATIA_AVISO_LINHAS) e o limite, F4 só avisa. Acima do
+# limite o arquivo não cresce: a tolerância (FATIA_TOLERANCIA_B bytes e
+# FATIA_TOLERANCIA_LINHAS linhas) é POR PR, somada sobre todos os arquivos acima
+# do limite, para a edição inevitável (uma linha de tabela).
 #
 # Arquivos gerados (FATIA_IGNORAR, uma regex de caminho) não contam para F2 e F3:
 # a regra é sobre o que uma pessoa precisa revisar. Eles continuam sujeitos a F4.
@@ -42,9 +43,13 @@ tolerancia_l="${FATIA_TOLERANCIA_LINHAS:-20}"
 ignorar="${FATIA_IGNORAR:-(^|/)(package-lock\.json|fixtures/candidatos/)}"
 excecao="${FATIA_EXCECAO:-}"
 
+# os limites em KB são comparados em BYTES: dividir por 1024 truncaria, e um
+# arquivo um byte acima de 150 KiB passaria por 150
+max_b=$((max_kb * 1024))
+aviso_b=$((aviso_kb * 1024))
+
 git rev-parse --verify --quiet "$base^{commit}" >/dev/null || { echo "base inexistente: $base" >&2; exit 2; }
 git rev-parse --verify --quiet "$head^{commit}" >/dev/null || { echo "head inexistente: $head" >&2; exit 2; }
-
 mb="$(git merge-base "$base" "$head")" || { echo "sem ancestral comum entre $base e $head" >&2; exit 2; }
 
 violacoes=0
@@ -56,11 +61,15 @@ viola_ou_avisa() {
   if [ -n "$excecao" ]; then avisa "$1 [excecao declarada: $excecao]"; else viola "$1"; fi
 }
 
-# linhas alteradas e arquivos de um diff, sem os gerados
+# KiB com arredondamento para cima, só para exibir
+kib() { echo $((($1 + 1023) / 1024)); }
+
+# linhas alteradas e arquivos de um diff, sem os gerados. O numstat é separado
+# por TAB e o caminho é o terceiro campo inteiro: caminho com espaço não quebra.
 soma() { # <argumentos do git diff>
-  git diff --numstat -M "$@" | IGN="$ignorar" awk '
+  git -c core.quotepath=off diff --numstat -M "$@" | IGN="$ignorar" awk -F'\t' '
     $1 == "-" { l = 0 } $1 != "-" { l = $1 + $2 }
-    { arq = $NF; if (arq ~ ENVIRON["IGN"]) next; linhas += l; n++ }
+    { if ($3 ~ ENVIRON["IGN"]) next; linhas += l; n++ }
     END { printf "%d %d\n", linhas + 0, n + 0 }'
 }
 
@@ -79,37 +88,38 @@ while IFS= read -r c; do
   fi
 done < <(git rev-list --no-merges "$mb..$head")
 
-# F4 — tamanho de arquivo de texto no head, e crescimento acima do limite
-while IFS= read -r arq; do
-  [ -n "$arq" ] || continue
-  tam_head="$(git cat-file -s "$head:$arq" 2>/dev/null || echo 0)"
-  tipo="$(git diff --numstat "$mb" "$head" -- "$arq" | awk '{print $1}')"
+# F4 — tamanho de arquivo de texto no head. Acima do limite, o crescimento é
+# SOMADO sobre a PR inteira e comparado com a tolerância uma vez.
+cresc_b=0; cresc_l=0
+acima=()
+while IFS=$'\t' read -r st a b; do
+  [ -n "$st" ] || continue
+  novo="${b:-$a}"
+  # renomeação: o arquivo no ancestral tem o caminho ANTIGO; sem isto, um
+  # arquivo grande só movido pareceria ter crescido do zero ao tamanho inteiro
+  antigo="$a"
+  tipo="$(git -c core.quotepath=off diff --numstat "$mb" "$head" -- "$novo" | awk -F'\t' 'NR == 1 { print $1 }')"
   [ "$tipo" = "-" ] && continue   # binário: não é revisado como texto
-  kb_head=$((tam_head / 1024))
-  tam_base="$(git cat-file -s "$mb:$arq" 2>/dev/null || echo 0)"
-  if [ "$kb_head" -gt "$max_kb" ]; then
-    if [ $((tam_head - tam_base)) -gt "$tolerancia_b" ]; then
-      viola "F4: $arq tem ${kb_head} KB (limite $max_kb) e cresceu $((tam_head - tam_base)) bytes (tolerancia $tolerancia_b); arquivo acima do limite so diminui ou e dividido"
-    else
-      avisa "F4: $arq tem ${kb_head} KB, acima do limite $max_kb; cresceu no maximo a tolerancia, mas precisa ser dividido"
-    fi
-  elif [ "$kb_head" -gt "$aviso_kb" ]; then
-    avisa "F4: $arq tem ${kb_head} KB, perto do limite $max_kb"
+  tam_head="$(git cat-file -s "$head:$novo" 2>/dev/null || echo 0)"
+  tam_base="$(git cat-file -s "$mb:$antigo" 2>/dev/null || echo 0)"
+  lin_head="$(git cat-file -p "$head:$novo" 2>/dev/null | wc -l | tr -d ' ')"
+  lin_base="$(git cat-file -p "$mb:$antigo" 2>/dev/null | wc -l | tr -d ' ')"
+
+  # o `codeant review` documenta 5.000 linhas por arquivo e o scan de agente
+  # filtra acima disso: o limite em linhas aqui tem folga (4.000)
+  if [ "$tam_head" -gt "$max_b" ] || [ "$lin_head" -gt "$max_linhas_arq" ]; then
+    acima+=("$novo")
+    [ "$tam_head" -gt "$tam_base" ] && cresc_b=$((cresc_b + tam_head - tam_base))
+    [ "$lin_head" -gt "$lin_base" ] && cresc_l=$((cresc_l + lin_head - lin_base))
+    avisa "F4: $novo tem $(kib "$tam_head") KB e $lin_head linhas, acima do limite ($max_kb KB / $max_linhas_arq linhas); precisa ser dividido"
+  elif [ "$tam_head" -gt "$aviso_b" ] || [ "$lin_head" -gt "$aviso_linhas_arq" ]; then
+    avisa "F4: $novo tem $(kib "$tam_head") KB e $lin_head linhas, perto do limite ($max_kb KB / $max_linhas_arq linhas)"
   fi
-  # linhas: o `codeant review` documenta 5.000 por arquivo, e a API de scan filtra
-  # arquivo acima disso; o limite aqui tem folga (4.000)
-  lin_head="$(git cat-file -p "$head:$arq" 2>/dev/null | wc -l | tr -d ' ')"
-  lin_base="$(git cat-file -p "$mb:$arq" 2>/dev/null | wc -l | tr -d ' ')"
-  if [ "$lin_head" -gt "$max_linhas_arq" ]; then
-    if [ $((lin_head - lin_base)) -gt "$tolerancia_l" ]; then
-      viola "F4: $arq tem $lin_head linhas (limite $max_linhas_arq) e cresceu $((lin_head - lin_base)) (tolerancia $tolerancia_l); arquivo acima do limite so diminui ou e dividido"
-    else
-      avisa "F4: $arq tem $lin_head linhas, acima do limite $max_linhas_arq; precisa ser dividido"
-    fi
-  elif [ "$lin_head" -gt "$aviso_linhas_arq" ]; then
-    avisa "F4: $arq tem $lin_head linhas, perto do limite $max_linhas_arq"
-  fi
-done < <(git diff --name-only --diff-filter=AMR "$mb" "$head")
+done < <(git -c core.quotepath=off diff --name-status -M --diff-filter=AMR "$mb" "$head")
+
+if [ "$cresc_b" -gt "$tolerancia_b" ] || [ "$cresc_l" -gt "$tolerancia_l" ]; then
+  viola "F4: os arquivos acima do limite cresceram $cresc_b bytes e $cresc_l linhas no total (tolerancia da PR: $tolerancia_b bytes, $tolerancia_l linhas): ${acima[*]}; arquivo acima do limite so diminui ou e dividido"
+fi
 
 printf 'fatiamento: %d violacao(oes), %d aviso(s); PR com %d linhas em %d arquivo(s)\n' \
   "$violacoes" "$avisos" "$linhas_pr" "$arquivos_pr"
