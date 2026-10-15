@@ -83,12 +83,14 @@ reescreva `atualizado_em`, não toque em `.expx/`.
 ### O caso do merge no comando manual
 
 O E9 percorre pull requests de **vários** trabalhos, inclusive de outras pessoas. Grave
-`pr_estado: merged` **somente quando o PR mergeado for o do trabalho atual** — aquele cuja
-`pr_url` casa com a do `ENTREGA.md` do trabalho que está em `trabalho` no próprio
-`estado.json`.
+`pr_estado: merged` **somente quando o PR mergeado for o do trabalho atual**. Quem decide
+isso é o versionador e o registro da entrega, nunca este arquivo: o trabalho atual é o único
+`ENTREGA.md` cujo `branch` é igual a `git branch --show-current`, e o PR é dele quando a URL
+casa com a `pr_url` desse `ENTREGA.md` (definição completa em "Trabalho atual no E9", em
+`references/09-revisao.md`).
 
-Mergear o PR de outro trabalho não muda o estado do seu. Se o E9 rodar fora de um trabalho
-em andamento (`trabalho: null`), não grave nada.
+Mergear o PR de outro trabalho não muda o estado do seu. Sem trabalho atual — branch
+principal, HEAD destacado, nenhuma ou mais de uma correspondência —, não grave nada.
 
 ## O procedimento de gravação
 
@@ -193,57 +195,40 @@ push, nunca barra uma etapa, nunca vira aviso na saída ao usuário.
 | `.expx/` não existe | Segue sem gravar. Sem erro, sem aviso, sem criar o diretório |
 | `estado.json` não existe, mas `.expx/` existe | Cria a partir de `{}`, com os seus campos e `expx_estado: 1` |
 | `estado.json` ilegível ou corrompido | Segue sem gravar. Não conserta, não substitui |
-| Sem permissão de escrita, disco cheio, `mv` falhou | Segue **em silêncio**; ver "A lacuna" |
+| Sem permissão de escrita, disco cheio, `mv` falhou | Segue, **sem tratar o `estado.json` como gravado**, e registra a falha no rastro (ver "Falha de gravação é rastreada") |
 | `python3` e `jq` ausentes | Segue sem gravar |
 | Repositório sem versionador | Não grava nada |
 
-Falha de gravação **nunca interrompe** o trabalho: a etapa continua, o `ENTREGA.md` já tem
-o registro que importa, e nada é avisado ao usuário.
+Falha de gravação vai para `docs/eventos/<trabalho_id>.jsonl`, com `resultado` `falha`, e o
+trabalho continua. No E9 sem trabalho atual, o destino é `docs/eventos/sem-trabalho.jsonl` (ver
+"Destino do rastro" em `references/09-revisao.md`):
+
+```json
+{"ts":"<ISO-8601 UTC>","expx_eventos":1,"trabalho_id":"<id>","ferramenta":"mergex","origem":"skill","evento":"artefato_gravado","fase":"<e0|e7|e8|e9>","task":null,"agente":"principal","resultado":"falha","detalhe":"estado.json nao gravado: <erro literal>","arquivos":[".expx/estado.json"]}
+```
 
 `.expx/` ausente **não** é falha e não gera evento: é a configuração normal de um projeto
 sem a barra instalada.
 
-### A lacuna — por que a falha não vira linha de rastro
+### Falha de gravação é rastreada
 
-O vocabulário de `evento` do contrato `expx-eventos` v1 **não tem um termo para "falhou ao
-gravar artefato de saída"**. Os valores que a mergex grava são `commit_criado`, `pr_aberto`,
-`veredito_emitido`, e os de hook (`regra_violada`, `acao_bloqueada`, `suite_executada`,
-`arquivo_alterado`). Nenhum deles é esta ocorrência.
+A falha de gravar o `estado.json` **não é silenciosa**: gera a linha `artefato_gravado` com
+`resultado: falha`, no rastro do trabalho — ou em `docs/eventos/sem-trabalho.jsonl`, no E9 sem
+trabalho atual. `agente` é `principal`, nunca `null` (R6).
 
-Por isso, **a passagem é silenciosa**. As duas saídas que pareciam alternativas não são:
+O que a falha **não** faz:
 
-- **Inventar um evento** (`artefato_gravado` e afins) quebra a leitura do painel, que trata
-  `evento` como lista fechada — e um nome que só existe aqui não é contrato, é divergência.
-- **Reusar um evento existente** dá à linha semântica falsa. Falha ao gravar `estado.json`
-  não é commit, não é PR e não é veredito; quem filtrar por `commit_criado` passaria a contar
-  gravação de barra, e o dado deixaria de significar o que diz.
+- **A falha nunca interrompe a etapa.** A barra nunca barra trabalho, e a fonte de verdade da
+  entrega continua sendo o `ENTREGA.md`.
+- **Não faz o estado avançar nem parecer sucesso.** O `estado.json` é **saída derivada**, nunca
+  entrada de decisão: o que não foi gravado não é tratado como gravado, nenhuma etapa o lê, e a
+  linha de rastro diz `falha`, não `ok`.
+- **Não muda o estado final da entrega.** Quem leva o `ENTREGA.md` ao histórico é o
+  fechamento final do E8 (`08-registro.md`, "O fechamento final — a entrega precisa sobreviver
+  ao worktree"); a observabilidade da falha complementa DM-91 a DM-93, não os substitui.
 
-Nada se perde para o propósito declarado do rastro: o `estado.json` é **saída derivada**,
-nunca entrada de decisão nenhuma (ver "O que NÃO fazer"). A informação que a falha carregava é
-sobre a máquina de quem executou, não sobre a entrega.
-
-A fonte de verdade continua sendo o `ENTREGA.md`, e a gravação dele não depende desta falha:
-no E0 e no E7 ele está **gravado na árvore de trabalho, ainda não commitado** — é levado ao
-histórico pelo fechamento final do E8 (`07-abertura-pr.md`, "O E7 não commita e não faz push";
-`08-registro.md`, passo 2). Como a falha de gravação do `estado.json` **nunca interrompe** a
-etapa, ela não é o que impede esse fechamento de acontecer.
-
-**O que o silêncio aqui não cobre:** uma interrupção entre o E0/E7 e o fechamento do E8 — queda
-de energia, sessão morta, processo derrubado — deixa o `ENTREGA.md` fora do histórico. Isso vale
-com ou sem falha no `estado.json`: é risco da janela entre gravar e commitar, não consequência
-desta lacuna, e quem o endereça é o E8 ("O fechamento final — a entrega precisa sobreviver ao
-worktree", em `08-registro.md`). Não o confunda com a passagem silenciosa, e não leia esta seção
-como garantia de que o registro da entrega já está no histórico.
-
-É a mesma política da passagem limpa dos hooks (DM-43, `.claude/hooks/README.md`): quando o
-contrato não nomeia a ocorrência, a skill **não** inventa o nome e **não** empresta outro.
-
-**LACUNA REGISTRADA para o dono do contrato `expx-eventos`:** falta um evento para gravação de
-artefato derivado que falhou — algo como `artefato_nao_gravado`, com `resultado: falha`.
-Enquanto ele não existir no enum, esta passagem continua silenciosa. Quem mantém o contrato
-decide se acrescenta; **esta skill não decide sozinha**, porque `evento` é lido pelo painel e
-pelas outras skills. Acrescentado o evento, este trecho volta a trazer o exemplo da linha — e
-aí `agente` será `principal`, nunca `null`.
+`artefato_gravado` é evento do contrato `expx-eventos` (enum `EventoNome` do `expxdev`,
+AxisGov/expxdev#18): o `doctor` e o painel o reconhecem. A decisão está registrada em DM-227.
 
 ## O que NÃO fazer
 

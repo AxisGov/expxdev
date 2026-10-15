@@ -22,6 +22,14 @@ Não o encadeie a partir de nenhum fluxo, não o sugira ao fim de um trabalho, n
 
 **Integrar código é decisão humana.** É a única exceção ao automatismo do método.
 
+Uma vez chamado, o E9 avalia automaticamente o **Review Evidence Gate** de cada PR antes de
+oferecer merge: mudança de código não encerra review, evidência encerra review. Finding válido
+sem evidência publicada vira um pacote de remediação devolvido a quem executou (`sprintx`,
+`runx` ou `buildx`) e o PR fica pendente — a mergex nunca corrige código de produto para
+satisfazer um review. Isto continua dentro do E9 e continua exigindo a chamada manual; nada
+aqui muda o automatismo do resto do método. Detalhe:
+`.claude/skills/mergex/references/09-revisao.md`.
+
 ## Segurança de versionamento
 
 Valem sempre, em qualquer etapa:

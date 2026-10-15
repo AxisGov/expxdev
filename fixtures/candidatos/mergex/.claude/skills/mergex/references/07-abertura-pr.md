@@ -144,9 +144,9 @@ Na retomada de um PR que já existia ("PR já existe para esta branch"), grave o
 que a ferramenta devolveu — é retomada, não abertura nova.
 
 O procedimento é o de `10-estado.md`: só se `.expx/` existir, preservando os campos das
-outras skills, com gravação em temporário e renomeação. Falha de gravação é **silenciosa** e
-**não interrompe o E7** — sem linha de rastro, pela lacuna registrada em `10-estado.md`,
-"A lacuna".
+outras skills, com gravação em temporário e renomeação. Falha de gravação
+**não interrompe o E7**, mas é registrada: `artefato_gravado` com `resultado: falha`, conforme
+`10-estado.md`, "Falha de gravação é rastreada".
 
 ### Grave o evento no rastro
 
@@ -187,4 +187,4 @@ Siga para o E8.
 | Portão vencido (`validade-do-portao.sh --rev <SHA publicado>` com `ok=false`) | O E7 não roda; relate o `motivo` e mande rodar o E2 |
 | Alguém pediu para forçar a abertura com credencial | Recuse: a skill nunca configura credencial nem armazena segredo |
 | `.expx/` não existe | Segue sem gravar o estado da barra, sem erro e sem aviso; **nunca cria o diretório** |
-| Gravação do `estado.json` falhou | Segue **em silêncio**, sem rastro (`10-estado.md`, "A lacuna"); o E7 continua OK e o PR continua aberto |
+| Gravação do `estado.json` falhou | Segue, registrando `artefato_gravado` com `resultado: falha` (`10-estado.md`); o E7 continua OK e o PR continua aberto |

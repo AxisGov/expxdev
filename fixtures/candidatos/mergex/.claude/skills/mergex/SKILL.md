@@ -45,6 +45,7 @@ A mergex **costura**, não inventa. Tudo que ela escreve sobre a mudança vem de
 - **Não faz merge no fluxo automático.** A integração é sempre decisão humana.
 - **Não cria release, não publica, não faz deploy.**
 - **Não altera código para caber na entrega.** Trabalho incompleto é barrado, nunca maquiado.
+- **Não corrige código de produto para satisfazer um finding de review.** No E9, finding válido vira um pacote de remediação devolvido a quem executou (sprintx, runx ou buildx); o PR fica REVIEW PENDENTE até o novo commit.
 - **NÃO PREVINE COLISÃO ENTRE DESENVOLVEDORES.** Não avisa que outro trabalho planeja tocar o mesmo arquivo, não reserva arquivo, não resolve conflito. A branch **isola** o trabalho; ela não impede que duas pessoas alterem o mesmo código. Quem resolve conflito é quem revisa o pull request, com contexto humano.
 
 Como consequência direta dessa última linha, duas coisas são tratadas como prioritárias na skill:
@@ -74,7 +75,19 @@ O fluxo não é uma máquina de estados sequencial como a da sprintx ou da runx:
 
 **E8 REGISTRO DA ENTREGA** — é o último escritor do terminal e chama `scripts/persistir-metodo.sh --persistir ... --checkpoint e8`. Fecha **os dois desfechos**: `entregue`, publicando depois o commit pelo mesmo princípio do E6; e `bloqueado`, persistindo sem publicar a branch.
 
-**E9 REVISÃO E MERGE — MANUAL.** Lista os pull requests abertos, ordena do menor para o maior impacto, apresenta o estado de cada um e conduz um PR por vez com confirmação explícita. Nunca resolve conflito. **Só roda por chamada explícita do desenvolvedor.**
+**E9 REVISÃO E MERGE — MANUAL.** Lista os pull requests abertos, ordena do menor para o maior impacto, apresenta o estado de cada um — inclusive o veredito do REVIEW EVIDENCE GATE — e conduz um PR por vez com confirmação explícita. Nunca resolve conflito. **Só roda por chamada explícita do desenvolvedor.**
+
+## O Review Evidence Gate — dentro do E9
+
+**Mudança de código não encerra review. Evidência encerra review.** Um finding de review pode ter gerado uma correção; isso sozinho não prova que o reviewer aceitou, que há evidência publicada, que o CI voltou a passar, ou que a thread foi resolvida.
+
+Por isso, uma vez que o E9 é chamado, ele avalia automaticamente — antes de oferecer qualquer merge — o estado dos reviews de cada PR: reviews submetidos, requested changes, comentários inline, threads, e o CI do HEAD atual. Isto não fura a regra 16: o gate roda **dentro** de uma execução do E9 já iniciada manualmente; ele não dispara `/mergex-revisar` sozinho. Bot e humano são reviewers equivalentes — a skill não hardcoda nome de ferramenta de review nenhuma.
+
+Cada finding ou thread cai em uma de seis situações — `ACTIONABLE_UNRESOLVED`, `FIXED_AWAITING_EVIDENCE`, `AWAITING_REREVIEW`, `REJECTED_WITH_EVIDENCE`, `RESOLVED`, `OUTDATED_NON_BLOCKING` — e o PR só sai com `REVIEW EVIDENCE: SATISFEITO` quando todos os critérios aplicáveis de R1–R6 (CI, reviews bloqueantes, threads acionáveis, evidência de correção, resposta publicada antes da resolução, encerramento confirmado) estiverem satisfeitos — `n/a` é estado válido. Na dúvida entre duas situações, o finding conta como pendente.
+
+**Fronteira de responsabilidade.** A mergex lê reviews, valida findings, reúne evidência, responde thread, verifica CI e re-review, e resolve thread quando o critério é atendido — mas **não corrige código de produto**. Finding válido que exige mudança vira um pacote de remediação devolvido à skill de origem (sprintx, runx ou buildx); o PR fica `REVIEW PENDENTE` e não é oferecido para merge até o novo commit.
+
+Definição normativa completa — os seis estados, R1–R6, o formato da resposta ao review, a ordem de resolução de thread e o pacote de remediação — está em `references/09-revisao.md`; aqui vai só o resumo do contrato.
 
 ## Lifecycle executável dos artefatos de método
 
@@ -181,7 +194,9 @@ correspondente, `pr_aberto` (E7) com a URL, e `veredito_emitido` (E3) do
 `revisor-diff`.
 
 No comando manual (E9), grava a lista de PRs avaliados, a ordem apresentada e o
-que foi mergeado — e **nunca faz merge por conta própria em nenhum caminho**.
+que foi mergeado — e **nunca faz merge por conta própria em nenhum caminho**. Sem
+trabalho atual, esse rastro da sessão vai para `docs/eventos/sem-trabalho.jsonl`,
+nunca para o stream do trabalho de um PR revisado (ver `references/09-revisao.md`).
 
 Com isso o painel mostra, sem tocar no versionador: por trabalho, a branch, os
 commits e a task de cada um; o que aguarda revisão e há quanto tempo; e a
