@@ -212,9 +212,12 @@ describe("catalogo de eventos da sprintx congelada (D-06)", () => {
     expect(r.defeitos[0]?.motivo).toContain("evento");
   });
 
-  it("funcional: `artefato_gravado`, da mergex (DM-227), é evento do contrato", () => {
-    const r = validarRastro(j(linha({ ferramenta: "mergex", evento: "artefato_gravado" })));
-    expect(r.defeitos).toEqual([]);
+  it("funcional: `artefato_gravado`, da mergex (DM-227), é evento do contrato — e o nome fora dele segue reprovando", () => {
+    // o evento só existe para a gravação que FALHOU: a linha de exemplo é `resultado: falha`
+    const dele = validarRastro(j(linha({ ferramenta: "mergex", evento: "artefato_gravado", resultado: "falha" })));
+    expect(dele.defeitos).toEqual([]);
+    const outro = validarRastro(j(linha({ ferramenta: "mergex", evento: "artefato_nao_gravado", resultado: "falha" })));
+    expect(outro.defeitos).toHaveLength(1);
   });
 
   it("funcional: a falha de gravação da mergex — `resultado: falha`, `agente: principal` — não tem defeito", () => {
