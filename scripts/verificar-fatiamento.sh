@@ -90,10 +90,11 @@ while IFS=$'\t' read -r st a b; do
   [ "$tipo" = "-" ] && continue   # binário: não é revisado como texto
   tam_head="$(git cat-file -s "$head:$novo" 2>/dev/null || echo 0)"
   tam_base="$(git cat-file -s "$mb:$antigo" 2>/dev/null || echo 0)"
-  lin_head="$(git cat-file -p "$head:$novo" 2>/dev/null | wc -l | tr -d ' ')"
-  lin_base="$(git cat-file -p "$mb:$antigo" 2>/dev/null | wc -l | tr -d ' ')"
+  lin_head="$(git cat-file -p "$head:$novo" 2>/dev/null | awk 'END { print NR }')"
+  lin_base="$(git cat-file -p "$mb:$antigo" 2>/dev/null | awk 'END { print NR }')"
 
-  # o `codeant review` documenta 5.000 linhas por arquivo e o scan de agente
+  # linhas por `awk NR`, nao `wc -l`: o wc conta quebras, e a ultima linha sem
+  # quebra ficaria de fora. O `codeant review` documenta 5.000 linhas por arquivo e o scan de agente
   # filtra acima disso: o limite em linhas aqui tem folga (4.000)
   if [ "$tam_head" -gt "$max_b" ] || [ "$lin_head" -gt "$max_linhas_arq" ]; then
     acima+=("$novo")
