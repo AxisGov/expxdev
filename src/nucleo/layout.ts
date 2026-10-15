@@ -38,6 +38,8 @@ export type Layout =
       settings?: string;
       /** O manifesto de modos (`.expx/hooks.json`) que a skill publica. */
       modos?: string;
+      /** Os agentes (`.claude/agents/*.md`) que a skill publica. */
+      agentes?: string[];
     }
   | { ok: false; erro: string };
 
@@ -141,6 +143,20 @@ function acharArvoreHooks(raiz: string): string | undefined {
   return undefined;
 }
 
+/** Os agentes que o repositório publica em `.claude/agents/`. */
+function acharAgentes(raiz: string): string[] {
+  const dir = join(raiz, ".claude", "agents");
+  try {
+    return readdirSync(dir)
+      .filter((a) => a.endsWith(".md"))
+      .sort()
+      .map((a) => join(dir, a))
+      .filter((a) => statSync(a).isFile());
+  } catch {
+    return [];
+  }
+}
+
 function arquivoSeExiste(caminho: string): string | undefined {
   try {
     return statSync(caminho).isFile() ? caminho : undefined;
@@ -161,6 +177,7 @@ export function detectarLayout(raizRepo: string, nomeEsperado: string): Layout {
   const arvore = acharArvoreHooks(raizRepo);
   const settings = arquivoSeExiste(join(raizRepo, ".claude", "settings.json"));
   const modos = arquivoSeExiste(join(raizRepo, ".expx", "hooks.json"));
+  const agentes = acharAgentes(raizRepo);
   return {
     ok: true,
     nome,
@@ -170,5 +187,6 @@ export function detectarLayout(raizRepo: string, nomeEsperado: string): Layout {
     ...(arvore !== undefined ? { arvoreHooks: arvore } : {}),
     ...(settings !== undefined ? { settings } : {}),
     ...(modos !== undefined ? { modos } : {}),
+    ...(agentes.length > 0 ? { agentes } : {}),
   };
 }

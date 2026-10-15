@@ -28,7 +28,7 @@ import { dirname, join, relative, sep } from "node:path";
  * O resultado é ordenado pelo destino, então não depende da ordem das skills.
  */
 
-export type TipoArtefato = "nucleo" | "skill" | "comando" | "hook";
+export type TipoArtefato = "nucleo" | "skill" | "comando" | "hook" | "agente";
 
 export type Artefato = {
   /** Relativo à raiz onde o plano é aplicado, sempre com `/`. */
@@ -42,6 +42,12 @@ export type Artefato = {
   tipo: TipoArtefato;
   /** Precisa do bit de execução: hook sem ele não roda, e não avisa. */
   executavel: boolean;
+  /**
+   * Os bytes a gravar, quando diferem da origem (o agente com o override do
+   * projeto aplicado). O `hash` é sempre o desses bytes, e é ele que vai para o
+   * lock: o que está no disco é exatamente o que o plano afirma.
+   */
+  conteudo?: Buffer;
 };
 
 export type FonteDaColisao = { skill: string; origem: string; hash: string };
@@ -160,6 +166,17 @@ export function artefato(origem: string, destino: string, skill: string, tipo: T
     tipo,
     executavel: ehExecutavel(origem, destino, bytes),
   };
+}
+
+/** Um arquivo cujo conteúdo final difere do da origem. */
+export function artefatoComConteudo(
+  origem: string,
+  destino: string,
+  skill: string,
+  tipo: TipoArtefato,
+  conteudo: Buffer,
+): Artefato {
+  return { destino, origem, skill, hash: hashDeBytes(conteudo), tipo, executavel: false, conteudo };
 }
 
 /** Cada arquivo de `raizOrigem` projetado sob `prefixo`. */
@@ -287,7 +304,7 @@ export function descreverColisoes(colisoes: readonly Colisao[]): string {
  */
 export function aplicarArtefatos(raiz: string, artefatos: readonly Artefato[]): void {
   for (const a of artefatos) {
-    const bytes = readFileSync(a.origem);
+    const bytes = a.conteudo ?? readFileSync(a.origem);
     if (hashDeBytes(bytes) !== a.hash) {
       throw new Error(`${a.origem} mudou entre o plano e a aplicacao`);
     }

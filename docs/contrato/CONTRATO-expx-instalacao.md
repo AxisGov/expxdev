@@ -35,7 +35,7 @@ O `install.sh` continua existindo no repositório da skill para quem instala
 
 Cada arquivo a instalar vira um **artefato** com: skill de origem, arquivo de
 origem, destino (relativo à raiz do projeto), hash sha256 e tipo (`nucleo`,
-`skill`, `comando`, `hook`). `settings.json` e `.expx/hooks.json` não são
+`skill`, `comando`, `hook`, `agente`). `settings.json` e `.expx/hooks.json` não são
 artefatos: são **entradas de composição** (seções 4 e 5).
 
 Tudo é processado em **ordem canônica**: o núcleo (`expx`) primeiro, depois as
@@ -64,6 +64,7 @@ vence".
 | pasta do `SKILL.md` | `.claude/skills/<skill>/…` e `.expx/marketplace/plugins/expx/skills/<skill>/…` |
 | `.claude/hooks/**` (árvore inteira, menos `hooks.json`) | `.claude/hooks/**` e `…/plugins/expx/hooks/**` |
 | `.claude/commands/<skill>*.md` | `…/plugins/expx/commands/` (e `.opencode/commands/` com `opencode`) |
+| `.claude/agents/*.md` | `.claude/agents/*.md`, com o override de `.expx/agentes.json` aplicado (seção 8) |
 | `.claude/settings.json` | **composto** em `.claude/settings.json` |
 | `.expx/hooks.json` | **composto** em `.expx/hooks.json` |
 
@@ -127,6 +128,37 @@ ao padrão anterior segue o padrão novo da skill (é assim que uma promoção d
 `aviso` para `bloqueio` chega ao projeto). Sem lock anterior, qualquer `modo`
 presente é preservado. Um id que o ExpxDev gerenciava e cuja skill saiu da
 seleção é removido.
+
+## 5.1 `.expx/agentes.json` — override de modelo e esforço
+
+Cada agente publicado em `.claude/agents/` declara `model` e `effort` no
+próprio frontmatter: é o **piso** do método (um agente de veredito que herda o
+modelo de quem chama fica tão fraco quanto a sessão que o chamou). O projeto
+que precisa de outro custo sobrepõe de forma consciente e versionada:
+
+```json
+{
+  "expx_agentes": 1,
+  "agentes": {
+    "investigador": { "model": "haiku", "effort": "low" }
+  }
+}
+```
+
+- chave = o `name:` do agente; só `model` e `effort` são sobrepostos;
+- `model`: alias (`opus`, `sonnet`, `haiku`, `inherit`) ou ID `claude-*`;
+  `effort`: `low`, `medium`, `high`, `xhigh`, `max`;
+- o Claude Code só lê o frontmatter, então o override é aplicado na
+  **instalação**: a cópia em `.claude/agents/` sai com os valores do projeto, e
+  o hash dessa cópia final é o que vai para o lock;
+- o arquivo é do projeto: o `init`, `add`, `remove` e `update` nunca o
+  escrevem, e por isso o override sobrevive a toda reinstalação e vale também
+  sobre a versão nova do agente;
+- ausente → vale o frontmatter; presente e inválido → **falha antes de
+  qualquer escrita**;
+- override de agente que nenhuma skill instalada publica → aviso, não erro;
+- **OpenCode**: fora do escopo. Os agentes de `.opencode/agent/` não são
+  instalados pelo `init` e o override não os alcança.
 
 ## 6. O que o `init` não apaga
 

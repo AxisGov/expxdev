@@ -42,6 +42,8 @@ export type SkillMontavel = {
   settings?: string;
   /** `.expx/hooks.json` publicado pela skill (ver `harness/modos.ts`). */
   modos?: string;
+  /** Agentes (`.claude/agents/*.md`) publicados pela skill (ver `harness/agentes.ts`). */
+  agentes?: readonly string[];
 };
 
 /**
