@@ -1,7 +1,7 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { SkillMontavel } from "../plugin/montagem.js";
-import { artefato, artefatoComConteudo, emOrdemCanonica, type Artefato } from "../plugin/plano.js";
+import { artefato, artefatoComConteudo, emOrdemCanonica, hashDeBytes, type Artefato } from "../plugin/plano.js";
 
 /**
  * Agentes das skills em `.claude/agents/`, com o modelo e o esforço que o
@@ -71,7 +71,7 @@ export function lerOverridesDoProjeto(raiz: string): LeituraOverrides {
   if (bruto["expx_agentes"] !== undefined && bruto["expx_agentes"] !== 1) {
     return { ok: false, erro: `${onde}: expx_agentes ${String(bruto["expx_agentes"])} nao suportado` };
   }
-  const agentes = bruto["agentes"] ?? {};
+  const agentes = Object.prototype.hasOwnProperty.call(bruto, "agentes") ? bruto["agentes"] : {};
   if (!ehObjeto(agentes)) return { ok: false, erro: `${onde}: "agentes" precisa ser um objeto` };
 
   const overrides: Overrides = {};
@@ -120,7 +120,8 @@ export function aplicarOverride(texto: string, o: OverrideDeAgente): string {
   for (const campo of ["model", "effort"] as const) {
     const valor = o[campo];
     if (valor === undefined) continue;
-    const re = new RegExp(`^${campo}:.*$`, "m");
+    // a chave pode vir entre aspas (`"model": opus` é YAML válido)
+    const re = new RegExp(`^["']?${campo}["']?\s*:.*$`, "m");
     corpo = re.test(corpo) ? corpo.replace(re, `${campo}: ${valor}`) : `${corpo}${eol}${campo}: ${valor}`;
   }
   return `${m[1] ?? ""}${corpo}${m[3] ?? ""}${texto.slice(m[0].length)}`;
@@ -165,4 +166,59 @@ export function planejarAgentes(skills: readonly SkillMontavel[], overrides: Ove
     }
   }
   return { artefatos, avisos };
+}
+
+export type Limpeza = {
+  erros: string[];
+  avisos: string[];
+  /** Agentes que a instalação anterior gravou e que saíram do plano. */
+  remover: string[];
+};
+
+function hashDoArquivo(caminho: string): string | undefined {
+  try {
+    if (!statSync(caminho).isFile()) return undefined;
+    return hashDeBytes(readFileSync(caminho));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * O que o plano de agentes faz com o que JÁ está em `.claude/agents/`.
+ *
+ * - Destino que existe, tem bytes diferentes e NÃO é do lock anterior é arquivo
+ *   do projeto (ou de uma instalação manual): sobrescrevê-lo destruiria o
+ *   trabalho da pessoa. Falha antes de qualquer escrita.
+ * - Agente que o lock anterior gravou e que saiu do plano (a skill foi removida,
+ *   ou deixou de publicá-lo) é removido — mas só se o arquivo ainda tem o hash
+ *   do lock. Editado à mão, fica e vira aviso.
+ */
+export function planejarLimpeza(
+  raiz: string,
+  agentes: readonly Artefato[],
+  destinosDoPlano: ReadonlySet<string>,
+  anteriores: Readonly<Record<string, string>>,
+): Limpeza {
+  const erros: string[] = [];
+  const avisos: string[] = [];
+  const remover: string[] = [];
+  for (const a of agentes) {
+    if (a.destino in anteriores) continue;
+    const atual = hashDoArquivo(join(raiz, ...a.destino.split("/")));
+    if (atual !== undefined && atual !== a.hash) {
+      erros.push(
+        `${a.destino} ja existe e nao foi instalado pelo expx (skill ${a.skill}); ` +
+          "renomeie ou remova o arquivo do projeto e rode o init de novo",
+      );
+    }
+  }
+  for (const [destino, hash] of Object.entries(anteriores).sort()) {
+    if (!destino.startsWith(".claude/agents/") || destinosDoPlano.has(destino)) continue;
+    const atual = hashDoArquivo(join(raiz, ...destino.split("/")));
+    if (atual === undefined) continue;
+    if (atual === hash) remover.push(destino);
+    else avisos.push(`${destino} saiu da instalacao mas foi alterado a mao; nao foi removido`);
+  }
+  return { erros, avisos, remover };
 }

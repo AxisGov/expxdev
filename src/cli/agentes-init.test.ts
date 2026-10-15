@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
@@ -54,6 +54,10 @@ describe("aplicarOverride", () => {
     const r = aplicarOverride("---\r\nname: a\r\nmodel: inherit\r\n---\r\ncorpo\r\n", { model: "opus" });
     expect(r).toBe("---\r\nname: a\r\nmodel: opus\r\n---\r\ncorpo\r\n");
   });
+  it("troca a chave entre aspas em vez de duplicá-la", () => {
+    const r = aplicarOverride('---\nname: a\n"model": opus\n---\ncorpo\n', { model: "haiku" });
+    expect(r).toBe("---\nname: a\nmodel: haiku\n---\ncorpo\n");
+  });
   it("sem frontmatter devolve igual", () => {
     expect(aplicarOverride("# so corpo\n", { model: "opus" })).toBe("# so corpo\n");
   });
@@ -70,6 +74,7 @@ describe("lerOverridesDoProjeto", () => {
     ["chave desconhecida no agente", { agentes: { a: { tools: "Read" } } }],
     ["chave desconhecida no topo", { agentes: {}, outra: 1 }],
     ["versao futura", { expx_agentes: 2, agentes: {} }],
+    ["agentes nulo", { expx_agentes: 1, agentes: null }],
   ])("falha: %s", (_n, conteudo) => {
     const p = produto();
     gravarOverride(p, conteudo);
@@ -140,5 +145,76 @@ describe("init com agentes", () => {
     const r = await executarInit({ raiz: p, skills: ["alfa"], harness: ["claude"], origens: origens() });
     expect(r.ok).toBe(true);
     expect(r.avisos.join("\n")).toContain("fantasma");
+  });
+});
+
+describe("init com agentes — proteção do que não é do expx", () => {
+  const um = () => ({ alfa: skill("alfa", { ".claude/agents/auditor.md": AGENTE("auditor") }) });
+  const rodar = (p: string, skills: string[], origens: Record<string, string>) =>
+    executarInit({ raiz: p, skills, harness: ["claude"], origens });
+
+  it("não sobrescreve agente do projeto com o mesmo nome", async () => {
+    const p = produto();
+    mkdirSync(join(p, ".claude/agents"), { recursive: true });
+    writeFileSync(join(p, ".claude/agents/auditor.md"), "# meu auditor\n");
+    const r = await rodar(p, ["alfa"], um());
+    expect(r.ok).toBe(false);
+    expect(r.erros.join("\n")).toContain(".claude/agents/auditor.md");
+    expect(readFileSync(join(p, ".claude/agents/auditor.md"), "utf8")).toBe("# meu auditor\n");
+  });
+
+  it("aceita o agente existente quando os bytes já são os do plano", async () => {
+    const p = produto();
+    mkdirSync(join(p, ".claude/agents"), { recursive: true });
+    writeFileSync(join(p, ".claude/agents/auditor.md"), AGENTE("auditor"));
+    const r = await rodar(p, ["alfa"], um());
+    expect(r.ok, r.erros.join("\n")).toBe(true);
+  });
+
+  it("reinstalar sobre o que o próprio expx gravou não é conflito", async () => {
+    const p = produto();
+    const o = um();
+    expect((await rodar(p, ["alfa"], o)).ok).toBe(true);
+    gravarOverride(p, { agentes: { auditor: { model: "haiku" } } });
+    const r = await rodar(p, ["alfa"], o);
+    expect(r.ok, r.erros.join("\n")).toBe(true);
+    expect(lerAgente(p, "auditor")).toContain("model: haiku");
+  });
+
+  it("remove o agente de uma skill que saiu, mas preserva o que foi editado à mão", async () => {
+    const p = produto();
+    const o = {
+      alfa: skill("alfa", { ".claude/agents/auditor.md": AGENTE("auditor") }),
+      beta: skill("beta", { ".claude/agents/revisor.md": AGENTE("revisor") }),
+    };
+    expect((await rodar(p, ["alfa", "beta"], o)).ok).toBe(true);
+    const r = await rodar(p, ["alfa"], o);
+    expect(r.ok, r.erros.join("\n")).toBe(true);
+    expect(existsSync(join(p, ".claude/agents/revisor.md"))).toBe(false);
+    expect(existsSync(join(p, ".claude/agents/auditor.md"))).toBe(true);
+
+    expect((await rodar(p, ["alfa", "beta"], o)).ok).toBe(true);
+    writeFileSync(join(p, ".claude/agents/revisor.md"), "# editado a mao\n");
+    const r2 = await rodar(p, ["alfa"], o);
+    expect(r2.ok).toBe(true);
+    expect(readFileSync(join(p, ".claude/agents/revisor.md"), "utf8")).toBe("# editado a mao\n");
+    expect(r2.avisos.join("\n")).toContain("revisor.md");
+  });
+
+  it("recusa agente que é link simbólico para fora da skill", async () => {
+    const repo = skill("alfa", { ".claude/agents/ok.md": AGENTE("ok") });
+    const pastaAlvo = mkdtempSync(join(tmpdir(), "expx-alvo-"));
+    criados.push(pastaAlvo);
+    writeFileSync(join(pastaAlvo, "segredo.md"), "SEGREDO\n");
+    try {
+      symlinkSync(join(pastaAlvo, "segredo.md"), join(repo, ".claude/agents/vazado.md"));
+    } catch {
+      return; // sem permissão de symlink neste ambiente
+    }
+    const p = produto();
+    const r = await rodar(p, ["alfa"], { alfa: repo });
+    expect(r.ok).toBe(false);
+    expect(JSON.stringify(r.falhas)).toContain("link simbolico");
+    expect(existsSync(join(p, ".claude/agents/vazado.md"))).toBe(false);
   });
 });

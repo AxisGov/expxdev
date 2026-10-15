@@ -43,7 +43,7 @@ import {
 import { comporModos, consolidarModos, lerModosDaSkill, type ModosPublicados } from "../harness/modos.js";
 import { ORIGEM_DO_PLUGIN } from "../plugin/manifestos.js";
 import { materializarCodex } from "../harness/codex.js";
-import { lerOverridesDoProjeto, planejarAgentes } from "../harness/agentes.js";
+import { lerOverridesDoProjeto, planejarAgentes, planejarLimpeza } from "../harness/agentes.js";
 
 /**
  * O fluxo do `init`: busca, PLANEJA, VALIDA, aplica e trava.
@@ -133,6 +133,8 @@ type Plano = {
   hooksDeSkill: boolean;
   /** Avisos de plano (override de agente sem agente correspondente). */
   avisos: string[];
+  /** Agentes de instalação anterior que saíram do plano (relativos à raiz). */
+  remover: string[];
 };
 
 /** O que a instalação anterior gerenciava, segundo o lock dela. */
@@ -203,6 +205,7 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
 
   const candidatos: Artefato[] = [];
   const avisosDoPlano: string[] = [];
+  const agentesDoPlano: Artefato[] = [];
   if (claude) {
     candidatos.push(...artefatosDeHooks(montaveis));
     // Agentes com o override do projeto (`.expx/agentes.json`) aplicado.
@@ -211,6 +214,7 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
     else {
       const ag = planejarAgentes(montaveis, ov.overrides);
       candidatos.push(...ag.artefatos);
+      agentesDoPlano.push(...ag.artefatos);
       avisosDoPlano.push(...ag.avisos);
     }
   }
@@ -220,7 +224,15 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
     erros.push(descreverColisoes(c.colisoes));
     return { ok: false, erros };
   }
-  const plano: Plano = { projeto: c.artefatos, plugin: plugin.ok ? plugin.artefatos : [], hooksDeSkill: false, avisos: avisosDoPlano };
+  const plano: Plano = { projeto: c.artefatos, plugin: plugin.ok ? plugin.artefatos : [], hooksDeSkill: false, avisos: avisosDoPlano, remover: [] };
+  if (claude) {
+    const lk = lerLock(op.raiz);
+    const anteriores = lk.ok ? (lk.lock.instalacao?.arquivos ?? {}) : {};
+    const lim = planejarLimpeza(op.raiz, agentesDoPlano, new Set(c.artefatos.map((a) => a.destino)), anteriores);
+    erros.push(...lim.erros);
+    plano.avisos.push(...lim.avisos);
+    plano.remover = lim.remover;
+  }
 
   // Destino bloqueado (arquivo onde precisa haver pasta) é previsível: falha aqui.
   const bloqueados = verificarDestinos(op.raiz, [
@@ -399,6 +411,7 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
   });
   try {
     aplicarArtefatos(op.raiz, p.plano.projeto);
+    for (const rel of p.plano.remover) rmSync(join(op.raiz, ...rel.split("/")), { force: true });
     if (p.plano.settings !== undefined) gravarSettings(p.plano.settings);
     if (op.harness.includes("codex")) {
       try {

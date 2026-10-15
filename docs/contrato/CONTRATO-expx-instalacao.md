@@ -157,6 +157,9 @@ que precisa de outro custo sobrepõe de forma consciente e versionada:
 - ausente → vale o frontmatter; presente e inválido → **falha antes de
   qualquer escrita**;
 - override de agente que nenhuma skill instalada publica → aviso, não erro;
+- agente com o mesmo destino que **não** foi instalado pelo expx (não está no lock) e tem bytes diferentes é do projeto: o `init` **falha antes de escrever**, em vez de sobrescrevê-lo;
+- agente que o lock anterior gravou e que saiu do plano (skill removida, ou que deixou de publicá-lo) é **removido**, desde que o arquivo ainda tenha o hash do lock; editado à mão, fica e vira aviso;
+- agente que é link simbólico no repositório da skill é recusado (a skill falha), para não copiar para o projeto o conteúdo de um arquivo de fora dela;
 - **OpenCode**: fora do escopo. Os agentes de `.opencode/agent/` não são
   instalados pelo `init` e o override não os alcança.
 

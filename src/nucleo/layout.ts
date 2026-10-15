@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 
 /**
@@ -143,18 +143,34 @@ function acharArvoreHooks(raiz: string): string | undefined {
   return undefined;
 }
 
-/** Os agentes que o repositório publica em `.claude/agents/`. */
-function acharAgentes(raiz: string): string[] {
+/**
+ * Os agentes que o repositório publica em `.claude/agents/`.
+ *
+ * `lstat` por entrada: um symlink apontando para fora da árvore faria o `init`
+ * copiar para o projeto o conteúdo do alvo, então é recusado em vez de seguido.
+ * Cada entrada é avaliada sozinha — uma quebrada não pode esconder as válidas.
+ */
+function acharAgentes(raiz: string): { agentes: string[]; erro?: string } {
   const dir = join(raiz, ".claude", "agents");
+  let nomes: string[];
   try {
-    return readdirSync(dir)
-      .filter((a) => a.endsWith(".md"))
-      .sort()
-      .map((a) => join(dir, a))
-      .filter((a) => statSync(a).isFile());
+    nomes = readdirSync(dir).filter((a) => a.endsWith(".md")).sort();
   } catch {
-    return [];
+    return { agentes: [] };
   }
+  const agentes: string[] = [];
+  for (const n of nomes) {
+    const p = join(dir, n);
+    let st;
+    try {
+      st = lstatSync(p);
+    } catch {
+      continue; // sumiu entre o readdir e o lstat
+    }
+    if (st.isSymbolicLink()) return { agentes: [], erro: `agente e um link simbolico: .claude/agents/${n}` };
+    if (st.isFile()) agentes.push(p);
+  }
+  return { agentes };
 }
 
 function arquivoSeExiste(caminho: string): string | undefined {
@@ -177,7 +193,9 @@ export function detectarLayout(raizRepo: string, nomeEsperado: string): Layout {
   const arvore = acharArvoreHooks(raizRepo);
   const settings = arquivoSeExiste(join(raizRepo, ".claude", "settings.json"));
   const modos = arquivoSeExiste(join(raizRepo, ".expx", "hooks.json"));
-  const agentes = acharAgentes(raizRepo);
+  const achados = acharAgentes(raizRepo);
+  if (achados.erro !== undefined) return { ok: false, erro: achados.erro };
+  const agentes = achados.agentes;
   return {
     ok: true,
     nome,
