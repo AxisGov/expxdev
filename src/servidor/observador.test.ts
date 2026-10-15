@@ -14,6 +14,16 @@ afterEach(async () => {
   dir = null;
 });
 
+/**
+ * Espera a condição em vez de dormir um tempo fixo: o watcher do Windows pode
+ * levar mais que 500 ms para entregar o primeiro evento no runner do CI, e uma
+ * espera fixa fazia o teste passar numa rodada e falhar na outra.
+ */
+async function esperarAte(cond: () => boolean, limiteMs = 5000): Promise<void> {
+  const fim = Date.now() + limiteMs;
+  while (!cond() && Date.now() < fim) await new Promise((r) => setTimeout(r, 25));
+}
+
 function projetoTemporario(): string {
   const d = mkdtempSync(join(tmpdir(), "expx-obs-"));
   cpSync("fixtures/projeto-ok", d, { recursive: true });
@@ -117,7 +127,9 @@ describe.sequential("índice do memox que nasce com o painel no ar", () => {
     mkdirSync(join(dir, ".expx/memoria"), { recursive: true });
     writeFileSync(join(dir, ".expx/memoria/indice.json"), '{"versao":1}');
 
-    await new Promise((r) => setTimeout(r, 500));
+    await esperarAte(() => memoria > 0);
+    // o evento chegou; uma folga curta mostra que foi UM disparo, e não vários
+    await new Promise((r) => setTimeout(r, 250));
     expect(memoria).toBe(1);
     expect(docs).toBe(0);
   });
