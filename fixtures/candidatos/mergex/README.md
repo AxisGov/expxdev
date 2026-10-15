@@ -285,6 +285,8 @@ Os de segurança nascem em **bloqueio**: segredo commitado não tem volta. Os de
 
 Dois agentes rodam em contexto próprio, somente leitura: **`revisor-diff`** classifica o diff nas três faixas sem ter visto a implementação sendo escrita, e **`analista-de-conflito`** explica o que cada lado de um conflito pretendia. Este último **não tem ferramenta de escrita nem de execução de comando** — é impossibilidade técnica, não disciplina, que o impede de resolver o conflito.
 
+Os dois agentes fixam `model: opus` e `effort: high` no frontmatter, em vez de herdar de quem chama: a classificação em faixas e a leitura de um conflito são veredito, e um veredito dado por modelo mais fraco que o do autor não verifica nada. Quem precisa de outro custo sobrepõe no projeto, em `.expx/agentes.json` (instalação pelo `expx`; o `install.sh` manual instala o piso). Vale para o Claude Code: os agentes de `.opencode/agent/` não declaram modelo nem esforço e ficam fora desta política.
+
 **Nos dois harnesses, a lógica é a mesma.** O plugin do OpenCode invoca os mesmos scripts de `.claude/hooks/`; só o registro difere. Detalhe, os três cuidados de desenho e a suíte: [`.claude/hooks/README.md`](.claude/hooks/README.md).
 
 ---

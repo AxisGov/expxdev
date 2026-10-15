@@ -2,7 +2,8 @@
 name: revisor-diff
 description: Classifica o diff de uma entrega nas três faixas de atenção humana (OLHO OBRIGATÓRIO, LEITURA RÁPIDA, DISPENSÁVEL), arquivo por arquivo, a partir de evidência registrada. Use no E3 da mergex, depois que o portão de prontidão devolveu PRONTO.
 tools: Read, Grep, Glob, Bash
-model: inherit
+model: opus
+effort: high
 ---
 
 # revisor-diff — classificação da atenção humana

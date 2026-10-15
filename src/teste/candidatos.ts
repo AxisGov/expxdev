@@ -22,8 +22,8 @@ export const BINARIO = join(RAIZ_DO_REPO, "dist", "cli", "expx-bin.js");
  * dele: cada snapshot é o commit, byte a byte.
  */
 export const CANDIDATOS = {
-  sprintx: { pasta: "SprintX", sha: "2d7f63a2e13d753e0cf2252ccaee68801c346794" },
-  mergex: { pasta: "MergeX", sha: "2fe64ced355f8ea4852904f243d5d7862dd454cf" },
+  sprintx: { pasta: "SprintX", sha: "74a1ad45cb66f2d932154b10cc1b74eba0332845" },
+  mergex: { pasta: "MergeX", sha: "01d951e8eb54a1964571da99a94cb8f8c68313ee" },
 } as const;
 
 export type NomeCandidato = keyof typeof CANDIDATOS;
