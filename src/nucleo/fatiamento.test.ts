@@ -152,6 +152,29 @@ describe("verificar-fatiamento.sh", () => {
     expect(r.saida).toMatch(/aviso\s+F4: medio\.md tem 120 KB, perto do limite/);
   });
 
+  it("funcional: F4 — arquivo com mais de 4000 linhas reprova ao crescer, mesmo pequeno em KB", () => {
+    const d = repo();
+    escreve(d, "longo.txt", "a\n".repeat(4100));
+    commita(d, "chore: arquivo longo ja existente");
+    git(d, "switch", "-q", "-c", "feature");
+    git(d, "branch", "-f", "main", "HEAD");
+    escreve(d, "longo.txt", "a\n".repeat(4100) + "b\n".repeat(60));
+    commita(d, "feat: engorda em linhas");
+    const r = verifica(d);
+    expect(r.codigo).toBe(1);
+    expect(r.saida).toMatch(/F4: longo\.txt tem 4160 linhas \(limite 4000\)/);
+  });
+
+  it("funcional: F4 — entre 3000 e 4000 linhas só avisa", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "medio.txt", "a\n".repeat(3500));
+    commita(d, "feat: arquivo medio em linhas");
+    const r = verifica(d, { FATIA_MAX_LINHAS_PR: "5000", FATIA_MAX_LINHAS_COMMIT: "5000" });
+    expect(r.codigo, r.saida).toBe(0);
+    expect(r.saida).toMatch(/aviso\s+F4: medio\.txt tem 3500 linhas, perto do limite/);
+  });
+
   it("funcional: F6 — a exceção declarada rebaixa F2 e F3 a aviso e imprime o motivo", () => {
     const d = repo();
     git(d, "switch", "-q", "-c", "feature");

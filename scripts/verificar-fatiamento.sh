@@ -8,7 +8,8 @@
 # de violações, quando:
 #   F2  a PR passa de FATIA_MAX_LINHAS_PR linhas alteradas ou de FATIA_MAX_ARQUIVOS arquivos;
 #   F3  um commit passa de FATIA_MAX_LINHAS_COMMIT linhas alteradas;
-#   F4  um arquivo de texto passa de FATIA_MAX_KB_ARQUIVO KB, ou cresce estando acima dele.
+#   F4  um arquivo de texto passa de FATIA_MAX_KB_ARQUIVO KB ou de FATIA_MAX_LINHAS_ARQUIVO
+#       linhas, ou cresce estando acima de um dos dois.
 # Entre FATIA_AVISO_KB e o limite, F4 só avisa. Acima do limite o arquivo não cresce,
 # com tolerância de FATIA_TOLERANCIA_B bytes por PR para a edição inevitável (uma
 # linha de tabela); passou disso, a PR divide o arquivo ou não mexe nele.
@@ -35,6 +36,9 @@ max_linhas_commit="${FATIA_MAX_LINHAS_COMMIT:-300}"
 max_kb="${FATIA_MAX_KB_ARQUIVO:-150}"
 aviso_kb="${FATIA_AVISO_KB:-100}"
 tolerancia_b="${FATIA_TOLERANCIA_B:-2048}"
+max_linhas_arq="${FATIA_MAX_LINHAS_ARQUIVO:-4000}"
+aviso_linhas_arq="${FATIA_AVISO_LINHAS:-3000}"
+tolerancia_l="${FATIA_TOLERANCIA_LINHAS:-20}"
 ignorar="${FATIA_IGNORAR:-(^|/)(package-lock\.json|fixtures/candidatos/)}"
 excecao="${FATIA_EXCECAO:-}"
 
@@ -91,6 +95,19 @@ while IFS= read -r arq; do
     fi
   elif [ "$kb_head" -gt "$aviso_kb" ]; then
     avisa "F4: $arq tem ${kb_head} KB, perto do limite $max_kb"
+  fi
+  # linhas: o `codeant review` documenta 5.000 por arquivo, e a API de scan filtra
+  # arquivo acima disso; o limite aqui tem folga (4.000)
+  lin_head="$(git cat-file -p "$head:$arq" 2>/dev/null | wc -l | tr -d ' ')"
+  lin_base="$(git cat-file -p "$mb:$arq" 2>/dev/null | wc -l | tr -d ' ')"
+  if [ "$lin_head" -gt "$max_linhas_arq" ]; then
+    if [ $((lin_head - lin_base)) -gt "$tolerancia_l" ]; then
+      viola "F4: $arq tem $lin_head linhas (limite $max_linhas_arq) e cresceu $((lin_head - lin_base)) (tolerancia $tolerancia_l); arquivo acima do limite so diminui ou e dividido"
+    else
+      avisa "F4: $arq tem $lin_head linhas, acima do limite $max_linhas_arq; precisa ser dividido"
+    fi
+  elif [ "$lin_head" -gt "$aviso_linhas_arq" ]; then
+    avisa "F4: $arq tem $lin_head linhas, perto do limite $max_linhas_arq"
   fi
 done < <(git diff --name-only --diff-filter=AMR "$mb" "$head")
 
