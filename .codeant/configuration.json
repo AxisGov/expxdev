@@ -1,0 +1,11 @@
+{
+  "file_filters": {
+    "config": {
+      "include_files": [],
+      "exclude_files": [
+        "fixtures/candidatos/*",
+        "*package-lock.json"
+      ]
+    }
+  }
+}

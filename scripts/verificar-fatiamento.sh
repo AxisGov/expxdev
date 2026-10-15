@@ -84,6 +84,8 @@ while IFS=$'\t' read -r st a b; do
   # renomeação: o arquivo no ancestral tem o caminho ANTIGO; sem isto, um
   # arquivo grande só movido pareceria ter crescido do zero ao tamanho inteiro
   antigo="$a"
+  # gerado (FATIA_IGNORAR) nao e revisado: fica fora de F4 tambem (contrato, F6)
+  [[ $novo =~ $ignorar ]] && continue
   tipo="$(git -c core.quotepath=off diff --numstat "$mb" "$head" -- "$novo" | awk -F'\t' 'NR == 1 { print $1 }')"
   [ "$tipo" = "-" ] && continue   # binário: não é revisado como texto
   tam_head="$(git cat-file -s "$head:$novo" 2>/dev/null || echo 0)"

@@ -179,6 +179,19 @@ describe("verificar-fatiamento.sh", () => {
     expect(r.saida).toMatch(/aviso\s+F4: medio\.txt tem \d+ KB e 3500 linhas, perto do limite/);
   });
 
+  it("funcional: snapshot gerado acima do limite que cresce não viola F4 (fora da revisão)", () => {
+    const d = repo();
+    escreve(d, "fixtures/candidatos/x/DECISOES.md", "x".repeat(160 * 1024) + "\n");
+    commita(d, "chore: snapshot grande ja existente");
+    git(d, "switch", "-q", "-c", "feature");
+    git(d, "branch", "-f", "main", "HEAD");
+    escreve(d, "fixtures/candidatos/x/DECISOES.md", "x".repeat(190 * 1024) + "\n");
+    commita(d, "chore: snapshot regenerado");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(0);
+    expect(r.saida).not.toContain("DECISOES.md");
+  });
+
   it("funcional: arquivo gerado em caminho com espaço também não conta (FATIA_IGNORAR)", () => {
     const d = repo();
     git(d, "switch", "-q", "-c", "feature");
