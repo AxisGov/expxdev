@@ -132,6 +132,7 @@ Quem valida uma linha verifica que as doze estão **contidas** nela — nunca ig
 | `agente_iniciado` · `agente_concluido` | hook `SubagentStop` e skill |
 | `veredito_emitido` | agente auditor ou QA |
 | `commit_criado` · `pr_aberto` | mergex |
+| `artefato_gravado` | mergex, quando a gravação de um artefato derivado (`.expx/estado.json`) falha: sai com `resultado: falha` e `agente: principal`, no rastro do trabalho ou em `docs/eventos/sem-trabalho.jsonl` no E9 sem trabalho atual. Nunca interrompe a etapa |
 
 **Esta tabela não é a fonte: o enum é.** A lista mora em `EventoNome`
 (`src/parser/esquema/evento.ts`) e `src/nucleo/documentacao.test.ts` confere a

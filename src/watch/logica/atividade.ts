@@ -29,6 +29,7 @@ export const ROTULO_EVENTO: Record<string, string> = {
   veredito_emitido: "veredito",
   commit_criado: "commit",
   pr_aberto: "pr aberto",
+  artefato_gravado: "artefato gravado",
 };
 
 /**
