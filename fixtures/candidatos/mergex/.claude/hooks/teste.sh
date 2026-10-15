@@ -13,6 +13,23 @@ REPO_ROOT="$(cd "$H/../.." && pwd)"
 # shellcheck source=scripts/ci/lib/fixture-git.sh
 . "$REPO_ROOT/scripts/ci/lib/fixture-git.sh" || exit 1
 OK=0; FALHOU=0; PULADOS=0; NAOEXEC=0
+
+# Git Bash (MSYS/MINGW) no Windows:
+#  - o MSYS converte para caminho do Windows todo argumento que parece caminho
+#    Unix quando chama um .exe (o jq): `/usr/bin/git push` virava
+#    `C:/Program Files/Git/usr/bin/git push`, e os casos "git por caminho" davam
+#    falso negativo no hook. Por isso o comando vai ao jq por STDIN (bash_json,
+#    write_json), nunca por argumento. Desligar a conversao no processo inteiro
+#    (MSYS_NO_PATHCONV) quebraria o resto: o git.exe deixaria de receber os
+#    caminhos convertidos;
+#  - o bash do MSYS e ordens de grandeza mais lento que o do Linux em entrada
+#    multibyte grande (150 KB de 日 levou 30 s contra 2 s no Linux), entao os
+#    limites de tempo escalam (LIMITE_MS) e os casos de >= 150 KB multibyte nao
+#    rodam la: viram NAO_EXECUTADO, listados a parte, nunca ok.
+case "$(uname -s 2>/dev/null)" in
+  MINGW*|MSYS*|CYGWIN*) EH_WINDOWS=1; LIMITE_MS="${LIMITE_MS:-10000}" ;;
+  *) EH_WINDOWS=0; LIMITE_MS="${LIMITE_MS:-2000}" ;;
+esac
 # Caso que depende de um ambiente ausente (Git for Windows sobre
 # \\wsl.localhost): NAO_EXECUTADO, listado a parte, nunca conta como ok.
 nao_executado() { NAOEXEC=$((NAOEXEC+1)); printf '  NAO_EXECUTADO: %s\n' "$1"; }
@@ -129,8 +146,8 @@ fm_sem_chave() {
     { print }' "$1" > "$1.fm" && cat "$1.fm" > "$1" && rm -f "$1.fm"
 }
 
-bash_json() { jq -cn --arg c "$1" --arg w "$HOOK_CWD" '{tool_name:"Bash",cwd:$w,tool_input:{command:$c}}'; }
-write_json() { jq -cn --arg c "$1" --arg w "$HOOK_CWD" '{tool_name:"Write",cwd:$w,tool_input:{content:$c}}'; }
+bash_json() { printf '%s' "$1" | jq -cRs --arg w "$HOOK_CWD" '{tool_name:"Bash",cwd:$w,tool_input:{command:.}}'; }
+write_json() { printf '%s' "$1" | jq -cRs --arg w "$HOOK_CWD" '{tool_name:"Write",cwd:$w,tool_input:{content:.}}'; }
 # Comando grande: vai por stdin do jq (`--arg` nao aceita argumento acima de 128 KB).
 json_grande() { printf '%s' "$1" | jq -Rs --arg w "$HOOK_CWD" '{tool_name:"Bash",cwd:$w,tool_input:{command:.}}'; }
 # Linhas de enchimento para os casos de SIGPIPE sob pipefail (rodada extra da
@@ -264,10 +281,10 @@ custo_ok() { # <desc> <json> <rc esperado> — rc certo e menos de 2 s
   fi
   fim="$(date +%s%N 2>/dev/null)"
   case "$ini$fim" in ''|*[!0-9]*) ms=0 ;; *) ms=$(( (fim - ini) / 1000000 )) ;; esac
-  if [ "$rc" = "$esperado" ] && [ "$ms" -lt 2000 ]; then
+  if [ "$rc" = "$esperado" ] && [ "$ms" -lt "$LIMITE_MS" ]; then
     OK=$((OK+1)); printf '  ok    %s (%s ms)\n' "$desc" "$ms"
   else
-    FALHOU=$((FALHOU+1)); printf '  FALHA %s (rc %s, esperava %s; %s ms, limite 2000)\n' "$desc" "$rc" "$esperado" "$ms"
+    FALHOU=$((FALHOU+1)); printf '  FALHA %s (rc %s, esperava %s; %s ms, limite %s)\n' "$desc" "$rc" "$esperado" "$ms" "$LIMITE_MS"
   fi
 }
 custo_ok "10 KB sem git: passa em menos de 2 s"                     "$(bash_json "$GRANDE")" 0
@@ -296,7 +313,9 @@ custo_ok "acima do teto (>512 KB) sem git: passa, em menos de 2 s" \
 # C.UTF-8 de proposito (e a locale padrao do WSL e da maioria dos Linux); sem
 # ela nesta maquina, ficam NAO_EXECUTADO. O texto e montado por byte (yes/head/
 # tr), para o tamanho nao depender da locale de quem roda a suite.
-if LC_ALL=C.UTF-8 bash -c 'x=é; [ "${#x}" = 1 ]' 2>/dev/null; then
+if [ "$EH_WINDOWS" = 1 ]; then
+  nao_executado "multibyte em C.UTF-8: bash do MSYS e quadratico em entrada multibyte de 150 KB ou mais (30 s contra 2 s no Linux); coberto no Linux e no macOS (5 casos)"
+elif LC_ALL=C.UTF-8 bash -c 'x=é; [ "${#x}" = 1 ]' 2>/dev/null; then
   LC_ANTES="${LC_ALL-__nao_definida__}"
   export LC_ALL=C.UTF-8
   MULTI="$(yes '日' | head -n 500000 | tr -d '\n')"   # 500 000 caracteres, 1 500 000 bytes
@@ -338,7 +357,11 @@ PUSHES16K="$(yes push | head -n 16000)"                            # 16 000 segm
 TOKENS2K="$(yes a | head -n 2047 | tr '\n' ' ')"                   # 2 047 tokens de 1 byte (4 KB) num so segmento
 TOKENS8K="$(yes a | head -n 8191 | tr '\n' ' ')"                   # 8 191 tokens (16 KB)
 # PATH sem `wc`: tudo de /usr/bin e /bin por symlink, menos o wc (rodada extra 2, N6).
-for f in /usr/bin/* /bin/*; do b="${f##*/}"; [ "$b" = wc ] || [ -e "$BINSW_T/$b" ] || ln -s "$f" "$BINSW_T/$b"; done 2>/dev/null
+# No Windows o git e o jq nao moram em /usr/bin nem em /bin (mingw64, chocolatey):
+# as pastas deles entram tambem, ou o PATH "sem wc" ficaria sem git e o caso mediria
+# outra coisa. No Linux sao as mesmas pastas e nada muda.
+DIR_GIT="$(dirname "$(command -v git)")"; DIR_JQ="$(dirname "$(command -v jq 2>/dev/null || echo /usr/bin/jq)")"
+for f in /usr/bin/* /bin/* "$DIR_GIT"/* "$DIR_JQ"/*; do b="${f##*/}"; [ "$b" = wc ] || [ -e "$BINSW_T/$b" ] || ln -s "$f" "$BINSW_T/$b"; done 2>/dev/null
 LOCALES="C"
 LC_ALL=C.UTF-8 bash -c 'x=é; [ "${#x}" = 1 ]' 2>/dev/null && LOCALES="C C.UTF-8"
 for LOC in $LOCALES; do
@@ -351,8 +374,13 @@ for LOC in $LOCALES; do
   # argumento do programa desconhecido) em 0,5-0,9 s. Com o teto de bytes dos
   # segmentos com push (N5), um segmento de 128 KB com `push` nao e lido: barra,
   # falha fechada, em vez de pagar a leitura por token.
+  if [ "$EH_WINDOWS" = 1 ]; then
+    # Bash do MSYS: este caso passa de 30 s, o timeout do harness (DM-228)
+    nao_executado "[$LOC] token de 128 KB como programa + git push --force: no Git Bash passa de 30 s (DM-228)"
+  else
   custo_ok "[$LOC] token de 128 KB como programa + git push --force: segmento com push acima do teto de bytes, barra em menos de 2 s" \
     "$(json_grande "${TOKEN128} git push --force origin feature/x")" 2
+  fi
   custo_ok "[$LOC] push forcado na 1a linha + 120 KB em 8 000 linhas sem push (pre-filtro sob pipefail): barra" \
     "$(json_grande "git push --force origin feature/x"$'\n'"${CAUDA}")" 2
   custo_ok "[$LOC] 10 000 linhas 'git …' (160 KB) + push forcado na ultima (pre-filtro sob pipefail): barra" \
@@ -1217,21 +1245,23 @@ for CWD_UNC in '//' '//wsl.localhost/mergex-nao-existe/x'; do
   HOOK_CWD="$CWD_UNC"
   T0_UNC=$SECONDS
   caso_aviso "cwd UNC sem repositorio nao entra em laco ($CWD_UNC)" "$(bash_json "$PUSH_FT")"
-  valor "cwd UNC sem repositorio: termina em menos de 2 s ($CWD_UNC)" "$([ $((SECONDS - T0_UNC)) -lt 2 ] && echo sim || echo nao)" sim
+  valor "cwd UNC sem repositorio: termina em menos de 2 s ($CWD_UNC)" "$([ $((SECONDS - T0_UNC)) -lt $((LIMITE_MS / 1000)) ] && echo sim || echo nao)" sim
 done
 HOOK_CWD="$HIST_T"
 
 # dubious ownership: o Git recusa o repositorio do cwd (dono diferente, sem
-# safe.directory). Config global VAZIA e temporaria, so no processo do hook.
+# safe.directory). Config global VAZIA e temporaria, e a de SISTEMA desligada:
+# com safe.directory=* na config de sistema (o runner do GitHub falhou aqui por
+# isso) o Git aceita o repositorio e o caso nao mede nada. So no processo do hook.
 GLOBAL_VAZIA_T="$SEMGIT_T/global-vazia"
 : > "$GLOBAL_VAZIA_T"
 caso_aviso "dubious ownership avisa e sai 0" "$(bash_json "$PUSH_FT")" \
-  GIT_CONFIG_GLOBAL="$GLOBAL_VAZIA_T" GIT_TEST_ASSUME_DIFFERENT_OWNER=1
+  GIT_CONFIG_GLOBAL="$GLOBAL_VAZIA_T" GIT_CONFIG_NOSYSTEM=1 GIT_TEST_ASSUME_DIFFERENT_OWNER=1
 case "$SAIDA_H" in
   *safe.directory*) OK=$((OK+1)); printf '  ok    %s\n' "dubious ownership: o aviso cita safe.directory na config global" ;;
   *) FALHOU=$((FALHOU+1)); printf '  FALHA %s\n' "dubious ownership: o aviso nao cita safe.directory" ;;
 esac
-GIT_CONFIG_GLOBAL="$GLOBAL_VAZIA_T" GIT_TEST_ASSUME_DIFFERENT_OWNER=1 git -C "$HIST_T" rev-parse --show-toplevel >/dev/null 2>&1 \
+GIT_CONFIG_GLOBAL="$GLOBAL_VAZIA_T" GIT_CONFIG_NOSYSTEM=1 GIT_TEST_ASSUME_DIFFERENT_OWNER=1 git -C "$HIST_T" rev-parse --show-toplevel >/dev/null 2>&1 \
   && { FALHOU=$((FALHOU+1)); printf '  FALHA %s\n' "controle: o Git aceitou o repositorio com dono diferente"; } \
   || { OK=$((OK+1)); printf '  ok    %s\n' "controle: o Git recusa o repositorio (dubious ownership)"; }
 

@@ -203,7 +203,7 @@ As nove primeiras são automáticas; a décima só roda quando você a chama.
 | **E6** Push | Depois do portão e do pacote | Sobe a branch. Nunca forçado, nunca na principal |
 | **E7** Abertura do PR | Depois do push | Abre o PR pela ferramenta do serviço. Ausente, grava em arquivo e informa |
 | **E8** Registro | Ao fim | Grava o registro da entrega, com frontmatter, para o painel de operação |
-| **E9** Revisão e merge | **Só quando você chama** | Lista os PRs abertos, ordena por impacto e conduz um merge por vez |
+| **E9** Revisão e merge | **Só quando você chama** | Lista os PRs abertos, ordena por impacto, avalia o Review Evidence Gate de cada um e conduz um merge por vez |
 
 ---
 
@@ -236,9 +236,18 @@ Quando você chama, ele:
 - lista os PRs abertos e reúne o estado de cada um: raio, faixas de atenção, integração contínua, conflito;
 - destaca no topo os PRs que tocam o mesmo arquivo;
 - ordena **do menor para o maior impacto** — cada merge fácil que entra reduz a superfície do próximo, e adiar o difícil não o piora, enquanto adiar o fácil sim;
+- avalia automaticamente o **Review Evidence Gate** de cada PR, antes de oferecer qualquer merge;
 - conduz um PR por vez, com confirmação explícita de cada um.
 
-Ele **nunca resolve conflito**. Relata onde está, quais arquivos e trechos, e o que cada lado pretendia segundo a mensagem de commit e o plano de cada trabalho — essa análise é o que ele tem de mais útil. A resolução é humana. E nunca faz merge com integração vermelha, de PR em rascunho, em lote, ou de PR com arquivos em olho obrigatório sem que você confirme que os revisou.
+Ele **nunca resolve conflito**. Relata onde está, quais arquivos e trechos, e o que cada lado pretendia segundo a mensagem de commit e o plano de cada trabalho — essa análise é o que ele tem de mais útil. A resolução é humana. E nunca faz merge com integração vermelha, de PR em rascunho, em lote, de PR com arquivos em olho obrigatório sem que você confirme que os revisou, ou de PR com o Review Evidence Gate bloqueado.
+
+### O Review Evidence Gate: mudança de código não encerra review
+
+Um finding de review pode ter gerado uma correção no código; isso sozinho não prova que o reviewer aceitou, que há evidência publicada, que o CI voltou a passar, ou que a thread foi resolvida. **Mudança de código não encerra review. Evidência encerra review.**
+
+Por isso, dentro de cada chamada do `/mergex-revisar`, o E9 classifica cada finding de review numa de seis situações e só libera o PR para merge quando todos os critérios aplicáveis, entre os seis (CI, reviews bloqueantes, threads acionáveis, evidência de correção, resposta publicada antes da resolução, encerramento confirmado), estiverem satisfeitos — critério que não se aplica ao PR vai como `n/a`, que é estado válido. Bot e humano são reviewers equivalentes — nada é específico de uma ferramenta de review.
+
+Finding válido que exige mudança **não é corrigido pela mergex**: ela valida, monta um pacote de remediação e devolve à skill que executou o trabalho (`sprintx`, `runx` ou `buildx`), deixando o PR marcado como pendente até o novo commit. Detalhe completo: [`references/09-revisao.md`](.claude/skills/mergex/references/09-revisao.md).
 
 ---
 
@@ -285,7 +294,7 @@ Os de segurança nascem em **bloqueio**: segredo commitado não tem volta. Os de
 
 Dois agentes rodam em contexto próprio, somente leitura: **`revisor-diff`** classifica o diff nas três faixas sem ter visto a implementação sendo escrita, e **`analista-de-conflito`** explica o que cada lado de um conflito pretendia. Este último **não tem ferramenta de escrita nem de execução de comando** — é impossibilidade técnica, não disciplina, que o impede de resolver o conflito.
 
-Os dois agentes fixam `model: opus` e `effort: high` no frontmatter, em vez de herdar de quem chama: a classificação em faixas e a leitura de um conflito são veredito, e um veredito dado por modelo mais fraco que o do autor não verifica nada. Quem precisa de outro custo sobrepõe no projeto, em `.expx/agentes.json` (instalação pelo `expx`; o `install.sh` manual instala o piso). Vale para o Claude Code: os agentes de `.opencode/agent/` não declaram modelo nem esforço e ficam fora desta política.
+Os dois agentes fixam `model: opus` e `effort: high` no frontmatter, em vez de herdar de quem chama: a classificação em faixas e a leitura de um conflito são veredito, e um veredito dado por modelo mais fraco que o do autor não verifica nada. Quem precisa de outro custo sobrepõe no projeto, em `.expx/agentes.json` (instalação pelo `expx`). Vale para o Claude Code: os agentes de `.opencode/agent/` não declaram modelo nem esforço e ficam fora desta política.
 
 **Nos dois harnesses, a lógica é a mesma.** O plugin do OpenCode invoca os mesmos scripts de `.claude/hooks/`; só o registro difere. Detalhe, os três cuidados de desenho e a suíte: [`.claude/hooks/README.md`](.claude/hooks/README.md).
 
