@@ -19,7 +19,7 @@ b7df233c4f44cd336260a8ba9e0a208adc1fdaf82ab8e9a7610097dafcbcc807  .claude/hooks/
 9028fe1092c7773727ad051d959bb884ae98b1de603490c2f4645f6223863aca  .claude/hooks/mergex/pr-so-com-portao.sh
 0e43abad32f0141c655bf526df6d791679fbee60df48819ca3ca79aae3016390  .claude/hooks/teste.sh
 129f882bcb75828d929a9f95f44bcab5c166ad0e89514542fed8629c22a16d0c  .claude/settings.json
-fab1bb8238a9c049eb8812b8be4a1fd678e0b59eb1aea57277415390f5df7bef  .claude/skills/mergex/DECISOES-DA-SKILL.md
+6398a717ce29e7b34baef56b66319064846611ed5d3fc443480355f703424127  .claude/skills/mergex/DECISOES-DA-SKILL.md
 2cee380aa7b8f23f1064493ad3741cf4da68e3016e4273d03ecb651b77f216a6  .claude/skills/mergex/SKILL.md
 5a2f0a9758dfc54900f12a98cea716d0d2c34c619777c6c3cd11145e519ce8c2  .claude/skills/mergex/assets/TEMPLATE-ENTREGA.md
 08c4ec09876ad1f049f780900bef2741c42beb3b194e54b4e4baa464a79545bb  .claude/skills/mergex/assets/TEMPLATE-PR.md
@@ -29,6 +29,7 @@ fab1bb8238a9c049eb8812b8be4a1fd678e0b59eb1aea57277415390f5df7bef  .claude/skills
 ef69477ea35e8abedf97bd9f7c38fd461a272c0a13197e21ff1ab54a5fa828b0  .claude/skills/mergex/assets/TEMPLATE-revisao.md
 8a78434435e46c72e7fadf995e1c6299c1776c5659dc03ece97e6d68165210e9  .claude/skills/mergex/assets/ci/mergex-portao.yml
 69ffdc28ccc180b34a5bef2a3cc2252263628f5989589e0f076f3cfbd6af4b95  .claude/skills/mergex/assets/pre-push-gerenciado.sh
+d5af359692ed5da01c566d5cf37b25e221bf66b9fb69a7b154fe454b9876ac2c  .claude/skills/mergex/decisoes/anteriores-ao-p02.md
 0110dabcb1a8b145b9348a42dabde8fc9bb15c4b8c957183d10a99b2788ba7b5  .claude/skills/mergex/references/00-abertura.md
 67bf15731e5cdc318094c440f469f3cdb2730f9471543755cee819aa1120f586  .claude/skills/mergex/references/00-schema.md
 89c7da38ed8bf0a992ada0f4a63b409917d55637e753b8c2edcb98a94cfb7339  .claude/skills/mergex/references/01-commits.md
