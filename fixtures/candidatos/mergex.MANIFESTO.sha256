@@ -19,7 +19,7 @@ b7df233c4f44cd336260a8ba9e0a208adc1fdaf82ab8e9a7610097dafcbcc807  .claude/hooks/
 9028fe1092c7773727ad051d959bb884ae98b1de603490c2f4645f6223863aca  .claude/hooks/mergex/pr-so-com-portao.sh
 0e43abad32f0141c655bf526df6d791679fbee60df48819ca3ca79aae3016390  .claude/hooks/teste.sh
 129f882bcb75828d929a9f95f44bcab5c166ad0e89514542fed8629c22a16d0c  .claude/settings.json
-7300e6bcdd2d64fd090c24ea48d8798622c943fa4eb06aaaf137e16988968895  .claude/skills/mergex/DECISOES-DA-SKILL.md
+fab1bb8238a9c049eb8812b8be4a1fd678e0b59eb1aea57277415390f5df7bef  .claude/skills/mergex/DECISOES-DA-SKILL.md
 2cee380aa7b8f23f1064493ad3741cf4da68e3016e4273d03ecb651b77f216a6  .claude/skills/mergex/SKILL.md
 5a2f0a9758dfc54900f12a98cea716d0d2c34c619777c6c3cd11145e519ce8c2  .claude/skills/mergex/assets/TEMPLATE-ENTREGA.md
 08c4ec09876ad1f049f780900bef2741c42beb3b194e54b4e4baa464a79545bb  .claude/skills/mergex/assets/TEMPLATE-PR.md
@@ -37,9 +37,9 @@ c731d9bd4640827d60e1a319c36870f102c7019a70dad90c59b97bb8f9b42325  .claude/skills
 7e30562defa61af67e0818b806b180e6ab653938ffeaa7011b4886958c177b8a  .claude/skills/mergex/references/04-descricao-pr.md
 901ffcc8cb9b318dea84cf16ac1bf0c46127fd8cbfc5b11c0911d725fa43c800  .claude/skills/mergex/references/05-pacote-qa.md
 e9bfcd901e927216b4cc60ea6dafec89cc0343c5359cb0c3cc8adfa770266063  .claude/skills/mergex/references/06-push.md
-e1035a0072d95dafbfac26a90286cc8f8d93aebe56237402d88102a255f238c9  .claude/skills/mergex/references/07-abertura-pr.md
+0a53937d12a1d521d090fcc48560e6de711c4fb0b01c08083c4d598abbd42596  .claude/skills/mergex/references/07-abertura-pr.md
 4b38d55075442aae16b9792f7e9f9ce99b138108de0761b2badcd7fc810f1fb3  .claude/skills/mergex/references/08-registro.md
-410bf80705b9aa8bbb70b249a13f5b88d68f51b9e039b5800f71bd7114167525  .claude/skills/mergex/references/09-revisao.md
+effe435de778377bed34b0aef2491377d87837cd8f07393e7aefc7a97cecda84  .claude/skills/mergex/references/09-revisao.md
 9f83309870a8e3b6ec5d62f6bb52782adda3e90574c516327c661179a3cfdb02  .claude/skills/mergex/references/10-estado.md
 4cbd873b1844f75c44934cea83217545732965d74433ac2511408ccb73949899  .claude/skills/mergex/references/11-reconciliacao-base.md
 eaabc48d69fdf0eb7f31873e8f6152d74bbf41c7a69775d16f723070b4721535  .claude/skills/mergex/references/12-barreira-de-push.md
@@ -54,6 +54,7 @@ c8b17b90c4ab2d03c5b07be0d81d78b8342a4e49ac1a22bf978c1a0f248513c5  .claude/skills
 d71b6f0084d6921ea5252a3a7c28b2bc84ca657aa10f66aacd11e7e87a4b308a  .claude/skills/mergex/scripts/causa-do-portao.sh
 fb81a32b1429b0f9bda5f91b71fac77d66d2d9fcc42bd60088296d44f660b1db  .claude/skills/mergex/scripts/classificar-atencao.sh
 899c446eb9fe32b124a3b98f433ed2e6abbca428a2a3664fe7ee3c05586ecad5  .claude/skills/mergex/scripts/contrato-de-commit.sh
+dc9f65ea3c43f589a87706f467e6f07d8e1a3c1c137443b73d141ed851bc644a  .claude/skills/mergex/scripts/fatiamento-da-pr.sh
 c73d8b69898ea720591f62e99a6d6b787d6577a9680a869f2ca58a4869e0af70  .claude/skills/mergex/scripts/fechamento-do-e1.sh
 d66338c4c63ddfb2cfa74cb27e4f4f782c080b1f637f8f5b2b1b51d8b255958d  .claude/skills/mergex/scripts/ownership-da-task.sh
 ac8d2c94e8445ca20275f90529ea8fb9f437e2bc24097937fb91c1cf9c9770c8  .claude/skills/mergex/scripts/persistir-metodo.sh
