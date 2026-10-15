@@ -118,8 +118,10 @@ Duas, e só elas:
   `.codeant/configuration.json` (`review_configuration.exclude` e
   `file_filters.config.exclude_files`, as chaves que a documentação cita) não é lido
   na PR: com as duas no `main`, a #24 ainda teve achados em `fixtures/candidatos/`.
-  Ele fica no repositório para a revisão no IDE e como registro da mesma lista;
-  padrão novo em `FATIA_IGNORAR` vai para o painel e para o arquivo.
+  Ele fica no repositório para a revisão no IDE e cobre os mesmos caminhos, cada
+  chave na sua sintaxe (`file_filters` é fnmatch, sem `**`: `fixtures/candidatos/*`,
+  `*package-lock.json`); padrão novo em `FATIA_IGNORAR` vai para o painel e para as
+  duas chaves.
 
 Fora disso, F4 não tem exceção: o limite de arquivo é do revisor, não nosso.
 
