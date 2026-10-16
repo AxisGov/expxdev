@@ -1,4 +1,6 @@
-# Scripts de shell rodam no bash, inclusive no Windows: sempre LF. Sem esta
-# regra, um checkout com core.autocrlf=true punha CRLF em nucleo/hooks/, e a
-# montagem do plugin copiava `#!/usr/bin/env bash\r` para o projeto.
+# Tudo o que o nucleo distribui sai LF, em qualquer sistema. Sem esta regra, um
+# checkout com core.autocrlf=true punha CRLF em nucleo/, e a montagem do plugin o
+# copiava byte a byte para o projeto: `#!/usr/bin/env bash\r` nos hooks de shell,
+# o hook .mjs e os .md com CRLF (AxisGov/login#2 e #3).
 *.sh text eol=lf
+nucleo/** text eol=lf
