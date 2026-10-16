@@ -98,17 +98,57 @@ expx_json_escape() {
   printf '%s' "$s"
 }
 
+# Sem jq: o valor string da primeira ocorrencia de "<chave>", lido e DECODIFICADO
+# como JSON, so com builtins. Um grep de `[^"]*` parava na primeira aspa escapada e
+# devolvia as escapas cruas — `C:\\Users\\x` chegava com a barra dobrada, que nao e
+# caminho nenhum. Valor que nao e string: vazio.
+expx_json_str() {
+  local s="$1" k="$2" r="" c i n hi lo hex
+  # A chave e o "<chave>" seguido de `:`; um valor igual ao nome da chave
+  # ({"a":"file_path", ...}) nao e ela — siga para a proxima ocorrencia.
+  while :; do
+    case "$s" in *"\"$k\""*) ;; *) return 0 ;; esac
+    s="${s#*\"$k\"}"
+    s="${s#"${s%%[![:space:]]*}"}"
+    [ "${s:0:1}" = ":" ] && break
+  done
+  s="${s:1}"; s="${s#"${s%%[![:space:]]*}"}"; [ "${s:0:1}" = '"' ] || return 0
+  s="${s:1}"; n=${#s}; i=0
+  while [ "$i" -lt "$n" ]; do
+    c="${s:i:1}"
+    case "$c" in
+      '"') break ;;
+      \\) i=$((i + 1)); c="${s:i:1}"
+          case "$c" in
+            n) r+=$'\n' ;; t) r+=$'\t' ;; r) r+=$'\r' ;; b) r+=$'\b' ;; f) r+=$'\f' ;;
+            # \uXXXX sai em UTF-8 qualquer que seja a locale do processo (hook nao herda uma).
+            # Par substituto (\uD8xx\uDCxx) e UM caractere fora do plano basico: junte os dois.
+            u) hi="${s:i+1:4}"; lo="${s:i+7:4}"
+               case "$hi${s:i+5:2}$lo" in
+                 [dD][89aAbB]??'\u'[dD][c-fC-F]??)
+                   printf -v hex '%08x' $((0x10000 + ((16#$hi - 0xD800) << 10) + (16#$lo - 0xDC00)))
+                   LC_ALL=C.UTF-8 printf -v c '%b' "\\U$hex"; i=$((i + 10)) ;;
+                 *) LC_ALL=C.UTF-8 printf -v c '%b' "\\u$hi"; i=$((i + 4)) ;;
+               esac
+               r+="$c" ;;
+            *) r+="$c" ;;
+          esac ;;
+      *) r+="$c" ;;
+    esac
+    i=$((i + 1))
+  done
+  printf '%s' "$r"
+}
+
 # Le uma chave de topo do JSON que o harness manda no stdin do hook.
-# Com jq quando existe; sem jq, um grep tolerante. Nunca falha.
+# Com jq quando existe; sem jq, o leitor de string acima. Nunca falha.
 expx_json_get() {
   local json="$1" chave="$2"
   if command -v jq >/dev/null 2>&1; then
     printf '%s' "$json" | jq -r --arg k "$chave" '.[$k] // empty' 2>/dev/null
     return 0
   fi
-  printf '%s' "$json" \
-    | grep -o "\"$chave\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" \
-    | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//'
+  expx_json_str "$json" "$chave"
 }
 
 # Le uma chave aninhada em tool_input (ex.: file_path).
@@ -118,9 +158,7 @@ expx_tool_input_get() {
     printf '%s' "$json" | jq -r --arg k "$chave" '.tool_input[$k] // empty' 2>/dev/null
     return 0
   fi
-  printf '%s' "$json" \
-    | grep -o "\"$chave\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" \
-    | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//'
+  expx_json_str "$json" "$chave"
 }
 
 # ------------------------------------------------------------- trabalho_id

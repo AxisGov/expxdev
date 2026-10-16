@@ -190,3 +190,36 @@ describe("expx_modo sem jq", () => {
     expect(roda(raiz, `${SEM_JQ}expx_modo "$PWD" meu-hook`).trimEnd()).toBe("bloqueio");
   });
 });
+
+describe("leitura do JSON sem jq", () => {
+  const SEM_JQ = 'command() { [ "$1 $2" = "-v jq" ] && return 1; builtin command "$@"; }\n';
+
+  // o JSON vai por variavel de ambiente: na linha de comando do Windows, a releitura
+  // do MSYS comeria as barras invertidas antes de o bash ver o argumento
+
+  it("funcional: file_path com barra invertida e aspa escapadas chega decodificado", () => {
+    const raiz = temp();
+    const caminho = String.raw`C:\Users\a"b\x.ts`;
+    const json = JSON.stringify({ tool_input: { file_path: caminho, outro: 1 } });
+    expect(roda(raiz, `${SEM_JQ}expx_tool_input_get "$JSON_TESTE" file_path`, { JSON_TESTE: json })).toBe(caminho);
+  });
+
+  it("funcional: valor igual ao nome da chave não esconde a chave de verdade", () => {
+    const raiz = temp();
+    const json = JSON.stringify({ a: "file_path", tool_input: { file_path: "real.ts" } });
+    expect(roda(raiz, `${SEM_JQ}expx_tool_input_get "$JSON_TESTE" file_path`, { JSON_TESTE: json })).toBe("real.ts");
+  });
+
+  it("funcional: par substituto (\\ud83d\\ude00) vira um caractere só", () => {
+    const raiz = temp();
+    const json = '{"a":"x\\ud83d\\ude00y"}';
+    expect(roda(raiz, `${SEM_JQ}expx_json_get "$JSON_TESTE" a`, { JSON_TESTE: json })).toBe("x\u{1F600}y");
+  });
+
+  it("funcional: quebra, tabulação e \\u00e9 são decodificados; valor que não é string sai vazio", () => {
+    const raiz = temp();
+    const json = JSON.stringify({ a: "x\ny\tz é", n: 3 }).replace("é", "\\u00e9");
+    expect(roda(raiz, `${SEM_JQ}expx_json_get "$JSON_TESTE" a`, { JSON_TESTE: json })).toBe("x\ny\tz é");
+    expect(roda(raiz, `${SEM_JQ}expx_json_get "$JSON_TESTE" n`, { JSON_TESTE: json })).toBe("");
+  });
+});
