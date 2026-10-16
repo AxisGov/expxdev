@@ -67,7 +67,8 @@ achar_run() {
   local evento="$1" desde="$2" filtro=() id="" i
   [ "$evento" = push ] && filtro=(--commit "$SHA")
   for i in $(seq 1 12); do
-    id="$(gh run list -R "$REPO" --workflow "$WORKFLOW" --event "$evento" "${filtro[@]}" --limit 20 \
+    # ${filtro[@]+...}: array vazio com `set -u` aborta no bash < 4.4 (o do macOS é 3.2).
+    id="$(gh run list -R "$REPO" --workflow "$WORKFLOW" --event "$evento" ${filtro[@]+"${filtro[@]}"} --limit 20 \
       --json databaseId,createdAt --jq "[.[] | select(.createdAt >= \"$desde\")] | last | .databaseId // empty")"
     [ -n "$id" ] && break
     sleep 10
