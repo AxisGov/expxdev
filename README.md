@@ -76,6 +76,7 @@ plano: veja [A primeira coisa a rodar](#a-primeira-coisa-a-rodar-depois-do-init)
 | **[As três camadas de garantia](#as-três-camadas-de-garantia)** | skill, hook e agente — da mais fraca à mais forte |
 | **[Os dois contratos](#os-dois-contratos-compartilhados)** | `expx-schema` e `expx-eventos`, o que faz tudo se encaixar |
 | **[O que fica no seu projeto](#o-que-fica-no-seu-projeto)** | cada pasta, quem escreve e quem lê |
+| **[Instalar a partir da release](#instalar-a-partir-da-release)** | o CLI empacotado por commit da main, sem compilar |
 | **[Subcomandos](#subcomandos)** · **[Lock e atualização](#versão-lock-e-atualização)** · **[Doctor](#o-que-o-doctor-verifica)** · **[Painel](#o-painel)** | a referência do CLI |
 | **[Anatomia do `init`](#anatomia-do-init-passo-a-passo)** | o que roda, em que ordem, e por quê |
 | **[`/expx:onboarding`](#a-primeira-coisa-a-rodar-depois-do-init)** | o comando que mapeia as camadas instaladas antes do primeiro plano |
@@ -461,6 +462,28 @@ só lê o artefato que cada uma produz e chama o comando de verdade.
 > que o resto do `nucleo/` viaja por cópia. Por isso `/expx:onboarding` está disponível mesmo
 > que você não tenha escolhido nenhuma camada de mapeamento: nesse caso ele só avisa, em uma
 > linha, que não há nada para orquestrar.
+
+---
+
+## Instalar a partir da release
+
+O `expxdev` publicado no npm é de outro autor: `npx expxdev` instala o CLI dele, não o deste
+repositório. E o `dist/` não é versionado, então um clone daqui não roda sem compilar. Para
+instalar este CLI em outra máquina ou outro projeto, use o pacote que o CI publica a cada commit
+da main, como release `cli-<sha7>`:
+
+```bash
+gh release download cli-<sha7> -R AxisGov/expxdev -D ~/expx-cli/cli-<sha7>
+(cd ~/expx-cli/cli-<sha7> && sha256sum -c expxdev-*.tgz.sha256)
+npx --yes --package ~/expx-cli/cli-<sha7>/expxdev-0.7.0.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+```
+
+- A tag é sempre `cli-` seguido dos 7 primeiros caracteres do commit da main. O nome do `.tgz`
+  segue a versão do `package.json` (hoje `0.7.0`).
+- Um commit da main sem release (por exemplo, quando dois pushes seguidos cancelam o CI do
+  primeiro) se publica por **Actions → CI → Run workflow**, com o commit no campo `ref`.
+- Uma tag existente nunca é sobrescrita: o mesmo `cli-<sha7>` tem os mesmos bytes em toda
+  máquina.
 
 ---
 
