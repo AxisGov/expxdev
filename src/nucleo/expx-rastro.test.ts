@@ -223,3 +223,27 @@ describe("leitura do JSON sem jq", () => {
     expect(roda(raiz, `${SEM_JQ}expx_json_get "$JSON_TESTE" n`, { JSON_TESTE: json })).toBe("");
   });
 });
+
+describe("rotação do rastro", () => {
+  function comArquivoGrande(): string {
+    const raiz = temp();
+    mkdirSync(join(raiz, "docs", "eventos"), { recursive: true });
+    writeFileSync(join(raiz, "docs", "eventos", "t.jsonl"), "x".repeat(5 * 1024 * 1024 + 10) + "\n");
+    writeFileSync(join(raiz, "docs", "eventos", "t.1.jsonl"), "antigo\n");
+    return raiz;
+  }
+
+  it("funcional: acima de 5 MB, quem pega a trava rotaciona para .1.jsonl", () => {
+    const raiz = comArquivoGrande();
+    roda(raiz, 'expx_rastro_grava "$PWD" acao_permitida hook permitido x', { EXPX_TRABALHO_ID: "t" });
+    expect(readFileSync(join(raiz, "docs", "eventos", "t.1.jsonl"), "utf8").length).toBeGreaterThan(5 * 1024 * 1024);
+    expect(readdirSync(join(raiz, "docs", "eventos")).filter((f) => f.startsWith("."))).toEqual([]);
+  });
+
+  it("funcional: com a trava de outro gravador, não rotaciona e o .1.jsonl fica intacto", () => {
+    const raiz = comArquivoGrande();
+    mkdirSync(join(raiz, "docs", "eventos", ".t.rotacao"));
+    roda(raiz, 'expx_rastro_grava "$PWD" acao_permitida hook permitido x', { EXPX_TRABALHO_ID: "t" });
+    expect(readFileSync(join(raiz, "docs", "eventos", "t.1.jsonl"), "utf8")).toBe("antigo\n");
+  });
+});

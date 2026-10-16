@@ -325,11 +325,22 @@ expx_rastro_grava() {
     local arq="$dir/$tid.jsonl"
 
     # Rotacao: acima de 5 MB o arquivo vira <trabalho_id>.1.jsonl (contrato).
+    # So quem pega a trava (mkdir e atomico) rotaciona, e confere o tamanho de novo
+    # ja com ela: dois gravadores que viram o arquivo grande ao mesmo tempo nao podem
+    # os dois mover — o segundo moveria o arquivo NOVO por cima do .1 e perderia os
+    # eventos antigos. Trava largada (processo morto) com mais de 1 min sai.
     if [ -f "$arq" ]; then
-      local tam
+      local tam trava="$dir/.$tid.rotacao"
       tam=$(wc -c < "$arq" 2>/dev/null | tr -d ' ')
       if [ -n "$tam" ] && [ "$tam" -gt 5242880 ] 2>/dev/null; then
-        mv -f "$arq" "$dir/$tid.1.jsonl" 2>/dev/null || true
+        [ -n "$(find "$trava" -maxdepth 0 -mmin +1 2>/dev/null)" ] && rmdir "$trava" 2>/dev/null
+        if mkdir "$trava" 2>/dev/null; then
+          tam=$(wc -c < "$arq" 2>/dev/null | tr -d ' ')
+          if [ -n "$tam" ] && [ "$tam" -gt 5242880 ] 2>/dev/null; then
+            mv -f "$arq" "$dir/$tid.1.jsonl" 2>/dev/null || true
+          fi
+          rmdir "$trava" 2>/dev/null
+        fi
       fi
     fi
 
