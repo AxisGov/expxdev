@@ -77,3 +77,22 @@ describe("expx_raiz", () => {
   });
 });
 
+describe("expx_json_escape", () => {
+  it("funcional: todo controle U+0001–U+001F sai escapado, e a string volta igual pelo JSON", () => {
+    const d = temp();
+    // todos os controles que cabem numa variavel de shell (o NUL nao cabe)
+    const out = roda(d, "s=''; for i in $(seq 1 31); do printf -v o '\\\\%03o' \"$i\"; printf -v c '%b' \"$o\"; s=\"$s$c\"; done; expx_json_escape \"a${s}z\\\\\\\"\"");
+    expect(out).not.toMatch(/[\u0000-\u001f]/);
+    const original = `a${Array.from({ length: 31 }, (_, i) => String.fromCharCode(i + 1)).join("")}z\\"`;
+    expect(JSON.parse(`"${out}"`)).toBe(original);
+  });
+
+  it("integração: detalhe com ESC (cor de terminal) grava uma linha JSON válida", () => {
+    const raiz = temp();
+    mkdirSync(join(raiz, ".git"));
+    roda(raiz, "EXPX_TRABALHO_ID=t expx_rastro_grava \"$PWD\" acao_permitida hook permitido $'\\033[31mvermelho\\033[0m\\001'");
+    const [linha] = eventos(raiz)["t.jsonl"] ?? [];
+    expect((JSON.parse(linha ?? "") as { detalhe: string }).detalhe).toBe("\u001b[31mvermelho\u001b[0m\u0001");
+  });
+});
+

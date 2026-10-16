@@ -68,13 +68,33 @@ expx_raiz() {
 
 # Escapa uma string para caber num JSON string literal.
 # A barra invertida vem primeiro, senao escapamos o que ja foi escapado.
+#
+# JSON proibe controle CRU dentro de string (U+0000..U+001F). Escapar so TAB,
+# CR e LF deixava o resto passar — um detalhe com cor de terminal (ESC) gravava
+# uma linha que nao e JSON e o leitor perdia o arquivo dali em diante. Os cinco
+# com forma curta saem como `\b \t \n \f \r`; o resto, como `\u00XX`. O NUL nao
+# chega aqui: nao cabe numa variavel de shell.
+#
+# O `case` guarda o laco: texto normal nao tem controle exotico, e nesse
+# caminho a funcao continua sendo so substituicao em massa, sem processo.
+EXPX_CTRL_EXOTICOS=$'\001\002\003\004\005\006\007\013\016\017\020\021\022\023\024\025\026\027\030\031\032\033\034\035\036\037'
 expx_json_escape() {
-  local s="$1"
+  local s="$1" _i _b _hex
   s="${s//\\/\\\\}"
   s="${s//\"/\\\"}"
+  s="${s//$'\b'/\\b}"
   s="${s//	/\\t}"
-  s="${s//$'\r'/\\r}"
   s="${s//$'\n'/\\n}"
+  s="${s//$'\f'/\\f}"
+  s="${s//$'\r'/\\r}"
+  case "$s" in
+    *["$EXPX_CTRL_EXOTICOS"]*)
+      for _i in 1 2 3 4 5 6 7 11 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31; do
+        printf -v _hex '%02x' "$_i"
+        printf -v _b '\\%03o' "$_i"; printf -v _b '%b' "$_b"
+        s="${s//"$_b"/\\u00$_hex}"
+      done ;;
+  esac
   printf '%s' "$s"
 }
 
