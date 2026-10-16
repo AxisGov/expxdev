@@ -363,10 +363,13 @@ describe("verificar-fatiamento.sh", () => {
     git(d, "switch", "-q", "-c", "feature", "main");
     escreve(d, "c.md", "feature\n");
     commita(d, "feature");
-    spawnSync("git", ["merge", "-q", "--no-edit", "lado"], { cwd: d, encoding: "utf8" });
+    // conflito esperado (sai 1); a identidade vai junto: no CI nao ha user.name, e sem ela
+    // o merge para antes de deixar MERGE_HEAD
+    spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "merge", "-q", "--no-edit", "lado"], { cwd: d, encoding: "utf8" });
+    expect(spawnSync("git", ["rev-parse", "-q", "--verify", "MERGE_HEAD"], { cwd: d }).status).toBe(0);
     escreve(d, "c.md", linhas(350, "resolucao"));
     git(d, "add", "-A");
-    git(d, "-c", "core.editor=true", "commit", "-q", "--no-edit");
+    git(d, "commit", "-q", "-m", "merge: resolve o conflito");
     const r = verifica(d);
     expect(r.codigo, r.saida).toBe(1);
     expect(r.saida).toMatch(/F3: o merge \w+ resolve \d+ linhas próprias|F3: o merge \w+ resolve \d+ linhas proprias/);
