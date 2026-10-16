@@ -428,6 +428,27 @@ describe("verificar-fatiamento.sh", () => {
     expect(r.saida).not.toMatch(/F4: .*grande\.bin/);
   });
 
+  it("funcional: F3 — renomeação na resolução do merge não conta como arquivo inteiro, mesmo com diff.renames=false", () => {
+    const d = repo();
+    git(d, "config", "diff.renames", "false");
+    escreve(d, "grande.md", linhas(350));
+    escreve(d, "c.md", "base\n");
+    commita(d, "base");
+    git(d, "switch", "-q", "-c", "lado");
+    escreve(d, "c.md", "lado\n");
+    commita(d, "lado");
+    git(d, "switch", "-q", "-c", "feature", "main");
+    escreve(d, "c.md", "feature\n");
+    commita(d, "feature");
+    spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "merge", "-q", "--no-edit", "lado"], { cwd: d, encoding: "utf8" });
+    escreve(d, "c.md", "resolvido\n");
+    git(d, "mv", "grande.md", "grande-movido.md");
+    git(d, "add", "-A");
+    git(d, "commit", "-q", "-m", "merge: resolve e move");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(0);
+  });
+
   it("funcional: uso incorreto sai com 2", () => {
     const r = spawnSync(BASH, [SCRIPT], { encoding: "utf8" });
     expect(r.status).toBe(2);
