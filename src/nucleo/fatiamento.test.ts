@@ -290,7 +290,7 @@ describe("verificar-fatiamento.sh", () => {
     return { d, s1 };
   }
 
-  for (const alvo of ["rev-list", "--name-status"]) {
+  for (const alvo of ["rev-list", "--name-status", "--remerge-diff"]) {
     it(`funcional: git que falha ao listar (${alvo}) sai com 2, nunca confere lista vazia`, () => {
       const { d } = comMerge();
       const real = spawnSync(BASH, ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
@@ -349,6 +349,45 @@ describe("verificar-fatiamento.sh", () => {
     git(d, "switch", "-q", "-c", "feature");
     git(d, "update-index", "--add", "--cacheinfo", `160000,${"a".repeat(40)},vendor/lib`);
     git(d, "commit", "-q", "-m", "feat: submodulo");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(0);
+  });
+
+  it("funcional: F3 — merge que resolve conflito com mais de 300 linhas próprias reprova", () => {
+    const d = repo();
+    escreve(d, "c.md", "base\n");
+    commita(d, "c");
+    git(d, "switch", "-q", "-c", "lado");
+    escreve(d, "c.md", "lado\n");
+    commita(d, "lado");
+    git(d, "switch", "-q", "-c", "feature", "main");
+    escreve(d, "c.md", "feature\n");
+    commita(d, "feature");
+    // conflito esperado (sai 1); a identidade vai junto: no CI nao ha user.name, e sem ela
+    // o merge para antes de deixar MERGE_HEAD
+    spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "merge", "-q", "--no-edit", "lado"], { cwd: d, encoding: "utf8" });
+    expect(spawnSync("git", ["rev-parse", "-q", "--verify", "MERGE_HEAD"], { cwd: d }).status).toBe(0);
+    escreve(d, "c.md", linhas(350, "resolucao"));
+    git(d, "add", "-A");
+    git(d, "commit", "-q", "-m", "merge: resolve o conflito");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(1);
+    expect(r.saida).toMatch(/F3: o merge \w+ resolve \d+ linhas próprias|F3: o merge \w+ resolve \d+ linhas proprias/);
+  });
+
+  it("funcional: F4 — nome de arquivo com quebra de linha é medido, não vira saída 2", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    const blob = spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: d, input: "x\n", encoding: "utf8" }).stdout.trim();
+    // direto nos objetos: o indice e a arvore de trabalho do Git for Windows recusam \n no caminho
+    const sh = (args: string[], input?: string): string => {
+      const r = spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: d, input, encoding: "utf8" });
+      if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
+      return r.stdout;
+    };
+    const arvore = sh(["mktree", "-z"], `${sh(["ls-tree", "-z", "HEAD"])}100644 blob ${blob}\tlinha\nquebrada.md\0`).trim();
+    const commit = sh(["commit-tree", arvore, "-p", "HEAD", "-m", "feat: nome com quebra"]).trim();
+    sh(["update-ref", "refs/heads/feature", commit]);
     const r = verifica(d);
     expect(r.codigo, r.saida).toBe(0);
   });

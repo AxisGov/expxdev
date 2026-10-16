@@ -171,3 +171,22 @@ describe("expx_trabalho_id", () => {
     expect(roda(raiz, 'expx_trabalho_id "$PWD"', { EXPX_TRABALHO_ID: "outro" }).trimEnd()).toBe("outro");
   });
 });
+
+describe("expx_modo sem jq", () => {
+  // sem jq o hook cai no parser de grep; `command -v jq` falhando simula a ausência
+  const SEM_JQ = 'command() { [ "$1 $2" = "-v jq" ] && return 1; builtin command "$@"; }\n';
+
+  it("funcional: a forma antiga (modos com valor string) é lida, e desligado desliga", () => {
+    const raiz = temp();
+    mkdirSync(join(raiz, ".expx"), { recursive: true });
+    writeFileSync(join(raiz, ".expx", "hooks.json"), '{"modos": {"meu-hook": "desligado"}}\n');
+    expect(roda(raiz, `${SEM_JQ}expx_modo "$PWD" meu-hook`).trimEnd()).toBe("desligado");
+  });
+
+  it("funcional: a forma atual (hooks com objeto) continua valendo sem jq", () => {
+    const raiz = temp();
+    mkdirSync(join(raiz, ".expx"), { recursive: true });
+    writeFileSync(join(raiz, ".expx", "hooks.json"), '{"hooks": {"meu-hook": {"modo": "bloqueio"}}}\n');
+    expect(roda(raiz, `${SEM_JQ}expx_modo "$PWD" meu-hook`).trimEnd()).toBe("bloqueio");
+  });
+});
