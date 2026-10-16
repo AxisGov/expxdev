@@ -100,7 +100,7 @@ outro.
 
 ### F6 — Exceções declaradas
 
-Duas, e só elas:
+Três, e só elas:
 
 - **movimento mecânico**: dividir ou renomear arquivo sem alterar conteúdo, em PR
   que não faz mais nada. Declara-se com `FATIA_EXCECAO=<motivo>`, que rebaixa F2
@@ -122,6 +122,14 @@ Duas, e só elas:
   chave na sua sintaxe (`file_filters` é fnmatch, sem `**`: `fixtures/candidatos/*`,
   `*package-lock.json`); padrão novo em `FATIA_IGNORAR` vai para o painel e para as
   duas chaves.
+- **artefato de método**: o que a `sprintx` e a `mergex` gravam na branch da
+  feature — `docs/sprintx/`, `docs/entregas/`, `docs/eventos/` — entra no PR para
+  rastreabilidade, mas fica fora de F2, F3 e F4 (o E7 da `mergex` os põe no
+  `FATIA_IGNORAR`) e fora da revisão automática (no painel do CodeAnt do projeto,
+  como acima). O planejamento de uma feature real passa sozinho de 250 arquivos e
+  38 mil linhas antes da primeira linha de código; medi-lo reprovaria todo PR, e o
+  método já é conferido pelos portões das próprias skills. A regra de tamanho da F3
+  da `sprintx` é sobre o código das tasks.
 
 Fora disso, F4 não tem exceção: o limite de arquivo é do revisor, não nosso.
 
