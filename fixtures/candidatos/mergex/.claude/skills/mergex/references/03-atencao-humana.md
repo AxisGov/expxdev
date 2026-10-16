@@ -26,6 +26,10 @@ Passe a ele:
 - o arquivo de raio da legadox
 - o `PERFIL.md` da legadox
 - a saída do memox por arquivo, quando o memox está instalado (`Passo 2.b`)
+- a lista de reconciliados (`$e3/reconciliados.tsv`, montada como em "O classificador", abaixo),
+  quando o trabalho tem reconciliação de base (`RECONCILIACAO-BASE-NNN.md`): o agente a passa ao
+  classificador com `--reconciliados`, e sem ela os reconciliados não ganham O10. Monte-a
+  **antes** de acionar o agente; reconciliação reprovada não chega a ele
 
 O agente devolve a lista por arquivo, com faixa e motivo. **A regra que o prompt
 dele carrega em destaque é a que mais se erra:** tamanho de diff não é critério —

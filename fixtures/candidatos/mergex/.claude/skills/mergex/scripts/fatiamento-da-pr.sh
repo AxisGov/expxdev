@@ -12,7 +12,8 @@
 # Compara <base>...<head> e falha, com a lista de violações, em F2 (PR: linhas e
 # arquivos), F3 (linhas por commit) e F4 (tamanho de arquivo, em KB e em linhas;
 # acima do limite o arquivo não cresce, com tolerância POR PR). Os limites e as
-# exceções (FATIA_*) estão no contrato. Saída: 0 sem violação, 1 com, 2 uso.
+# exceções (FATIA_*) estão no contrato. Saída: 0 sem violação, 1 com, 2 uso ou
+# medição impossível (ref inexistente, sem ancestral comum, `git diff` que falha).
 
 set -uo pipefail
 
@@ -55,25 +56,49 @@ viola_ou_avisa() {
 # KiB com arredondamento para cima, só para exibir
 kib() { echo $((($1 + 1023) / 1024)); }
 
-# linhas alteradas e arquivos de um diff, sem os gerados. O numstat é separado
-# por TAB e o caminho é o terceiro campo inteiro: caminho com espaço não quebra.
+# linhas alteradas e arquivos de um diff, sem os gerados. O numstat vem com -z: o
+# caminho e um campo terminado por NUL, entao espaco, `=>` ou quebra no nome nao o
+# confundem. Na renomeacao o campo do caminho vem vazio e seguem origem e destino;
+# o FATIA_IGNORAR vale para o DESTINO, como no F4 — sem isto, um arquivo tirado de
+# fixtures/candidatos/ para um caminho revisado ficaria fora da conta. A saida do
+# git vai para um arquivo, nao para um pipe: um diff que falha tem de falhar aqui.
 soma() { # <argumentos do git diff>
-  git -c core.quotepath=off diff --numstat -M "$@" | IGN="$ignorar" awk -F'\t' '
-    $1 == "-" { l = 0 } $1 != "-" { l = $1 + $2 }
-    { if ($3 ~ ENVIRON["IGN"]) next; linhas += l; n++ }
-    END { printf "%d %d\n", linhas + 0, n + 0 }'
+  local t a d p linhas=0 n=0
+  t="$(mktemp)" || return 1
+  git -c core.quotepath=off diff --numstat -z -M "$@" > "$t" || { rm -f "$t"; return 1; }
+  while IFS=$'\t' read -r -d '' a d p; do
+    [ -n "$p" ] || { read -r -d '' p; read -r -d '' p; }
+    [[ $p =~ $ignorar ]] && continue
+    [ "$a" = - ] || linhas=$((linhas + a + d))
+    n=$((n + 1))
+  done < "$t"
+  rm -f "$t"
+  printf '%d %d\n' "$linhas" "$n"
+}
+
+# a medida vai para uma variavel, nunca direto num `read < <(...)`: a substituicao
+# de processo esconde a saida do `git diff`, e um diff que falha (objeto ausente)
+# imprimiria `0 0` e passaria por PR limpo. Nao mediu e saida 2, nunca 0.
+mede() { # <rotulo> <argumentos do git diff>
+  local r="$1"; shift
+  soma "$@" || { echo "nao foi possivel medir $r (git diff falhou)" >&2; exit 2; }
 }
 
 # F2 — a PR inteira
-read -r linhas_pr arquivos_pr < <(soma "$mb" "$head")
+med="$(mede "a PR $mb..$head" "$mb" "$head")" || exit 2
+read -r linhas_pr arquivos_pr <<< "$med"
 [ "$linhas_pr" -le "$max_linhas_pr" ] \
   || viola_ou_avisa "F2: a PR altera $linhas_pr linhas (limite $max_linhas_pr); divida por assunto"
 [ "$arquivos_pr" -le "$max_arquivos" ] \
   || viola_ou_avisa "F2: a PR altera $arquivos_pr arquivos (limite $max_arquivos); divida por assunto"
 
-# F3 — cada commit (merges ficam de fora: o conteúdo deles é o dos pais)
+# F3 — cada commit (merges ficam de fora: o conteúdo deles é o dos pais). Commit
+# sem pai (raiz de historia trazida por merge) mede contra a arvore vazia.
+vazia="$(git hash-object -t tree /dev/null)"
 while IFS= read -r c; do
-  read -r l _ < <(soma "$c^" "$c" 2>/dev/null || echo "0 0")
+  pai="$c^"; git rev-parse -q --verify "$c^" >/dev/null || pai="$vazia"
+  med="$(mede "o commit $c" "$pai" "$c")" || exit 2
+  read -r l _ <<< "$med"
   if [ "$l" -gt "$max_linhas_commit" ]; then
     viola_ou_avisa "F3: o commit $(git rev-parse --short "$c") altera $l linhas (limite $max_linhas_commit): $(git log -1 --format=%s "$c" | cut -c1-70)"
   fi
@@ -93,9 +118,12 @@ while IFS=$'\t' read -r st a b; do
   [[ $novo =~ $ignorar ]] && continue
   tipo="$(git -c core.quotepath=off diff --numstat "$mb" "$head" -- "$novo" | awk -F'\t' 'NR == 1 { print $1 }')"
   [ "$tipo" = "-" ] && continue   # binário: não é revisado como texto
-  tam_head="$(git cat-file -s "$head:$novo" 2>/dev/null || echo 0)"
+  # o arquivo existe no head (A/M/R): sem ler o tamanho dele nao ha medida, e um 0
+  # passaria por arquivo pequeno. No ancestral ele pode nao existir (A): ali, 0.
+  tam_head="$(git cat-file -s "$head:$novo" 2>/dev/null)" \
+    && lin_head="$(git cat-file -p "$head:$novo" 2>/dev/null | awk 'END { print NR }')" \
+    || { echo "nao foi possivel medir $novo no head" >&2; exit 2; }
   tam_base="$(git cat-file -s "$mb:$antigo" 2>/dev/null || echo 0)"
-  lin_head="$(git cat-file -p "$head:$novo" 2>/dev/null | awk 'END { print NR }')"
   lin_base="$(git cat-file -p "$mb:$antigo" 2>/dev/null | awk 'END { print NR }')"
 
   # linhas por `awk NR`, nao `wc -l`: o wc conta quebras, e a ultima linha sem

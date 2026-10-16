@@ -32,6 +32,7 @@ não vira uma correção sua.
 | Arquivo de raio da legadox | Que arquivos vieram de raio ALTO |
 | `PERFIL.md` da legadox | Que caminhos estão em zona de risco declarada |
 | Índice do `memox`, quando instalado | O que já aconteceu com este caminho antes: regressão, reprovação em QA |
+| Lista de reconciliados (`reconciliados.tsv`), quando o trabalho tem reconciliação de base | Que arquivos vieram da base reconciliada: vai para o classificador com `--reconciliados` (O10) |
 
 **Fonte ausente não vira suposição.** Se não existe `PERFIL.md`, você não sabe
 se o arquivo está em zona de risco: os outros critérios decidem, e a fonte
@@ -139,6 +140,13 @@ inteiro**, da raiz do projeto:
 ```
 printf '%s\t%s\t%s\n' src/auth/sessao.ts "O4: cria o token de sessão (T-01.02)" "L3: arquivo novo, dois testes verdes" \
   | bash .claude/skills/mergex/scripts/classificar-atencao.sh --base <base>
+```
+
+Recebeu a lista de reconciliados? Passe-a, sempre: sem ela, os reconciliados não
+ganham O10.
+
+```
+... | bash .claude/skills/mergex/scripts/classificar-atencao.sh --base <base> --reconciliados <reconciliados.tsv>
 ```
 
 - Uma linha por arquivo: o caminho e, separados por TAB, os critérios
