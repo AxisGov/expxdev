@@ -204,6 +204,18 @@ describe("leitura do JSON sem jq", () => {
     expect(roda(raiz, `${SEM_JQ}expx_tool_input_get "$JSON_TESTE" file_path`, { JSON_TESTE: json })).toBe(caminho);
   });
 
+  it("funcional: valor igual ao nome da chave não esconde a chave de verdade", () => {
+    const raiz = temp();
+    const json = JSON.stringify({ a: "file_path", tool_input: { file_path: "real.ts" } });
+    expect(roda(raiz, `${SEM_JQ}expx_tool_input_get "$JSON_TESTE" file_path`, { JSON_TESTE: json })).toBe("real.ts");
+  });
+
+  it("funcional: par substituto (\\ud83d\\ude00) vira um caractere só", () => {
+    const raiz = temp();
+    const json = '{"a":"x\\ud83d\\ude00y"}';
+    expect(roda(raiz, `${SEM_JQ}expx_json_get "$JSON_TESTE" a`, { JSON_TESTE: json })).toBe("x\u{1F600}y");
+  });
+
   it("funcional: quebra, tabulação e \\u00e9 são decodificados; valor que não é string sai vazio", () => {
     const raiz = temp();
     const json = JSON.stringify({ a: "x\ny\tz é", n: 3 }).replace("é", "\\u00e9");
