@@ -240,6 +240,16 @@ describe("rotação do rastro", () => {
     expect(readdirSync(join(raiz, "docs", "eventos")).filter((f) => f.startsWith("."))).toEqual([]);
   });
 
+  it("funcional: trava velha também segura a rotação — ninguém a remove, nada se perde", () => {
+    const raiz = comArquivoGrande();
+    const trava = join(raiz, "docs", "eventos", ".t.rotacao");
+    mkdirSync(trava);
+    const antes = new Date(Date.now() - 10 * 60 * 1000);
+    utimesSync(trava, antes, antes);
+    roda(raiz, 'expx_rastro_grava "$PWD" acao_permitida hook permitido x', { EXPX_TRABALHO_ID: "t" });
+    expect(readFileSync(join(raiz, "docs", "eventos", "t.1.jsonl"), "utf8")).toBe("antigo\n");
+  });
+
   it("funcional: com a trava de outro gravador, não rotaciona e o .1.jsonl fica intacto", () => {
     const raiz = comArquivoGrande();
     mkdirSync(join(raiz, "docs", "eventos", ".t.rotacao"));

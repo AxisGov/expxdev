@@ -328,12 +328,14 @@ expx_rastro_grava() {
     # So quem pega a trava (mkdir e atomico) rotaciona, e confere o tamanho de novo
     # ja com ela: dois gravadores que viram o arquivo grande ao mesmo tempo nao podem
     # os dois mover — o segundo moveria o arquivo NOVO por cima do .1 e perderia os
-    # eventos antigos. Trava largada (processo morto) com mais de 1 min sai.
+    # eventos antigos. Trava presente: ninguem rotaciona, e o arquivo so cresce. Nao ha
+    # remocao de trava velha: ela abriria a mesma corrida (um gravador apagaria a trava
+    # NOVA do outro). Trava so sobra se o processo morrer entre o mkdir e o rmdir — e o
+    # efeito e um arquivo grande, nunca evento perdido.
     if [ -f "$arq" ]; then
       local tam trava="$dir/.$tid.rotacao"
       tam=$(wc -c < "$arq" 2>/dev/null | tr -d ' ')
       if [ -n "$tam" ] && [ "$tam" -gt 5242880 ] 2>/dev/null; then
-        [ -n "$(find "$trava" -maxdepth 0 -mmin +1 2>/dev/null)" ] && rmdir "$trava" 2>/dev/null
         if mkdir "$trava" 2>/dev/null; then
           tam=$(wc -c < "$arq" 2>/dev/null | tr -d ' ')
           if [ -n "$tam" ] && [ "$tam" -gt 5242880 ] 2>/dev/null; then
