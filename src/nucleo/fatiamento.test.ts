@@ -392,6 +392,27 @@ describe("verificar-fatiamento.sh", () => {
     expect(r.codigo, r.saida).toBe(0);
   });
 
+  it("funcional: F4 — nome com metacaractere de pathspec não casa um arquivo vizinho", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    // `g?.md` como padrao casaria `g1.md`, que vem antes na ordem do numstat; sendo
+    // binario, o tipo `-` tiraria do F4 o arquivo grande de texto `g?.md`
+    const obj = (conteudo: string): string =>
+      spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: d, input: conteudo, encoding: "latin1" }).stdout.trim();
+    // direto nos objetos: o indice do Git for Windows recusa `?` no caminho
+    const sh = (args: string[], input?: string): string => {
+      const r = spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: d, input, encoding: "utf8" });
+      if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
+      return r.stdout;
+    };
+    const entradas = `100644 blob ${obj("bin\u0000ario")}\tg1.md\u0000100644 blob ${obj("y".repeat(170 * 1024) + "\n")}\tg?.md\u0000`;
+    const arvore = sh(["mktree", "-z"], `${sh(["ls-tree", "-z", "HEAD"])}${entradas}`).trim();
+    sh(["update-ref", "refs/heads/feature", sh(["commit-tree", arvore, "-p", "HEAD", "-m", "feat: ? ao lado de binario"]).trim()]);
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(1);
+    expect(r.saida).toMatch(/F4: .*g\?\.md/);
+  });
+
   it("funcional: uso incorreto sai com 2", () => {
     const r = spawnSync(BASH, [SCRIPT], { encoding: "utf8" });
     expect(r.status).toBe(2);

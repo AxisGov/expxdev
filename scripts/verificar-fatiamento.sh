@@ -152,8 +152,9 @@ while IFS= read -r -d '' st; do
   # gerado (FATIA_IGNORAR) nao e revisado: fica fora de F4 tambem (contrato, F6)
   [[ $novo =~ $ignorar ]] && continue
   # submodulo (gitlink, 160000) nao e arquivo: o objeto dele nem esta neste repositorio
-  case "$(git ls-tree "$head" -- "$novo")" in 160000\ *) continue ;; esac
-  tipo="$(git -c core.quotepath=off diff --numstat "$mb" "$head" -- "$novo" | awk -F'\t' 'NR == 1 { print $1 }')"
+  # --literal-pathspecs: o nome e caminho, nunca padrao — `g[x].md` nao pode casar `gx.md`
+  case "$(git --literal-pathspecs ls-tree "$head" -- "$novo")" in 160000\ *) continue ;; esac
+  tipo="$(git --literal-pathspecs -c core.quotepath=off diff --numstat "$mb" "$head" -- "$novo" | awk -F'\t' 'NR == 1 { print $1 }')"
   [ "$tipo" = "-" ] && continue   # binário: não é revisado como texto
   # o arquivo existe no head (A/M/R): sem ler o tamanho dele nao ha medida, e um 0
   # passaria por arquivo pequeno. No ancestral ele pode nao existir (A): ali, 0.
