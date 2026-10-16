@@ -63,9 +63,13 @@ kib() { echo $((($1 + 1023) / 1024)); }
 # fixtures/candidatos/ para um caminho revisado ficaria fora da conta. A saida do
 # git vai para um arquivo, nao para um pipe: um diff que falha tem de falhar aqui.
 soma() { # <argumentos do git diff>
+  soma_de git -c core.quotepath=off diff --numstat -z -M "$@"
+}
+# soma_de <comando que imprime numstat -z> — a mesma conta para qualquer fonte de numstat
+soma_de() {
   local t a d p linhas=0 n=0
   t="$(mktemp)" || return 1
-  git -c core.quotepath=off diff --numstat -z -M "$@" > "$t" || { rm -f "$t"; return 1; }
+  "$@" > "$t" || { rm -f "$t"; return 1; }
   while IFS=$'\t' read -r -d '' a d p; do
     [ -n "$p" ] || { read -r -d '' p; read -r -d '' p; }
     [[ $p =~ $ignorar ]] && continue
@@ -117,14 +121,34 @@ while IFS= read -r c; do
   fi
 done < "$lista_c"
 
+# F3 nos merges: o conteudo deles e o dos pais, MENOS a resolucao — linhas que nao
+# estao em nenhum pai. `--remerge-diff` mostra so isso (a diferenca entre a mescla
+# automatica e o merge gravado). Merge que nao se mede sai 2, como toda medida
+# impossivel aqui — inclusive no git anterior a 2.36, que nao tem a opcao.
+git rev-list --merges "$mb..$head" > "$lista_c" \
+  || { echo "nao foi possivel listar os merges de $mb..$head" >&2; exit 2; }
+while IFS= read -r c; do
+  med="$(soma_de git -c core.quotepath=off show --remerge-diff --format= --numstat -z "$c")" \
+    || { echo "nao foi possivel medir o merge $c (git show --remerge-diff falhou; exige git 2.36 ou mais novo)" >&2; exit 2; }
+  read -r l _ <<< "$med"
+  if [ "$l" -gt "$max_linhas_commit" ]; then
+    viola_ou_avisa "F3: o merge $(git rev-parse --short "$c") resolve $l linhas proprias (limite $max_linhas_commit): $(git log -1 --format=%s "$c" | cut -c1-70)"
+  fi
+done < "$lista_c"
+
 # F4 — tamanho de arquivo de texto no head. Acima do limite, o crescimento é
 # SOMADO sobre a PR inteira e comparado com a tolerância uma vez. `T` (mudança de
 # tipo: link virou arquivo) entra: o arquivo de texto que sai dali e revisado igual.
-git -c core.quotepath=off diff --name-status -M --diff-filter=AMRT "$mb" "$head" > "$lista_f" \
+# Com -z, como no `soma`: cada campo termina em NUL, e um nome com quebra de linha
+# chega inteiro, nunca escapado entre aspas (que nao e caminho nenhum).
+git -c core.quotepath=off diff --name-status -z -M --diff-filter=AMRT "$mb" "$head" > "$lista_f" \
   || { echo "nao foi possivel listar os arquivos de $mb..$head" >&2; exit 2; }
 cresc_b=0; cresc_l=0
 acima=()
-while IFS=$'\t' read -r st a b; do
+while IFS= read -r -d '' st; do
+  a=""; b=""
+  IFS= read -r -d '' a
+  case "$st" in R*|C*) IFS= read -r -d '' b ;; esac
   [ -n "$st" ] || continue
   novo="${b:-$a}"
   # renomeação: o arquivo no ancestral tem o caminho ANTIGO; sem isto, um
