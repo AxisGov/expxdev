@@ -250,6 +250,9 @@ expx_modo() {
     m="$(grep -o "\"$hook\"[[:space:]]*:[[:space:]]*{[^}]*}" "$cfg" 2>/dev/null \
          | grep -o '"modo"[[:space:]]*:[[:space:]]*"[^"]*"' \
          | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')"
+    # forma antiga sem jq: `"modos": {"<hook>": "<modo>"}`, o valor e string, nao objeto
+    [ -n "$m" ] || m="$(grep -o "\"$hook\"[[:space:]]*:[[:space:]]*\"[a-z]*\"" "$cfg" 2>/dev/null \
+         | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')"
   fi
 
   case "$m" in
