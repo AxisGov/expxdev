@@ -329,6 +329,30 @@ describe("verificar-fatiamento.sh", () => {
     expect(r.saida).toContain("fronteira de um clone raso");
   });
 
+  it("funcional: F4 — link que vira arquivo de texto acima do limite (mudança de tipo) reprova", () => {
+    const d = repo();
+    const blob = spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: d, input: "alvo", encoding: "utf8" }).stdout.trim();
+    git(d, "update-index", "--add", "--cacheinfo", `120000,${blob},grande.md`);
+    git(d, "commit", "-q", "-m", "link");
+    git(d, "switch", "-q", "-c", "feature");
+    // pelo indice, e nao pela arvore: com core.symlinks=false (Windows) o git manteria 120000 e daria M
+    const grande = spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: d, input: "w".repeat(170 * 1024) + "\n", encoding: "utf8" }).stdout.trim();
+    git(d, "update-index", "--cacheinfo", `100644,${grande},grande.md`);
+    git(d, "commit", "-q", "-m", "feat: o link vira arquivo grande");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(1);
+    expect(r.saida).toMatch(/F4: .*grande\.md/);
+  });
+
+  it("funcional: submódulo (gitlink) não é medido como arquivo", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    git(d, "update-index", "--add", "--cacheinfo", `160000,${"a".repeat(40)},vendor/lib`);
+    git(d, "commit", "-q", "-m", "feat: submodulo");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(0);
+  });
+
   it("funcional: uso incorreto sai com 2", () => {
     const r = spawnSync(BASH, [SCRIPT], { encoding: "utf8" });
     expect(r.status).toBe(2);
