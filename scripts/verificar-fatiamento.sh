@@ -118,15 +118,13 @@ done < "$lista_c"
 
 # F3 nos merges: o conteudo deles e o dos pais, MENOS a resolucao — linhas que nao
 # estao em nenhum pai. `--remerge-diff` mostra so isso (a diferenca entre a mescla
-# automatica e o merge gravado). Git sem a opcao (anterior a 2.36): aviso, nao medida.
+# automatica e o merge gravado). Merge que nao se mede sai 2, como toda medida
+# impossivel aqui — inclusive no git anterior a 2.36, que nao tem a opcao.
 git rev-list --merges "$mb..$head" > "$lista_c" \
   || { echo "nao foi possivel listar os merges de $mb..$head" >&2; exit 2; }
 while IFS= read -r c; do
-  if ! git show --remerge-diff --format= -s "$c" >/dev/null 2>&1; then
-    avisa "F3: o merge $(git rev-parse --short "$c") nao foi medido (git sem --remerge-diff)"; continue
-  fi
   med="$(soma_de git -c core.quotepath=off show --remerge-diff --format= --numstat -z "$c")" \
-    || { echo "nao foi possivel medir o merge $c" >&2; exit 2; }
+    || { echo "nao foi possivel medir o merge $c (git show --remerge-diff falhou; exige git 2.36 ou mais novo)" >&2; exit 2; }
   read -r l _ <<< "$med"
   if [ "$l" -gt "$max_linhas_commit" ]; then
     viola_ou_avisa "F3: o merge $(git rev-parse --short "$c") resolve $l linhas proprias (limite $max_linhas_commit): $(git log -1 --format=%s "$c" | cut -c1-70)"

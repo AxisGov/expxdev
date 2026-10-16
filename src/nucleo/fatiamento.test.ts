@@ -290,7 +290,7 @@ describe("verificar-fatiamento.sh", () => {
     return { d, s1 };
   }
 
-  for (const alvo of ["rev-list", "--name-status"]) {
+  for (const alvo of ["rev-list", "--name-status", "--remerge-diff"]) {
     it(`funcional: git que falha ao listar (${alvo}) sai com 2, nunca confere lista vazia`, () => {
       const { d } = comMerge();
       const real = spawnSync(BASH, ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
