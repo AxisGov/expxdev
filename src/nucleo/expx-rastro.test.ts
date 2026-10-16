@@ -141,9 +141,29 @@ describe("expx_trabalho_id", () => {
     expect(roda(join(wt, "docs"), 'expx_trabalho_id "$(expx_raiz)"').trimEnd()).toBe("b");
   });
 
-  it("funcional: branch sem feature correspondente mantém a regra anterior (mais recente)", () => {
+  it("funcional: dois trabalhos e branch que não casa vão para sem-trabalho, nunca para o mais recente", () => {
     const raiz = duasFeatures("main");
-    expect(roda(raiz, 'expx_trabalho_id "$PWD"').trimEnd()).toBe("a");
+    expect(roda(raiz, 'expx_trabalho_id "$PWD"').trimEnd()).toBe("sem-trabalho");
+  });
+
+  it("integração: com dois trabalhos e sem branch que case, o evento grava em sem-trabalho.jsonl", () => {
+    const raiz = duasFeatures("main");
+    roda(raiz, 'expx_rastro_grava "$PWD" acao_permitida hook permitido x');
+    expect(Object.keys(eventos(raiz))).toEqual(["sem-trabalho.jsonl"]);
+  });
+
+  it("funcional: com um trabalho só, mesmo sem branch que case, o evento vai para ele", () => {
+    const raiz = temp();
+    git(raiz, "init", "-q", "-b", "main");
+    mkdirSync(join(raiz, "docs", "sprintx", "features", "unico"), { recursive: true });
+    writeFileSync(join(raiz, "docs", "sprintx", "features", "unico", "ORQUESTRADOR.md"), "# unico\n");
+    expect(roda(raiz, 'expx_trabalho_id "$PWD"').trimEnd()).toBe("unico");
+  });
+
+  it("funcional: sem ORQUESTRADOR.md nenhum, sem-trabalho", () => {
+    const raiz = temp();
+    git(raiz, "init", "-q", "-b", "feature/x");
+    expect(roda(raiz, 'expx_trabalho_id "$PWD"').trimEnd()).toBe("sem-trabalho");
   });
 
   it("funcional: EXPX_TRABALHO_ID continua vencendo a branch", () => {

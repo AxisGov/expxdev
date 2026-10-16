@@ -134,8 +134,9 @@ expx_tool_input_get() {
 #   2. .expx/expx-lock.json, que o CLI mantem
 #   3. a branch do checkout (`feature/<slug>`), quando existe ORQUESTRADOR.md
 #      numa pasta com esse slug
-#   4. o ORQUESTRADOR.md mais recente, nos dois layouts de pasta
-#   5. "sem-trabalho"
+#   4. o UNICO trabalho com ORQUESTRADOR.md, nos dois layouts de pasta
+#   5. "sem-trabalho" — inclusive com dois ou mais trabalhos e nada acima
+#      decidindo: o mtime NAO escolhe (decisao do usuario, AxisGov/login#2)
 #
 # O nome do lock e `expx-lock.json` (src/nucleo/lock.ts). Ler `lock.json` sem
 # o prefixo devolve "sem-trabalho" para sempre, em silencio — a falha aqui e
@@ -144,8 +145,8 @@ expx_tool_input_get() {
 # O passo 3 vem antes do mtime porque, com duas features ativas, o
 # ORQUESTRADOR.md mexido por ultimo pode ser o da OUTRA: a worktree/branch e o
 # contexto desta sessao, o disco nao. So vale quando o ultimo segmento da
-# branch casa com uma pasta de trabalho existente; fora disso o passo 4 segue
-# como antes.
+# branch casa com uma pasta de trabalho existente. "Ativo" nao tem criterio
+# proprio aqui: conta todo ORQUESTRADOR.md que a busca acha.
 
 # expx_branch_atual_em <var> <raiz> — a branch do checkout em <raiz>, lida do
 # HEAD sem chamar o git (regra 1). Numa worktree vinculada `.git` e arquivo e
@@ -194,14 +195,15 @@ expx_trabalho_id() {
   # `find` em vez de glob: no zsh um padrao sem match ABORTA a funcao (nomatch),
   # e o hook perderia o trabalho_id no shell de metade dos usuarios. O -maxdepth
   # 4 cobre os dois layouts sem varrer o repositorio inteiro.
-  local f d mais_novo="" br slug="" da_branch=""
+  local f d unico="" ambiguo="" br slug="" da_branch=""
   expx_branch_atual_em br "$raiz"
   [ -n "$br" ] && slug="${br##*/}"
   while IFS= read -r f; do
     [ -f "$f" ] || continue
-    d="${f%/ORQUESTRADOR.md}"
-    [ -n "$slug" ] && [ "${d##*/}" = "$slug" ] && da_branch="$slug"
-    if [ -z "$mais_novo" ] || [ "$f" -nt "$mais_novo" ]; then mais_novo="$f"; fi
+    d="${f%/ORQUESTRADOR.md}"; d="${d##*/}"
+    [ -n "$slug" ] && [ "$d" = "$slug" ] && da_branch="$slug"
+    # o mesmo slug nos dois layouts e o MESMO trabalho (mesmo arquivo de eventos)
+    if [ -z "$unico" ]; then unico="$d"; elif [ "$d" != "$unico" ]; then ambiguo=1; fi
   done <<EOF
 $(find "$raiz/docs" -maxdepth 4 -name ORQUESTRADOR.md -type f 2>/dev/null)
 EOF
@@ -209,8 +211,11 @@ EOF
     printf '%s' "$da_branch"
     return 0
   fi
-  if [ -n "$mais_novo" ]; then
-    basename "$(dirname "$mais_novo")"
+  # Mais de um trabalho e nada que decida entre eles: sem-trabalho, nunca o
+  # mtime. O ORQUESTRADOR.md mexido por ultimo pode ser o da OUTRA feature, e
+  # evento atribuido ao trabalho errado e pior que evento sem trabalho.
+  if [ -n "$unico" ] && [ -z "$ambiguo" ]; then
+    printf '%s' "$unico"
     return 0
   fi
 
