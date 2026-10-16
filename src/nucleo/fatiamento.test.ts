@@ -353,6 +353,42 @@ describe("verificar-fatiamento.sh", () => {
     expect(r.codigo, r.saida).toBe(0);
   });
 
+  it("funcional: F3 — merge que resolve conflito com mais de 300 linhas próprias reprova", () => {
+    const d = repo();
+    escreve(d, "c.md", "base\n");
+    commita(d, "c");
+    git(d, "switch", "-q", "-c", "lado");
+    escreve(d, "c.md", "lado\n");
+    commita(d, "lado");
+    git(d, "switch", "-q", "-c", "feature", "main");
+    escreve(d, "c.md", "feature\n");
+    commita(d, "feature");
+    spawnSync("git", ["merge", "-q", "--no-edit", "lado"], { cwd: d, encoding: "utf8" });
+    escreve(d, "c.md", linhas(350, "resolucao"));
+    git(d, "add", "-A");
+    git(d, "-c", "core.editor=true", "commit", "-q", "--no-edit");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(1);
+    expect(r.saida).toMatch(/F3: o merge \w+ resolve \d+ linhas próprias|F3: o merge \w+ resolve \d+ linhas proprias/);
+  });
+
+  it("funcional: F4 — nome de arquivo com quebra de linha é medido, não vira saída 2", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    const blob = spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: d, input: "x\n", encoding: "utf8" }).stdout.trim();
+    // direto nos objetos: o indice e a arvore de trabalho do Git for Windows recusam \n no caminho
+    const sh = (args: string[], input?: string): string => {
+      const r = spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: d, input, encoding: "utf8" });
+      if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
+      return r.stdout;
+    };
+    const arvore = sh(["mktree", "-z"], `${sh(["ls-tree", "-z", "HEAD"])}100644 blob ${blob}\tlinha\nquebrada.md\0`).trim();
+    const commit = sh(["commit-tree", arvore, "-p", "HEAD", "-m", "feat: nome com quebra"]).trim();
+    sh(["update-ref", "refs/heads/feature", commit]);
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(0);
+  });
+
   it("funcional: uso incorreto sai com 2", () => {
     const r = spawnSync(BASH, [SCRIPT], { encoding: "utf8" });
     expect(r.status).toBe(2);
