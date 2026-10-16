@@ -30,6 +30,18 @@ case "$(uname -s 2>/dev/null)" in
   MINGW*|MSYS*|CYGWIN*) EH_WINDOWS=1; LIMITE_MS="${LIMITE_MS:-10000}" ;;
   *) EH_WINDOWS=0; LIMITE_MS="${LIMITE_MS:-2000}" ;;
 esac
+# Tempo em milissegundos, nao em $SECONDS: o $SECONDS conta viradas de segundo, e
+# uma execucao de 1,1 s que atravessa duas viradas mede 2 e reprova o "menos de 2 s".
+# Fontes, da mais barata: $EPOCHREALTIME (bash 5), `date +%N` (GNU), perl
+# (presente no macOS, cujo date nao tem %N); so sem nenhuma, o $SECONDS de antes.
+agora_ms() {
+  local t
+  if [ -n "${EPOCHREALTIME:-}" ]; then t="${EPOCHREALTIME/[.,]/}"; echo $((10#$t / 1000)); return; fi
+  t="$(date +%s%N 2>/dev/null)"
+  case "$t" in ''|*[!0-9]*) ;; *) echo $((t / 1000000)); return ;; esac
+  t="$(perl -MTime::HiRes=time -e 'printf "%d", time * 1000' 2>/dev/null)"
+  case "$t" in ''|*[!0-9]*) echo $((SECONDS * 1000)) ;; *) echo "$t" ;; esac
+}
 # Caso que depende de um ambiente ausente (Git for Windows sobre
 # \\wsl.localhost): NAO_EXECUTADO, listado a parte, nunca conta como ok.
 nao_executado() { NAOEXEC=$((NAOEXEC+1)); printf '  NAO_EXECUTADO: %s\n' "$1"; }
@@ -1240,12 +1252,13 @@ git worktree remove --force "$WTB_T" || exit 1
 git branch -q -D fixture-main-wt fixture-sem-entregas
 
 # cwd que nao e repositorio, em forma UNC: aviso rapido, sem laco de subida de
-# diretorio (`dirname //` e `//` em alguns sistemas)
+# diretorio (`dirname //` e `//` em alguns sistemas); tempo por agora_ms
 for CWD_UNC in '//' '//wsl.localhost/mergex-nao-existe/x'; do
   HOOK_CWD="$CWD_UNC"
-  T0_UNC=$SECONDS
+  T0_UNC="$(agora_ms)"
   caso_aviso "cwd UNC sem repositorio nao entra em laco ($CWD_UNC)" "$(bash_json "$PUSH_FT")"
-  valor "cwd UNC sem repositorio: termina em menos de 2 s ($CWD_UNC)" "$([ $((SECONDS - T0_UNC)) -lt $((LIMITE_MS / 1000)) ] && echo sim || echo nao)" sim
+  MS_UNC=$(( $(agora_ms) - T0_UNC ))
+  valor "cwd UNC sem repositorio: termina em menos de $((LIMITE_MS / 1000)) s ($CWD_UNC, ${MS_UNC} ms)" "$([ "$MS_UNC" -lt "$LIMITE_MS" ] && echo sim || echo nao)" sim
 done
 HOOK_CWD="$HIST_T"
 
@@ -1487,10 +1500,10 @@ for I_T in $(git for-each-ref --format='%(refname)' 'refs/heads/feature/b*'); do
 printf 'produto vencido para o push real\n' > src/lento.ts
 git add src/lento.ts && git commit -qm "feat: produto para o push real" || exit 1
 printf '#!/usr/bin/env bash\nsleep 3119\nprintf "ok=true\\nprimeiro_commit=-\\n"; exit 0\n' > "$STUB_T"
-T0_LENTO=$SECONDS
+T0_LENTO="$(agora_ms)"
 caso_aviso "validade lenta nao segura o comando: avisa e sai 0" "$(bash_json "$PUSH_FT")"
-DUR_LENTO=$((SECONDS - T0_LENTO))
-valor "validade lenta nao segura o comando: menos de 9 s (${DUR_LENTO} s)" "$([ "$DUR_LENTO" -lt 9 ] && echo sim || echo nao)" sim
+DUR_LENTO=$(( $(agora_ms) - T0_LENTO ))
+valor "validade lenta nao segura o comando: menos de 9 s (${DUR_LENTO} ms)" "$([ "$DUR_LENTO" -lt 9000 ] && echo sim || echo nao)" sim
 case "$SAIDA_H" in
   *"orçamento de 8 s"*) OK=$((OK+1)); printf '  ok    %s\n' "validade lenta: o aviso nomeia o orcamento de 8 s" ;;
   *) FALHOU=$((FALHOU+1)); printf '  FALHA %s (%s)\n' "validade lenta: o aviso nao nomeia o orcamento" "$(printf '%s' "$SAIDA_H" | head -1)" ;;
