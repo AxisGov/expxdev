@@ -42,11 +42,26 @@
 # ---------------------------------------------------------------- util basica
 
 # Raiz do repositorio: sobe ate achar .git; sem .git, o cwd.
+#
+# `[ -e ]`, nao `[ -d ]`: numa worktree vinculada `.git` e ARQUIVO ("gitdir:
+# <principal>/.git/worktrees/<nome>"). Com `[ -d ]` a busca pulava a raiz da
+# worktree e, de um subdiretorio, devolvia o proprio subdiretorio — e o rastro
+# ia para um `docs/eventos` no lugar errado.
+#
+# O pai sai por expansao de parametro, nao por `dirname`: um processo a menos
+# por nivel, e caminho relativo (sem barra) termina a subida em vez de girar
+# para sempre em ".".
 expx_raiz() {
-  local d="${1:-$PWD}"
+  local d="${1:-$PWD}" p
   while [ "$d" != "/" ]; do
-    [ -d "$d/.git" ] && { printf '%s' "$d"; return 0; }
-    d="$(dirname "$d")"
+    [ -e "$d/.git" ] && { printf '%s' "$d"; return 0; }
+    case "$d" in
+      */) p="${d%/}" ;;
+      */*) p="${d%/*}"; [ -n "$p" ] || p=/ ;;
+      *) p=. ;;
+    esac
+    [ "$p" = "$d" ] && break
+    d="$p"
   done
   printf '%s' "${1:-$PWD}"
 }
