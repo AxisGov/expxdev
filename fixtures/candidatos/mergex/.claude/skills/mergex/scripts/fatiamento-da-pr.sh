@@ -98,8 +98,10 @@ read -r linhas_pr arquivos_pr <<< "$med"
 
 # As listas que os lacos percorrem vao para arquivo, nunca para `< <(...)`: a
 # substituicao de processo esconde a falha, e um laco sobre lista vazia nao confere nada.
+# a limpeza vem antes dos mktemp: se o segundo falhar, o primeiro nao fica para tras
+lista_c=""; lista_f=""
+trap 'rm -f ${lista_c:+"$lista_c"} ${lista_f:+"$lista_f"}' EXIT
 lista_c="$(mktemp)" && lista_f="$(mktemp)" || { echo "sem arquivo temporario" >&2; exit 2; }
-trap 'rm -f "$lista_c" "$lista_f"' EXIT
 
 # F3 — cada commit (merges ficam de fora: o conteúdo deles é o dos pais). Commit
 # sem pai (raiz de historia trazida por merge) mede contra a arvore vazia. Na
@@ -128,7 +130,9 @@ done < "$lista_c"
 git rev-list --merges "$mb..$head" > "$lista_c" \
   || { echo "nao foi possivel listar os merges de $mb..$head" >&2; exit 2; }
 while IFS= read -r c; do
-  med="$(soma_de git -c core.quotepath=off show --remerge-diff --format= --numstat -z "$c")" \
+  # -M explicito, como no soma: com diff.renames=false, renomeacao na resolucao
+  # contaria o arquivo inteiro como apagado e criado
+  med="$(soma_de git -c core.quotepath=off show -M --remerge-diff --format= --numstat -z "$c")" \
     || { echo "nao foi possivel medir o merge $c (git show --remerge-diff falhou; exige git 2.36 ou mais novo)" >&2; exit 2; }
   read -r l _ <<< "$med"
   if [ "$l" -gt "$max_linhas_commit" ]; then
@@ -157,8 +161,11 @@ while IFS= read -r -d '' st; do
   # gerado (FATIA_IGNORAR) nao e revisado: fica fora de F4 tambem (contrato, F6)
   [[ $novo =~ $ignorar ]] && continue
   # submodulo (gitlink, 160000) nao e arquivo: o objeto dele nem esta neste repositorio
-  case "$(git ls-tree "$head" -- "$novo")" in 160000\ *) continue ;; esac
-  tipo="$(git -c core.quotepath=off diff --numstat "$mb" "$head" -- "$novo" | awk -F'\t' 'NR == 1 { print $1 }')"
+  # --literal-pathspecs: o nome e caminho, nunca padrao — `g[x].md` nao pode casar `gx.md`
+  case "$(git --literal-pathspecs ls-tree "$head" -- "$novo")" in 160000\ *) continue ;; esac
+  # sem o tipo nao ha medida: tipo vazio mediria um binario como texto
+  tipo="$(git --literal-pathspecs -c core.quotepath=off diff --numstat "$mb" "$head" -- "$novo" | awk -F'\t' 'NR == 1 { print $1 }')" \
+    || { echo "nao foi possivel medir $novo (git diff falhou)" >&2; exit 2; }
   [ "$tipo" = "-" ] && continue   # binário: não é revisado como texto
   # o arquivo existe no head (A/M/R): sem ler o tamanho dele nao ha medida, e um 0
   # passaria por arquivo pequeno. No ancestral ele pode nao existir (A): ali, 0.

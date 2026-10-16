@@ -55,7 +55,7 @@ c8b17b90c4ab2d03c5b07be0d81d78b8342a4e49ac1a22bf978c1a0f248513c5  .claude/skills
 d71b6f0084d6921ea5252a3a7c28b2bc84ca657aa10f66aacd11e7e87a4b308a  .claude/skills/mergex/scripts/causa-do-portao.sh
 fb81a32b1429b0f9bda5f91b71fac77d66d2d9fcc42bd60088296d44f660b1db  .claude/skills/mergex/scripts/classificar-atencao.sh
 899c446eb9fe32b124a3b98f433ed2e6abbca428a2a3664fe7ee3c05586ecad5  .claude/skills/mergex/scripts/contrato-de-commit.sh
-739729de52b74a7f0dbf0e00a309053cf26afc6065b8d9e03122cb57f1ca7a57  .claude/skills/mergex/scripts/fatiamento-da-pr.sh
+98f12d5a05db854ca4490c74de403a5855333738381b6de7e551e20ee6921bb5  .claude/skills/mergex/scripts/fatiamento-da-pr.sh
 c73d8b69898ea720591f62e99a6d6b787d6577a9680a869f2ca58a4869e0af70  .claude/skills/mergex/scripts/fechamento-do-e1.sh
 d66338c4c63ddfb2cfa74cb27e4f4f782c080b1f637f8f5b2b1b51d8b255958d  .claude/skills/mergex/scripts/ownership-da-task.sh
 ac8d2c94e8445ca20275f90529ea8fb9f437e2bc24097937fb91c1cf9c9770c8  .claude/skills/mergex/scripts/persistir-metodo.sh
