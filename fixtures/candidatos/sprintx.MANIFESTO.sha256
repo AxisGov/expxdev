@@ -12,7 +12,7 @@ fcfde3bb2782b961aacb22b337c445cac654655f01c20ff6d51b7666c1756298  .claude/comman
 600f60d345c347319348e9bb34032a35b9fbee89bfc258469dab9d0d9434dd94  .claude/hooks/comum/rastro-post.sh
 dbaa5068a1f8aefafbc9c7843b52c4882d6a03069f1a9cdaf4c17198bad5e92c  .claude/hooks/comum/rastro-subagente.sh
 1c07bbb2664165eb0f919a829f239acf62313460f87649cfc5995d2fd841e46b  .claude/hooks/comum/rastro.sh
-77ff9b45d6506e80708dff11113a36abc382a5ca52668bee21faeb40037db497  .claude/hooks/comum/segredo.sh
+733c7215dc84888f4632a9967c9d2d21a649c28f00eff637d3bc605413b3d019  .claude/hooks/comum/segredo.sh
 e5661e490ce5d19212ae3b9eeb6c6456509ff7f4fb037e42b5c99182b62a4470  .claude/hooks/doctor.sh
 0282ecaf7a56b48c8689671ef34cf2831e1ea2a49d1d33618345ca7cd6fc12a3  .claude/hooks/sprintx/arvore-limpa-antes-da-suite.sh
 b530a926f52710eabb2bdd6d7e2e79fec05ea4737566f6500c359b7e62639b87  .claude/hooks/sprintx/escopo-da-task.sh
@@ -23,8 +23,8 @@ af8642903f504cb832d59576686c23d374a982c27c7c20f119aa4eded7419703  .claude/hooks/
 b1323d31872393330339d3f09f46a5f0d7cfa4a880dc54a52be9d2863befb1f3  .claude/hooks/sprintx/tdd-teste-antes.sh
 c79f5061a97281b6b82f4593df8aded01adb631e356dae9d1594c5c0c6fd5da1  .claude/hooks/testes/agente-real-rastro.sh
 36c35685722d30f5be306369498bc84b54c42ffd33eebed814a81b6ad1f1c7ee  .claude/hooks/testes/bancada-escopo-links.sh
-5bebfc1df2072c732017626e762f3b84eb1a56d074f0c9a2c530b9a1a9871c7f  .claude/hooks/testes/bancada-segredo-sem-git.sh
-3319a904db2f60eb941212a9a3c6bf717eade08629bc28c87f1e6b0904df7ca5  .claude/hooks/testes/bancada.sh
+e62780c59c847e00c4464280ccb3eda581ef3ddb2f5adddc43d79de34a3e6ba4  .claude/hooks/testes/bancada-segredo-sem-git.sh
+3d4294d616a485fca65396aafb13ea58a6aa9df2dde4508398e4873065e26762  .claude/hooks/testes/bancada.sh
 00dc2c2d5319710f73f5f54616c5b652aa3f99879f8c75444c8002abeeb13483  .claude/hooks/testes/transcrito-agente.sh
 0354c304ed52b1d41becc8df83b36f4a3bf0b3543316bf0e569347ca719fe43d  .claude/settings.json
 d7522b50b63292b80a5dca9abebb2b5eed87e853e826b20761a296cc4a922ae8  .claude/skills/sprintx/DECISOES-DA-SKILL.md
