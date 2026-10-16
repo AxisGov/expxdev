@@ -112,3 +112,42 @@ describe("fase e task", () => {
   });
 });
 
+describe("expx_trabalho_id", () => {
+  /** Repositório com duas features ativas; `a` é a mais recente por mtime. */
+  function duasFeatures(branch: string): string {
+    const raiz = temp();
+    git(raiz, "init", "-q", "-b", branch);
+    for (const [slug, quando] of [["a", 2_000_000_000], ["b", 1_000_000_000]] as const) {
+      const dir = join(raiz, "docs", "sprintx", "features", slug);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "ORQUESTRADOR.md"), `# ${slug}\n`);
+      utimesSync(join(dir, "ORQUESTRADOR.md"), quando, quando);
+    }
+    return raiz;
+  }
+
+  it("funcional: na branch feature/<slug> o trabalho é o slug, não o ORQUESTRADOR.md mais recente", () => {
+    const raiz = duasFeatures("feature/b");
+    expect(roda(raiz, 'expx_trabalho_id "$PWD"').trimEnd()).toBe("b");
+  });
+
+  it("funcional: numa worktree vinculada a branch vem do HEAD dela", () => {
+    const raiz = duasFeatures("main");
+    git(raiz, "add", "-A");
+    git(raiz, "commit", "-q", "-m", "base");
+    const wt = join(temp(), "wt");
+    git(raiz, "worktree", "add", "-q", "-b", "feature/b", wt);
+    utimesSync(join(wt, "docs", "sprintx", "features", "a", "ORQUESTRADOR.md"), 2_000_000_000, 2_000_000_000);
+    expect(roda(join(wt, "docs"), 'expx_trabalho_id "$(expx_raiz)"').trimEnd()).toBe("b");
+  });
+
+  it("funcional: branch sem feature correspondente mantém a regra anterior (mais recente)", () => {
+    const raiz = duasFeatures("main");
+    expect(roda(raiz, 'expx_trabalho_id "$PWD"').trimEnd()).toBe("a");
+  });
+
+  it("funcional: EXPX_TRABALHO_ID continua vencendo a branch", () => {
+    const raiz = duasFeatures("feature/b");
+    expect(roda(raiz, 'expx_trabalho_id "$PWD"', { EXPX_TRABALHO_ID: "outro" }).trimEnd()).toBe("outro");
+  });
+});

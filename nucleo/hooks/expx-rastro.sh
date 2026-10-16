@@ -132,12 +132,40 @@ expx_tool_input_get() {
 #
 #   1. EXPX_TRABALHO_ID, quando a skill ja sabe qual e
 #   2. .expx/expx-lock.json, que o CLI mantem
-#   3. o ORQUESTRADOR.md mais recente, nos dois layouts de pasta
-#   4. "sem-trabalho"
+#   3. a branch do checkout (`feature/<slug>`), quando existe ORQUESTRADOR.md
+#      numa pasta com esse slug
+#   4. o ORQUESTRADOR.md mais recente, nos dois layouts de pasta
+#   5. "sem-trabalho"
 #
 # O nome do lock e `expx-lock.json` (src/nucleo/lock.ts). Ler `lock.json` sem
 # o prefixo devolve "sem-trabalho" para sempre, em silencio — a falha aqui e
 # aberta por desenho, entao o erro nunca se anuncia.
+#
+# O passo 3 vem antes do mtime porque, com duas features ativas, o
+# ORQUESTRADOR.md mexido por ultimo pode ser o da OUTRA: a worktree/branch e o
+# contexto desta sessao, o disco nao. So vale quando o ultimo segmento da
+# branch casa com uma pasta de trabalho existente; fora disso o passo 4 segue
+# como antes.
+
+# expx_branch_atual_em <var> <raiz> — a branch do checkout em <raiz>, lida do
+# HEAD sem chamar o git (regra 1). Numa worktree vinculada `.git` e arquivo e
+# aponta o gitdir dela. HEAD destacado ou ilegivel: vazio.
+expx_branch_atual_em() {
+  local _g="$2/.git" _h=""
+  printf -v "$1" '%s' ""
+  if [ -f "$_g" ]; then
+    IFS= read -r _h < "$_g" 2>/dev/null || [ -n "$_h" ] || return 0
+    _h="${_h%$'\r'}"
+    case "$_h" in "gitdir: "*) _g="${_h#gitdir: }" ;; *) return 0 ;; esac
+    case "$_g" in /*|[A-Za-z]:*) ;; *) _g="$2/$_g" ;; esac
+  fi
+  [ -f "$_g/HEAD" ] || return 0
+  _h=""
+  IFS= read -r _h < "$_g/HEAD" 2>/dev/null || [ -n "$_h" ] || return 0
+  _h="${_h%$'\r'}"
+  case "$_h" in "ref: refs/heads/"?*) printf -v "$1" '%s' "${_h#ref: refs/heads/}" ;; esac
+}
+
 expx_trabalho_id() {
   local raiz="$1" v=""
 
@@ -166,13 +194,21 @@ expx_trabalho_id() {
   # `find` em vez de glob: no zsh um padrao sem match ABORTA a funcao (nomatch),
   # e o hook perderia o trabalho_id no shell de metade dos usuarios. O -maxdepth
   # 4 cobre os dois layouts sem varrer o repositorio inteiro.
-  local f mais_novo=""
+  local f d mais_novo="" br slug="" da_branch=""
+  expx_branch_atual_em br "$raiz"
+  [ -n "$br" ] && slug="${br##*/}"
   while IFS= read -r f; do
     [ -f "$f" ] || continue
+    d="${f%/ORQUESTRADOR.md}"
+    [ -n "$slug" ] && [ "${d##*/}" = "$slug" ] && da_branch="$slug"
     if [ -z "$mais_novo" ] || [ "$f" -nt "$mais_novo" ]; then mais_novo="$f"; fi
   done <<EOF
 $(find "$raiz/docs" -maxdepth 4 -name ORQUESTRADOR.md -type f 2>/dev/null)
 EOF
+  if [ -n "$da_branch" ]; then
+    printf '%s' "$da_branch"
+    return 0
+  fi
   if [ -n "$mais_novo" ]; then
     basename "$(dirname "$mais_novo")"
     return 0
