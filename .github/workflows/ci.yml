@@ -154,6 +154,9 @@ jobs:
           estado() { gh release view "$TAG" --json isDraft,assets --jq '"\(.isDraft) \([.assets[].name] | sort | join(","))"'; }
           if atual="$(estado 2>/dev/null)"; then
             if [ "$atual" = "$completa" ]; then
+              # Outro commit com os mesmos 7 primeiros caracteres cairia nesta tag.
+              dono="$(gh api "repos/$GH_REPO/commits/$TAG" --jq .sha)"
+              [ "$dono" = "$SHA" ] || { echo "::error::$TAG ja e de $dono, nao de $SHA"; exit 1; }
               echo "$TAG ja publicada; nao sobrescreve"
               exit 0
             fi
