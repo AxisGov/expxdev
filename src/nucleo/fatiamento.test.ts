@@ -273,6 +273,52 @@ describe("verificar-fatiamento.sh", () => {
     expect(r.codigo).toBe(1);
   });
 
+  // PR com merge de um lado (lado: s1 → s2): base para os casos de medida impossível
+  function comMerge(): { d: string; s1: string } {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "b.md", "b\n");
+    commita(d, "feat: b");
+    git(d, "switch", "-q", "-c", "lado", "main");
+    escreve(d, "s.md", "s1\n");
+    commita(d, "feat: s1");
+    const s1 = spawnSync("git", ["rev-parse", "HEAD"], { cwd: d, encoding: "utf8" }).stdout.trim();
+    escreve(d, "s.md", "s1\ns2\n");
+    commita(d, "feat: s2");
+    git(d, "switch", "-q", "feature");
+    git(d, "merge", "-q", "--no-edit", "lado");
+    return { d, s1 };
+  }
+
+  for (const alvo of ["rev-list", "--name-status"]) {
+    it(`funcional: git que falha ao listar (${alvo}) sai com 2, nunca confere lista vazia`, () => {
+      const { d } = comMerge();
+      const real = spawnSync(BASH, ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+      const bin = join(d, ".bin");
+      mkdirSync(bin);
+      writeFileSync(
+        join(bin, "git"),
+        `#!/usr/bin/env bash\nfor x in "$@"; do [ "$x" = "${alvo}" ] && exit 128; done\nexec "${real}" "$@"\n`,
+        { mode: 0o755 },
+      );
+      // o caminho entra no PATH como o bash o vê (`pwd`): no Git Bash, `C:/...` traria um `:`
+      const r = spawnSync(BASH, ["-c", 'PATH="$(cd "$1" && pwd):$PATH" exec bash "$2" main HEAD', "_", bin, SCRIPT], {
+        cwd: d,
+        encoding: "utf8",
+      });
+      expect(r.status, `${r.stdout}${r.stderr}`).toBe(2);
+    });
+  }
+
+  it("funcional: commit na fronteira de clone raso sai com 2, nunca é medido como raiz", () => {
+    const { d, s1 } = comMerge();
+    expect(verifica(d).codigo).toBe(0);
+    writeFileSync(join(d, ".git", "shallow"), `${s1}\n`);
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(2);
+    expect(r.saida).toContain("fronteira de um clone raso");
+  });
+
   it("funcional: uso incorreto sai com 2", () => {
     const r = spawnSync(BASH, [SCRIPT], { encoding: "utf8" });
     expect(r.status).toBe(2);
