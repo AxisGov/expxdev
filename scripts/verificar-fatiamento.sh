@@ -93,8 +93,10 @@ read -r linhas_pr arquivos_pr <<< "$med"
 
 # As listas que os lacos percorrem vao para arquivo, nunca para `< <(...)`: a
 # substituicao de processo esconde a falha, e um laco sobre lista vazia nao confere nada.
+# a limpeza vem antes dos mktemp: se o segundo falhar, o primeiro nao fica para tras
+lista_c=""; lista_f=""
+trap 'rm -f ${lista_c:+"$lista_c"} ${lista_f:+"$lista_f"}' EXIT
 lista_c="$(mktemp)" && lista_f="$(mktemp)" || { echo "sem arquivo temporario" >&2; exit 2; }
-trap 'rm -f "$lista_c" "$lista_f"' EXIT
 
 # F3 — cada commit (merges ficam de fora: o conteúdo deles é o dos pais). Commit
 # sem pai (raiz de historia trazida por merge) mede contra a arvore vazia. Na
@@ -123,7 +125,9 @@ done < "$lista_c"
 git rev-list --merges "$mb..$head" > "$lista_c" \
   || { echo "nao foi possivel listar os merges de $mb..$head" >&2; exit 2; }
 while IFS= read -r c; do
-  med="$(soma_de git -c core.quotepath=off show --remerge-diff --format= --numstat -z "$c")" \
+  # -M explicito, como no soma: com diff.renames=false, renomeacao na resolucao
+  # contaria o arquivo inteiro como apagado e criado
+  med="$(soma_de git -c core.quotepath=off show -M --remerge-diff --format= --numstat -z "$c")" \
     || { echo "nao foi possivel medir o merge $c (git show --remerge-diff falhou; exige git 2.36 ou mais novo)" >&2; exit 2; }
   read -r l _ <<< "$med"
   if [ "$l" -gt "$max_linhas_commit" ]; then
