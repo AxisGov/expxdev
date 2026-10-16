@@ -68,21 +68,40 @@ local antiga, ou de outro remoto (fork), mediria o PR contra a base errada. A ex
 `branch_base` que já nomeia o remoto (`upstream/main`, `refs/remotes/upstream/main`, como a base
 informada pelo chamador no E0 pode vir): aí vale o remoto dela, e só o nome da branch vai para o
 fetch. A base medida é o `FETCH_HEAD`, o que acabou de chegar, e não a ref de rastreio: um
-`origin/HEAD` buscado não atualiza a ref simbólica local, que mediria contra o alvo antigo:
+`origin/HEAD` buscado não atualiza a ref simbólica local, que mediria contra o alvo antigo. E
+`origin/HEAD` normaliza para `bb=HEAD`, que não é branch no serviço: o `$bb` vai para o
+`gh pr create --base` e para a instrução manual do passo 3, então o `HEAD` do remoto é resolvido
+agora, no remoto, para o nome da branch padrão (`refs/heads/main` → `main`):
 
 ```bash
 rb="$remoto"; bb="<branch_base>"; bb="${bb#refs/remotes/}"; bb="${bb#refs/heads/}"
 if [ "${bb%%/*}" != "$bb" ] && git remote | grep -qxF "${bb%%/*}"; then rb="${bb%%/*}"; bb="${bb#*/}"; fi
+if [ "$bb" = HEAD ]; then
+  bb="$(git ls-remote --symref "$rb" HEAD | awk '$1 == "ref:" && $3 == "HEAD" { sub("^refs/heads/", "", $2); print $2; exit }')"
+  [ -n "$bb" ] || { echo "o HEAD de $rb não resolveu para uma branch: o E7 não mede nem abre o PR"; exit 1; }
+fi
 git fetch "$rb" "$bb" || { echo "busca de $bb em $rb falhou: o E7 não mede nem abre o PR"; exit 1; }
 base="$(git rev-parse --verify "FETCH_HEAD^{commit}")" || exit 1
-FATIA_IGNORAR="${FATIA_IGNORAR:-(^|/)package-lock\.json$}" \
+e7_ignorar='(^|/)package-lock\.json$|^docs/(sprintx|entregas|eventos)/'
+FATIA_IGNORAR="${FATIA_IGNORAR:+$FATIA_IGNORAR|}$e7_ignorar" \
   bash .claude/skills/mergex/scripts/fatiamento-da-pr.sh "$base" "$publicado"
 ```
 
 O `FATIA_IGNORAR` vai explícito porque o padrão do script é o do ExpxDev, que também tira
 `fixtures/candidatos/` da conta; no projeto do desenvolvedor esse caminho pode ser código
 revisado. Gerado que o projeto exclui da revisão automática entra aqui só se o desenvolvedor
-declarar o padrão.
+declarar o padrão — e o padrão dele **soma** ao do E7, nunca o substitui: os artefatos de
+método saem da medida sempre.
+
+Os **artefatos de método** — `docs/sprintx/`, `docs/entregas/`, `docs/eventos/`, o que a
+`sprintx` e esta skill gravam na branch — ficam fora da medida (exceção "artefato de método"
+do F6 do `expx-fatiamento`). Eles entram no PR para rastreabilidade, mas o planejamento de uma
+feature sozinho passa de centenas de arquivos e dezenas de milhares de linhas: medi-los
+reprovaria todo PR, e o que o revisor precisa ler é o código. Fora da medida também deve ser
+fora da revisão automática: no CodeAnt, os mesmos três caminhos vão na exclusão de arquivos
+do painel do projeto (Code Review → Configuration → Exclusions → Exclude Files). A mergex
+não enxerga o painel: quando o PR leva artefatos de método, o relato do E7 ao desenvolvedor
+lembra os três padrões a excluir lá — o `PR.md` não, que sai do E4 sem essa entrada.
 
 Saída `0`: siga para o passo 2 (ou 3, sem ferramenta); avisos (arquivo perto do limite) vão para a seção de atenção do
 `PR.md`, sem impedir. Saída `1`: o E7 **não abre o PR**. Um PR acima do limite não recebe

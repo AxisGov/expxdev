@@ -118,8 +118,9 @@ while IFS= read -r c; do
 done < "$lista_c"
 
 # F4 — tamanho de arquivo de texto no head. Acima do limite, o crescimento é
-# SOMADO sobre a PR inteira e comparado com a tolerância uma vez.
-git -c core.quotepath=off diff --name-status -M --diff-filter=AMR "$mb" "$head" > "$lista_f" \
+# SOMADO sobre a PR inteira e comparado com a tolerância uma vez. `T` (mudança de
+# tipo: link virou arquivo) entra: o arquivo de texto que sai dali e revisado igual.
+git -c core.quotepath=off diff --name-status -M --diff-filter=AMRT "$mb" "$head" > "$lista_f" \
   || { echo "nao foi possivel listar os arquivos de $mb..$head" >&2; exit 2; }
 cresc_b=0; cresc_l=0
 acima=()
@@ -131,6 +132,8 @@ while IFS=$'\t' read -r st a b; do
   antigo="$a"
   # gerado (FATIA_IGNORAR) nao e revisado: fica fora de F4 tambem (contrato, F6)
   [[ $novo =~ $ignorar ]] && continue
+  # submodulo (gitlink, 160000) nao e arquivo: o objeto dele nem esta neste repositorio
+  case "$(git ls-tree "$head" -- "$novo")" in 160000\ *) continue ;; esac
   tipo="$(git -c core.quotepath=off diff --numstat "$mb" "$head" -- "$novo" | awk -F'\t' 'NR == 1 { print $1 }')"
   [ "$tipo" = "-" ] && continue   # binário: não é revisado como texto
   # o arquivo existe no head (A/M/R): sem ler o tamanho dele nao ha medida, e um 0

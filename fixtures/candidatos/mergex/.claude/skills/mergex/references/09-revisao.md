@@ -25,9 +25,19 @@ A revisão e o merge precisam ser feitos pela interface do serviço de hospedage
 
 ## Passo 1 — Listar os pull requests abertos
 
+A lista tem de ser **completa**: o E9 apresenta e avalia todos os PRs abertos. O `gh pr list`
+devolve só os 30 mais recentes por padrão, e um `--limit` fixo apenas desloca o corte; por isso
+os números vêm da API paginada, percorrida até a última página, e o estado de cada PR vem de uma
+leitura por PR:
+
 ```
-gh pr list --state open --json number,title,author,headRefName,headRefOid,baseRefName,isDraft,mergeable,url,files,statusCheckRollup
+gh api --paginate "repos/{owner}/{repo}/pulls?state=open&per_page=100" --jq '.[].number'
+gh pr view <n> --json number,title,author,headRefName,headRefOid,baseRefName,isDraft,mergeable,url,files,statusCheckRollup
 ```
+
+No GitLab: `glab api --paginate "projects/:id/merge_requests?state=opened&per_page=100"`. Se
+alguma página não puder ser obtida, a lista não é completa: diga isso, com o erro literal, e
+encerre — nunca apresente a primeira página como se fosse a lista inteira.
 
 Inclui rascunhos: eles aparecem na lista, marcados, mas **nunca são oferecidos para merge**.
 
