@@ -96,3 +96,19 @@ describe("expx_json_escape", () => {
   });
 });
 
+describe("fase e task", () => {
+  it("funcional: EXPX_FASE e EXPX_TASK saem como string JSON; ausentes, null", () => {
+    const raiz = temp();
+    mkdirSync(join(raiz, ".git"));
+    roda(raiz, 'expx_rastro_grava "$PWD" acao_permitida hook permitido x', {
+      EXPX_TRABALHO_ID: "t",
+      EXPX_FASE: "f6",
+      EXPX_TASK: 'T-01.01 "x"',
+    });
+    roda(raiz, 'expx_rastro_grava "$PWD" acao_permitida hook permitido y', { EXPX_TRABALHO_ID: "t" });
+    const [com, sem] = (eventos(raiz)["t.jsonl"] ?? []).map((l) => JSON.parse(l) as { fase: unknown; task: unknown });
+    expect(com).toMatchObject({ fase: "f6", task: 'T-01.01 "x"' });
+    expect(sem).toMatchObject({ fase: null, task: null });
+  });
+});
+

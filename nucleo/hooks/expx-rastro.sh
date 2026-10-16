@@ -259,8 +259,13 @@ expx_rastro_grava() {
     linha="$linha,\"ferramenta\":\"$EXPX_FERRAMENTA\""
     linha="$linha,\"origem\":\"$origem\""
     linha="$linha,\"evento\":\"$evento\""
-    linha="$linha,\"fase\":${EXPX_FASE:-null}"
-    linha="$linha,\"task\":${EXPX_TASK:-null}"
+    # `fase` e `task` sao string JSON (`"f6"`, `"T-01.01"`), escapadas; `null`
+    # so na ausencia. Sem aspas a linha saia `"fase":f6`, que nao e JSON.
+    local fase=null task=null
+    [ -n "${EXPX_FASE:-}" ] && fase="\"$(expx_json_escape "$EXPX_FASE")\""
+    [ -n "${EXPX_TASK:-}" ] && task="\"$(expx_json_escape "$EXPX_TASK")\""
+    linha="$linha,\"fase\":$fase"
+    linha="$linha,\"task\":$task"
     # Sem subagente o valor e "principal", nunca null: "foi o principal" e
     # informacao, nao ausencia.
     linha="$linha,\"agente\":\"${EXPX_AGENTE:-principal}\""
