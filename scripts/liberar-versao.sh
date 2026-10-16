@@ -45,7 +45,19 @@ TGZ="expxdev-$VERSAO.tgz"
 passo "commit $SHA → $TAG (pacote $TGZ)"
 
 # Estado da release numa linha: "<isDraft> <arquivos em ordem>"; vazio se não existe.
-estado() { gh release view "$TAG" -R "$REPO" --json isDraft,assets --jq '"\(.isDraft) \([.assets[].name] | sort | join(","))"' 2>/dev/null; }
+# Só "release not found" é ausência: outro erro (rede, credencial) para aqui, senão
+# viraria um disparo do CI por uma release que existe.
+estado() {
+  local saida
+  if saida="$(gh release view "$TAG" -R "$REPO" --json isDraft,assets \
+      --jq '"\(.isDraft) \([.assets[].name] | sort | join(","))"' 2>&1)"; then
+    printf '%s\n' "$saida"
+  elif [ "$saida" = "release not found" ]; then
+    :
+  else
+    falha "não consegui consultar a release $TAG: $saida"
+  fi
+}
 COMPLETA="false $TGZ,$TGZ.sha256"
 
 # Procura um run do CI (até 2 min, o run demora a aparecer); devolve o id ou nada.
@@ -73,13 +85,13 @@ acompanhar_run() {
 }
 
 # 2. garantir a release
-atual="$(estado)"
+atual="$(estado)" || exit 1
 if [ "$atual" != "$COMPLETA" ]; then
   [ -z "$atual" ] || falha "$TAG existe incompleta ($atual); remova com: gh release delete $TAG -R $REPO --cleanup-tag"
   passo "$TAG ainda não existe; esperando o CI do push"
   conclusao="$(acompanhar_run "$(achar_run push 1970-01-01T00:00:00Z)")"
   echo "   conclusão: $conclusao"
-  atual="$(estado)"
+  atual="$(estado)" || exit 1
   if [ "$atual" != "$COMPLETA" ]; then
     case "$conclusao" in
       success|cancelled|sem-run) ;;
@@ -95,7 +107,7 @@ if [ "$atual" != "$COMPLETA" ]; then
     echo "   conclusão: $conclusao"
     # Push ou outro dispatch na main cancelam este run (concurrency por ref): rodar de novo.
     [ "$conclusao" = success ] || falha "o CI disparado terminou em '$conclusao'; se foi 'cancelled', rode de novo"
-    atual="$(estado)"
+    atual="$(estado)" || exit 1
   fi
 fi
 
