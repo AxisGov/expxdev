@@ -154,7 +154,9 @@ while IFS= read -r -d '' st; do
   # submodulo (gitlink, 160000) nao e arquivo: o objeto dele nem esta neste repositorio
   # --literal-pathspecs: o nome e caminho, nunca padrao — `g[x].md` nao pode casar `gx.md`
   case "$(git --literal-pathspecs ls-tree "$head" -- "$novo")" in 160000\ *) continue ;; esac
-  tipo="$(git --literal-pathspecs -c core.quotepath=off diff --numstat "$mb" "$head" -- "$novo" | awk -F'\t' 'NR == 1 { print $1 }')"
+  # sem o tipo nao ha medida: tipo vazio mediria um binario como texto
+  tipo="$(git --literal-pathspecs -c core.quotepath=off diff --numstat "$mb" "$head" -- "$novo" | awk -F'\t' 'NR == 1 { print $1 }')" \
+    || { echo "nao foi possivel medir $novo (git diff falhou)" >&2; exit 2; }
   [ "$tipo" = "-" ] && continue   # binário: não é revisado como texto
   # o arquivo existe no head (A/M/R): sem ler o tamanho dele nao ha medida, e um 0
   # passaria por arquivo pequeno. No ancestral ele pode nao existir (A): ali, 0.

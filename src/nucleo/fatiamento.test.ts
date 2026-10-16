@@ -290,7 +290,8 @@ describe("verificar-fatiamento.sh", () => {
     return { d, s1 };
   }
 
-  for (const alvo of ["rev-list", "--name-status", "--remerge-diff"]) {
+  // `--literal-pathspecs` so aparece no diff por arquivo do F4: falhar ali isola esse passo
+  for (const alvo of ["rev-list", "--name-status", "--remerge-diff", "--literal-pathspecs"]) {
     it(`funcional: git que falha ao listar (${alvo}) sai com 2, nunca confere lista vazia`, () => {
       const { d } = comMerge();
       const real = spawnSync(BASH, ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
@@ -411,6 +412,20 @@ describe("verificar-fatiamento.sh", () => {
     const r = verifica(d);
     expect(r.codigo, r.saida).toBe(1);
     expect(r.saida).toMatch(/F4: .*g\?\.md/);
+  });
+
+  it("funcional: F4 — textconv local não faz binário passar por texto", () => {
+    const d = repo();
+    // driver local que transforma o binario em texto: o verificador nao deve usa-lo
+    writeFileSync(join(d, ".gitattributes"), "*.bin diff=vira-texto\n");
+    git(d, "config", "diff.vira-texto.textconv", "echo texto");
+    commita(d, "chore: atributos");
+    git(d, "switch", "-q", "-c", "feature");
+    writeFileSync(join(d, "grande.bin"), Buffer.concat([Buffer.from([0]), Buffer.alloc(170 * 1024, 65)]));
+    commita(d, "feat: binario grande");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(0);
+    expect(r.saida).not.toMatch(/F4: .*grande\.bin/);
   });
 
   it("funcional: uso incorreto sai com 2", () => {
