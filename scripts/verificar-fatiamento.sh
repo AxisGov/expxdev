@@ -99,7 +99,7 @@ trap 'rm -f "$lista_c" "$lista_f"' EXIT
 git rev-list --no-merges "$mb..$head" > "$lista_c" \
   || { echo "nao foi possivel listar os commits de $mb..$head" >&2; exit 2; }
 vazia="$(git hash-object -t tree /dev/null)"
-raso="$(git rev-parse --git-path shallow)"
+raso="${GIT_SHALLOW_FILE:-$(git rev-parse --git-path shallow)}"
 while IFS= read -r c; do
   if git rev-parse -q --verify "$c^" >/dev/null; then pai="$c^"
   elif [ -f "$raso" ] && grep -qx "$c" "$raso"; then

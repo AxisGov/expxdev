@@ -319,6 +319,16 @@ describe("verificar-fatiamento.sh", () => {
     expect(r.saida).toContain("fronteira de um clone raso");
   });
 
+  it("funcional: fronteira rasa num GIT_SHALLOW_FILE externo também sai com 2", () => {
+    const { d, s1 } = comMerge();
+    const fora = join(d, "..", `${d.split(/[\\/]/).pop() ?? "x"}.shallow`);
+    criados.push(fora);
+    writeFileSync(fora, `${s1}\n`);
+    const r = verifica(d, { GIT_SHALLOW_FILE: fora });
+    expect(r.codigo, r.saida).toBe(2);
+    expect(r.saida).toContain("fronteira de um clone raso");
+  });
+
   it("funcional: uso incorreto sai com 2", () => {
     const r = spawnSync(BASH, [SCRIPT], { encoding: "utf8" });
     expect(r.status).toBe(2);
