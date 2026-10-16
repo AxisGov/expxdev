@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { existsSync, rmSync, readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, rmSync, readFileSync, readdirSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
@@ -39,6 +40,32 @@ describe("nucleo compartilhado", () => {
     expect(fonte).toContain("EXPX_FERRAMENTA");
     expect(fonte).toContain("expx_rastro_grava");
     expect(fonte).toContain("expx_modo");
+  });
+
+  // Os hooks são copiados byte a byte do checkout. Sem regra de fim de linha
+  // para os `.sh`, um checkout no Windows (core.autocrlf=true) entregava
+  // `#!/usr/bin/env bash\r` ao projeto, e o hook não rodava (AxisGov/login#2).
+  it("integração: os hooks de shell distribuídos saem com LF", () => {
+    p = projetoTemporario();
+    const destino = join(p.raiz, "plugin");
+    montarPlugin(destino, [], "1.0.0");
+
+    const dir = join(destino, "nucleo", "hooks");
+    const shells = readdirSync(dir).filter((f) => f.endsWith(".sh"));
+    expect(shells.length).toBeGreaterThan(0);
+    for (const f of shells) {
+      expect({ f, cr: readFileSync(join(dir, f), "latin1").includes("\r") }).toEqual({ f, cr: false });
+    }
+  });
+
+  // A causa, e não o sintoma: o checkout só sai LF em qualquer sistema se o
+  // git mandar. No CI em Linux o teste de bytes passa mesmo sem a regra.
+  it("unitário: o git fixa eol=lf para os hooks de shell do núcleo", () => {
+    const fonte = join(process.cwd(), "nucleo", "hooks");
+    for (const f of readdirSync(fonte).filter((n) => n.endsWith(".sh"))) {
+      const r = spawnSync("git", ["check-attr", "eol", "--", `nucleo/hooks/${f}`], { encoding: "utf8" });
+      expect(r.stdout.trim()).toBe(`nucleo/hooks/${f}: eol: lf`);
+    }
   });
 });
 

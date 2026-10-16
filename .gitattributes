@@ -1,0 +1,4 @@
+# Scripts de shell rodam no bash, inclusive no Windows: sempre LF. Sem esta
+# regra, um checkout com core.autocrlf=true punha CRLF em nucleo/hooks/, e a
+# montagem do plugin copiava `#!/usr/bin/env bash\r` para o projeto.
+*.sh text eol=lf
