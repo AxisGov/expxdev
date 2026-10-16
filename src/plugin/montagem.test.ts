@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { spawnSync } from "node:child_process";
-import { existsSync, rmSync, readFileSync, readdirSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, rmSync, readFileSync, readdirSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
@@ -45,26 +45,31 @@ describe("nucleo compartilhado", () => {
   // Os hooks são copiados byte a byte do checkout. Sem regra de fim de linha
   // para os `.sh`, um checkout no Windows (core.autocrlf=true) entregava
   // `#!/usr/bin/env bash\r` ao projeto, e o hook não rodava (AxisGov/login#2).
-  it("integração: os hooks de shell distribuídos saem com LF", () => {
+  // Vale para tudo o que o núcleo distribui, não só os `.sh`: o hook `.mjs` e os
+  // `.md` também chegavam com CRLF (AxisGov/login#3).
+  it("integração: todo arquivo distribuído do núcleo sai com LF", () => {
     p = projetoTemporario();
     const destino = join(p.raiz, "plugin");
     montarPlugin(destino, [], "1.0.0");
 
-    const dir = join(destino, "nucleo", "hooks");
-    const shells = readdirSync(dir).filter((f) => f.endsWith(".sh"));
-    expect(shells.length).toBeGreaterThan(0);
-    for (const f of shells) {
-      expect({ f, cr: readFileSync(join(dir, f), "latin1").includes("\r") }).toEqual({ f, cr: false });
+    const nucleo = join(destino, "nucleo");
+    const arquivos = (readdirSync(nucleo, { recursive: true }) as string[]).filter((f) => !statSync(join(nucleo, f)).isDirectory());
+    expect(arquivos.some((f) => f.endsWith(".sh"))).toBe(true);
+    expect(arquivos.some((f) => f.endsWith(".mjs"))).toBe(true);
+    for (const f of arquivos) {
+      expect({ f, cr: readFileSync(join(nucleo, f), "latin1").includes("\r") }).toEqual({ f, cr: false });
     }
   });
 
   // A causa, e não o sintoma: o checkout só sai LF em qualquer sistema se o
   // git mandar. No CI em Linux o teste de bytes passa mesmo sem a regra.
-  it("unitário: o git fixa eol=lf para os hooks de shell do núcleo", () => {
-    const fonte = join(process.cwd(), "nucleo", "hooks");
-    for (const f of readdirSync(fonte).filter((n) => n.endsWith(".sh"))) {
-      const r = spawnSync("git", ["check-attr", "eol", "--", `nucleo/hooks/${f}`], { encoding: "utf8" });
-      expect(r.stdout.trim()).toBe(`nucleo/hooks/${f}: eol: lf`);
+  it("unitário: o git fixa eol=lf para todo arquivo do núcleo", () => {
+    const r = spawnSync("git", ["ls-files", "nucleo"], { encoding: "utf8" });
+    const arquivos = r.stdout.split("\n").filter((l) => l !== "");
+    expect(arquivos.length).toBeGreaterThan(0);
+    for (const f of arquivos) {
+      const a = spawnSync("git", ["check-attr", "eol", "--", f], { encoding: "utf8" });
+      expect(a.stdout.trim()).toBe(`${f}: eol: lf`);
     }
   });
 });
