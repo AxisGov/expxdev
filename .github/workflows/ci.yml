@@ -8,6 +8,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit da main a publicar como release cli-<sha7> (vazio, só valida)
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -70,3 +75,90 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: bash scripts/verificar-fatiamento.sh "origin/$BASE_REF" "$HEAD_SHA"
+
+  # Pacote do CLI por commit da main, como release `cli-<sha7>`. O dist/ não é
+  # versionado e o `expxdev` do npm é de outro autor, então é daqui que outro
+  # projeto instala, sem compilar e com os mesmos bytes em toda máquina. Pelo
+  # workflow_dispatch com `ref`, publica um commit que ficou sem release.
+  # O concurrency acima cancela por ref: dois pushes seguidos na main cancelam a
+  # release do primeiro, e quem cobre esse commit é o dispatch com `ref`.
+  release:
+    name: release do CLI (cli-<sha7>)
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.ref != '')
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve commit and tag
+        id: alvo
+        shell: bash
+        run: |
+          sha="$(git rev-parse HEAD)"
+          git merge-base --is-ancestor "$sha" origin/main || { echo "::error::$sha nao esta na main"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "tag=cli-${sha::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Pack
+        id: pacote
+        shell: bash
+        run: |
+          tgz="$(npm pack --silent)"
+          sha256sum "$tgz" > "$tgz.sha256"
+          cat "$tgz.sha256"
+          echo "tgz=$tgz" >> "$GITHUB_OUTPUT"
+
+      # Uma release publicada nunca é sobrescrita. Um draft (create interrompido
+      # antes de subir os arquivos) não conta como publicada: para, em vez de
+      # pular para sempre.
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ steps.alvo.outputs.sha }}
+          TAG: ${{ steps.alvo.outputs.tag }}
+          TGZ: ${{ steps.pacote.outputs.tgz }}
+        run: |
+          if rascunho="$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            if [ "$rascunho" = false ]; then
+              echo "$TAG ja publicada; nao sobrescreve"
+              exit 0
+            fi
+            echo "::error::$TAG existe como draft; remova (gh release delete $TAG) e rode de novo"
+            exit 1
+          fi
+          gh release create "$TAG" "$TGZ" "$TGZ.sha256" \
+            --target "$SHA" --title "CLI ${SHA::7}" --latest=false \
+            --notes "Pacote do CLI no commit $SHA (npm pack, Node 20.19). Instalação: README, seção \"Instalar a partir da release\"."
+          estado="$(gh release view "$TAG" --json isDraft,assets --jq '"\(.isDraft) \(.assets|length)"')"
+          [ "$estado" = "false 2" ] || { echo "::error::$TAG saiu incompleta (isDraft e arquivos: $estado)"; exit 1; }
