@@ -42,24 +42,59 @@
 # ---------------------------------------------------------------- util basica
 
 # Raiz do repositorio: sobe ate achar .git; sem .git, o cwd.
+#
+# `[ -e ]`, nao `[ -d ]`: numa worktree vinculada `.git` e ARQUIVO ("gitdir:
+# <principal>/.git/worktrees/<nome>"). Com `[ -d ]` a busca pulava a raiz da
+# worktree e, de um subdiretorio, devolvia o proprio subdiretorio — e o rastro
+# ia para um `docs/eventos` no lugar errado.
+#
+# O pai sai por expansao de parametro, nao por `dirname`: um processo a menos
+# por nivel, e caminho relativo (sem barra) termina a subida em vez de girar
+# para sempre em ".".
 expx_raiz() {
-  local d="${1:-$PWD}"
+  local d="${1:-$PWD}" p
   while [ "$d" != "/" ]; do
-    [ -d "$d/.git" ] && { printf '%s' "$d"; return 0; }
-    d="$(dirname "$d")"
+    [ -e "$d/.git" ] && { printf '%s' "$d"; return 0; }
+    case "$d" in
+      */) p="${d%/}" ;;
+      */*) p="${d%/*}"; [ -n "$p" ] || p=/ ;;
+      *) p=. ;;
+    esac
+    [ "$p" = "$d" ] && break
+    d="$p"
   done
   printf '%s' "${1:-$PWD}"
 }
 
 # Escapa uma string para caber num JSON string literal.
 # A barra invertida vem primeiro, senao escapamos o que ja foi escapado.
+#
+# JSON proibe controle CRU dentro de string (U+0000..U+001F). Escapar so TAB,
+# CR e LF deixava o resto passar — um detalhe com cor de terminal (ESC) gravava
+# uma linha que nao e JSON e o leitor perdia o arquivo dali em diante. Os cinco
+# com forma curta saem como `\b \t \n \f \r`; o resto, como `\u00XX`. O NUL nao
+# chega aqui: nao cabe numa variavel de shell.
+#
+# O `case` guarda o laco: texto normal nao tem controle exotico, e nesse
+# caminho a funcao continua sendo so substituicao em massa, sem processo.
+EXPX_CTRL_EXOTICOS=$'\001\002\003\004\005\006\007\013\016\017\020\021\022\023\024\025\026\027\030\031\032\033\034\035\036\037'
 expx_json_escape() {
-  local s="$1"
+  local s="$1" _i _b _hex
   s="${s//\\/\\\\}"
   s="${s//\"/\\\"}"
+  s="${s//$'\b'/\\b}"
   s="${s//	/\\t}"
-  s="${s//$'\r'/\\r}"
   s="${s//$'\n'/\\n}"
+  s="${s//$'\f'/\\f}"
+  s="${s//$'\r'/\\r}"
+  case "$s" in
+    *["$EXPX_CTRL_EXOTICOS"]*)
+      for _i in 1 2 3 4 5 6 7 11 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31; do
+        printf -v _hex '%02x' "$_i"
+        printf -v _b '\\%03o' "$_i"; printf -v _b '%b' "$_b"
+        s="${s//"$_b"/\\u00$_hex}"
+      done ;;
+  esac
   printf '%s' "$s"
 }
 
@@ -97,12 +132,41 @@ expx_tool_input_get() {
 #
 #   1. EXPX_TRABALHO_ID, quando a skill ja sabe qual e
 #   2. .expx/expx-lock.json, que o CLI mantem
-#   3. o ORQUESTRADOR.md mais recente, nos dois layouts de pasta
-#   4. "sem-trabalho"
+#   3. a branch do checkout (`feature/<slug>`), quando existe ORQUESTRADOR.md
+#      numa pasta com esse slug
+#   4. o UNICO trabalho com ORQUESTRADOR.md, nos dois layouts de pasta
+#   5. "sem-trabalho" — inclusive com dois ou mais trabalhos e nada acima
+#      decidindo: o mtime NAO escolhe (decisao do usuario, AxisGov/login#2)
 #
 # O nome do lock e `expx-lock.json` (src/nucleo/lock.ts). Ler `lock.json` sem
 # o prefixo devolve "sem-trabalho" para sempre, em silencio — a falha aqui e
 # aberta por desenho, entao o erro nunca se anuncia.
+#
+# O passo 3 vem antes do mtime porque, com duas features ativas, o
+# ORQUESTRADOR.md mexido por ultimo pode ser o da OUTRA: a worktree/branch e o
+# contexto desta sessao, o disco nao. So vale quando o ultimo segmento da
+# branch casa com uma pasta de trabalho existente. "Ativo" nao tem criterio
+# proprio aqui: conta todo ORQUESTRADOR.md que a busca acha.
+
+# expx_branch_atual_em <var> <raiz> — a branch do checkout em <raiz>, lida do
+# HEAD sem chamar o git (regra 1). Numa worktree vinculada `.git` e arquivo e
+# aponta o gitdir dela. HEAD destacado ou ilegivel: vazio.
+expx_branch_atual_em() {
+  local _g="$2/.git" _h=""
+  printf -v "$1" '%s' ""
+  if [ -f "$_g" ]; then
+    IFS= read -r _h < "$_g" 2>/dev/null || [ -n "$_h" ] || return 0
+    _h="${_h%$'\r'}"
+    case "$_h" in "gitdir: "*) _g="${_h#gitdir: }" ;; *) return 0 ;; esac
+    case "$_g" in /*|[A-Za-z]:*) ;; *) _g="$2/$_g" ;; esac
+  fi
+  [ -f "$_g/HEAD" ] || return 0
+  _h=""
+  IFS= read -r _h < "$_g/HEAD" 2>/dev/null || [ -n "$_h" ] || return 0
+  _h="${_h%$'\r'}"
+  case "$_h" in "ref: refs/heads/"?*) printf -v "$1" '%s' "${_h#ref: refs/heads/}" ;; esac
+}
+
 expx_trabalho_id() {
   local raiz="$1" v=""
 
@@ -131,15 +195,27 @@ expx_trabalho_id() {
   # `find` em vez de glob: no zsh um padrao sem match ABORTA a funcao (nomatch),
   # e o hook perderia o trabalho_id no shell de metade dos usuarios. O -maxdepth
   # 4 cobre os dois layouts sem varrer o repositorio inteiro.
-  local f mais_novo=""
+  local f d unico="" ambiguo="" br slug="" da_branch=""
+  expx_branch_atual_em br "$raiz"
+  [ -n "$br" ] && slug="${br##*/}"
   while IFS= read -r f; do
     [ -f "$f" ] || continue
-    if [ -z "$mais_novo" ] || [ "$f" -nt "$mais_novo" ]; then mais_novo="$f"; fi
+    d="${f%/ORQUESTRADOR.md}"; d="${d##*/}"
+    [ -n "$slug" ] && [ "$d" = "$slug" ] && da_branch="$slug"
+    # o mesmo slug nos dois layouts e o MESMO trabalho (mesmo arquivo de eventos)
+    if [ -z "$unico" ]; then unico="$d"; elif [ "$d" != "$unico" ]; then ambiguo=1; fi
   done <<EOF
 $(find "$raiz/docs" -maxdepth 4 -name ORQUESTRADOR.md -type f 2>/dev/null)
 EOF
-  if [ -n "$mais_novo" ]; then
-    basename "$(dirname "$mais_novo")"
+  if [ -n "$da_branch" ]; then
+    printf '%s' "$da_branch"
+    return 0
+  fi
+  # Mais de um trabalho e nada que decida entre eles: sem-trabalho, nunca o
+  # mtime. O ORQUESTRADOR.md mexido por ultimo pode ser o da OUTRA feature, e
+  # evento atribuido ao trabalho errado e pior que evento sem trabalho.
+  if [ -n "$unico" ] && [ -z "$ambiguo" ]; then
+    printf '%s' "$unico"
     return 0
   fi
 
@@ -224,8 +300,13 @@ expx_rastro_grava() {
     linha="$linha,\"ferramenta\":\"$EXPX_FERRAMENTA\""
     linha="$linha,\"origem\":\"$origem\""
     linha="$linha,\"evento\":\"$evento\""
-    linha="$linha,\"fase\":${EXPX_FASE:-null}"
-    linha="$linha,\"task\":${EXPX_TASK:-null}"
+    # `fase` e `task` sao string JSON (`"f6"`, `"T-01.01"`), escapadas; `null`
+    # so na ausencia. Sem aspas a linha saia `"fase":f6`, que nao e JSON.
+    local fase=null task=null
+    [ -n "${EXPX_FASE:-}" ] && fase="\"$(expx_json_escape "$EXPX_FASE")\""
+    [ -n "${EXPX_TASK:-}" ] && task="\"$(expx_json_escape "$EXPX_TASK")\""
+    linha="$linha,\"fase\":$fase"
+    linha="$linha,\"task\":$task"
     # Sem subagente o valor e "principal", nunca null: "foi o principal" e
     # informacao, nao ausencia.
     linha="$linha,\"agente\":\"${EXPX_AGENTE:-principal}\""
