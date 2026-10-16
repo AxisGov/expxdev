@@ -484,6 +484,9 @@ npx --yes --package ~/expx-cli/cli-<sha7>/expxdev-0.7.0.tgz expx init --skills b
   primeiro) se publica por **Actions → CI → Run workflow**, com o commit no campo `ref`.
 - Uma tag existente nunca é sobrescrita: o mesmo `cli-<sha7>` tem os mesmos bytes em toda
   máquina.
+- Para liberar uma versão, rode `bash scripts/liberar-versao.sh [commit]` (sem argumento, o HEAD
+  da main). Ele espera o CI, dispara o `ref` se a release não saiu, confere a release e a
+  instalação, e imprime estes comandos já com a tag.
 
 ---
 

@@ -35,8 +35,12 @@ jobs:
           - windows-latest
 
     steps:
+      # No dispatch com `ref`, valida o commit que vai virar release, não o HEAD da
+      # main: uma main vermelha não pode barrar a release de um commit anterior.
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
