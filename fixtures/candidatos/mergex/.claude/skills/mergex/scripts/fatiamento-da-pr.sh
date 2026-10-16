@@ -92,20 +92,35 @@ read -r linhas_pr arquivos_pr <<< "$med"
 [ "$arquivos_pr" -le "$max_arquivos" ] \
   || viola_ou_avisa "F2: a PR altera $arquivos_pr arquivos (limite $max_arquivos); divida por assunto"
 
+# As listas que os lacos percorrem vao para arquivo, nunca para `< <(...)`: a
+# substituicao de processo esconde a falha, e um laco sobre lista vazia nao confere nada.
+lista_c="$(mktemp)" && lista_f="$(mktemp)" || { echo "sem arquivo temporario" >&2; exit 2; }
+trap 'rm -f "$lista_c" "$lista_f"' EXIT
+
 # F3 — cada commit (merges ficam de fora: o conteúdo deles é o dos pais). Commit
-# sem pai (raiz de historia trazida por merge) mede contra a arvore vazia.
+# sem pai (raiz de historia trazida por merge) mede contra a arvore vazia. Na
+# fronteira de um clone raso o commit tambem parece sem pai, mas nao e raiz: ali
+# nao ha medida, e conta-lo inteiro daria uma violacao falsa.
+git rev-list --no-merges "$mb..$head" > "$lista_c" \
+  || { echo "nao foi possivel listar os commits de $mb..$head" >&2; exit 2; }
 vazia="$(git hash-object -t tree /dev/null)"
+raso="${GIT_SHALLOW_FILE:-$(git rev-parse --git-path shallow)}"
 while IFS= read -r c; do
-  pai="$c^"; git rev-parse -q --verify "$c^" >/dev/null || pai="$vazia"
+  if git rev-parse -q --verify "$c^" >/dev/null; then pai="$c^"
+  elif [ -f "$raso" ] && grep -qx "$c" "$raso"; then
+    echo "o commit $c esta na fronteira de um clone raso: sem o pai nao ha medida; aprofunde o clone (git fetch --unshallow)" >&2; exit 2
+  else pai="$vazia"; fi
   med="$(mede "o commit $c" "$pai" "$c")" || exit 2
   read -r l _ <<< "$med"
   if [ "$l" -gt "$max_linhas_commit" ]; then
     viola_ou_avisa "F3: o commit $(git rev-parse --short "$c") altera $l linhas (limite $max_linhas_commit): $(git log -1 --format=%s "$c" | cut -c1-70)"
   fi
-done < <(git rev-list --no-merges "$mb..$head")
+done < "$lista_c"
 
 # F4 — tamanho de arquivo de texto no head. Acima do limite, o crescimento é
 # SOMADO sobre a PR inteira e comparado com a tolerância uma vez.
+git -c core.quotepath=off diff --name-status -M --diff-filter=AMR "$mb" "$head" > "$lista_f" \
+  || { echo "nao foi possivel listar os arquivos de $mb..$head" >&2; exit 2; }
 cresc_b=0; cresc_l=0
 acima=()
 while IFS=$'\t' read -r st a b; do
@@ -137,7 +152,7 @@ while IFS=$'\t' read -r st a b; do
   elif [ "$tam_head" -gt "$aviso_b" ] || [ "$lin_head" -gt "$aviso_linhas_arq" ]; then
     avisa "F4: $novo tem $(kib "$tam_head") KB e $lin_head linhas, perto do limite ($max_kb KB / $max_linhas_arq linhas)"
   fi
-done < <(git -c core.quotepath=off diff --name-status -M --diff-filter=AMR "$mb" "$head")
+done < "$lista_f"
 
 if [ "$cresc_b" -gt "$tolerancia_b" ] || [ "$cresc_l" -gt "$tolerancia_l" ]; then
   viola "F4: os arquivos acima do limite cresceram $cresc_b bytes e $cresc_l linhas no total (tolerancia da PR: $tolerancia_b bytes, $tolerancia_l linhas): ${acima[*]}; arquivo acima do limite so diminui ou e dividido"
