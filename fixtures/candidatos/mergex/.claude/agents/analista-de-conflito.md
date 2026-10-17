@@ -60,6 +60,10 @@ Quatro coisas, sempre nesta ordem:
 E, ao fim de cada trecho, **o que perguntar a quem decidir** — a pergunta que
 destrava a decisão, não a resposta.
 
+O bloco abaixo é um **exemplo fictício**, só para mostrar a forma: o PR, o
+arquivo, as datas e as intenções dele não existem. Nunca os use como
+evidência; na análise real, cada dado vem da fonte do conflito real.
+
 ```
 CONFLITO — #482 contra main
 

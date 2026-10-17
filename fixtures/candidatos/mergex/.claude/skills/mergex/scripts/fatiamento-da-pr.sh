@@ -32,7 +32,8 @@ tolerancia_b="${FATIA_TOLERANCIA_B:-2048}"
 max_linhas_arq="${FATIA_MAX_LINHAS_ARQUIVO:-4000}"
 aviso_linhas_arq="${FATIA_AVISO_LINHAS:-3000}"
 tolerancia_l="${FATIA_TOLERANCIA_LINHAS:-20}"
-ignorar="${FATIA_IGNORAR:-(^|/)(package-lock\.json|fixtures/candidatos/)}"
+# o lock casa o nome inteiro (`$`): `package-lock.json.backup` e revisado
+ignorar="${FATIA_IGNORAR:-(^|/)(package-lock\.json$|fixtures/candidatos/)}"
 excecao="${FATIA_EXCECAO:-}"
 
 # os limites em KB são comparados em BYTES: dividir por 1024 truncaria, e um
@@ -59,20 +60,22 @@ kib() { echo $((($1 + 1023) / 1024)); }
 # linhas alteradas e arquivos de um diff, sem os gerados. O numstat vem com -z: o
 # caminho e um campo terminado por NUL, entao espaco, `=>` ou quebra no nome nao o
 # confundem. Na renomeacao o campo do caminho vem vazio e seguem origem e destino;
-# o FATIA_IGNORAR vale para o DESTINO, como no F4 — sem isto, um arquivo tirado de
-# fixtures/candidatos/ para um caminho revisado ficaria fora da conta. A saida do
+# ela so fica fora da conta quando os DOIS casam com o FATIA_IGNORAR — sem isto, um
+# arquivo tirado de fixtures/candidatos/ para um caminho revisado, ou codigo do
+# produto movido para la, esconderia as linhas alteradas no caminho. A saida do
 # git vai para um arquivo, nao para um pipe: um diff que falha tem de falhar aqui.
 soma() { # <argumentos do git diff>
   soma_de git -c core.quotepath=off diff --numstat -z -M "$@"
 }
 # soma_de <comando que imprime numstat -z> — a mesma conta para qualquer fonte de numstat
 soma_de() {
-  local t a d p linhas=0 n=0
+  local t a d p o linhas=0 n=0
   t="$(mktemp)" || return 1
   "$@" > "$t" || { rm -f "$t"; return 1; }
   while IFS=$'\t' read -r -d '' a d p; do
-    [ -n "$p" ] || { read -r -d '' p; read -r -d '' p; }
-    [[ $p =~ $ignorar ]] && continue
+    o="$p"
+    [ -n "$p" ] || { read -r -d '' o; read -r -d '' p; }
+    [[ $p =~ $ignorar ]] && [[ $o =~ $ignorar ]] && continue
     [ "$a" = - ] || linhas=$((linhas + a + d))
     n=$((n + 1))
   done < "$t"

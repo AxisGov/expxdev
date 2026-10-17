@@ -55,7 +55,7 @@ OBRIGATÓRIO, e o revisor precisa saber disso antes de abrir o diff.
 ## Os critérios, na ordem
 
 Aplique nesta ordem e pare no primeiro que bater — a ordem já é a da rigidez.
-É a ordem do classificador (`classificar-atencao.sh --ordem`): O1–O9, L1–L4,
+É a ordem do classificador (`classificar-atencao.sh --ordem`): O1–O10, L1–L4,
 D1–D4, padrão.
 
 ### OLHO OBRIGATÓRIO — o revisor lê linha a linha
@@ -93,8 +93,8 @@ D1–D4, padrão.
 
 ## Artefatos de método — decisão, plano, base, registro
 
-A sprintx, a runx e a própria mergex escrevem no diff arquivos que não são
-produto. Artefato de método **não é automaticamente de baixo risco**, e
+A sprintx, a runx e a própria mergex escrevem no diff arquivos que não fazem
+parte do produto. Artefato de método **não é automaticamente de baixo risco**, e
 **também não é automaticamente OLHO OBRIGATÓRIO**. A regra é a mesma,
 palavra por palavra, do `references/03-atencao-humana.md` da skill:
 
@@ -265,8 +265,9 @@ e as fontes.
 - relatório de cobertura — O6 não pôde ser descartado por medição
 ```
 
-**Toda justificativa nomeia pelo menos um critério** (`O1`..`O10`, `L1`..`L4`,
-`D1`..`D4`) **e a evidência que o confirma.** Sem isso é opinião, e opinião não
+**Toda justificativa nomeia pelo menos um critério** (`O1`–`O10`, `L1`–`L4`,
+`D1`–`D4`) **e a evidência que o confirma** — ou, quando nenhum bate, diz que é o
+**padrão** (OLHO OBRIGATÓRIO) e por que nenhum critério se confirmou. Sem isso é opinião, e opinião não
 é auditável.
 
 Errado, porque não nomeia evidência:
@@ -279,7 +280,7 @@ src/fiscal/calculo_icms_st.py — OLHO OBRIGATÓRIO
 ## Antes de entregar, confira
 
 - [ ] Todo arquivo do diff está em **exatamente uma** faixa — nenhum ficou de fora.
-- [ ] Toda classificação nomeia critério e evidência.
+- [ ] Toda classificação nomeia critério e evidência, ou o padrão com a razão.
 - [ ] A faixa de cada arquivo é a que o classificador devolveu; todo L4 e D4 veio dele.
 - [ ] Todo artefato de método que é origem de decisão de risco passou pelos critérios O antes.
 - [ ] Nenhuma justificativa usa tamanho de diff.

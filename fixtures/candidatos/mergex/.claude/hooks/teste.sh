@@ -283,7 +283,8 @@ GRANDE=""; while [ "${#GRANDE}" -lt 10240 ]; do GRANDE="${GRANDE}echo aaaa bbbb;
 custo_ok() { # <desc> <json> <rc esperado> — rc certo e menos de 2 s
   local desc="$1" json="$2" esperado="$3" ini fim rc ms
   if [ "$SEM_JQ" = "1" ]; then PULADOS=$((PULADOS+1)); printf '  pulado %s (sem jq)\n' "$desc"; return 0; fi
-  ini="$(date +%s%N 2>/dev/null)"
+  # agora_ms, nao `date +%s%N`: sem o %N (macOS) o tempo virava 0 e o limite nunca reprovava
+  ini="$(agora_ms)"
   # O limite de 30 s espelha o do harness: um caso que o estoura e morto (rc 124)
   # e falha, em vez de travar a suite por minutos (rodada 5 da revisao).
   if command -v timeout >/dev/null 2>&1; then
@@ -291,8 +292,8 @@ custo_ok() { # <desc> <json> <rc esperado> — rc certo e menos de 2 s
   else
     printf '%s' "$json" | bash "$H/mergex/git-perigoso.sh" >/dev/null 2>&1; rc=$?
   fi
-  fim="$(date +%s%N 2>/dev/null)"
-  case "$ini$fim" in ''|*[!0-9]*) ms=0 ;; *) ms=$(( (fim - ini) / 1000000 )) ;; esac
+  fim="$(agora_ms)"
+  ms=$(( fim - ini ))
   if [ "$rc" = "$esperado" ] && [ "$ms" -lt "$LIMITE_MS" ]; then
     OK=$((OK+1)); printf '  ok    %s (%s ms)\n' "$desc" "$ms"
   else
