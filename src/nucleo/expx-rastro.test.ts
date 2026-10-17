@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { bashDosHooks, RAIZ_DO_REPO } from "../teste/candidatos.js";
-import { suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
+import { suportaNomeComCaractereReservado, suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
 
 /**
  * `nucleo/hooks/expx-rastro.sh`, a biblioteca de rastro que o plugin distribui
@@ -101,6 +101,23 @@ describe("expx_raiz", () => {
         const [achada, esperada] = roda(fora, corpo, { LINK: link, RAIZ: raiz }).split("\n");
         expect(achada, gitArquivo ? ".git arquivo" : ".git diretório").toBe(esperada);
       }
+    },
+  );
+
+  // O Windows não aceita newline em nome de arquivo; Linux e macOS aceitam. O
+  // `$(...)` corta newline do FIM da saída, então o que expõe o corte é um link
+  // que aponta direto para a raiz cujo nome termina em newline.
+  const comNewline = comLink && suportaNomeComCaractereReservado();
+  const seNewline = comNewline ? "" : " [pulado: sem link de diretório ou sem newline em nome de arquivo]";
+
+  it.skipIf(!comNewline)(
+    `funcional: link para a raiz cujo nome termina em newline não perde o newline ao resolver${seNewline}`,
+    () => {
+      const raiz = join(temp(), "repo\n");
+      mkdirSync(join(raiz, ".git"), { recursive: true });
+      const link = join(temp(), "atalho");
+      symlinkSync(raiz, link, "dir");
+      expect(roda(raiz, 'expx_raiz "$LINK"', { LINK: link })).toBe(realpathSync(raiz));
     },
   );
 

@@ -59,9 +59,12 @@
 # nao por nivel. `CDPATH=` porque, com CDPATH, o `cd` imprime o destino. Se o
 # `cd` falha (caminho que nao existe), sobe pelo caminho como veio. A raiz
 # achada sai fisica (no macOS, /private/tmp em vez de /tmp): mesmo lugar.
+# O `x` depois do `pwd -P` protege o nome que termina em newline: o `$(...)`
+# corta newline do fim, e sem a sentinela levaria junto o do proprio caminho.
 expx_raiz() {
   local d p
-  d="$(CDPATH='' cd -P -- "${1:-$PWD}" 2>/dev/null && pwd -P)" || d=""
+  d="$(CDPATH='' cd -P -- "${1:-$PWD}" 2>/dev/null && pwd -P && printf x)" || d=""
+  d="${d%?x}"
   [ -n "$d" ] || d="${1:-$PWD}"
   while [ "$d" != "/" ]; do
     [ -e "$d/.git" ] && { printf '%s' "$d"; return 0; }
