@@ -57,7 +57,8 @@
 # devolvia o proprio link. `cd -P` + `pwd -P` sao POSIX e existem no bash 3.2
 # do macOS, que nao tem `realpath` nem `readlink -f`. Um subshell por chamada,
 # nao por nivel. `CDPATH=` porque, com CDPATH, o `cd` imprime o destino. Se o
-# `cd` falha (caminho que nao existe), sobe pelo caminho como veio.
+# `cd` falha (caminho que nao existe), sobe pelo caminho como veio. A raiz
+# achada sai fisica (no macOS, /private/tmp em vez de /tmp): mesmo lugar.
 expx_raiz() {
   local d p
   d="$(CDPATH='' cd -P -- "${1:-$PWD}" 2>/dev/null && pwd -P)" || d=""

@@ -63,7 +63,9 @@ describe("expx_raiz", () => {
     const sub = join(raiz, "src", "fundo");
     mkdirSync(sub, { recursive: true });
 
-    const out = roda(sub, 'printf "%s\\n%s" "$(expx_raiz)" "$(cd ../.. && pwd)"');
+    // a raiz sai FÍSICA: no Git Bash do CI Windows o /tmp é montagem e no macOS
+    // é link para /private/tmp, então o esperado também é `pwd -P`
+    const out = roda(sub, 'printf "%s\\n%s" "$(expx_raiz)" "$(cd -P ../.. && pwd -P)"');
     const [achada, esperada] = out.split("\n");
     expect(achada).toBe(esperada);
   });
@@ -73,7 +75,7 @@ describe("expx_raiz", () => {
     mkdirSync(join(raiz, ".git"));
     const sub = join(raiz, "a");
     mkdirSync(sub);
-    const [achada, esperada] = roda(sub, 'printf "%s\\n%s" "$(expx_raiz)" "$(cd .. && pwd)"').split("\n");
+    const [achada, esperada] = roda(sub, 'printf "%s\\n%s" "$(expx_raiz)" "$(cd -P .. && pwd -P)"').split("\n");
     expect(achada).toBe(esperada);
   });
 
