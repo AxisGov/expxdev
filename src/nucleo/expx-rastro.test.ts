@@ -222,6 +222,37 @@ describe("leitura do JSON sem jq", () => {
     expect(roda(raiz, `${SEM_JQ}expx_json_get "$JSON_TESTE" a`, { JSON_TESTE: json })).toBe("x\ny\tz é");
     expect(roda(raiz, `${SEM_JQ}expx_json_get "$JSON_TESTE" n`, { JSON_TESTE: json })).toBe("");
   });
+
+  // O contrato dos hooks e o bash 3.2 do macOS, cujo `printf` nao conhece as escapas
+  // de code point (vieram no bash 4.2) e as devolve cruas. Nao ha bash 3.2 na bancada:
+  // este `printf` faz o mesmo, dobrando a barra dessas escapas antes do builtin quando
+  // o formato as interpretaria (o proprio formato ou um %b). E roda sem locale UTF-8
+  // (LC_ALL=C), que o macOS nem tem com o nome C.UTF-8.
+  const PRINTF_32 = [
+    "printf() {",
+    '  local f="$1"; [ "$1" = -v ] && f="$3"',
+    '  case "$f" in *%s*) ;; *) set -- "${@//"\\u"/"\\\\\\\\u"}"; set -- "${@//"\\U"/"\\\\\\\\U"}" ;; esac',
+    '  builtin printf "$@"',
+    "}",
+    "",
+  ].join("\n");
+  // vai por variavel de ambiente, como o JSON: na linha de comando as barras se perdem
+  const COMO_32 = { LC_ALL: "C", LANG: "C", PRINTF_32 };
+
+  it("funcional: printf de bash 3.2 e locale C, file_path com \\u00e9 e par substituto chega em UTF-8", () => {
+    const raiz = temp();
+    const json = '{"tool_input":{"file_path":"docs/caf\\u00e9/\\u4e2d\\ud83d\\ude00.md"}}';
+    const out = roda(raiz, `${SEM_JQ}eval "$PRINTF_32"\nexpx_tool_input_get "$JSON_TESTE" file_path`, { ...COMO_32, JSON_TESTE: json });
+    expect(out).toBe("docs/caf\u00e9/\u4e2d\u{1F600}.md");
+  });
+
+  it("funcional: printf de bash 3.2, escapa de aspa/barra/% e substituto solto saem certos", () => {
+    const raiz = temp();
+    const json = '{"a":"\\u0022\\u005c\\u0025s\\u0041|\\ud83d|\\ude00|\\u00zz"}';
+    const out = roda(raiz, `${SEM_JQ}eval "$PRINTF_32"\nexpx_json_get "$JSON_TESTE" a`, { ...COMO_32, JSON_TESTE: json });
+    // substituto sem par vira U+FFFD, como no jq; escapa malformada nao derruba o hook
+    expect(out).toBe('"\\%sA|\uFFFD|\uFFFD|u00zz');
+  });
 });
 
 describe("rotação do rastro", () => {
