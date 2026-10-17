@@ -213,6 +213,47 @@ describe("verificar-fatiamento.sh", () => {
     expect(r.saida).toContain("PR com 10 linhas em 1 arquivo");
   });
 
+  it("funcional: o padrão de FATIA_IGNORAR casa o nome inteiro — `package-lock.json.backup` conta", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "web/package-lock.json", linhas(900));
+    escreve(d, "package-lock.json.backup", linhas(450));
+    commita(d, "chore: lock e copia do lock");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(1);
+    expect(r.saida).toContain("PR com 450 linhas em 1 arquivo");
+  });
+
+  it("funcional: código renomeado PARA caminho gerado conta as linhas removidas (F2 e F3)", () => {
+    const d = repo();
+    escreve(d, "produto.md", linhas(1000));
+    commita(d, "feat: produto");
+    git(d, "switch", "-q", "-c", "feature");
+    git(d, "branch", "-f", "main", "HEAD");
+    // 450 linhas saem e o resto vai para fixtures/: a similaridade (55%) faz do par uma renomeacao
+    rmSync(join(d, "produto.md"));
+    escreve(d, "fixtures/candidatos/x/produto.md", linhas(1000).split("\n").slice(450).join("\n"));
+    commita(d, "chore: tira codigo do produto para a fixture");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(1);
+    expect(r.saida).toContain("PR com 450 linhas em 1 arquivo");
+    expect(r.saida).toMatch(/F3: o commit \w+ altera 450 linhas/);
+  });
+
+  it("funcional: renomeação entre dois caminhos gerados continua fora da conta", () => {
+    const d = repo();
+    escreve(d, "fixtures/candidatos/x/a.md", linhas(1000));
+    commita(d, "chore: fixture");
+    git(d, "switch", "-q", "-c", "feature");
+    git(d, "branch", "-f", "main", "HEAD");
+    rmSync(join(d, "fixtures/candidatos/x/a.md"));
+    escreve(d, "fixtures/candidatos/y/a.md", linhas(1000).split("\n").slice(450).join("\n"));
+    commita(d, "chore: regenera a fixture");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(0);
+    expect(r.saida).toContain("PR com 0 linhas em 0 arquivo");
+  });
+
   it("funcional: F4 — arquivo grande só renomeado não conta como crescimento", () => {
     const d = repo();
     escreve(d, "enorme.md", "x".repeat(160 * 1024) + "\n");
