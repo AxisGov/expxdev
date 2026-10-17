@@ -134,9 +134,32 @@ equivalente em outro serviço.
   ao HEAD autoritativo. Divergiu (push posterior não buscado, ref velha, branch homônima em
   outro repositório): descarte o fallback.
 - PR vindo de fork normalmente não tem `origin/<head>`, e o gate nunca depende dele. Para testar
-  ancestralidade, busque a cabeça do próprio PR (`git fetch origin pull/<n>/head` no GitHub;
-  `git fetch origin merge-requests/<iid>/head` no GitLab) e confira que o SHA obtido é o
-  autoritativo.
+  ancestralidade, busque a cabeça do próprio PR (`pull/<n>/head` no GitHub;
+  `merge-requests/<iid>/head` no GitLab) **no repositório base**, e confira que o SHA obtido é o
+  autoritativo. O repositório base sai da URL do PR, nunca do nome do remoto: o remoto dele pode
+  se chamar `upstream`, ou outro nome, e o `origin` ser o fork, que não tem essa ref. Vale o
+  remoto cuja URL configurada tem o `<host>` do PR **como host** (a autoridade de `https://` ou
+  `ssh://`, ou o `<host>` de `git@<host>:`; nunca um pedaço do caminho) e o `<dono>/<repo>` do PR
+  como caminho inteiro — o mesmo `<dono>/<repo>` noutro serviço é outro repositório —; sem
+  nenhum, a própria URL. No GitHub:
+
+```bash
+pr_url="$(gh pr view <n> --json url --jq .url)" || exit 1   # https://<host>/<dono>/<repo>/pull/<n>
+repo_url="${pr_url%/pull/*}"; alvo="${repo_url#*://}"       # <host>/<dono>/<repo>
+remoto_base="$(git config --get-regexp '^remote\..*\.url$' | awk -v h="${alvo%%/*}" -v r="${alvo#*/}" '
+  { u = tolower($2); sub(/\/$/, "", u); sub(/\.git$/, "", u)
+    if (sub(/^[a-z][a-z0-9+.-]*:\/\//, "", u)) i = index(u, "/")   # https://, ssh://: autoridade até a 1ª /
+    else if (u ~ /^[^\/]*:/) i = index(u, ":")                      # git@<host>:<caminho>
+    else next                                                        # caminho local
+    host = substr(u, 1, i - 1); sub(/^.*@/, "", host); sub(/:[0-9]*$/, "", host)
+    if (i > 1 && host == tolower(h) && substr(u, i + 1) == tolower(r)) {
+      nome = $1; sub(/^remote\./, "", nome); sub(/\.url$/, "", nome); print nome; exit } }')"
+git fetch "${remoto_base:-$repo_url}" "pull/<n>/head" || exit 1
+cabeca="$(git rev-parse --verify 'FETCH_HEAD^{commit}')" || exit 1
+```
+
+  No GitLab, o mesmo com a URL do `glab mr view <iid> --output json` (campo `web_url`; o
+  repositório é o que vem antes de `/-/merge_requests/`) e a ref `merge-requests/<iid>/head`.
 - HEAD autoritativo não confirmado: **R4 nunca pode ser `OK`** (finding corrigido fica sem
   evidência válida, e o gate fica `BLOQUEADO` por bloqueio corrigível — não confirmável
   humanamente). **R1 não muda de regra por isso**, e a precedência é esta: sem CI configurado,
@@ -596,10 +619,18 @@ justificativa para um finding; marcar finding válido como resolvido sem evidên
 
 Finding válido que exige mudança **não é corrigido pela mergex**. Ela valida o finding contra
 o código atual, monta este pacote, e devolve à skill de origem do trabalho (sprintx, runx ou
-buildx):
+buildx): a do `expx_tool` do `ENTREGA.md` na branch do PR.
+
+PR aberto fora do método — sem `ENTREGA.md` ("sem registro da mergex", passo 2) — não tem skill
+de origem. O destinatário é então o **autor do PR** na plataforma (`author.login` no GitHub,
+`author.username` no GitLab), e o `Destino:` do pacote diz isso; a persistência abaixo é a mesma.
+Nunca escolha uma skill para ele por palpite.
 
 ```
 REVIEW REMEDIATION
+
+Destino:
+<skill de origem, do expx_tool do ENTREGA.md | autor do PR (@<login>): PR sem ENTREGA.md, sem skill de origem>
 
 Finding:
 <texto normalizado>
@@ -717,9 +748,9 @@ a branch de um PR aberto nem a de um PR mergeado nesta passagem — depois do me
 predecessora, a base tem de ter sido redirecionada para a base dela, pelo serviço ou pelo
 desenvolvedor. Senão continua inelegível, com o motivo.
 
-PRs **inelegíveis para merge** — rascunho, integração contínua vermelha, review obrigatório pendente (`reviewDecision: REVIEW_REQUIRED` no GitHub; aprovações exigidas ainda não dadas no GitLab), `empilhado sobre #<n>` (ver "Antes do impacto: PRs empilhados", acima), ou `REVIEW EVIDENCE: BLOQUEADO` por **bloqueio corrigível por remediação** (ver "Dois tipos de bloqueio", acima) — aparecem na lista, **no fim**, marcados com o motivo, e **não entram na condução do passo 7**.
+PRs **inelegíveis para merge** — rascunho, integração contínua vermelha, review obrigatório pendente (`reviewDecision: REVIEW_REQUIRED` no GitHub; aprovações exigidas ainda não dadas no GitLab), `empilhado sobre #<n>` (ver "Antes do impacto: PRs empilhados", acima), conflito com a base (inclusive o "conflito não verificado", que conta como conflito), ou `REVIEW EVIDENCE: BLOQUEADO` por **bloqueio corrigível por remediação** (ver "Dois tipos de bloqueio", acima) — aparecem na lista, **no fim**, marcados com o motivo, e **não entram na condução do passo 7**.
 
-PRs com `REVIEW EVIDENCE: BLOQUEADO` **apenas** por **bloqueio confirmável humanamente nesta execução**, e sem nenhum outro impedimento (não rascunho, CI não vermelha), ficam na fila pela mesma ordem de impacto, marcados `confirmação humana necessária`, e entram no passo 7 **só** na condução limitada: pedir as confirmações específicas, recalcular o gate, e seguir apenas se o resultado for `SATISFEITO`.
+PRs com `REVIEW EVIDENCE: BLOQUEADO` **apenas** por **bloqueio confirmável humanamente nesta execução**, e sem nenhum outro impedimento (não rascunho, CI não vermelha, sem conflito com a base), ficam na fila pela mesma ordem de impacto, marcados `confirmação humana necessária`, e entram no passo 7 **só** na condução limitada: pedir as confirmações específicas, recalcular o gate, e seguir apenas se o resultado for `SATISFEITO`.
 
 ## Passo 5 — Analisar conflitos (relatar, nunca resolver)
 

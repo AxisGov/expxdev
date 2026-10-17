@@ -453,7 +453,7 @@ Procure no conteúdo adicionado:
 
 | Categoria | Sinais |
 |---|---|
-| Chave de API / token | `api_key`, `apikey`, `secret`, `token`, `bearer `, `authorization:`, sequências longas de base64 ou hex em atribuição literal, prefixos de provedor (`sk-`, `ghp_`, `xox`, `AKIA`, `AIza`) no começo da linha ou depois de caractere fora de `[A-Za-z0-9_-]` — dentro de identificador (`task-fora-do-plano`) não é chave |
+| Chave de API / token | `api_key`, `apikey`, `secret`, `token`, `bearer `, `authorization:`, sequências longas de base64 ou hex em atribuição literal, prefixos de provedor (`sk-`, `ghp_`, `gho_`, `github_pat_`, `xox`, `AIza`) no começo da linha ou depois de caractere fora de `[A-Za-z0-9_-]` — dentro de identificador (`task-fora-do-plano`) não é chave; `AKIA` e `ASIA` (chave temporária da AWS) no começo da linha ou depois de caractere fora de `[A-Za-z0-9_]` — depois de hífen (`id-AKIA…`) é chave, logo depois de letra, dígito ou `_` não é; e, como a chave tem exatamente 20 caracteres, só quando termina ali (fim da linha ou caractere fora de `[A-Za-z0-9_]`): seguida de mais letras, dígitos ou `_` é identificador |
 | Credencial | `password`, `passwd`, `senha`, `pwd` com valor literal; string de conexão com usuário e senha embutidos (`://usuario:senha@`) |
 | Chave privada | `BEGIN RSA PRIVATE KEY`, `BEGIN OPENSSH PRIVATE KEY`, `BEGIN PRIVATE KEY`, `.pem`, `.p12` |
 | Dado real de cliente | CPF, CNPJ, e-mail, telefone, cartão, endereço ou nome de pessoa real em fixture, teste, seed ou comentário |

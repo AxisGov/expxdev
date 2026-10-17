@@ -85,7 +85,7 @@ Por isso, uma vez que o E9 é chamado, ele avalia automaticamente — antes de o
 
 Cada finding ou thread cai em uma de seis situações — `ACTIONABLE_UNRESOLVED`, `FIXED_AWAITING_EVIDENCE`, `AWAITING_REREVIEW`, `REJECTED_WITH_EVIDENCE`, `RESOLVED`, `OUTDATED_NON_BLOCKING` — e o PR só sai com `REVIEW EVIDENCE: SATISFEITO` quando todos os critérios aplicáveis de R1–R6 (CI, reviews bloqueantes, threads acionáveis, evidência de correção, resposta publicada antes da resolução, encerramento confirmado) estiverem satisfeitos — `n/a` é estado válido. Na dúvida entre duas situações, o finding conta como pendente.
 
-**Fronteira de responsabilidade.** A mergex lê reviews, valida findings, reúne evidência, responde thread, verifica CI e re-review, e resolve thread quando o critério é atendido — mas **não corrige código de produto**. Finding válido que exige mudança vira um pacote de remediação devolvido à skill de origem (sprintx, runx ou buildx); o PR fica `REVIEW PENDENTE` e não é oferecido para merge até o novo commit.
+**Fronteira de responsabilidade.** A mergex lê reviews, valida findings, reúne evidência, responde thread, verifica CI e re-review, e resolve thread quando o critério é atendido — mas **não corrige código de produto**. Finding válido que exige mudança vira um pacote de remediação devolvido à skill de origem (sprintx, runx ou buildx) — ou, no PR aberto fora do método (sem `ENTREGA.md`), que não tem skill de origem, ao autor do PR; o PR fica `REVIEW PENDENTE` e não é oferecido para merge até o novo commit.
 
 Definição normativa completa — os seis estados, R1–R6, o formato da resposta ao review, a ordem de resolução de thread e o pacote de remediação — está em `references/09-revisao.md`; aqui vai só o resumo do contrato.
 
