@@ -188,7 +188,7 @@ Nenhum critério acima bateu, e **um** destes bate:
 | D1 | Arquivo de teste que só acrescenta caso | O arquivo é de teste, e o diff só adiciona casos — não altera nem remove asserção existente |
 | D2 | Alteração mecânica coberta por teste de regressão verde | Renomeação, movimentação, formatação, troca de import — com o teste de regressão do trabalho verde sobre ela |
 | D3 | Arquivo gerado automaticamente, **quando declarado como tal** | O `CONVENCOES.md` da stackx ou o próprio arquivo o declara gerado (lockfile, snapshot, cliente de API gerado, migração gerada por ORM que só reflete o modelo) |
-| D4 | Artefato de método reconhecido, mecânico, com a prova mecânica aprovada | O classificador devolve `D4`, com a prova que passou (seção "Artefatos de método") |
+| D4 | Artefato de método reconhecido, mecânico, com a prova mecânica aprovada; a saída da própria mergex nesta entrega (`ENTREGA.md`, `PR.md`, `QA-PACOTE.md`, `ATENCAO.md`) é D4 só pelo reconhecimento, sem prova de conteúdo | O classificador devolve `D4`, com a prova que passou — ou, na saída da mergex, só a linha do catálogo (seção "Artefatos de método") |
 
 D3 continua significando **gerado de forma determinística** pelo processo ou pela ferramenta, e
 declarado. "Escrito por um agente" não é "gerado": plano, decisão e fechamento escritos pela
@@ -228,7 +228,12 @@ Só depois, sem nenhum O, entram os critérios de método:
 - **L4** — artefato de método reconhecido, de decisão, plano ou registro: o revisor confere a
   intenção.
 - **D4** — artefato de método reconhecido, mecânico, com a prova mecânica aprovada: a máquina já
-  provou. Prova que falha manda o artefato para L4, nunca para DISPENSÁVEL.
+  provou. Prova que falha manda o artefato para L4, nunca para DISPENSÁVEL. A exceção é a saída
+  da própria mergex nesta entrega (`ENTREGA.md`, `PR.md`, `QA-PACOTE.md`, `ATENCAO.md`), que é D4
+  **sem prova de conteúdo**: o que a máquina confere ali é só o reconhecimento — caminho na pasta
+  deste trabalho, `kind` e `trabalho_id` e, no `ENTREGA.md`, a `branch:` atual —, e a
+  justificativa do classificador não traz `prova mecânica:`. Não diga que o conteúdo deles foi
+  provado, e não estenda a exceção a nenhum outro artefato.
 
 **L4 e D4 só existem pela saída do classificador**
 (`.claude/skills/mergex/scripts/classificar-atencao.sh`), que reconhece pelo catálogo fechado:

@@ -103,7 +103,7 @@ CONFLITO — #{{n}} contra {{base | #n}}
 
 {{cada PR aqui também mostra, na fila acima ou junto do motivo, o bloco R1–R6 completo}}
 
-{{motivo: rascunho, integração contínua vermelha, review obrigatório pendente, `empilhado sobre #<n>` (a base é branch de outro PR aberto, ou de um mergeado nesta passagem), ou REVIEW EVIDENCE: BLOQUEADO (corrigível por remediação)}}
+{{motivo: rascunho, integração contínua vermelha, review obrigatório pendente, conflito com a base, `empilhado sobre #<n>` (a base é branch de outro PR aberto, ou de um mergeado nesta passagem), ou REVIEW EVIDENCE: BLOQUEADO (corrigível por remediação)}}
 
 | PR | Motivo |
 |---|---|
@@ -111,13 +111,16 @@ CONFLITO — #{{n}} contra {{base | #n}}
 
 ## Review Remediation
 
-{{um bloco por finding válido devolvido à skill de origem — o pacote é o de "O pacote de
+{{um bloco por finding válido devolvido à skill de origem (ou ao autor do PR, no PR sem ENTREGA.md) — o pacote é o de "O pacote de
 remediação", em references/09-revisao.md; o template só o materializa}}
 
 - #{{n}} {{arquivo}}:{{linha}} — origem {{ID ou URL estável do review/comentário de origem}} — publicado em {{thread <url> | comentário no PR <url> | NÃO PERSISTIDO (handoff NÃO VERIFICÁVEL; o PR segue BLOQUEADO) — <motivo literal>}}
 
 ```
 REVIEW REMEDIATION
+
+Destino:
+{{skill de origem, do expx_tool do ENTREGA.md | autor do PR (@<login>): PR sem ENTREGA.md, sem skill de origem}}
 
 Finding:
 {{texto normalizado}}

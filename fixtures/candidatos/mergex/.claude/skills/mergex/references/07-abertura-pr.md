@@ -76,9 +76,23 @@ que falha (rede, credencial) não prova nada e para o E7. A base medida é o `FE
 `origin/HEAD` buscado não atualiza a ref simbólica local, que mediria contra o alvo antigo. E
 `origin/HEAD` normaliza para `bb=HEAD`, que não é branch no serviço: o `$bb` vai para o
 `gh pr create --base` e para a instrução manual do passo 3, então o `HEAD` do remoto é resolvido
-agora, no remoto, para o nome da branch padrão (`refs/heads/main` → `main`):
+agora, no remoto, para o nome da branch padrão (`refs/heads/main` → `main`).
+
+Cada bloco de comandos deste reference roda numa chamada própria do shell, e variável de um
+bloco não chega ao seguinte: este bloco recalcula o `$remoto` e o `$publicado` dos
+pré-requisitos — e busca a branch de novo, conferida, porque a ref remota pode ter andado
+desde aquela chamada; a ponta continua tendo de ser o `HEAD` —, e grava o `$bb` resolvido num arquivo de estado do Git, que o passo 2 lê. O estado só
+é gravado quando a medição sai `0`, e o de uma execução anterior é apagado na primeira linha,
+antes de qualquer busca ou conferência: qualquer falha do bloco, reprovado (`1`) ou não medido
+(`2`), deixa o arquivo ausente, e o passo 2 não tem base para abrir o PR:
 
 ```bash
+estado_bb="$(git rev-parse --git-path mergex-e7-base)" && rm -f "$estado_bb" || exit 1   # antes de tudo
+upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}')" || exit 1
+remoto="${upstream%%/*}"; ref_remota="${upstream#*/}"
+git fetch "$remoto" "$ref_remota" || { echo "busca de $upstream falhou: o E7 não mede nem abre o PR"; exit 1; }
+publicado="$(git rev-parse --verify "refs/remotes/$upstream^{commit}")" || exit 1
+[ "$publicado" = "$(git rev-parse HEAD)" ] || { echo "a ponta remota ($publicado) não é o HEAD: o E7 não mede nem abre o PR"; exit 1; }
 rb="$remoto"; bb="<branch_base>"
 case "$bb" in
   refs/remotes/*/*) bb="${bb#refs/remotes/}"; rb="${bb%%/*}"; bb="${bb#*/}" ;;
@@ -102,6 +116,7 @@ e7_ignorar='(^|/)package-lock\.json$|^docs/(sprintx|entregas|eventos)/'
 FATIA_IGNORAR="${FATIA_IGNORAR:+$FATIA_IGNORAR|}$e7_ignorar" \
 FATIA_EXCECAO="${FATIA_EXCECAO:-}" \
   bash .claude/skills/mergex/scripts/fatiamento-da-pr.sh "$base" "$publicado"
+rc_fatia=$?; [ "$rc_fatia" = 0 ] && { printf '%s\n' "$bb" > "$estado_bb" || exit 1; }; exit "$rc_fatia"
 ```
 
 O `FATIA_IGNORAR` vai explícito porque o padrão do script é o do ExpxDev, que também tira
@@ -151,18 +166,37 @@ Rascunho é o padrão: no fluxo normal, a mergex entrega antes do QA rodar. Um P
 Título: o do trabalho — o mesmo do `ORQUESTRADOR.md`. Corpo: o conteúdo de `PR.md`, integralmente.
 A base é o `$bb` do passo 1.5 — a `branch_base` já sem o remoto e sem `refs/...` —, nunca a
 `branch_base` crua: o serviço não conhece `upstream/main` como branch, e a abertura falharia.
+O comando roda noutra chamada do shell, então o `$bb` vem do arquivo de estado que o passo 1.5
+gravou (sem ele, o passo 1.5 não chegou à medição, e o PR não abre), e a branch, do upstream.
+
+O título é texto do `ORQUESTRADOR.md`, não comando: entre aspas duplas, um `$(...)` ou uma crase
+nele rodaria na abertura do PR. Ele entra pelo heredoc com o delimitador entre aspas
+(`<<'TITULO_DO_PR'`), que o shell não avalia, e chega ao `gh`/`glab` como `"$titulo"`, literal.
+Troque só a linha `<título>` do bloco, por uma linha só; nunca ponha o título dentro do comando.
 
 No GitHub (`gh`, do passo 1):
 
-```
-gh pr create --base "$bb" --head <branch> --title "<título>" --body-file docs/entregas/<trabalho_id>/PR.md --draft
+```bash
+bb="$(cat "$(git rev-parse --git-path mergex-e7-base)")" && [ -n "$bb" ] || { echo "sem a base do passo 1.5: o E7 não abre o PR"; exit 1; }
+upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}')" || exit 1
+IFS= read -r titulo <<'TITULO_DO_PR'
+<título>
+TITULO_DO_PR
+[ -n "$titulo" ] || { echo "título vazio: o E7 não abre o PR"; exit 1; }
+gh pr create --base "$bb" --head "${upstream#*/}" --title "$titulo" --body-file docs/entregas/<trabalho_id>/PR.md --draft
 ```
 
 No GitLab (`glab`, do passo 1), o equivalente é o merge request; o `--yes` pula a confirmação
 interativa do `glab`, que de outro modo esperaria uma resposta:
 
-```
-glab mr create --target-branch "$bb" --source-branch <branch> --title "<título>" --description "$(cat docs/entregas/<trabalho_id>/PR.md)" --draft --yes
+```bash
+bb="$(cat "$(git rev-parse --git-path mergex-e7-base)")" && [ -n "$bb" ] || { echo "sem a base do passo 1.5: o E7 não abre o PR"; exit 1; }
+upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}')" || exit 1
+IFS= read -r titulo <<'TITULO_DO_PR'
+<título>
+TITULO_DO_PR
+[ -n "$titulo" ] || { echo "título vazio: o E7 não abre o PR"; exit 1; }
+glab mr create --target-branch "$bb" --source-branch "${upstream#*/}" --title "$titulo" --description "$(cat docs/entregas/<trabalho_id>/PR.md)" --draft --yes
 ```
 
 Sem `--draft` quando o QA já aprovou.

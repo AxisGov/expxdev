@@ -89,7 +89,7 @@ D1–D4, padrão.
 | D1 | Arquivo de teste que **só acrescenta** caso |
 | D2 | Alteração mecânica coberta por teste de regressão verde |
 | D3 | Arquivo gerado automaticamente, **quando declarado como tal** |
-| D4 | Artefato de método reconhecido, mecânico, com a prova mecânica aprovada |
+| D4 | Artefato de método reconhecido, mecânico, com a prova mecânica aprovada; a saída da própria mergex nesta entrega (`ENTREGA.md`, `PR.md`, `QA-PACOTE.md`, `ATENCAO.md`) é D4 só pelo reconhecimento, sem prova de conteúdo |
 
 ## Artefatos de método — decisão, plano, base, registro
 
@@ -121,7 +121,12 @@ Só depois, sem nenhum O, entram os critérios de método:
 - **L4** — artefato de método reconhecido, de decisão, plano ou registro: o revisor confere a
   intenção.
 - **D4** — artefato de método reconhecido, mecânico, com a prova mecânica aprovada: a máquina já
-  provou. Prova que falha manda o artefato para L4, nunca para DISPENSÁVEL.
+  provou. Prova que falha manda o artefato para L4, nunca para DISPENSÁVEL. A exceção é a saída
+  da própria mergex nesta entrega (`ENTREGA.md`, `PR.md`, `QA-PACOTE.md`, `ATENCAO.md`), que é D4
+  **sem prova de conteúdo**: o que a máquina confere ali é só o reconhecimento — caminho na pasta
+  deste trabalho, `kind` e `trabalho_id` e, no `ENTREGA.md`, a `branch:` atual —, e a
+  justificativa do classificador não traz `prova mecânica:`. Não diga que o conteúdo deles foi
+  provado, e não estenda a exceção a nenhum outro artefato.
 
 **L4 e D4 só existem pela saída do classificador**
 (`.claude/skills/mergex/scripts/classificar-atencao.sh`), que reconhece pelo catálogo fechado:
