@@ -25,14 +25,26 @@ set -uo pipefail   # sem -e: hook de método não pode morrer no meio e travar o
 # raiz do worktree e continuava subindo — de um subdiretório dele, isso
 # devolvia o subdiretório errado. Mesmo achado que a sprintx registrou na
 # DS-106 do repositório dela.
+#
+# A subida parte do caminho absoluto: com caminho relativo (o cwd "." do
+# evento), `dirname .` é `.` e o laço nunca chegava a `/` — o hook girava até o
+# timeout do harness. E para quando o pai não muda (`.`, `//` em alguns
+# sistemas), qualquer que seja a forma do caminho. O `cd` vai sem CDPATH: com
+# ele, `cd <relativo>` imprime o destino e o caminho viraria duas linhas.
 expx_raiz() {
   local dir="${1:-$PWD}"
-  local topo
+  local topo pai
   topo="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null)" || topo=""
   if [ -n "$topo" ]; then printf '%s\n' "$topo"; return 0; fi
+  case "$dir" in
+    /*) ;;
+    *) dir="$(CDPATH='' cd -- "$dir" 2>/dev/null && pwd)" || dir="" ;;
+  esac
   while [ "$dir" != "/" ] && [ -n "$dir" ]; do
     if [ -e "$dir/.git" ]; then printf '%s\n' "$dir"; return 0; fi
-    dir="$(dirname "$dir")"
+    pai="$(dirname "$dir")"
+    [ "$pai" = "$dir" ] && break
+    dir="$pai"
   done
   printf '%s\n' "${1:-$PWD}"
 }
