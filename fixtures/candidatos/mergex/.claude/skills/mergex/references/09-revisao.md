@@ -52,7 +52,7 @@ Para cada PR, junte **o que estiver disponível**. Fonte ausente vira "não disp
 | Registro de entrega da mergex | `docs/entregas/<trabalho_id>/ENTREGA.md` na branch do PR | "sem registro da mergex" — PR aberto por fora do método |
 | Faixa de raio da legadox | `raio` do `ENTREGA.md` | "raio não calculado" |
 | Classificação de atenção | `atencao` do `ENTREGA.md`, ou `ATENCAO.md` na branch | "não classificado" |
-| Resultado da integração contínua | `statusCheckRollup` do HEAD autoritativo (GitHub); `head_pipeline` do merge request (GitLab) | Resultado ausente **não** é CI ausente. Com configuração de CI no HEAD (`.github/workflows/*.yml` ou `*.yaml`, `.gitlab-ci.yml`), o CI está configurado: `head_pipeline` nulo ou rollup vazio é pipeline que ainda não anexou, e R1 é `NÃO VERIFICÁVEL`, nunca `n/a`. Check reportado é CI configurado: CI externo (Jenkins, CircleCI, app de checks) não deixa arquivo no HEAD, mas aparece no rollup/pipeline, e check não verde ali é R1 `FALHOU`. "sem integração contínua configurada" (`n/a`) só sem nenhuma configuração de CI no HEAD, sem nenhum check reportado para ele **e** sem check obrigatório na proteção da base. CI externo que ainda não reportou é visível só por ali: no GitHub, `required_status_checks` da proteção da branch base ou das regras dela (`gh api repos/<dono>/<repo>/rules/branches/<base>`); check obrigatório sem resultado no HEAD é R1 `NÃO VERIFICÁVEL` |
+| Resultado da integração contínua | `statusCheckRollup` do HEAD autoritativo (GitHub); `head_pipeline` do merge request (GitLab) | Resultado ausente **não** é CI ausente. Com configuração de CI no HEAD (`.github/workflows/*.yml` ou `*.yaml`, `.gitlab-ci.yml`), o CI está configurado: `head_pipeline` nulo ou rollup vazio é pipeline que ainda não anexou, e R1 é `NÃO VERIFICÁVEL`, nunca `n/a`. Check reportado é CI configurado: CI externo (Jenkins, CircleCI, app de checks) não deixa arquivo no HEAD, mas aparece no rollup/pipeline, e check não verde ali é R1 `FALHOU`. "sem integração contínua configurada" (`n/a`) só sem nenhuma configuração de CI no HEAD, sem nenhum check reportado para ele **e** sem check obrigatório na proteção da base. CI externo que ainda não reportou é visível só por ali, e no GitHub são dois mecanismos, lidos os dois: a proteção clássica da branch (`gh api repos/<dono>/<repo>/branches/<base>`, `protection.required_status_checks`: `contexts` e `checks`) e os rulesets (`gh api repos/<dono>/<repo>/rules/branches/<base>`, regra `required_status_checks`); um só não basta, porque cada endpoint ignora o outro mecanismo; check obrigatório sem resultado no HEAD é R1 `NÃO VERIFICÁVEL`, e leitura de qualquer dos dois que falha também é R1 `NÃO VERIFICÁVEL`, nunca `n/a`: sem ela, a ausência de check obrigatório não está provada |
 | Conflito com a base | `mergeable` do PR | Verifique localmente (passo 5) |
 | Arquivos tocados | `files` do PR | `git diff --name-only <base>...<head>` |
 | Aberto pela mergex nesta máquina | `pr_url` do `ENTREGA.md` local casa com a URL do PR | Assuma que não |
@@ -373,7 +373,7 @@ outro ponto da skill que cite R1–R6 está referenciando esta tabela, não rede
 
 | # | Critério | Satisfeito quando |
 |---|---|---|
-| R1 | CI | O HEAD autoritativo atual do PR (ver "HEAD autoritativo") está com CI verde. Valores: `OK` (CI configurado, HEAD atual verde), `FALHOU` (CI configurado, HEAD atual não verde), `n/a` (sem CI configurado: nenhuma configuração de CI no HEAD e nenhum check reportado pela plataforma para ele, nem check obrigatório na proteção da base — check reportado pela plataforma para o HEAD também é CI configurado, mesmo sem arquivo de CI), `NÃO VERIFICÁVEL` (CI configurado, mas o resultado do HEAD atual não pôde ser obtido — inclusive o pipeline que ainda não anexou ao HEAD). |
+| R1 | CI | O HEAD autoritativo atual do PR (ver "HEAD autoritativo") está com CI verde. Valores: `OK` (CI configurado, HEAD atual verde), `FALHOU` (CI configurado, HEAD atual não verde), `n/a` (sem CI configurado: nenhuma configuração de CI no HEAD e nenhum check reportado pela plataforma para ele, nem check obrigatório na proteção da base, lida com sucesso na proteção clássica e nos rulesets — check reportado pela plataforma para o HEAD também é CI configurado, mesmo sem arquivo de CI), `NÃO VERIFICÁVEL` (CI configurado, mas o resultado do HEAD atual não pôde ser obtido — inclusive o pipeline que ainda não anexou ao HEAD). |
 | R2 | Blocking reviews | Nenhum pedido de mudança está ativo no estado bloqueante efetivo da plataforma (ver "R2 usa o ESTADO BLOQUEANTE EFETIVO", acima). |
 | R3 | Actionable threads | Zero findings válidos em `ACTIONABLE_UNRESOLVED`. |
 | R4 | Fix evidence | Todo finding corrigido tem evidência mínima: commit existente e ancestral do HEAD autoritativo atual, resumo preciso da correção, cobertura de regressão relevante, e a validação executada. |
@@ -702,6 +702,21 @@ Some, em ordem lexicográfica de prioridade (o primeiro critério que difere dec
 
 **Declare o critério na saída**, sempre. A ordem sem o critério é opinião; com o critério, é auditável.
 
+### Antes do impacto: PRs empilhados
+
+Um PR cuja base (`baseRefName`; no GitLab, `target_branch`) é a branch de outro PR aberto
+(`headRefName`; no GitLab, `source_branch`) está **empilhado** sobre ele. Mergeá-lo primeiro
+levaria o diff dele para a branch da predecessora, e o PR dela passaria a carregar código que
+ninguém revisou ali. Por isso a ordem é **topológica antes de ser de impacto**: a ordem de
+impacto vale só entre PRs sem essa dependência, e o empilhado vai **depois** da predecessora (e
+de toda a cadeia abaixo dela), qualquer que seja o impacto de cada um.
+
+Enquanto a predecessora estiver aberta, o empilhado fica nos inelegíveis com o motivo
+`empilhado sobre #<n>`. Ele só chega ao passo 7 se, na vez dele, a base relida no serviço não for
+a branch de um PR aberto nem a de um PR mergeado nesta passagem — depois do merge da
+predecessora, a base tem de ter sido redirecionada para a base dela, pelo serviço ou pelo
+desenvolvedor. Senão continua inelegível, com o motivo.
+
 PRs **inelegíveis para merge** — rascunho, integração contínua vermelha, review obrigatório pendente (`reviewDecision: REVIEW_REQUIRED` no GitHub; aprovações exigidas ainda não dadas no GitLab), ou `REVIEW EVIDENCE: BLOQUEADO` por **bloqueio corrigível por remediação** (ver "Dois tipos de bloqueio", acima) — aparecem na lista, **no fim**, marcados com o motivo, e **não entram na condução do passo 7**.
 
 PRs com `REVIEW EVIDENCE: BLOQUEADO` **apenas** por **bloqueio confirmável humanamente nesta execução**, e sem nenhum outro impedimento (não rascunho, CI não vermelha), ficam na fila pela mesma ordem de impacto, marcados `confirmação humana necessária`, e entram no passo 7 **só** na condução limitada: pedir as confirmações específicas, recalcular o gate, e seguir apenas se o resultado for `SATISFEITO`.
@@ -856,14 +871,17 @@ Sem essa confirmação, **não ofereça o merge** deste PR. Passe para o próxim
    Evidence (item 2), de OLHO OBRIGATÓRIO (item 3) e da confirmação final daquele PR (item 4), e
    **antes** da operação de merge, releia da plataforma: HEAD autoritativo (`headRefOid` ou
    equivalente); estado de rascunho; CI/status checks desse HEAD; decisão de review e pedidos de
-   mudança ativos (`reviewDecision` ou equivalente); threads e findings relevantes. A
+   mudança ativos (`reviewDecision` ou equivalente); threads e findings relevantes; a base
+   (`baseRefName`; no GitLab, `target_branch`), que não pode ser a branch de um PR aberto nem a
+   de um PR mergeado nesta passagem (ver "Antes do impacto: PRs empilhados", no passo 4). A
    confirmação humana final **não congela** o estado do PR.
    - **HEAD mudou** desde a confirmação: invalide todas as confirmações associadas ao estado
      anterior (Review Evidence, OLHO OBRIGATÓRIO e merge), recalcule o gate, e **não faça o
      merge nesta passagem**. Diga o SHA anterior e o novo, registre no rastro e siga para o
      próximo PR.
    - **HEAD igual, mas algum critério passou a bloquear** (virou rascunho, CI deixou de estar
-     verde, pedido de mudança novo, finding novo ou reaberto): não faça o merge; diga
+     verde, pedido de mudança novo, finding novo ou reaberto, base que passou a ser a branch de
+     outro PR aberto ou mergeado nesta passagem): não faça o merge; diga
      exatamente o que mudou.
    - **Releitura impossível**: trate como mudança; não faça o merge.
 
@@ -919,10 +937,10 @@ humana substitui CI vermelho (`FALHOU`) nem CI não verificável (R1 `NÃO VERIF
 - [ ] Todos os PRs abertos foram listados, inclusive rascunhos e inelegíveis.
 - [ ] Sobreposições estão no topo, com os PRs identificados e os arquivos em comum.
 - [ ] O critério de ordenação está declarado.
-- [ ] A ordem vai do menor para o maior impacto.
+- [ ] A ordem vai do menor para o maior impacto, depois da ordem dos empilhados: nenhum PR empilhado foi oferecido antes da predecessora.
 - [ ] PRs com integração vermelha, rascunhos e `REVIEW EVIDENCE` diferente de `SATISFEITO` não foram oferecidos para merge.
 - [ ] Todo PR mostrou `Review Evidence: SATISFEITO | BLOQUEADO`, R1–R6 individuais e o bloco `Reviews` com as seis contagens.
-- [ ] Todo merge feito passou pela revalidação imediatamente anterior (HEAD, rascunho, CI, decisão de review, threads); HEAD alterado invalidou as confirmações e barrou o merge nesta passagem.
+- [ ] Todo merge feito passou pela revalidação imediatamente anterior (HEAD, rascunho, CI, decisão de review, threads, base); HEAD alterado invalidou as confirmações e barrou o merge nesta passagem.
 - [ ] Toda escrita de review (resposta, resolução, comentário) foi contada só com ID/URL ou releitura devolvidos pela plataforma.
 - [ ] PR bloqueado mostrou os findings pendentes nomeados e o tipo de bloqueio.
 - [ ] PR com bloqueio confirmável só chegou à pergunta de merge depois das confirmações específicas e do gate recalculado `SATISFEITO`; as confirmações aparecem na saída e no rastro.

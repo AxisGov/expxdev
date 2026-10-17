@@ -84,13 +84,14 @@ git fetch "$rb" "$bb" || { echo "busca de $bb em $rb falhou: o E7 não mede nem 
 base="$(git rev-parse --verify "FETCH_HEAD^{commit}")" || exit 1
 e7_ignorar='(^|/)package-lock\.json$|^docs/(sprintx|entregas|eventos)/'
 FATIA_IGNORAR="${FATIA_IGNORAR:+$FATIA_IGNORAR|}$e7_ignorar" \
+FATIA_EXCECAO="${FATIA_EXCECAO:-}" \
   bash .claude/skills/mergex/scripts/fatiamento-da-pr.sh "$base" "$publicado"
 ```
 
 O `FATIA_IGNORAR` vai explícito porque o padrão do script é o do ExpxDev, que também tira
 `fixtures/candidatos/` da conta; no projeto do desenvolvedor esse caminho pode ser código
-revisado. Gerado que o projeto exclui da revisão automática entra aqui só se o desenvolvedor
-declarar o padrão — e o padrão dele **soma** ao do E7, nunca o substitui: os artefatos de
+revisado. Código gerado que o projeto exclui da revisão automática entra aqui só se o
+desenvolvedor declarar o padrão — e o padrão dele **soma** ao do E7, nunca o substitui: os artefatos de
 método saem da medida sempre.
 
 Os **artefatos de método** — `docs/sprintx/`, `docs/entregas/`, `docs/eventos/`, o que a
@@ -110,7 +111,8 @@ arquivo), e PR sem revisão que parece revisado é pior que PR não aberto. Regi
 lista de violações, deixe `pr_estado` em `null` e diga ao desenvolvedor como dividir: por
 assunto (F1), um PR por fatia, na ordem das tasks. No passo 3 vale igual: o `PR.md` não manda
 abrir à mão um PR que reprovou aqui. A exceção de movimento mecânico (F6) só vale
-quando **o desenvolvedor** a declara (`FATIA_EXCECAO=<motivo>`), nunca por decisão do E7.
+quando **o desenvolvedor** a declara (`FATIA_EXCECAO=<motivo>`), nunca por decisão do E7. Ela
+vai explícita na chamada, como o `FATIA_IGNORAR`: declarada sem `export`, não chegaria ao script.
 
 Saída `2` (ou qualquer outra que não `0` nem `1`): o E7 **não abre o PR**. O script não conseguiu
 medir — ref inexistente, sem ancestral comum entre a base e o SHA publicado, `git diff` que
@@ -134,8 +136,17 @@ Título: o do trabalho — o mesmo do `ORQUESTRADOR.md`. Corpo: o conteúdo de `
 A base é o `$bb` do passo 1.5 — a `branch_base` já sem o remoto e sem `refs/...` —, nunca a
 `branch_base` crua: o serviço não conhece `upstream/main` como branch, e a abertura falharia.
 
+No GitHub (`gh`, do passo 1):
+
 ```
 gh pr create --base "$bb" --head <branch> --title "<título>" --body-file docs/entregas/<trabalho_id>/PR.md --draft
+```
+
+No GitLab (`glab`, do passo 1), o equivalente é o merge request; o `--yes` pula a confirmação
+interativa do `glab`, que de outro modo esperaria uma resposta:
+
+```
+glab mr create --target-branch "$bb" --source-branch <branch> --title "<título>" --description "$(cat docs/entregas/<trabalho_id>/PR.md)" --draft --yes
 ```
 
 Sem `--draft` quando o QA já aprovou.
@@ -146,7 +157,8 @@ Não adicione revisor, etiqueta, marco ou responsável por conta própria: nada 
 
 Qualquer falha — sem permissão, PR já existe, base inválida, rede fora — **não interrompe a entrega**. Vá para o passo 3, registre o erro literal do comando, e siga.
 
-Se a falha for "PR já existe para esta branch", recupere a URL existente (`gh pr view --json url`) e registre-a: é uma retomada, não uma falha. É o caso normal depois de uma reconciliação de base (`references/11-reconciliacao-base.md`): o PR existente é retomado, **nunca um segundo PR**.
+Se a falha for "PR já existe para esta branch", recupere a URL existente (`gh pr view --json url`; no GitLab, `glab mr view <branch> --output json`,
+campo `web_url`) e registre-a: é uma retomada, não uma falha. É o caso normal depois de uma reconciliação de base (`references/11-reconciliacao-base.md`): o PR existente é retomado, **nunca um segundo PR**.
 
 ## Passo 3 — Quando a ferramenta não está disponível
 
