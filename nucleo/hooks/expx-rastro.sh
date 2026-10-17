@@ -98,12 +98,30 @@ expx_json_escape() {
   printf '%s' "$s"
 }
 
+# expx_utf8 <var> <code point> — o caractere em UTF-8, montado byte a byte com as
+# escapas octais do FORMATO do printf (POSIX, presentes no bash 3.2). Sem `\u`/`\U`
+# (so no bash 4.2+) e sem depender de locale. U+0000 nao cabe numa variavel: vazio.
+expx_utf8() {
+  local _cp="$2" _f
+  if [ "$_cp" -lt 128 ]; then
+    printf -v _f '\\%03o' "$_cp"
+  elif [ "$_cp" -lt 2048 ]; then
+    printf -v _f '\\%03o\\%03o' $((192 | _cp >> 6)) $((128 | (_cp & 63)))
+  elif [ "$_cp" -lt 65536 ]; then
+    printf -v _f '\\%03o\\%03o\\%03o' $((224 | _cp >> 12)) $((128 | (_cp >> 6 & 63))) $((128 | (_cp & 63)))
+  else
+    printf -v _f '\\%03o\\%03o\\%03o\\%03o' $((240 | _cp >> 18)) $((128 | (_cp >> 12 & 63))) \
+      $((128 | (_cp >> 6 & 63))) $((128 | (_cp & 63)))
+  fi
+  printf -v "$1" "$_f"
+}
+
 # Sem jq: o valor string da primeira ocorrencia de "<chave>", lido e DECODIFICADO
 # como JSON, so com builtins. Um grep de `[^"]*` parava na primeira aspa escapada e
 # devolvia as escapas cruas — `C:\\Users\\x` chegava com a barra dobrada, que nao e
 # caminho nenhum. Valor que nao e string: vazio.
 expx_json_str() {
-  local s="$1" k="$2" r="" c i n hi lo hex
+  local s="$1" k="$2" r="" c i n hi lo cp
   # A chave e o "<chave>" seguido de `:`; um valor igual ao nome da chave
   # ({"a":"file_path", ...}) nao e ela — siga para a proxima ocorrencia.
   while :; do
@@ -121,16 +139,25 @@ expx_json_str() {
       \\) i=$((i + 1)); c="${s:i:1}"
           case "$c" in
             n) r+=$'\n' ;; t) r+=$'\t' ;; r) r+=$'\r' ;; b) r+=$'\b' ;; f) r+=$'\f' ;;
-            # \uXXXX sai em UTF-8 qualquer que seja a locale do processo (hook nao herda uma).
-            # Par substituto (\uD8xx\uDCxx) e UM caractere fora do plano basico: junte os dois.
+            # \uXXXX sai em UTF-8 qualquer que seja a locale do processo (hook nao herda
+            # uma) e sem o `\u` do printf, que o bash 3.2 do contrato nao conhece: os
+            # bytes saem de expx_utf8. Par substituto (\uD8xx\uDCxx) e UM caractere
+            # fora do plano basico: junte os dois; substituto sem par vira U+FFFD, como
+            # no jq. Escapa malformada nao derruba o hook: o `u` segue como texto.
             u) hi="${s:i+1:4}"; lo="${s:i+7:4}"
-               case "$hi${s:i+5:2}$lo" in
-                 [dD][89aAbB]??'\u'[dD][c-fC-F]??)
-                   printf -v hex '%08x' $((0x10000 + ((16#$hi - 0xD800) << 10) + (16#$lo - 0xDC00)))
-                   LC_ALL=C.UTF-8 printf -v c '%b' "\\U$hex"; i=$((i + 10)) ;;
-                 *) LC_ALL=C.UTF-8 printf -v c '%b' "\\u$hi"; i=$((i + 4)) ;;
+               case "$hi" in
+                 [0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]) ;;
+                 *) r+="u"; i=$((i + 1)); continue ;;
                esac
-               r+="$c" ;;
+               cp=$((16#$hi)); i=$((i + 4))
+               if [ "$cp" -ge 55296 ] && [ "$cp" -le 57343 ]; then
+                 case "$hi${s:i+1:2}$lo" in
+                   [dD][89aAbB][0-9a-fA-F][0-9a-fA-F]'\u'[dD][c-fC-F][0-9a-fA-F][0-9a-fA-F])
+                     cp=$((0x10000 + ((cp - 0xD800) << 10) + (16#$lo - 0xDC00))); i=$((i + 6)) ;;
+                   *) cp=65533 ;;
+                 esac
+               fi
+               expx_utf8 c "$cp"; r+="$c" ;;
             *) r+="$c" ;;
           esac ;;
       *) r+="$c" ;;
