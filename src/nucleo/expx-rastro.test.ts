@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { bashDosHooks, RAIZ_DO_REPO } from "../teste/candidatos.js";
+import { suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
 
 /**
  * `nucleo/hooks/expx-rastro.sh`, a biblioteca de rastro que o plugin distribui
@@ -74,6 +75,37 @@ describe("expx_raiz", () => {
     mkdirSync(sub);
     const [achada, esperada] = roda(sub, 'printf "%s\\n%s" "$(expx_raiz)" "$(cd .. && pwd)"').split("\n");
     expect(achada).toBe(esperada);
+  });
+
+  // Sem privilégio, o Windows recusa link simbólico de diretório (EPERM); o CI
+  // Linux roda o caso. O nome diz por que pulou, para não passar por verde.
+  const comLink = suportaSymlinkDeDiretorio();
+  const seLink = comLink ? "" : " [pulado: este sistema não cria link simbólico de diretório]";
+
+  it.skipIf(!comLink)(
+    `funcional: cwd é link simbólico de FORA para um subdiretório do repositório: devolve a raiz física${seLink}`,
+    () => {
+      for (const gitArquivo of [false, true]) {
+        const raiz = join(temp(), "repo");
+        mkdirSync(join(raiz, "a", "b"), { recursive: true });
+        if (gitArquivo) writeFileSync(join(raiz, ".git"), "gitdir: /em/outro/lugar/.git/worktrees/w\n");
+        else mkdirSync(join(raiz, ".git"));
+        const fora = temp();
+        const link = join(fora, "atalho");
+        symlinkSync(join(raiz, "a", "b"), link, "dir");
+
+        // o hook recebe o cwd do evento como argumento, sem resolver
+        const corpo = 'printf "%s\\n%s" "$(expx_raiz "$LINK")" "$(cd -P "$RAIZ" && pwd -P)"';
+        const [achada, esperada] = roda(fora, corpo, { LINK: link, RAIZ: raiz }).split("\n");
+        expect(achada, gitArquivo ? ".git arquivo" : ".git diretório").toBe(esperada);
+      }
+    },
+  );
+
+  it("funcional: fora de repositório devolve o próprio caminho recebido", () => {
+    const solto = join(temp(), "solto");
+    mkdirSync(solto);
+    expect(roda(solto, 'expx_raiz "$PWD"')).toBe(roda(solto, 'printf "%s" "$PWD"'));
   });
 });
 

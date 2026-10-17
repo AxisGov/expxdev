@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -42,6 +42,27 @@ export function suportaNomeComCaractereReservado(): boolean {
   const dir = mkdtempSync(join(tmpdir(), "expx-nome-"));
   try {
     writeFileSync(join(dir, 'a"b*c?.sh'), "x\n");
+    return true;
+  } catch {
+    return false;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * O sistema deixa criar link simbólico de DIRETÓRIO?
+ *
+ * Medido no Windows (node 24 nativo, sem modo desenvolvedor): `symlinkSync`
+ * com tipo "dir" devolve `EPERM`. Junction não serve de substituto: o caso que
+ * se quer provar é o link simbólico que o macOS e o Linux criam sem privilégio.
+ * Linux e macOS respondem sim, e é lá que o CI roda o caso.
+ */
+export function suportaSymlinkDeDiretorio(): boolean {
+  const dir = mkdtempSync(join(tmpdir(), "expx-link-"));
+  try {
+    mkdirSync(join(dir, "alvo"));
+    symlinkSync(join(dir, "alvo"), join(dir, "link"), "dir");
     return true;
   } catch {
     return false;

@@ -51,8 +51,17 @@
 # O pai sai por expansao de parametro, nao por `dirname`: um processo a menos
 # por nivel, e caminho relativo (sem barra) termina a subida em vez de girar
 # para sempre em ".".
+#
+# A subida parte do caminho FISICO. Um cwd que e link simbolico, de fora, para
+# um subdiretorio do repositorio subia pelo lado de fora: nao achava `.git` e
+# devolvia o proprio link. `cd -P` + `pwd -P` sao POSIX e existem no bash 3.2
+# do macOS, que nao tem `realpath` nem `readlink -f`. Um subshell por chamada,
+# nao por nivel. `CDPATH=` porque, com CDPATH, o `cd` imprime o destino. Se o
+# `cd` falha (caminho que nao existe), sobe pelo caminho como veio.
 expx_raiz() {
-  local d="${1:-$PWD}" p
+  local d p
+  d="$(CDPATH='' cd -P -- "${1:-$PWD}" 2>/dev/null && pwd -P)" || d=""
+  [ -n "$d" ] || d="${1:-$PWD}"
   while [ "$d" != "/" ]; do
     [ -e "$d/.git" ] && { printf '%s' "$d"; return 0; }
     case "$d" in
