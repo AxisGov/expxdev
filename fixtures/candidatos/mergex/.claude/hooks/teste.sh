@@ -30,6 +30,12 @@ case "$(uname -s 2>/dev/null)" in
   MINGW*|MSYS*|CYGWIN*) EH_WINDOWS=1; LIMITE_MS="${LIMITE_MS:-10000}" ;;
   *) EH_WINDOWS=0; LIMITE_MS="${LIMITE_MS:-2000}" ;;
 esac
+# O texto do limite sai do limite em uso: com "menos de 2 s" fixo, uma execucao de
+# 9 s no Git Bash (limite 10 s) passava afirmando uma regra que nao foi conferida.
+# Limite que nao e segundo inteiro vai em ms (2500 nao vira "2 s", mais estrito).
+case "$LIMITE_MS" in ''|*[!0-9]*) printf 'LIMITE_MS invalido: %s\n' "$LIMITE_MS" >&2; exit 1 ;; esac
+LIMITE_MS=$((10#$LIMITE_MS))   # base 10 explicita: 0800 e 800 ms, nao octal invalido
+if [ $((LIMITE_MS % 1000)) = 0 ]; then LIMITE_TXT="$((LIMITE_MS / 1000)) s"; else LIMITE_TXT="$LIMITE_MS ms"; fi
 # Tempo em milissegundos, nao em $SECONDS: o $SECONDS conta viradas de segundo, e
 # uma execucao de 1,1 s que atravessa duas viradas mede 2 e reprova o "menos de 2 s".
 # Fontes, da mais barata: $EPOCHREALTIME (bash 5), `date +%N` (GNU), perl
@@ -202,6 +208,25 @@ caso "commit + 70 KB de linhas: a varredura continua, barra"      comum/sem-segr
 caso "commit + 200 KB de linhas: barra"                           comum/sem-segredo.sh "$(json_grande "git commit -m x"$'\n'"$LINHAS200")" 2
 caso "comando legitimo + 200 KB de linhas: passa"                 comum/sem-segredo.sh "$(json_grande "npm test"$'\n'"$LINHAS200")" 0
 git rm -q --cached segredo.pem && rm -f segredo.pem
+# Prefixo de chave no meio de um identificador nao e chave. Falso positivo do
+# conselho #204: "ta" + "sk-fora-do-plano-..." (nome de um caso da bancada da
+# sprintx) casava com sk-, e barrou os commits de instalacao do framework. O
+# prefixo so vale no comeco da linha ou depois de caractere fora de [A-Za-z0-9_-].
+echo "sem-segredo — prefixo dentro de identificador tem que PASSAR"
+IDENT='  n_fora:nfora-task-fora-do-plano-corrente-fail-closed'
+caso "sk- dentro de identificador"         comum/sem-segredo.sh "$(write_json "$IDENT")" 0
+printf '%s\n' "$IDENT" > ident.sh && git add ident.sh
+caso "sk- dentro de identificador no diff" comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 0
+git rm -q --cached ident.sh && rm -f ident.sh
+caso "ghp_ e AKIA dentro de palavra"       comum/sem-segredo.sh "$(write_json "abcghp_$(printf 'A%.0s' {1..24}) MEUAKIA$(printf 'B%.0s' {1..16})")" 0
+echo "sem-segredo — prefixo com limite a esquerda continua BARRANDO"
+caso "sk- no comeco da linha"              comum/sem-segredo.sh "$(write_json "$SK")" 2
+caso "sk- depois de espaco"                comum/sem-segredo.sh "$(write_json "Bearer $SK")" 2
+caso "sk- depois de ="                     comum/sem-segredo.sh "$(write_json "OPENAI=$SK")" 2
+caso "sk- depois de aspas"                 comum/sem-segredo.sh "$(write_json "k='$SK'")" 2
+caso "sk- depois de :"                     comum/sem-segredo.sh "$(write_json "chave:$SK")" 2
+caso "identificador e chave na mesma linha" comum/sem-segredo.sh "$(write_json "${IDENT} $SK")" 2
+caso "ghp_ depois de ="                    comum/sem-segredo.sh "$(write_json "GH=ghp_$(printf 'Z9%.0s' {1..12})")" 2
 
 echo
 echo "git-perigoso — tem que BARRAR"
@@ -276,11 +301,12 @@ caso "FOO=\"a b\" /usr/bin/git push --force barra" mergex/git-perigoso.sh "$(bas
 caso "FOO='a b c' git push origin main barra"      mergex/git-perigoso.sh "$(bash_json "FOO='a b c' git push origin main")" 2
 caso "FOO=\"a b\" git push na feature passa"       mergex/git-perigoso.sh "$(bash_json 'FOO="a b" git push origin feature/x')" 0
 # Custo: comando grande SEM git sai antes de normalizar (so builtins); com git
-# no fim, a normalizacao e linear. Limite folgado: menos de 2 s cada.
+# no fim, a normalizacao e linear. Limite folgado: menos de LIMITE_MS cada (2 s;
+# 10 s no Git Bash), e a descricao do caso diz o limite em uso, nunca outro.
 # (rodada 2 da revisao: a normalizacao O(n^2) antes do pre-filtro levava 0,5-3 s em 10 KB)
 echo "git-perigoso — custo em comando de 10 KB"
 GRANDE=""; while [ "${#GRANDE}" -lt 10240 ]; do GRANDE="${GRANDE}echo aaaa bbbb; x y z; "; done
-custo_ok() { # <desc> <json> <rc esperado> — rc certo e menos de 2 s
+custo_ok() { # <desc> <json> <rc esperado> — rc certo e abaixo de LIMITE_MS
   local desc="$1" json="$2" esperado="$3" ini fim rc ms
   if [ "$SEM_JQ" = "1" ]; then PULADOS=$((PULADOS+1)); printf '  pulado %s (sem jq)\n' "$desc"; return 0; fi
   # agora_ms, nao `date +%s%N`: sem o %N (macOS) o tempo virava 0 e o limite nunca reprovava
@@ -300,23 +326,23 @@ custo_ok() { # <desc> <json> <rc esperado> — rc certo e menos de 2 s
     FALHOU=$((FALHOU+1)); printf '  FALHA %s (rc %s, esperava %s; %s ms, limite %s)\n' "$desc" "$rc" "$esperado" "$ms" "$LIMITE_MS"
   fi
 }
-custo_ok "10 KB sem git: passa em menos de 2 s"                     "$(bash_json "$GRANDE")" 0
-custo_ok "10 KB com git push --force no fim: barra em menos de 2 s" "$(bash_json "${GRANDE}git push --force origin feature/x")" 2
+custo_ok "10 KB sem git: passa em menos de $LIMITE_TXT"                     "$(bash_json "$GRANDE")" 0
+custo_ok "10 KB com git push --force no fim: barra em menos de $LIMITE_TXT" "$(bash_json "${GRANDE}git push --force origin feature/x")" 2
 # Denso em git (rodada 3 da revisao): ~100 KB de `git;` e um push forcado no fim.
 # A normalizacao tem de ser linear no tamanho: em a8b63b8 custava 19 s e, com
 # 125 KB, estourava o timeout de 30 s do harness, que NAO bloqueia (falha aberta).
 # O JSON vai por stdin do jq: --arg nao aceita argumento desse tamanho.
 DENSO=""; while [ "${#DENSO}" -lt 102400 ]; do DENSO="${DENSO}git;git;git;git;git;git;git;git;git;git;git;git;git;git;git;git;"; done
-custo_ok "100 KB de git; + git push --force no fim: barra em menos de 2 s" \
+custo_ok "100 KB de git; + git push --force no fim: barra em menos de $LIMITE_TXT" \
   "$(printf '%s' "${DENSO}git push --force origin feature/x" | jq -Rs --arg w "$HOOK_CWD" '{tool_name:"Bash",cwd:$w,tool_input:{command:.}}')" 2
 # Teto que falha FECHADO: acima de GIT_TETO bytes (512 KB) com git, o hook nao
 # avalia e barra (um hook morto pelo timeout do harness nao bloqueia). Mesmo um
 # comando inofensivo (git status) barra ali; e o limite de tempo prova que ele
 # nem tentou. Sem git, o tamanho nao importa: passa.
 TETO=""; while [ "${#TETO}" -lt 524289 ]; do TETO="${TETO}${TETO:-echo aaaa bbbb cccc dddd; }"; done
-custo_ok "acima do teto (>512 KB) com git: barra sem avaliar, em menos de 2 s" \
+custo_ok "acima do teto (>512 KB) com git: barra sem avaliar, em menos de $LIMITE_TXT" \
   "$(printf '%s' "${TETO}git status" | jq -Rs --arg w "$HOOK_CWD" '{tool_name:"Bash",cwd:$w,tool_input:{command:.}}')" 2
-custo_ok "acima do teto (>512 KB) sem git: passa, em menos de 2 s" \
+custo_ok "acima do teto (>512 KB) sem git: passa, em menos de $LIMITE_TXT" \
   "$(printf '%s' "$TETO" | jq -Rs --arg w "$HOOK_CWD" '{tool_name:"Bash",cwd:$w,tool_input:{command:.}}')" 0
 # O teto conta BYTES, nao caracteres (re-revisao da rodada 3, N2). Em locale
 # UTF-8 `${#CMD}` conta caracteres, e o custo da normalizacao e por byte:
@@ -332,7 +358,7 @@ elif LC_ALL=C.UTF-8 bash -c 'x=é; [ "${#x}" = 1 ]' 2>/dev/null; then
   LC_ANTES="${LC_ALL-__nao_definida__}"
   export LC_ALL=C.UTF-8
   MULTI="$(yes '日' | head -n 500000 | tr -d '\n')"   # 500 000 caracteres, 1 500 000 bytes
-  custo_ok "multibyte em C.UTF-8: 500 000 x 日 (1,5 MB) + git status: barra pelo teto em bytes, em menos de 2 s" \
+  custo_ok "multibyte em C.UTF-8: 500 000 x 日 (1,5 MB) + git status: barra pelo teto em bytes, em menos de $LIMITE_TXT" \
     "$(printf '%s' "${MULTI} git status" | jq -Rs --arg w "$HOOK_CWD" '{tool_name:"Bash",cwd:$w,tool_input:{command:.}}')" 2
   custo_ok "multibyte em C.UTF-8: 500 000 x 日 (1,5 MB); git push --force: barra sem disputar com o timeout" \
     "$(printf '%s' "${MULTI}; git push --force origin feature/x" | jq -Rs --arg w "$HOOK_CWD" '{tool_name:"Bash",cwd:$w,tool_input:{command:.}}')" 2
@@ -347,7 +373,7 @@ elif LC_ALL=C.UTF-8 bash -c 'x=é; [ "${#x}" = 1 ]' 2>/dev/null; then
   MULTI="$(yes '日' | head -n 174760 | tr -d '\n')"
   caso "multibyte em C.UTF-8: 524 288 bytes exatos (174 760 x 日 + ' git sta'): no teto, avalia e passa" \
     mergex/git-perigoso.sh "$(json_grande "${MULTI} git sta")" 0
-  custo_ok "multibyte em C.UTF-8: 524 289 bytes (174 760 x 日 + ' git stat'): um acima, barra em menos de 2 s" \
+  custo_ok "multibyte em C.UTF-8: 524 289 bytes (174 760 x 日 + ' git stat'): um acima, barra em menos de $LIMITE_TXT" \
     "$(json_grande "${MULTI} git stat")" 2
   if [ "$LC_ANTES" = "__nao_definida__" ]; then unset LC_ALL; else LC_ALL="$LC_ANTES"; fi
   unset MULTI LC_ANTES
@@ -379,9 +405,9 @@ LOCALES="C"
 LC_ALL=C.UTF-8 bash -c 'x=é; [ "${#x}" = 1 ]' 2>/dev/null && LOCALES="C C.UTF-8"
 for LOC in $LOCALES; do
   LC_ANTES="${LC_ALL-__nao_definida__}"; export LC_ALL="$LOC"
-  custo_ok "[$LOC] push forcado; token de 32 KB terminado em push: barra em menos de 2 s" \
+  custo_ok "[$LOC] push forcado; token de 32 KB terminado em push: barra em menos de $LIMITE_TXT" \
     "$(json_grande "git push --force origin feature/x; ${TOKEN32}push")" 2
-  custo_ok "[$LOC] push forcado; token de 128 KB terminado em push: barra em menos de 2 s" \
+  custo_ok "[$LOC] push forcado; token de 128 KB terminado em push: barra em menos de $LIMITE_TXT" \
     "$(json_grande "git push --force origin feature/x; ${TOKEN128}push")" 2
   # Ate a rodada extra 2 este caso lia o segmento inteiro e decidia 0 (git e
   # argumento do programa desconhecido) em 0,5-0,9 s. Com o teto de bytes dos
@@ -391,7 +417,7 @@ for LOC in $LOCALES; do
     # Bash do MSYS: este caso passa de 30 s, o timeout do harness (DM-228)
     nao_executado "[$LOC] token de 128 KB como programa + git push --force: no Git Bash passa de 30 s (DM-228)"
   else
-  custo_ok "[$LOC] token de 128 KB como programa + git push --force: segmento com push acima do teto de bytes, barra em menos de 2 s" \
+  custo_ok "[$LOC] token de 128 KB como programa + git push --force: segmento com push acima do teto de bytes, barra em menos de $LIMITE_TXT" \
     "$(json_grande "${TOKEN128} git push --force origin feature/x")" 2
   fi
   custo_ok "[$LOC] push forcado na 1a linha + 120 KB em 8 000 linhas sem push (pre-filtro sob pipefail): barra" \
@@ -403,11 +429,11 @@ for LOC in $LOCALES; do
   # — um push forcado seguido de 16 000 linhas `push` (80 KB) levava 39 s em
   # C.UTF-8: morto pelo timeout do harness, o push passava. Acima de PUSH_TETO
   # segmentos com `push` o hook nao le: barra, falha fechada.
-  custo_ok "[$LOC] push forcado + 16 000 linhas 'push': barra pelo teto de segmentos, em menos de 2 s" \
+  custo_ok "[$LOC] push forcado + 16 000 linhas 'push': barra pelo teto de segmentos, em menos de $LIMITE_TXT" \
     "$(json_grande "git push --force origin feature/x"$'\n'"$PUSHES16K")" 2
-  custo_ok "[$LOC] push forcado + 32 000 linhas 'push': barra pelo teto de segmentos, em menos de 2 s" \
+  custo_ok "[$LOC] push forcado + 32 000 linhas 'push': barra pelo teto de segmentos, em menos de $LIMITE_TXT" \
     "$(json_grande "git push --force origin feature/x"$'\n'"$PUSHES16K"$'\n'"$PUSHES16K")" 2
-  custo_ok "[$LOC] tres pushes legitimos em tres linhas: passa, em menos de 2 s" \
+  custo_ok "[$LOC] tres pushes legitimos em tres linhas: passa, em menos de $LIMITE_TXT" \
     "$(json_grande "git push origin feature/x"$'\n'"git push origin feature/x"$'\n'"git push origin feature/x")" 0
   caso "[$LOC] push forcado + 400 linhas 'push': abaixo do teto, le e barra" \
     mergex/git-perigoso.sh "$(json_grande "git push --force origin feature/x"$'\n'"$(yes push | head -n 400)")" 2
@@ -417,11 +443,11 @@ for LOC in $LOCALES; do
   # (512 KB) e de segmentos (500): morto pelo timeout, o push forcado passava.
   # Teto estrutural: bytes somados dos segmentos com `push`, medidos antes da
   # leitura por token.
-  custo_ok "[$LOC] push forcado; push com 2 047 tokens (4 KB): barra pelo teto de bytes dos segmentos, em menos de 2 s" \
+  custo_ok "[$LOC] push forcado; push com 2 047 tokens (4 KB): barra pelo teto de bytes dos segmentos, em menos de $LIMITE_TXT" \
     "$(json_grande "git push --force origin feature/x; git push origin feature/x ${TOKENS2K}")" 2
-  custo_ok "[$LOC] push forcado; push com 8 191 tokens (16 KB): barra pelo teto de bytes dos segmentos, em menos de 2 s" \
+  custo_ok "[$LOC] push forcado; push com 8 191 tokens (16 KB): barra pelo teto de bytes dos segmentos, em menos de $LIMITE_TXT" \
     "$(json_grande "git push --force origin feature/x; git push origin feature/x ${TOKENS8K}")" 2
-  custo_ok "[$LOC] push legitimo com 20 refspecs e PR em seguida: passa, em menos de 2 s" \
+  custo_ok "[$LOC] push legitimo com 20 refspecs e PR em seguida: passa, em menos de $LIMITE_TXT" \
     "$(json_grande "git push -u origin feature/x $(yes feature/x | head -n 20 | tr '\n' ' ')&& gh pr create --fill")" 0
   if [ "$LC_ANTES" = "__nao_definida__" ]; then unset LC_ALL; else LC_ALL="$LC_ANTES"; fi
 done
@@ -429,7 +455,7 @@ done
 # `wc -l` virava 0 em silencio, o teto sumia e `wc: command not found` vazava no
 # stderr. A contagem e a medida sao so com expansoes do bash: sem utilitario, sem
 # ruido, e um push forcado seguido de 16 000 linhas `push` barra rapido.
-PATH="$BINSW_T" custo_ok "[C] sem wc no PATH: push forcado + 16 000 linhas 'push' barra pelo teto, em menos de 2 s" \
+PATH="$BINSW_T" custo_ok "[C] sem wc no PATH: push forcado + 16 000 linhas 'push' barra pelo teto, em menos de $LIMITE_TXT" \
   "$(json_grande "git push --force origin feature/x"$'\n'"$PUSHES16K")" 2
 PATH="$BINSW_T" custo_ok "[C] sem wc no PATH: git push origin feature/x passa" "$(bash_json 'git push origin feature/x')" 0
 if [ "$SEM_JQ" = "0" ]; then
@@ -674,6 +700,31 @@ valor "subdiretorio do checkout"   "$(norm "$(expx_raiz "$RAIZ_T/src/sub")")" "$
 valor "worktree (.git arquivo)"    "$(norm "$(expx_raiz "$WT_T")")"           "$(norm "$WT_T")"
 valor "subdiretorio do worktree"   "$(norm "$(expx_raiz "$WT_T/sub")")"       "$(norm "$WT_T")"
 valor "fora de repositorio"        "$(norm "$(expx_raiz "$SEMGIT_T")")"       "$(norm "$SEMGIT_T")"
+# Caminho relativo no fallback: `dirname .` e `.`, e a subida por dirname nunca
+# chegava a `/` — laco infinito com cwd "." fora de repositorio (ou sem git). Cada
+# caso roda em segundo plano com prazo de 5 s: o codigo antigo nao trava a suite,
+# vira LACO e falha. <cwd> <arg> [sem-git]; imprime a raiz normalizada a partir de <cwd>.
+raiz_com_prazo() {
+  local saida="$SEMGIT_T.raiz" pid i
+  (
+    cd "$1" || exit 1
+    if [ "${3:-}" = sem-git ]; then git() { return 127; }; fi
+    expx_raiz "$2"
+  ) > "$saida" 2>/dev/null &
+  pid=$!
+  for i in $(seq 1 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+  if kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; rm -f "$saida"; printf 'LACO'; return 0
+  fi
+  wait "$pid" 2>/dev/null
+  (cd "$1" && norm "$(cat "$saida")"); rm -f "$saida"
+}
+mkdir -p "$SEMGIT_T/a/b"
+valor "cwd '.' fora de repositorio termina"         "$(raiz_com_prazo "$SEMGIT_T" .)"   "$(norm "$SEMGIT_T")"
+valor "cwd relativo 'a/b' fora de repositorio termina" "$(raiz_com_prazo "$SEMGIT_T" a/b)" "$(norm "$SEMGIT_T/a/b")"
+valor "sem git, cwd '.' no subdiretorio: sobe ate a raiz" "$(raiz_com_prazo "$RAIZ_T/src/sub" . sem-git)" "$(norm "$RAIZ_T")"
+valor "sem git, cwd relativo 'sub': sobe ate a raiz"   "$(raiz_com_prazo "$RAIZ_T/src" sub sem-git)"  "$(norm "$RAIZ_T")"
+rm -rf "$SEMGIT_T/a"
 
 echo
 echo "semantica de suite por task (sprintx: parcial na task, inteira ao fechar a sprint)"
@@ -1259,7 +1310,7 @@ for CWD_UNC in '//' '//wsl.localhost/mergex-nao-existe/x'; do
   T0_UNC="$(agora_ms)"
   caso_aviso "cwd UNC sem repositorio nao entra em laco ($CWD_UNC)" "$(bash_json "$PUSH_FT")"
   MS_UNC=$(( $(agora_ms) - T0_UNC ))
-  valor "cwd UNC sem repositorio: termina em menos de $((LIMITE_MS / 1000)) s ($CWD_UNC, ${MS_UNC} ms)" "$([ "$MS_UNC" -lt "$LIMITE_MS" ] && echo sim || echo nao)" sim
+  valor "cwd UNC sem repositorio: termina em menos de $LIMITE_TXT ($CWD_UNC, ${MS_UNC} ms)" "$([ "$MS_UNC" -lt "$LIMITE_MS" ] && echo sim || echo nao)" sim
 done
 HOOK_CWD="$HIST_T"
 

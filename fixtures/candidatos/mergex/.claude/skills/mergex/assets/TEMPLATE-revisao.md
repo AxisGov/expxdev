@@ -93,6 +93,9 @@ CONFLITO — #{{n}} contra {{base | #n}}
   Por que se cruzaram:
     {{mesma função, mesma linha, ou mudanças adjacentes}}
 
+  O que perguntar a quem decidir:
+    {{pergunta}} — a que destrava a decisão, não a resposta; uma por trecho
+
   A mergex não resolve conflito. Resolver isto é decisão humana.
 ```
 
@@ -100,7 +103,7 @@ CONFLITO — #{{n}} contra {{base | #n}}
 
 {{cada PR aqui também mostra, na fila acima ou junto do motivo, o bloco R1–R6 completo}}
 
-{{motivo: rascunho, integração contínua vermelha, review obrigatório pendente, ou REVIEW EVIDENCE: BLOQUEADO (corrigível por remediação)}}
+{{motivo: rascunho, integração contínua vermelha, review obrigatório pendente, `empilhado sobre #<n>` (a base é branch de outro PR aberto, ou de um mergeado nesta passagem), ou REVIEW EVIDENCE: BLOQUEADO (corrigível por remediação)}}
 
 | PR | Motivo |
 |---|---|

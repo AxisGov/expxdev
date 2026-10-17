@@ -72,8 +72,10 @@ esac
 ACHADOS=""
 
 achou() {
-  # achou <categoria> <regex estendida>
-  local cat="$1" re="$2" linha valor
+  # achou <categoria> <regex estendida> [limite a esquerda]
+  # O limite (opcional) exige o que vem antes do valor: prefixo de chave no meio
+  # de um identificador nao e chave. Ele entra na busca, nunca no valor mostrado.
+  local cat="$1" re="${3:-}$2" esq="${3:-}" linha valor
   # O `head -1` sai cedo: com muitas linhas casando, o grep leva SIGPIPE e, sob
   # `pipefail`, o pipeline devolve 141 — um `|| return 0` aqui diria "sem
   # segredo" por causa do status. Decide-se pelo conteúdo (a linha), não pelo
@@ -85,13 +87,18 @@ achou() {
   printf '%s' "$linha" | grep -aEi -e '(x{4,}|0{4,}|<[^>]*>|\{\{|\$\{|your[-_]|example|changeme|troque|placeholder|dummy|fake|sample|redacted|test[-_]?key|coloque)' >/dev/null && return 0
   # Mascara: nunca ecoa o valor (DM-16). Mostra os 4 últimos caracteres.
   valor="$(printf '%s' "$linha" | grep -aEo -e "$re" | head -1)"
+  # O caractere que fez o limite nao e parte da chave.
+  [ -n "$esq" ] && valor="${valor#[!A-Za-z0-9_-]}"
   local fim="${valor: -4}"
   ACHADOS="${ACHADOS}  - ${cat}: …${fim} (linha ${linha%%:*})
 "
 }
 
-# 1. Chave de API
-achou "chave de API"        '(sk-[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})'
+# 1. Chave de API — o prefixo so vale no comeco da linha ou depois de caractere
+# que nao continua um identificador: "task-fora-do-plano" nao e chave "sk-"
+# (falso positivo que barrou a instalacao do framework no conselho #204).
+# `grep -E` nao tem limite de palavra portavel nem lookbehind: dai o grupo explicito.
+achou "chave de API"        '(sk-[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})' '(^|[^A-Za-z0-9_-])'
 # 2. Credencial em atribuição
 achou "credencial"          '([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Nn][Hh][Aa]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii]_?[Kk][Ee][Yy])[[:space:]]*[:=][[:space:]]*['"'"'"]?[A-Za-z0-9/+_.=-]{8,}'
 # 3. Chave privada
