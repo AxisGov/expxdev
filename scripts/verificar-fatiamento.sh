@@ -27,7 +27,8 @@ tolerancia_b="${FATIA_TOLERANCIA_B:-2048}"
 max_linhas_arq="${FATIA_MAX_LINHAS_ARQUIVO:-4000}"
 aviso_linhas_arq="${FATIA_AVISO_LINHAS:-3000}"
 tolerancia_l="${FATIA_TOLERANCIA_LINHAS:-20}"
-ignorar="${FATIA_IGNORAR:-(^|/)(package-lock\.json|fixtures/candidatos/)}"
+# o lock casa o nome inteiro (`$`): `package-lock.json.backup` e revisado
+ignorar="${FATIA_IGNORAR:-(^|/)(package-lock\.json$|fixtures/candidatos/)}"
 excecao="${FATIA_EXCECAO:-}"
 
 # os limites em KB são comparados em BYTES: dividir por 1024 truncaria, e um

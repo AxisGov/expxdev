@@ -213,6 +213,17 @@ describe("verificar-fatiamento.sh", () => {
     expect(r.saida).toContain("PR com 10 linhas em 1 arquivo");
   });
 
+  it("funcional: o padrão de FATIA_IGNORAR casa o nome inteiro — `package-lock.json.backup` conta", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "web/package-lock.json", linhas(900));
+    escreve(d, "package-lock.json.backup", linhas(450));
+    commita(d, "chore: lock e copia do lock");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(1);
+    expect(r.saida).toContain("PR com 450 linhas em 1 arquivo");
+  });
+
   it("funcional: F4 — arquivo grande só renomeado não conta como crescimento", () => {
     const d = repo();
     escreve(d, "enorme.md", "x".repeat(160 * 1024) + "\n");
