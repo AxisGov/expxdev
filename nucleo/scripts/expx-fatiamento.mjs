@@ -12,7 +12,16 @@ const TETOS = { legibilidade: { pr_arquivos: CAP_ARQUIVOS }, arquivo: { linhas: 
 const EXCLUIDO_PADRAO = ["^docs/(sprintx|entregas|eventos)/"];
 const MODOS = ["obrigatoria", "se_disponivel", "desligada"];
 const ENTREGAS = ["por_trabalho", "por_sprint"];
-const CHAVES = ["expx_fatiamento", "justificativa", "legibilidade", "arquivo", "ignorar", "capacidade", "revisao_por_task", "entrega"];
+const CHAVES = ["expx_fatiamento", "justificativa", "legibilidade", "arquivo", "ignorar", "capacidade", "revisao_por_task", "entrega", "merge_automatico"];
+// Caminhos que nunca entram em merge automático (E9 da mergex). O projeto soma; nunca substitui.
+// Cada item e o porquê estão no contrato expx-instalacao §5.2.
+const PROTEGIDOS_PADRAO = [
+  "(^|/)auth/", "(^|/)autenticacao/", "(^|/)login/", // autenticação
+  "(^|/)(permiss|rls|policies?)", // permissões e RLS
+  "(^|/)(migrations?|migracoes?|migrate)/", "\\.sql$", // migrations e SQL de banco
+  "^\\.github/", "^(infra|deploy|terraform|k8s|docker)/", "(^|/)Dockerfile$", // CI e infraestrutura
+  "(^|/)\\.env", "(^|/)secrets?/", // configuração de segredos
+];
 
 function uso(msg) {
   process.stderr.write(`expx-fatiamento: ${msg}\nuso: node expx-fatiamento.mjs [--raiz <dir>] [--formato env|json] [--validar]\n`);
@@ -155,6 +164,11 @@ function resolver(cfg, origem) {
   if (!MODOS.includes(modo)) erro("revisao_por_task.modo", `deve ser ${MODOS.join(", ")}`);
   const entrega = cfg.entrega === undefined ? "por_trabalho" : cfg.entrega;
   if (!ENTREGAS.includes(entrega)) erro("entrega", `deve ser ${ENTREGAS.join(", ")}`);
+  // independente de revisao_por_task: quem decide cada merge são as condições do E9
+  const m = bloco(cfg, "merge_automatico", ["ativo", "caminhos_protegidos"]);
+  if (m.ativo !== undefined && typeof m.ativo !== "boolean") erro("merge_automatico.ativo", "deve ser true ou false");
+  const protegidos = regexes(m.caminhos_protegidos, "merge_automatico.caminhos_protegidos") ?? [];
+  const merge = { ativo: m.ativo === true, caminhos_protegidos: [...new Set([...PROTEGIDOS_PADRAO, ...protegidos])] };
   const just = cfg.justificativa;
   if (just !== undefined && typeof just !== "string") erro("justificativa", "deve ser texto");
   const difere = (v, p) => Object.keys(p).some((k) => v[k] !== p[k]);
@@ -166,7 +180,7 @@ function resolver(cfg, origem) {
     erro("revisao_por_task.modo", `afrouxar ${afrouxados.join(", ")} acima do padrao exige "obrigatoria"`);
   }
   const capacidade = { pr_arquivos: CAP_ARQUIVOS, excluido_no_painel: excluido };
-  return { origem, legibilidade, arquivo, ignorar, capacidade, revisao_por_task: { modo }, entrega, justificativa: just ?? null };
+  return { origem, legibilidade, arquivo, ignorar, capacidade, revisao_por_task: { modo }, entrega, merge_automatico: merge, justificativa: just ?? null };
 }
 
 const caminho = join(op.raiz, ".expx", "fatiamento.json");
@@ -198,6 +212,8 @@ const env = {
   FATIA_CAPACIDADE_EXCLUIDO: e.capacidade.excluido_no_painel.join("|"),
   EXPX_REVISAO_POR_TASK: e.revisao_por_task.modo,
   EXPX_ENTREGA: e.entrega,
+  EXPX_MERGE_AUTOMATICO: e.merge_automatico.ativo ? "sim" : "nao",
+  EXPX_CAMINHOS_PROTEGIDOS: e.merge_automatico.caminhos_protegidos.join("|"),
   EXPX_FATIAMENTO_ORIGEM: e.origem,
 };
 const texto = Object.entries(env).map(([k, v]) => `${k}=${shell(v)}\n`).join("");

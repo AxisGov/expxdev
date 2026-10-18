@@ -133,4 +133,52 @@ describe("expx-fatiamento.mjs", () => {
     expect(r.stderr).toBe("");
     expect(r.stdout).toBe("^a b/|^x'y/");
   });
+
+  describe("merge_automatico", () => {
+    const PADRAO = ["(^|/)auth/", "(^|/)autenticacao/", "(^|/)login/", "(^|/)(permiss|rls|policies?)", "(^|/)(migrations?|migracoes?|migrate)/",
+      "\\.sql$", "^\\.github/", "^(infra|deploy|terraform|k8s|docker)/", "(^|/)Dockerfile$", "(^|/)\\.env", "(^|/)secrets?/"];
+
+    it("funcional: ausente, desligado e com a lista padrão (env e json)", () => {
+      const raiz = projeto({ expx_fatiamento: 1 });
+      const linhas = roda(raiz).out.split("\n");
+      expect(linhas).toContain("EXPX_MERGE_AUTOMATICO=nao");
+      expect(linhas).toContain(`EXPX_CAMINHOS_PROTEGIDOS='${PADRAO.join("|")}'`);
+      expect(JSON.parse(roda(raiz, "--formato", "json").out).merge_automatico).toEqual({ ativo: false, caminhos_protegidos: PADRAO });
+      expect(roda(projeto()).out.split("\n")).toContain("EXPX_MERGE_AUTOMATICO=nao");
+    });
+
+    it("funcional: ativo com lista do projeto soma à padrão, nunca a substitui", () => {
+      const raiz = projeto({ expx_fatiamento: 1, merge_automatico: { ativo: true, caminhos_protegidos: ["^src/pagamentos/"] } });
+      expect(roda(raiz).out.split("\n")).toContain("EXPX_MERGE_AUTOMATICO=sim");
+      expect(JSON.parse(roda(raiz, "--formato", "json").out).merge_automatico).toEqual({ ativo: true, caminhos_protegidos: [...PADRAO, "^src/pagamentos/"] });
+    });
+
+    it.each([
+      ["ativo não booleano", { ativo: "sim" }, "merge_automatico.ativo"],
+      ["regex fora do ERE", { ativo: true, caminhos_protegidos: ["^a/", "(?=src/)"] }, "merge_automatico.caminhos_protegidos[1]"],
+      ["caminhos_protegidos que não é lista", { caminhos_protegidos: "^a/" }, "merge_automatico.caminhos_protegidos"],
+      ["chave desconhecida dentro", { ativo: false, liberar: true }, "merge_automatico.liberar"],
+      ["não objeto", true, "merge_automatico"],
+    ])("funcional: %s é inválido", (_nome, merge_automatico, chave) => {
+      const r = roda(projeto({ expx_fatiamento: 1, merge_automatico }));
+      expect(r).toMatchObject({ rc: 1, out: "" });
+      expect(r.err).toContain(`expx-fatiamento: ${chave}:`);
+    });
+
+    it("funcional: o env é seguro para eval e os padrões casam no ERE do bash", () => {
+      const raiz = projeto({ expx_fatiamento: 1, merge_automatico: { ativo: true, caminhos_protegidos: ["^a b/", "^x'y/"] } });
+      const protegidos = ["src/auth/x.ts", "a/autenticacao/b", "login/p.tsx", "src/permissoes.ts", "lib/rls.ts", "supabase/policies/a", "db/migrate/1.rb",
+        "supabase/migrations/1.sql", "consultas/a.sql", ".github/workflows/ci.yml", "infra/main.tf", "api/Dockerfile", ".env.local", "config/secrets/k", "a b/c", "x'y/z"];
+      const livres = ["src/app.ts", "docs/authors.md", "src/mylogin/a.ts", "src/infra/a.ts", "Dockerfile.md", "a/b.sqlite"];
+      const script = 'eval "$("$NODE" "$SCRIPT" --raiz "$RAIZ")" || exit 9; printf "%s\\n" "$EXPX_MERGE_AUTOMATICO"; '
+        + 'while IFS= read -r c; do if [[ $c =~ $EXPX_CAMINHOS_PROTEGIDOS ]]; then echo "P $c"; else echo "L $c (rc $?)"; fi; done <<< "$CAMINHOS"';
+      // caminhos por env: no Windows o Node junta argumentos com aspas simples e o bash os remonta errado
+      const r = spawnSync(bashDosHooks(), ["-c", script], {
+        encoding: "utf8",
+        env: { ...process.env, NODE: barra(process.execPath), SCRIPT: barra(SCRIPT), RAIZ: barra(raiz), CAMINHOS: [...protegidos, ...livres].join("\n") },
+      });
+      expect(r.stderr).toBe("");
+      expect(r.stdout.split("\n").filter(Boolean)).toEqual(["sim", ...protegidos.map((c) => `P ${c}`), ...livres.map((c) => `L ${c} (rc 1)`)]);
+    });
+  });
 });
