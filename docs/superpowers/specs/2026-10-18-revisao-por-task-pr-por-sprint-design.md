@@ -13,7 +13,7 @@ A revisão do CodeAnt tem valor provado no conselho (#202: falhas Critical/Secur
 
 Objetivos
 - O1. Cada task passa pela revisão da CLI do CodeAnt antes do commit; achado aberto em linha alterada pela task não deixa a task fechar.
-- O2. Um trabalho pode entregar um PR por sprint, empilhados, sem virar vários trabalhos.
+- O2. Um trabalho pode entregar um PR por sprint, um de cada vez, sem virar vários trabalhos, e sem os agentes esperarem o merge quando o PR é de baixo risco (merge automático, 4.6).
 - O3. Limites de fatiamento calibráveis por projeto, num arquivo versionado, lidos igualmente pela sprintx (F3 e auditor) e pela mergex (E7).
 - O4. PR empilhado nunca chega à main com um verde que não rodou a suíte contra a base real.
 - O5. Testes que provam que sprintx e mergex julgam igual o mesmo plano/diff.
@@ -93,31 +93,52 @@ teste → implementação → suíte afetada → revisor-testes → aceite → *
 - Rastro: sem evento novo; o resultado vai no detalhe do `task-concluida` (DS-180). O portão não lê rastro.
 - Hook: o `task-so-fecha-verde.sh` passa a exigir a evidência quando o modo for `obrigatoria` (é o único hook de evidência; fica no modo dele, aviso por padrão).
 
-### 4.3 Um PR por sprint
+### 4.3 Um PR por sprint, sequencial
 
-Opt-in (`entrega: por_sprint` na configuração ou no plano). A sprint vira a unidade de entrega; o trabalho continua um só (mesmo slug, mesmo plano, mesmo F1–F5).
+*Decisão do usuário, 2026-10-18, revista depois do rascunho do plano da mergex e de segunda opinião do Codex: a forma empilhada (uma branch e uma entrega por sprint, PRs abertos ao mesmo tempo) custava 5 PRs só na mergex e deixava sem resposta a correção na sprint N com a N+1 andando, o squash quebrando a pilha e os consumidores que leem `docs/entregas/<trabalho>/ENTREGA.md`. Fica a forma sequencial; a empilhada sai do desenho.*
 
-- **Branches:** sprint-01 em `feature/<slug>` (compatível com hoje); sprint-NN (NN>1) em `feature/<slug>--sNN`, criada no fechamento da sprint anterior a partir da ponta dela, com `expxBase=feature/<slug>--s(NN-1)` e `expxBaseNascimento` gravados pela F1/F6 como na DS-183/185. (`feature/<slug>/sNN` não serve: o git não aceita uma ref que é diretório de outra.)
-- **Entregas:** uma por sprint em `docs/entregas/<slug>/sprint-NN/ENTREGA.md`, com `escopo: sprint` e `sprint: NN`. O E0 aceita várias entregas por trabalho quando o escopo é sprint (o caso 3 deixa de parar nisso).
-- **Portão por sprint:** V1, V2, V3, V7, V9, V10, V11 e V12 restritos às tasks e à união de arquivos da sprint; a V6 continua sobre o trabalho (ver abaixo). V2: a evidência da suíte inteira da sprint vira **FALHA se ausente** quando a entrega é por sprint (hoje é aviso).
-- **Quando:** no portão de sprint da F6 (`06-execucao.md:219-247`), com a sprint fechada e a suíte inteira verde, a sprintx aciona E2–E8 da entrega daquela sprint e segue para a próxima na branch nova. E7 mede e abre contra a branch da sprint anterior (contra a base do trabalho na sprint-01).
-- **Correção pedida na revisão do PR da sprint N com a N+1 já em andamento:** commit na branch da sprint N (E1 da entrega N) e "update branch" da N+1 (merge da N na N+1), como na base encadeada entre features (D-19); a reconciliação de base da mergex já cobre o avanço da base.
-- **F2 do plano:** com `por_sprint`, o auditor soma por sprint, não por trabalho; a frase "não em mais sprints do mesmo trabalho" passa a valer só para `por_trabalho`.
-- **O que cada entrega de sprint leva** *(decisão minha)*: as entregas das sprints 1..N-1 não têm `FECHAMENTO.md`, `HISTORICO.md` nem o `arquivos_alterados` do ORQUESTRADOR; no lugar do `FECHAMENTO.md`, o E2 da sprint exige o fechamento da sprint (critério de saída e suíte inteira no `sprint.md`). A última sprint leva os artefatos de fim de trabalho como hoje. Verificações por escopo de sprint: V1, V2, V3, V7, V9, V10, V11, V12; a V6 (auditoria F5) continua sobre o trabalho, que é um plano só. O E8 grava a entrega de cada sprint; quem lê `ENTREGA.md` por trabalho (memox, painel) passa a aceitar várias por trabalho — conferir os consumidores no plano e incluir o repositório que precisar.
-- **Revisão do CodeAnt nos PRs empilhados** *(decisão minha; o comportamento do bot entra no spike 6.1)*: o E9 já não deixa mergear PR sem a revisão exigida no HEAD atual (R1–R6). Acrescenta: depois do redirecionamento para a main, o PR só é elegível com a revisão do bot no HEAD atual feita **depois** do redirecionamento; sem ela, a orientação é comentar `@codeant-ai : review`. Se o spike mostrar que o bot não revisa PR com base ≠ main, essa é a única revisão de PR que a sprint terá — além da revisão por task, que é o motivo de o afrouxamento valer.
+Opt-in (`entrega: por_sprint` na configuração; o plano pode sobrescrever por trabalho). O trabalho continua um só: mesmo slug, mesmo plano, um F1–F5.
 
-### 4.4 PRs empilhados e o gate do projeto
+- **Um PR por vez.** Ao fechar a sprint N (critério de saída e suíte inteira verde, portão de sprint da F6), a sprintx aciona E2–E8 só com as tasks da sprint N. A sprint N+1 **só executa depois do merge do PR da N**: a branch do trabalho é atualizada a partir da main (que já contém a N) e a execução segue.
+- **Mesma branch e mesma entrega.** `feature/<slug>` e `docs/entregas/<slug>/ENTREGA.md` continuam os de hoje. O `ENTREGA.md` ganha `sprint_atual` e `prs: [{sprint, url, estado, merge_sha}]`; o `pr_url`/`pr_estado` de topo passam a ser os da sprint atual.
+- **Portão por sprint:** V1, V2, V3, V7, V9, V10, V11 e V12 restritos às tasks e à união de arquivos da sprint atual; a V6 continua sobre o trabalho. V2: a suíte inteira da sprint é **FALHA se ausente**. Um arquivo pode reaparecer numa sprint seguinte quando estiver declarado numa task dela.
+- **Sprint fechada é imutável.** Correção pedida no PR da sprint N **enquanto ele está aberto** entra nele, como hoje (a N+1 ainda não começou). Defeito achado depois do merge vira task da sprint seguinte ou correção própria, nunca reabertura da N.
+- **Artefatos de fim de trabalho** (`FECHAMENTO.md`, `HISTORICO.md`, `arquivos_alterados` do ORQUESTRADOR, o `kind: entrega` do memox): só no PR da última sprint.
+- **F2 do plano:** com `por_sprint`, o auditor soma por sprint; "não em mais sprints do mesmo trabalho" vale só para `por_trabalho`.
+- **Sem pilha:** cada PR de sprint tem a main como base; squash ou merge comum não quebram nada, porque a sprint seguinte nasce da main depois do merge.
+- **A espera pelo merge** é o custo desta forma; o merge automático (4.6) o elimina quando o PR é de baixo risco.
 
-Decisão: o método exige duas provas, sem mexer no CI do projeto.
+### 4.4 Prova por fatia e features empilhadas
 
-1. **Prova por fatia:** cada PR de sprint (e de feature empilhada) carrega a suíte inteira verde no HEAD dele, registrada no `sprint.md` (V2 como FALHA se ausente, 4.3). É o "verde sozinha" da F5 do contrato.
-2. **Revalidação ao chegar à main (E9):** um PR cuja base mudou desde o último CI (redirecionado depois do merge da predecessora) só é elegível com um check do projeto **executado depois do redirecionamento e contra a base atual**. Sem isso, inelegível com o motivo `CI anterior ao redirecionamento`, e a orientação de disparar o CI (push vazio ou re-run, conforme o projeto). Fecha o caso `fora-de-main` reaproveitado do conselho do lado do método.
+1. **Prova por fatia:** cada PR de sprint carrega a suíte inteira verde no HEAD dele, registrada no `sprint.md` (V2 como FALHA se ausente, 4.3). É o "verde sozinha" da F5 do contrato.
+2. **Features empilhadas (DS-183, entre trabalhos):** continuam como hoje. Um PR cuja base mudou desde o último CI (redirecionado depois do merge da predecessora) só é elegível no E9 com um check do projeto **executado depois do redirecionamento e contra a base atual**, e com a revisão do bot no HEAD atual feita depois do redirecionamento; sem isso, inelegível com o motivo `CI anterior ao redirecionamento`, e a orientação de disparar o CI pelo serviço (re-run que use a base atual) — nunca um commit vazio, que invalidaria o portão.
 
 ### 4.5 Testes de consistência e registro
 
 - O mesmo `.expx/fatiamento.json`, o mesmo plano e o mesmo diff julgados igualmente: a bancada P0.2 do expxdev (que já instala sprintx e mergex juntas pelo `init` real) ganha casos que comparam (a) os limites efetivos que o auditor da sprintx cita com os que o E7 da mergex mede — os dois vindos do mesmo script do núcleo; (b) exclusões (`ignorar` + artefatos de método); (c) a união de arquivos por sprint calculada pela sprintx (`planejamento.sh`) e pela V9 da mergex.
 - Contrato `expx-fatiamento` v2: seção "capacidade × legibilidade", a configuração por projeto, a revisão por task como condição do afrouxamento, e o histórico preenchido (hoje tem uma linha só para 8 mudanças). Corrigir também a divergência atual: o contrato diz que os artefatos de método ficam fora da medida, mas o padrão do `verificar-fatiamento.sh` os mede.
 - Decisões novas: DS-186.. na sprintx, DM-235.. na mergex, e a decisão de contrato no expxdev.
+
+### 4.6 Merge automático e decisões com o Codex
+
+*Decisão do usuário, 2026-10-18 (nenhum projeto tem deploy automático da main; lista padrão de caminhos protegidos aceita; rejeitar achado continua sempre do desenvolvedor), depois de segunda opinião do Codex.*
+
+**Desligado por padrão.** O leitor do núcleo (`nucleo/scripts/expx-fatiamento.mjs`) passa a aceitar a chave e a emitir `EXPX_MERGE_AUTOMATICO` e `EXPX_CAMINHOS_PROTEGIDOS` (PR pequena no expxdev, antes da mergex). O projeto liga em `.expx/fatiamento.json`: `"merge_automatico": { "ativo": true, "caminhos_protegidos": [...] }` (a lista do projeto soma à padrão). Desligar é mudar a chave; vale na próxima passagem.
+
+**O E9 faz o merge sem perguntar só quando TODAS valem** (todas mecânicas, no HEAD exato que vai ser mergeado, com o merge preso a esse SHA como já é):
+1. CI do projeto verde e suíte inteira da sprint verde registrada.
+2. Gate R1–R6 `SATISFEITO`; nenhuma thread ou comentário de revisão sem resposta; nenhum review pedindo mudança.
+3. Branch atualizada com a base e sem conflito.
+4. **Sem perda de teste** contra a base: nenhum arquivo de teste apagado; nenhum `skip`/`only`/`todo`/`xfail` (e equivalentes da stack) novo no diff; a contagem de testes da suíte não cai.
+5. **Sem remoção fora do plano:** todo arquivo removido está declarado como removido numa task da sprint.
+6. **Nenhum achado de revisão rejeitado** no PR (rejeição é sempre do desenvolvedor).
+7. **Nenhum arquivo em caminho protegido.** Padrão: autenticação, permissões e RLS, migrations de banco, CI e infraestrutura, configuração de segredos; o projeto acrescenta caminhos.
+
+**Qualquer condição falha → o merge espera o desenvolvedor**, com o motivo dito.
+
+**Trilha e aviso:** cada merge automático grava no `ENTREGA.md` a base, o HEAD, os checks e as condições conferidas, e avisa o desenvolvedor.
+
+**Decisões no caminho.** O agente só para quando precisa de uma decisão. Antes de levá-la ao desenvolvedor, discute com o Codex (`codex exec`, só leitura). Os dois podem **fechar sozinhos** só decisões técnicas reversíveis e de baixo impacto, dentro do que o plano já define: escolher entre implementações equivalentes, diagnosticar uma falha com base nos testes, corrigir sem mudar contrato. **Nunca fecham**, mesmo concordando (vira recomendação ao desenvolvedor): rejeitar achado, aceitar risco, regra de negócio ou critério de aceite, dados e migrations, permissões e segurança, contrato público, exceção ao portão. Se os dois discordam, ou o Codex não está disponível, vai ao desenvolvedor. A decisão e os pareceres ficam registrados no bloqueio.
 
 ## 5. Calibragem inicial do conselho (exemplo; o valor final é seu)
 
