@@ -1,10 +1,11 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
 import { executarInit } from "../cli/init.js";
 import { diagnosticar } from "./verificadores.js";
+import { suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
 
 let p: ProjetoTemporario | undefined;
 const repos: string[] = [];
@@ -110,5 +111,47 @@ describe("diagnóstico da instalação do memox", () => {
     mkdirSync(join(p.raiz, ".claude/skills/memox/assets"), { recursive: true });
     writeFileSync(join(p.raiz, ".claude/skills/memox/assets/memox.py"), "print('memox')\n");
     expect(diagnosticar(p.raiz).achados.some((a) => a.id === "memox-sem-motor")).toBe(false);
+  });
+});
+
+describe("diagnóstico de .expx/fatiamento.json", () => {
+  const achado = (raiz: string, id: string) => diagnosticar(raiz).achados.find((a) => a.id === id);
+  const ids = (raiz: string): string[] => diagnosticar(raiz).achados.map((a) => a.id).filter((id) => id.startsWith("fatiamento-"));
+  const escreve = (raiz: string, c: object): void => writeFileSync(join(raiz, ".expx/fatiamento.json"), JSON.stringify(c));
+
+  it("funcional: sem .expx/fatiamento.json, ou com ele válido, não há achado de fatiamento", async () => {
+    p = await projetoSadio();
+    expect(ids(p.raiz)).toEqual([]);
+    escreve(p.raiz, { expx_fatiamento: 1, ignorar: ["^gerado/"] });
+    expect(ids(p.raiz)).toEqual([]);
+  });
+
+  it("funcional: arquivo inválido é erro fatiamento-invalido com a mensagem do script", async () => {
+    p = await projetoSadio();
+    escreve(p.raiz, { expx_fatiamento: 1, limites: {} });
+    expect(achado(p.raiz, "fatiamento-invalido")).toMatchObject({ severidade: "erro", problema: "expx-fatiamento: limites: chave desconhecida" });
+  });
+
+  const viraDiretorio = (c: string): void => (rmSync(c), mkdirSync(c));
+  it.each([["ausente", rmSync], ["diretório", viraDiretorio]])("funcional: leitor instalado %s é erro fatiamento-sem-leitor", async (_n, troca) => {
+    p = await projetoSadio();
+    escreve(p.raiz, { expx_fatiamento: 1 });
+    troca(join(p.raiz, ".expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs"));
+    expect(achado(p.raiz, "fatiamento-sem-leitor")).toMatchObject({ severidade: "erro", correcao: expect.stringContaining("expx update") });
+  });
+
+  it.skipIf(!suportaSymlinkDeDiretorio())("funcional: link quebrado no lugar do arquivo é fatiamento-invalido, não ausência", async () => {
+    p = await projetoSadio();
+    symlinkSync(join(p.raiz, "nao-existe.json"), join(p.raiz, ".expx/fatiamento.json"));
+    expect(achado(p.raiz, "fatiamento-invalido")?.severidade).toBe("erro");
+  });
+
+  it("funcional: o doctor nunca executa a cópia do leitor que está no checkout", async () => {
+    p = await projetoSadio();
+    escreve(p.raiz, { expx_fatiamento: 1, limites: {} });
+    const marca = join(p.raiz, "executou");
+    writeFileSync(join(p.raiz, ".expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs"), `import { writeFileSync } from "node:fs"; writeFileSync(${JSON.stringify(marca)}, "");`);
+    expect(achado(p.raiz, "fatiamento-invalido")?.problema).toContain("limites: chave desconhecida");
+    expect(existsSync(marca)).toBe(false);
   });
 });

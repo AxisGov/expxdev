@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,6 +7,7 @@ import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
 import { executarInit } from "./init.js";
 import { lerLock } from "../nucleo/lock.js";
+import { executarUpdate } from "../update/flags.js";
 
 let p: ProjetoTemporario | undefined;
 const repos: string[] = [];
@@ -278,5 +280,30 @@ describe("init repetido e a data da resolução", () => {
     writeFileSync(lock, antes.replace('"resolvido_em": "2026-10-17"', '"resolvido_em": "ontem"'));
     const depois = await initEm("2026-10-18T12:00:00Z", origens);
     expect(depois).toContain('"resolvido_em": "2026-10-18"');
+  });
+});
+
+describe(".expx/fatiamento.json é do projeto", () => {
+  it("funcional: init e update preservam .expx/fatiamento.json byte a byte", async () => {
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    repos.push(repo);
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: repo } });
+    // BOM e CRLF de propósito: o expx não pode "normalizar" o arquivo do projeto
+    const bytes = Buffer.from('\uFEFF{"expx_fatiamento": 1,\r\n "justificativa": "x"}\r\n', "utf8");
+    writeFileSync(join(p.raiz, ".expx/fatiamento.json"), bytes);
+    await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: repo } });
+    expect(readFileSync(join(p.raiz, ".expx/fatiamento.json")).equals(bytes)).toBe(true);
+    writeFileSync(join(repo, ".claude/skills/sprintx/references/01.md"), "# v1.1.0\n");
+    execFileSync("git", ["-c", "user.name=e", "-c", "user.email=e@e.invalid", "commit", "-qam", "v1.1.0"], { cwd: repo });
+    execFileSync("git", ["tag", "v1.1.0"], { cwd: repo });
+    expect((await executarUpdate({ raiz: p.raiz, sim: true, origens: { sprintx: repo } })).aplicou).toBe(true);
+    expect(readFileSync(join(p.raiz, ".expx/fatiamento.json")).equals(bytes)).toBe(true);
+  });
+
+  it("integração: init copia nucleo/scripts para o plugin", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: catalogoLocal(["sprintx"]) });
+    expect(existsSync(join(p.raiz, ".expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs"))).toBe(true);
   });
 });

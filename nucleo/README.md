@@ -9,6 +9,7 @@ foram selecionadas.
 | Arquivo | O que é |
 |---|---|
 | `hooks/expx-rastro.sh` | O rastro de eventos, os modos de hook e o `trabalho_id` |
+| `scripts/expx-fatiamento.mjs` | O leitor único de `.expx/fatiamento.json` (seção `scripts/` abaixo) |
 | `commands/onboarding.md` | `/expx:onboarding` — orquestra o mapeamento inicial (stackx, designx, legadox, memox, prodx) das camadas instaladas. Não é núcleo de hook: `montarPlugin` o copia à parte, direto para `commands/` na raiz do plugin — não para dentro de `nucleo/` — porque é assim que o Claude Code descobre um comando. |
 
 ## Como chega até um projeto
@@ -46,6 +47,15 @@ Variáveis que o rastro lê, todas opcionais:
 | `EXPX_TRABALHO_ID` | vence a detecção automática |
 | `EXPX_FASE` / `EXPX_TASK` | preenchem `fase` e `task` (JSON: com aspas) |
 | `EXPX_AGENTE` | o subagente; sem ela, `principal` |
+
+## `scripts/`
+
+Ferramentas Node (ESM, só `node:`), copiadas daqui como o resto do núcleo e
+chamadas por caminho. Hoje só o `doctor` usa o leitor; sprintx (F3/auditor) e
+mergex (E7) passam a chamá-lo nos planos delas. `expx-fatiamento.mjs` (formato no contrato de instalação, §5.2):
+`node <L>` imprime `FATIA_*`/`EXPX_*` para `eval`, `--formato json` os limites
+efetivos, `--validar` só valida; arquivo inválido sai 1. `<L>` é
+`.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs`.
 
 ## Por que existe
 
