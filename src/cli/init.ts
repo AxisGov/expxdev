@@ -314,7 +314,11 @@ function mesmaResolucao(a: Omit<SkillTravada, "resolvido_em">, b: SkillTravada):
  * e reescrever a data sujaria a árvore só porque o dia virou.
  */
 function dataDaResolucao(nova: Omit<SkillTravada, "resolvido_em">, anterior: SkillTravada | undefined): string {
-  if (anterior !== undefined && mesmaResolucao(nova, anterior)) return anterior.resolvido_em;
+  // só uma data de verdade é preservada: o schema aceita qualquer texto, e
+  // manter um valor inválido o perpetuaria em todo `init` seguinte
+  if (anterior !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(anterior.resolvido_em) && mesmaResolucao(nova, anterior)) {
+    return anterior.resolvido_em;
+  }
   return new Date().toISOString().slice(0, 10);
 }
 

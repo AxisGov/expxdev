@@ -269,4 +269,14 @@ describe("init repetido e a data da resolução", () => {
     const depois = await initEm("2026-10-18T00:00:01Z", catalogoLocal(["sprintx"]));
     expect(depois).toContain('"resolvido_em": "2026-10-18"');
   });
+
+  it("funcional: resolvido_em que nao e data nao e preservado, mesmo na mesma resolucao", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    const origens = catalogoLocal(["sprintx"]);
+    const antes = await initEm("2026-10-17T12:00:00Z", origens);
+    const lock = join(p.raiz, ".expx/expx-lock.json");
+    writeFileSync(lock, antes.replace('"resolvido_em": "2026-10-17"', '"resolvido_em": "ontem"'));
+    const depois = await initEm("2026-10-18T12:00:00Z", origens);
+    expect(depois).toContain('"resolvido_em": "2026-10-18"');
+  });
 });
