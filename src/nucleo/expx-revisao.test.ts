@@ -49,9 +49,9 @@ process.stdout.write((cfg.avisos ?? "") + JSON.stringify({ issues: cfg.issues.fi
 const PATH = process.env["PATH"] ?? process.env["Path"] ?? "";
 type Ev = { resultado: string; motivo?: string; arquivos: Record<string, string | null>; lotes: { include: string[] }[];
   achados: { identidade: string; arquivo: string; linha: number; estado: string }[]; rejeicoes: { identidade: string }[]; removidos_sem_revisao: string[] };
-function revisar(c: { raiz: string; falsa: string }, arquivos: string, task = "T-01", path = `${c.falsa}${delimiter}${PATH}`) {
+function revisar(c: { raiz: string; falsa: string }, arquivos: string, task = "T-01", path = `${c.falsa}${delimiter}${PATH}`, extra: Record<string, string> = {}) {
   const r = spawnSync(process.execPath, [SCRIPT, "revisar", "--trabalho", "w", "--task", task, "--arquivos", arquivos, "--raiz", c.raiz],
-    { encoding: "utf8", env: ambienteCom(path) });
+    { encoding: "utf8", env: ambienteCom(path, extra) });
   const ev = join(c.raiz, "docs", "entregas", "w", "revisao", `${task}.json`);
   const ch = join(c.falsa, "chamadas.jsonl");
   return { rc: r.status, out: r.stdout, err: r.stderr, ev: (existsSync(ev) ? JSON.parse(readFileSync(ev, "utf8")) : undefined) as Ev,
@@ -270,6 +270,25 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     expect(roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "falso positivo").rc).toBe(0);
     expect(evidencia(c.raiz)).toMatchObject({ resultado: "ok", achados: [{ estado: "rejeitado" }], rejeicoes: [{ identidade: id, motivo: "falso positivo" }] });
     expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it("funcional: rejeitar entre a releitura e a gravação do revisar não se perde (trava por evidência)", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
+    const [fim, gancho] = [join(c.falsa, "rejeitar.out"), join(c.falsa, "entre.mjs")];
+    const pausa = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+    // o gancho dispara o rejeitar em paralelo e segura o revisar entre a releitura e a gravação
+    writeFileSync(gancho, `import { spawn } from "node:child_process"; import { openSync } from "node:fs";
+const out = openSync(${JSON.stringify(fim)}, "w");
+spawn(process.execPath, ${JSON.stringify([SCRIPT, "rejeitar", "--trabalho", "w", "--task", "T-01", "--identidade", id, "--motivo", "fp", "--raiz", c.raiz])},
+  { detached: true, stdio: ["ignore", out, out] }).unref();
+Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500);
+`);
+    revisar(c, "src/a.js", "T-01", undefined, { EXPX_REVISAO_TESTE_ENTRE: gancho });
+    for (const ate = Date.now() + 20000; Date.now() < ate && !/T-01|expx-revisao/.test(existsSync(fim) ? readFileSync(fim, "utf8") : "");) pausa(100);
+    expect(readFileSync(fim, "utf8")).toContain("T-01 ok");
+    expect(evidencia(c.raiz)).toMatchObject({ resultado: "ok", rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] });
   });
 
   it("funcional: rejeitar não muda o resultado de indisponivel", () => {

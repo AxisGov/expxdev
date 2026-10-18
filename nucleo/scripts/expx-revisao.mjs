@@ -8,7 +8,7 @@
 // JSON. Nunca lê credencial da CLI.
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const VERSAO_MINIMA = [0, 5, 14];
@@ -40,6 +40,27 @@ const le = (f) => { try { return JSON.parse(readFileSync(f, "utf8").replace(/^\u
 const git = (...a) => spawnSync("git", a, { cwd: op.raiz, encoding: "utf8" });
 const blob = (f) => { const r = git("hash-object", "--", f); return r.status === 0 ? r.stdout.trim() : undefined; };
 
+const pausa = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+/** Trava por evidência (`mkdir` é exclusivo): quem relê e regrava a evidência o faz dentro dela. */
+function comTrava(task, fn) {
+  mkdirSync(pasta, { recursive: true });
+  const trava = `${caminhoEv(task)}.trava`;
+  for (const ate = Date.now() + 30000; ; pausa(50)) {
+    try { mkdirSync(trava); break; } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+      // trava de processo que morreu: mais velha que 2 min é abandonada
+      try { if (Date.now() - statSync(trava).mtimeMs > 120000) rmSync(trava, { recursive: true, force: true }); } catch { /* sumiu */ }
+      if (Date.now() > ate) { process.stderr.write(`expx-revisao: evidencia travada por outro processo: ${trava}\n`); process.exit(75); }
+    }
+  }
+  try { return fn(); } finally { rmSync(trava, { recursive: true, force: true }); }
+}
+/** Grava por arquivo temporário + rename: ninguém lê evidência pela metade. */
+function grava(task, ev) {
+  const tmp = `${caminhoEv(task)}.${process.pid}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(ev, null, 2)}\n`);
+  renameSync(tmp, caminhoEv(task));
+}
 /** A CLI. No Windows o `codeant` do npm é um `.cmd`, que só roda pelo cmd.exe. */
 function codeant(a) {
   if (process.platform !== "win32") return spawnSync("codeant", a, { cwd: op.raiz, encoding: "utf8", maxBuffer: 64 << 20 });
@@ -115,16 +136,19 @@ function revisar() {
     else if (presentes.some((f) => blob(f) !== ev.arquivos[f])) indisponivel("arquivo-mudou-durante-revisao");
     else achados(lotes.flatMap((l) => l.issues), ev);
   }
-  // rejeição gravada (rejeitar) enquanto a CLI rodava não se perde ao regravar
-  const agora = le(caminhoEv(op.task))?.rejeicoes;
-  for (const r of Array.isArray(agora) ? agora : []) {
-    if (!ev.rejeicoes.some((x) => x?.identidade === r?.identidade)) ev.rejeicoes.push(r);
-    for (const a of ev.achados) if (a.identidade === r?.identidade) a.estado = "rejeitado";
-  }
-  if (ev.resultado === "achados" && !ev.achados.some((a) => a.estado === "aberto")) ev.resultado = "ok";
-  mkdirSync(pasta, { recursive: true });
-  writeFileSync(caminhoEv(op.task), `${JSON.stringify(ev, null, 2)}\n`);
-  const abertos = ev.achados.filter((a) => a.estado === "aberto").length;
+  // rejeição gravada (rejeitar) enquanto a CLI rodava não se perde: releitura e gravação sob a trava
+  const abertos = comTrava(op.task, () => {
+    const agora = le(caminhoEv(op.task))?.rejeicoes;
+    // só para teste: roda um script entre a releitura e a gravação (simula a intercalação)
+    if (process.env.EXPX_REVISAO_TESTE_ENTRE) spawnSync(process.execPath, [process.env.EXPX_REVISAO_TESTE_ENTRE], { stdio: "ignore" });
+    for (const r of Array.isArray(agora) ? agora : []) {
+      if (!ev.rejeicoes.some((x) => x?.identidade === r?.identidade)) ev.rejeicoes.push(r);
+      for (const a of ev.achados) if (a.identidade === r?.identidade) a.estado = "rejeitado";
+    }
+    if (ev.resultado === "achados" && !ev.achados.some((a) => a.estado === "aberto")) ev.resultado = "ok";
+    grava(op.task, ev);
+    return ev.achados.filter((a) => a.estado === "aberto").length;
+  });
   process.stdout.write(`${op.task} ${ev.resultado === "indisponivel" ? `indisponivel:${ev.motivo}` : `${ev.resultado} (${abertos} abertos, ${ev.achados.length} achados)`}\n`);
   process.exit(ev.resultado === "indisponivel" ? 2 : abertos > 0 ? 1 : 0);
 }
@@ -181,17 +205,21 @@ function conferir() {
 }
 
 function rejeitar() {
-  const ev = le(caminhoEv(op.task));
-  const alvo = (ev?.achados ?? []).filter((a) => a.identidade === op.identidade);
-  if (alvo.length === 0) {
-    process.stderr.write(`expx-revisao: ${ev ? "achado nao encontrado" : "evidencia ausente"}: ${op.task} ${op.identidade}\n`);
+  const erro = comTrava(op.task, () => {
+    const ev = le(caminhoEv(op.task));
+    const alvo = (ev?.achados ?? []).filter((a) => a.identidade === op.identidade);
+    if (alvo.length === 0) return ev ? "achado nao encontrado" : "evidencia ausente";
+    for (const a of alvo) a.estado = "rejeitado";
+    ev.rejeicoes = [...(Array.isArray(ev.rejeicoes) ? ev.rejeicoes : []), { identidade: op.identidade, motivo: op.motivo, em: new Date().toISOString() }];
+    if (ev.resultado !== "indisponivel") ev.resultado = ev.achados.some((a) => a.estado === "aberto") ? "achados" : "ok";
+    grava(op.task, ev);
+    process.stdout.write(`${op.task} ${ev.resultado === "indisponivel" ? `indisponivel:${ev.motivo}` : ev.resultado}\n`);
+    return undefined;
+  });
+  if (erro) {
+    process.stderr.write(`expx-revisao: ${erro}: ${op.task} ${op.identidade}\n`);
     process.exit(1);
   }
-  for (const a of alvo) a.estado = "rejeitado";
-  ev.rejeicoes = [...(Array.isArray(ev.rejeicoes) ? ev.rejeicoes : []), { identidade: op.identidade, motivo: op.motivo, em: new Date().toISOString() }];
-  if (ev.resultado !== "indisponivel") ev.resultado = ev.achados.some((a) => a.estado === "aberto") ? "achados" : "ok";
-  writeFileSync(caminhoEv(op.task), `${JSON.stringify(ev, null, 2)}\n`);
-  process.stdout.write(`${op.task} ${ev.resultado === "indisponivel" ? `indisponivel:${ev.motivo}` : ev.resultado}\n`);
 }
 
 ({ revisar, conferir, rejeitar })[cmd]();

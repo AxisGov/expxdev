@@ -71,6 +71,10 @@ Imprime uma linha de resumo.
   na descrição do PR.
 - O blob de cada arquivo é tirado antes e depois da chamada da CLI: a evidência
   nunca fica amarrada a bytes que a CLI não viu.
+- `revisar` e `rejeitar` releem e regravam a evidência sob uma trava por arquivo
+  (`<T-NN>.json.trava`, criada por `mkdir` exclusivo; abandonada depois de 2 min),
+  gravando por arquivo temporário + `rename`: uma rejeição feita enquanto a CLI
+  roda não se perde. Trava ocupada por mais de 30 s: sai **75**.
 
 | Motivo de `indisponivel` | Quando |
 |---|---|
