@@ -135,7 +135,7 @@ describe("expx-fatiamento.mjs", () => {
   });
 
   describe("merge_automatico", () => {
-    const PADRAO = ["(^|/)auth/", "(^|/)autenticacao/", "(^|/)login/", "(^|/)(permiss|rls|policies?)", "(^|/)(migrations?|migracoes?|migrate)/",
+    const PADRAO = ["(^|/)auth/", "(^|/)autenticacao/", "(^|/)login/", "(^|/)(permiss|rls|polic(y|ies))", "(^|/)(migrations?|migracoes?|migrate)/",
       "\\.sql$", "^\\.github/", "^(infra|deploy|terraform|k8s|docker)/", "(^|/)Dockerfile$", "(^|/)\\.env", "(^|/)secrets?/"];
 
     it("funcional: ausente, desligado e com a lista padrão (env e json)", () => {
@@ -167,7 +167,7 @@ describe("expx-fatiamento.mjs", () => {
 
     it("funcional: o env é seguro para eval e os padrões casam no ERE do bash", () => {
       const raiz = projeto({ expx_fatiamento: 1, merge_automatico: { ativo: true, caminhos_protegidos: ["^a b/", "^x'y/"] } });
-      const protegidos = ["src/auth/x.ts", "a/autenticacao/b", "login/p.tsx", "src/permissoes.ts", "lib/rls.ts", "supabase/policies/a", "db/migrate/1.rb",
+      const protegidos = ["src/auth/x.ts", "a/autenticacao/b", "login/p.tsx", "src/permissoes.ts", "lib/rls.ts", "supabase/policies/a", "src/policy.ts", "db/migrate/1.rb",
         "supabase/migrations/1.sql", "consultas/a.sql", ".github/workflows/ci.yml", "infra/main.tf", "api/Dockerfile", ".env.local", "config/secrets/k", "a b/c", "x'y/z"];
       const livres = ["src/app.ts", "docs/authors.md", "src/mylogin/a.ts", "src/infra/a.ts", "Dockerfile.md", "a/b.sqlite"];
       const script = 'eval "$("$NODE" "$SCRIPT" --raiz "$RAIZ")" || exit 9; printf "%s\\n" "$EXPX_MERGE_AUTOMATICO"; '

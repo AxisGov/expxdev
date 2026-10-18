@@ -17,7 +17,7 @@ const CHAVES = ["expx_fatiamento", "justificativa", "legibilidade", "arquivo", "
 // Cada item e o porquê estão no contrato expx-instalacao §5.2.
 const PROTEGIDOS_PADRAO = [
   "(^|/)auth/", "(^|/)autenticacao/", "(^|/)login/", // autenticação
-  "(^|/)(permiss|rls|policies?)", // permissões e RLS
+  "(^|/)(permiss|rls|polic(y|ies))", // permissões e RLS
   "(^|/)(migrations?|migracoes?|migrate)/", "\\.sql$", // migrations e SQL de banco
   "^\\.github/", "^(infra|deploy|terraform|k8s|docker)/", "(^|/)Dockerfile$", // CI e infraestrutura
   "(^|/)\\.env", "(^|/)secrets?/", // configuração de segredos
