@@ -52,7 +52,7 @@ function limites(cfg, nome, padrao) {
   for (const k of Object.keys(padrao)) {
     const teto = TETOS[nome][k];
     if (v[k] === undefined) continue;
-    if (!Number.isInteger(v[k]) || v[k] <= 0) erro(`${nome}.${k}`, "deve ser inteiro positivo");
+    if (!Number.isInteger(v[k]) || v[k] <= 0 || v[k] > 2 ** 31 - 1) erro(`${nome}.${k}`, "deve ser inteiro entre 1 e 2^31-1");
     else if (teto !== undefined && v[k] > teto) erro(`${nome}.${k}`, `acima da capacidade do revisor (${teto})`);
     else r[k] = v[k];
   }

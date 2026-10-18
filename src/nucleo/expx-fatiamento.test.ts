@@ -26,7 +26,6 @@ function roda(raiz: string, ...args: string[]): { rc: number | null; out: string
   const r = spawnSync(process.execPath, [SCRIPT, "--raiz", raiz, ...args], { encoding: "utf8" });
   return { rc: r.status, out: r.stdout, err: r.stderr };
 }
-
 const barra = (c: string): string => c.replace(/\\/g, "/");
 const CONSELHO = { expx_fatiamento: 1, justificativa: "sprint de ~8 tasks", entrega: "por_sprint",
   legibilidade: { pr_linhas: 2500, pr_arquivos: 80, commit_linhas: 300 }, revisao_por_task: { modo: "obrigatoria" } };
@@ -54,6 +53,7 @@ describe("expx-fatiamento.mjs", () => {
     ["arquivo.linhas acima de 5000", { ...CONSELHO, arquivo: { linhas: 5001 } }, "arquivo.linhas"],
     ["chave desconhecida", { expx_fatiamento: 1, limites: {} }, "limites"],
     ["versão desconhecida", { expx_fatiamento: 2 }, "expx_fatiamento"],
+    ["inteiro que estoura a aritmética do bash", { ...CONSELHO, arquivo: { kb: 2 ** 53 } }, "arquivo.kb"],
     ["ignorar com regex inválida", { expx_fatiamento: 1, ignorar: ["(sem-fechar"] }, "ignorar[0]"],
     ["regex só do JavaScript (o verificador usa ERE)", { expx_fatiamento: 1, ignorar: ["^a/", "(?=src/)", "\\d"] }, "ignorar[1]"],
   ])("funcional: %s é inválido (rc 1, stderr cita a chave, stdout vazio)", (_nome, conteudo, chave) => {
