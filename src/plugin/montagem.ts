@@ -55,7 +55,7 @@ export type SkillMontavel = {
  *
  * Resolvido a partir do `dist/` em execução — daí o `../..`.
  */
-function raizDoNucleo(): string {
+export function raizDoNucleo(): string {
   return join(dirname(fileURLToPath(import.meta.url)), "..", "..", "nucleo");
 }
 

@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { lerLock, type InstalacaoTravada } from "../nucleo/lock.js";
 import { hashDoArquivo } from "../nucleo/integridade.js";
@@ -14,6 +15,7 @@ import {
   type ConsultaAoHead,
 } from "../nucleo/modo-executavel.js";
 import { jsonCanonico } from "../plugin/plano.js";
+import { raizDoNucleo } from "../plugin/montagem.js";
 import {
   descreverEntrada,
   entradasDivergentes,
@@ -216,6 +218,7 @@ export function diagnosticar(raiz: string): Diagnostico {
   }
   verificarHooks(raiz, push);
   verificarRastro(raiz, push);
+  verificarFatiamento(raiz, push);
 
   return { saudavel: achados.filter((a) => a.severidade === "erro").length === 0, achados };
 }
@@ -494,6 +497,33 @@ function verificarModoNoHead(
  * doctor que as pessoas param de rodar. As quatro skills que escrevem o rastro
  * têm implementações independentes — é justamente onde a divergência aparece.
  */
+/**
+ * `.expx/fatiamento.json` presente exige o leitor instalado (o que as skills chamam),
+ * mas quem valida é a cópia do próprio CLI: a do checkout é gravável por quem mexe no
+ * projeto, e o doctor não executa código do checkout. Link quebrado ou diretório é presente.
+ */
+function verificarFatiamento(raiz: string, push: (a: Achado) => void): void {
+  try { lstatSync(join(raiz, ".expx", "fatiamento.json")); } catch (e) { if ((e as NodeJS.ErrnoException).code === "ENOENT") return; }
+  const script = join(raiz, ".expx", "marketplace", "plugins", "expx", "nucleo", "scripts", "expx-fatiamento.mjs");
+  const leitor = join(raizDoNucleo(), "scripts", "expx-fatiamento.mjs");
+  // o instalado (o que as skills chamam) e o do pacote têm de ser arquivo regular
+  const falta = [script, leitor].find((c) => { try { return !statSync(c).isFile(); } catch { return true; } });
+  if (falta !== undefined) {
+    push({ id: "fatiamento-sem-leitor", severidade: "erro",
+      problema: `.expx/fatiamento.json existe, mas o leitor nao e um arquivo regular: ${falta}`,
+      correcao: "rode `expx update` (ou `expx init`); se o caminho e do pacote do expx, reinstale o expxdev" });
+    return;
+  }
+  const r = spawnSync(process.execPath, [leitor, "--validar", "--raiz", raiz], { encoding: "utf8" });
+  if (r.status === 0) return;
+  push({
+    id: "fatiamento-invalido",
+    severidade: "erro",
+    problema: r.stderr.trim() || `o leitor saiu ${String(r.status)} ${r.error?.message ?? ""}`.trim(),
+    correcao: "corrija .expx/fatiamento.json (contrato expx-instalacao, secao 5.2): invalido nunca vale como padrao",
+  });
+}
+
 function verificarRastro(raiz: string, push: (a: Achado) => void): void {
   const dir = join(raiz, "docs", "eventos");
   if (!existsSync(dir)) return;

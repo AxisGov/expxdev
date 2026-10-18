@@ -163,10 +163,36 @@ que precisa de outro custo sobrepõe de forma consciente e versionada:
 - **OpenCode**: fora do escopo. Os agentes de `.opencode/agent/` não são
   instalados pelo `init` e o override não os alcança.
 
+## 5.2 `.expx/fatiamento.json` — limites de fatiamento do projeto
+
+O projeto calibra o fatiamento (contrato `expx-fatiamento`) de forma versionada:
+
+```json
+{
+  "expx_fatiamento": 1,
+  "justificativa": "sprint de ~8 tasks",
+  "legibilidade": { "pr_linhas": 2500, "pr_arquivos": 80, "commit_linhas": 300 },
+  "arquivo": { "kb": 150, "linhas": 4000 },
+  "ignorar": ["^gerado/"],
+  "capacidade": { "excluido_no_painel": ["^docs/(sprintx|entregas|eventos)/"] },
+  "revisao_por_task": { "modo": "obrigatoria" },
+  "entrega": "por_sprint"
+}
+```
+
+- padrões: `legibilidade` 400 / 20 / 300; `arquivo` 150 KB / 4000 linhas; `ignorar` vazio; `excluido_no_painel` como acima; `modo: se_disponivel`; `entrega: por_trabalho`;
+- **capacidade do revisor**, não calibrável: `legibilidade.pr_arquivos` ≤ 100 e `arquivo.linhas` ≤ 5000;
+- limite diferente do padrão exige `justificativa` não vazia; `legibilidade` acima do padrão exige `revisao_por_task.modo: "obrigatoria"`;
+- `ignorar` sai em `FATIA_IGNORAR_PROJETO`, que **soma** às exclusões padrão (`FATIA_IGNORAR`), nunca as substitui: quem soma é o verificador do contrato `expx-fatiamento` v2, com a variável exportada pelo E7 da mergex; até lá ela não tem efeito. Regex que não compila, ou fora do ERE que o bash aplica (`(?…)`, `\d`, `\w`, retrovisor), é inválida;
+- validação estrita: chave desconhecida em qualquer nível, `expx_fatiamento` ≠ 1, inteiro fora de 1 a 2^31−1, `modo` fora de `obrigatoria`/`se_disponivel`/`desligada` e `entrega` fora de `por_trabalho`/`por_sprint` invalidam o arquivo; BOM e CRLF são aceitos;
+- ausente → padrões, e tudo como antes; presente e inválido → **erro**, nunca queda calada nos padrões; o arquivo é do projeto: `init`, `add`, `remove` e `update` nunca o escrevem;
+- **leitor único**: `.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs` (README do núcleo). Hoje só o `doctor` o usa (`fatiamento-invalido`, `fatiamento-sem-leitor`; valida com a cópia do próprio CLI, nunca executa a do checkout); a sprintx (F3 e auditor) e a mergex (E7) passam a chamá-lo nos planos delas. Arquivo presente e leitor ausente é erro, com a instrução de atualizar o expx.
+
 ## 6. O que o `init` não apaga
 
 Só `.expx/marketplace/` é trocada de uma vez. O restante de `.expx/`
-(`estado.json`, `memoria/`, …) não é do `init` e fica intocado.
+(`estado.json`, `memoria/`, `agentes.json`, `fatiamento.json`, …) não é do
+`init` e fica intocado.
 
 ## 7. Dependências de runtime
 
