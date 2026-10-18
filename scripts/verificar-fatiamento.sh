@@ -5,10 +5,20 @@
 #   bash scripts/verificar-fatiamento.sh <base> <head>
 #
 # Compara <base>...<head> e falha, com a lista de violações, em F2 (PR: linhas e
-# arquivos), F3 (linhas por commit) e F4 (tamanho de arquivo, em KB e em linhas;
-# acima do limite o arquivo não cresce, com tolerância POR PR). Os limites e as
-# exceções (FATIA_*) estão no contrato. Saída: 0 sem violação, 1 com, 2 uso ou
+# arquivos), F2c (arquivos visíveis ao revisor: capacidade), F3 (linhas por
+# commit) e F4 (tamanho de arquivo, em KB e em linhas; acima do limite o arquivo
+# não cresce, com tolerância POR PR). Saída: 0 sem violação, 1 com, 2 uso ou
 # medição impossível (ref inexistente, sem ancestral comum, `git diff` que falha).
+#
+# Variáveis (padrões no contrato; o leitor `expx-fatiamento.mjs` as preenche a
+# partir de .expx/fatiamento.json):
+#   FATIA_MAX_LINHAS_PR, FATIA_MAX_ARQUIVOS (F2), FATIA_MAX_LINHAS_COMMIT (F3),
+#   FATIA_MAX_KB_ARQUIVO, FATIA_MAX_LINHAS_ARQUIVO (até 5000), FATIA_AVISO_*, FATIA_TOLERANCIA_* (F4)
+#   FATIA_IGNORAR          fora de F2/F3/F4 (não vazia, substitui o padrão, que inclui os artefatos de método)
+#   FATIA_IGNORAR_PROJETO  regex do projeto que SOMA ao FATIA_IGNORAR, nunca o substitui
+#   FATIA_CAPACIDADE_ARQUIVOS  F2c: arquivos que o revisor lê numa PR (100; acima: saída 2)
+#   FATIA_CAPACIDADE_EXCLUIDO  fora de F2c (o painel não os mostra; padrão: o de FATIA_IGNORAR); vazio = nenhum
+#   FATIA_EXCECAO          rebaixa F2 e F3 a aviso; nunca F2c nem F4
 
 set -uo pipefail
 
@@ -27,8 +37,23 @@ tolerancia_b="${FATIA_TOLERANCIA_B:-2048}"
 max_linhas_arq="${FATIA_MAX_LINHAS_ARQUIVO:-4000}"
 aviso_linhas_arq="${FATIA_AVISO_LINHAS:-3000}"
 tolerancia_l="${FATIA_TOLERANCIA_LINHAS:-20}"
-# o lock casa o nome inteiro (`$`): `package-lock.json.backup` e revisado
-ignorar="${FATIA_IGNORAR:-(^|/)(package-lock\.json$|fixtures/candidatos/)}"
+# o lock casa o nome inteiro (`$`): `package-lock.json.backup` e revisado. Os
+# artefatos de metodo (docs/sprintx, entregas, eventos) nao sao codigo revisado
+padrao='(^|/)(package-lock\.json$|fixtures/candidatos/)|^docs/(sprintx|entregas|eventos)/'
+ignorar="${FATIA_IGNORAR:-$padrao}"
+[ -z "${FATIA_IGNORAR_PROJETO:-}" ] || ignorar="($ignorar)|($FATIA_IGNORAR_PROJETO)"
+cap_arquivos="${FATIA_CAPACIDADE_ARQUIVOS:-100}"
+# capacidade nao se afrouxa: mais estrito vale, acima do teto e uso incorreto
+teto() { # <variavel> <valor> <teto>
+  [[ $2 =~ ^[0-9]+$ ]] && [ "$2" -le "$3" ] \
+    || { echo "$1=$2: inteiro ate $3 (capacidade do revisor)" >&2; exit 2; }
+}
+teto FATIA_CAPACIDADE_ARQUIVOS "$cap_arquivos" 100
+teto FATIA_MAX_LINHAS_ARQUIVO "$max_linhas_arq" 5000
+# sem leitor, o painel e o dos repositorios do metodo, que exclui o mesmo padrao
+# (contrato, F6); num projeto o leitor o informa. Sem `:`: definida e vazia quer
+# dizer que o painel nao exclui nada
+cap_excluido="${FATIA_CAPACIDADE_EXCLUIDO-$padrao}"
 excecao="${FATIA_EXCECAO:-}"
 
 # os limites em KB são comparados em BYTES: dividir por 1024 truncaria, e um
@@ -52,25 +77,28 @@ viola_ou_avisa() {
 # KiB com arredondamento para cima, só para exibir
 kib() { echo $((($1 + 1023) / 1024)); }
 
-# linhas alteradas e arquivos de um diff, sem os gerados. O numstat vem com -z: o
+# linhas alteradas e arquivos de um diff, sem os que casam <padrao> (vazio: nenhum
+# fica de fora; um regex vazio casaria tudo). O numstat vem com -z: o
 # caminho e um campo terminado por NUL, entao espaco, `=>` ou quebra no nome nao o
 # confundem. Na renomeacao o campo do caminho vem vazio e seguem origem e destino;
 # ela so fica fora da conta quando os DOIS casam com o FATIA_IGNORAR — sem isto, um
 # arquivo tirado de fixtures/candidatos/ para um caminho revisado, ou codigo do
 # produto movido para la, esconderia as linhas alteradas no caminho. A saida do
 # git vai para um arquivo, nao para um pipe: um diff que falha tem de falhar aqui.
-soma() { # <argumentos do git diff>
-  soma_de git -c core.quotepath=off diff --numstat -z -M "$@"
+soma() { # <padrao> <argumentos do git diff>
+  local x="$1"; shift
+  soma_de "$x" git -c core.quotepath=off diff --numstat -z -M "$@"
 }
-# soma_de <comando que imprime numstat -z> — a mesma conta para qualquer fonte de numstat
+# soma_de <padrao> <comando que imprime numstat -z> — a mesma conta para qualquer fonte de numstat
 soma_de() {
-  local t a d p o linhas=0 n=0
+  local x="$1" t a d p o linhas=0 n=0
+  shift
   t="$(mktemp)" || return 1
   "$@" > "$t" || { rm -f "$t"; return 1; }
   while IFS=$'\t' read -r -d '' a d p; do
     o="$p"
     [ -n "$p" ] || { read -r -d '' o; read -r -d '' p; }
-    [[ $p =~ $ignorar ]] && [[ $o =~ $ignorar ]] && continue
+    [ -n "$x" ] && [[ $p =~ $x ]] && [[ $o =~ $x ]] && continue
     [ "$a" = - ] || linhas=$((linhas + a + d))
     n=$((n + 1))
   done < "$t"
@@ -81,18 +109,25 @@ soma_de() {
 # a medida vai para uma variavel, nunca direto num `read < <(...)`: a substituicao
 # de processo esconde a saida do `git diff`, e um diff que falha (objeto ausente)
 # imprimiria `0 0` e passaria por PR limpo. Nao mediu e saida 2, nunca 0.
-mede() { # <rotulo> <argumentos do git diff>
+mede() { # <rotulo> <padrao> <argumentos do git diff>
   local r="$1"; shift
   soma "$@" || { echo "nao foi possivel medir $r (git diff falhou)" >&2; exit 2; }
 }
 
 # F2 — a PR inteira
-med="$(mede "a PR $mb..$head" "$mb" "$head")" || exit 2
+med="$(mede "a PR $mb..$head" "$ignorar" "$mb" "$head")" || exit 2
 read -r linhas_pr arquivos_pr <<< "$med"
 [ "$linhas_pr" -le "$max_linhas_pr" ] \
   || viola_ou_avisa "F2: a PR altera $linhas_pr linhas (limite $max_linhas_pr); divida por assunto"
 [ "$arquivos_pr" -le "$max_arquivos" ] \
   || viola_ou_avisa "F2: a PR altera $arquivos_pr arquivos (limite $max_arquivos); divida por assunto"
+
+# F2c — capacidade: os arquivos que o revisor ve no painel. Nao e calibravel nem
+# rebaixada pela excecao (como F4): acima dela a revisao fica parcial
+med="$(mede "a PR $mb..$head" "$cap_excluido" "$mb" "$head")" || exit 2
+read -r _ visiveis <<< "$med"
+[ "$visiveis" -le "$cap_arquivos" ] \
+  || viola "F2c: a PR altera $visiveis arquivos visiveis ao revisor (limite $cap_arquivos); divida a PR"
 
 # As listas que os lacos percorrem vao para arquivo, nunca para `< <(...)`: a
 # substituicao de processo esconde a falha, e um laco sobre lista vazia nao confere nada.
@@ -114,7 +149,7 @@ while IFS= read -r c; do
   elif [ -f "$raso" ] && grep -qx "$c" "$raso"; then
     echo "o commit $c esta na fronteira de um clone raso: sem o pai nao ha medida; aprofunde o clone (git fetch --unshallow)" >&2; exit 2
   else pai="$vazia"; fi
-  med="$(mede "o commit $c" "$pai" "$c")" || exit 2
+  med="$(mede "o commit $c" "$ignorar" "$pai" "$c")" || exit 2
   read -r l _ <<< "$med"
   if [ "$l" -gt "$max_linhas_commit" ]; then
     viola_ou_avisa "F3: o commit $(git rev-parse --short "$c") altera $l linhas (limite $max_linhas_commit): $(git log -1 --format=%s "$c" | cut -c1-70)"
@@ -130,7 +165,7 @@ git rev-list --merges "$mb..$head" > "$lista_c" \
 while IFS= read -r c; do
   # -M explicito, como no soma: com diff.renames=false, renomeacao na resolucao
   # contaria o arquivo inteiro como apagado e criado
-  med="$(soma_de git -c core.quotepath=off show -M --remerge-diff --format= --numstat -z "$c")" \
+  med="$(soma_de "$ignorar" git -c core.quotepath=off show -M --remerge-diff --format= --numstat -z "$c")" \
     || { echo "nao foi possivel medir o merge $c (git show --remerge-diff falhou; exige git 2.36 ou mais novo)" >&2; exit 2; }
   read -r l _ <<< "$med"
   if [ "$l" -gt "$max_linhas_commit" ]; then

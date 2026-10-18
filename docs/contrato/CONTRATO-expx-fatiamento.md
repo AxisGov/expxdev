@@ -1,9 +1,11 @@
-# Contrato `expx-fatiamento` — mudanças pequenas, revisáveis, em ordem
+# Contrato `expx-fatiamento` v2 — mudanças pequenas, revisáveis, em ordem
 
 Este contrato vale para **todo desenvolvimento** nos repositórios do método —
 `expxdev`, `sprintx`, `mergex` e as demais skills — e para quem o conduz, pessoa
 ou agente. Ele não trata do formato dos artefatos (isso é `CONVENCOES.md`): trata
-do **tamanho e da ordem** em que uma mudança chega ao `main`.
+do **tamanho e da ordem** em que uma mudança chega ao `main`. Um projeto que usa o
+método calibra os limites de legibilidade para si (Configuração por projeto); a
+capacidade do revisor não se calibra.
 
 ## Por que existe
 
@@ -38,6 +40,18 @@ Medido em outubro de 2026, antes desta regra:
 Parte da linha P0.2 entrou por commits diretos, sem PR: nada nela foi revisado
 por quem revisa.
 
+## Capacidade × legibilidade
+
+Os limites são de duas naturezas, e só uma se calibra:
+
+| Natureza | Regras | Quem fixa | Por projeto |
+|---|---|---|---|
+| **capacidade** do revisor: acima dela a revisão automática pula arquivo ou a PR inteira, em silêncio | F2c (100 arquivos visíveis ao revisor na PR); F4 (arquivo acima do limite não cresce; o limite em linhas nunca passa de 5.000) | o CodeAnt (tabela acima) | não se calibra; `FATIA_EXCECAO` não a rebaixa |
+| **legibilidade** de quem lê: acima dela a PR é revisada, mas não é lida inteira | F2 (400 linhas e 20 arquivos por PR), F3 (300 linhas por commit) | este contrato | calibrável, e afrouxar exige revisão por task obrigatória |
+
+Os números de F4 (150 KB, 4.000 linhas) também se calibram por projeto, com
+justificativa, abaixo da capacidade.
+
 ## As regras
 
 Referencie sempre com o prefixo `F` (`F2`, `F4`), para não colidir com as `R` de
@@ -53,11 +67,22 @@ para PR própria e a thread original aponta para ela.
 ### F2 — Tamanho da PR
 
 No máximo **400 linhas alteradas** (adições mais remoções) e **20 arquivos**,
-sem contar os arquivos gerados (`FATIA_IGNORAR`: o lock de dependências e os
-snapshots de `fixtures/candidatos/`, que entram em commit próprio).
+sem contar o que casa com `FATIA_IGNORAR`: os arquivos gerados (o lock de
+dependências e os snapshots de `fixtures/candidatos/`, que entram em commit
+próprio) e os artefatos de método (F6).
 
-Os 20 arquivos são limite de legibilidade, nosso; o do revisor é 100. Uma PR
-entre os dois é revisada, mas a pessoa que lê não a lê inteira.
+Os 20 arquivos são limite de legibilidade, nosso; o do revisor é 100 (F2c). Uma
+PR entre os dois é revisada, mas a pessoa que lê não a lê inteira.
+
+### F2c — Capacidade do revisor
+
+No máximo **100 arquivos visíveis ao revisor** na PR: todos os alterados, menos
+os que o projeto exclui no painel do CodeAnt (`FATIA_CAPACIDADE_EXCLUIDO`). Num
+projeto, o leitor a preenche com `capacidade.excluido_no_painel`, cujo padrão são
+os artefatos de método, `^docs/(sprintx|entregas|eventos)/`. Sem leitor, nos
+repositórios do método, o padrão é o mesmo de `FATIA_IGNORAR`, que o painel deles
+exclui (F6). Gerado que o painel não exclui conta aqui, porque o bot o vê. Acima de 100 o bot não
+revisa a PR (tabela acima): F2c não se calibra e `FATIA_EXCECAO` não a rebaixa.
 
 ### F3 — Tamanho do commit
 
@@ -124,14 +149,61 @@ Três, e só elas:
   duas chaves.
 - **artefato de método**: o que a `sprintx` e a `mergex` gravam na branch da
   feature — `docs/sprintx/`, `docs/entregas/`, `docs/eventos/` — entra no PR para
-  rastreabilidade, mas fica fora de F2, F3 e F4 (o E7 da `mergex` os põe no
-  `FATIA_IGNORAR`) e fora da revisão automática (no painel do CodeAnt do projeto,
-  como acima). O planejamento de uma feature real passa sozinho de 250 arquivos e
+  rastreabilidade, mas fica fora de F2, F3 e F4 (está no padrão de `FATIA_IGNORAR`
+  do verificador) e fora da revisão automática (no painel do CodeAnt do projeto,
+  como acima; por isso é também o padrão de `FATIA_CAPACIDADE_EXCLUIDO` e não conta
+  para F2c). O planejamento de uma feature real passa sozinho de 250 arquivos e
   38 mil linhas antes da primeira linha de código; medi-lo reprovaria todo PR, e o
   método já é conferido pelos portões das próprias skills. A regra de tamanho da F3
   da `sprintx` é sobre o código das tasks.
 
-Fora disso, F4 não tem exceção: o limite de arquivo é do revisor, não nosso.
+Fora disso, F4 não tem exceção: o limite de arquivo é do revisor, não nosso. F2c
+também não tem.
+
+## Configuração por projeto
+
+Um projeto que usa o método calibra a legibilidade e acrescenta exclusões em
+`.expx/fatiamento.json`, arquivo do projeto. O formato, os padrões e a validação
+estão na §5.2 de `CONTRATO-expx-instalacao.md` e não se repetem aqui. Sem o
+arquivo, valem os números desta página. O leitor único
+(`nucleo/scripts/expx-fatiamento.mjs`, instalado em
+`.expx/marketplace/plugins/expx/nucleo/scripts/`) transforma o arquivo nas
+variáveis `FATIA_*` do verificador; `ignorar` sai em `FATIA_IGNORAR_PROJETO`, que
+**soma** ao `FATIA_IGNORAR` efetivo, nunca o substitui.
+
+### Afrouxar exige revisão por task obrigatória
+
+Um limite de legibilidade (F2, F3) acima do padrão só vale com
+`revisao_por_task.modo: "obrigatoria"`: cada task passa pela CLI do CodeAnt antes
+do commit, e nenhuma fecha com achado aberto em linha que ela alterou. A PR maior
+chega com cada pedaço já revisado. Com `se_disponivel` ou `desligada`, o arquivo
+que afrouxa é inválido: o leitor o recusa e o `doctor` o aponta. Todo valor
+diferente do padrão, mais frouxo ou mais estrito, exige `justificativa`. A
+capacidade (F2c e o teto de 5.000 linhas de F4) não se afrouxa em modo nenhum.
+
+### Entrega por sprint
+
+Com `entrega: "por_sprint"`, um trabalho entrega uma PR por sprint, empilhadas: a
+da sprint N+1 tem como base a branch da sprint N. F2 conta **por sprint**: cada PR
+é medida contra a base dela, e não o trabalho inteiro. F2c, F3 e F4 não mudam.
+Com `por_trabalho` (o padrão), uma PR por trabalho, como antes.
+
+### Como consumir o leitor
+
+```bash
+fatia="$(node .expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs)" || exit 1
+set -a; eval "$fatia"; set +a
+bash <verificador> <base> <head>
+```
+
+O leitor imprime `CHAVE=valor`, uma por linha, com aspas quando o valor pede. Um
+`eval` sozinho cria variáveis **do shell**, que não chegam ao verificador: ele roda
+em outro processo e só herda o que foi exportado. Sem o `set -a`, ele mediria com
+os padrões, em silêncio, mesmo com o projeto calibrado. O `set -a` exporta tudo o
+que o `eval` define; o `set +a` volta ao normal. A saída vai para uma variável
+antes do `eval` porque `eval "$(…)"` devolve o código do `eval`, não o do leitor:
+leitor que sai com 1 (arquivo inválido) não imprime nada, e o `eval` de nada sai
+com 0 — o verificador mediria com os padrões no lugar do arquivo inválido.
 
 ## Como verificar
 
@@ -139,21 +211,27 @@ Fora disso, F4 não tem exceção: o limite de arquivo é do revisor, não nosso
 bash scripts/verificar-fatiamento.sh <base> <head>
 ```
 
-Compara `<base>...<head>`, lista as violações com a regra (`F2`, `F3`, `F4`) e
-sai com 1 se houver alguma. Os limites vêm das variáveis `FATIA_MAX_LINHAS_PR`,
+Compara `<base>...<head>`, lista as violações com a regra (`F2`, `F2c`, `F3`, `F4`)
+e sai com 1 se houver alguma. Os limites vêm das variáveis `FATIA_MAX_LINHAS_PR`,
 `FATIA_MAX_ARQUIVOS`, `FATIA_MAX_LINHAS_COMMIT`, `FATIA_MAX_KB_ARQUIVO`,
-`FATIA_AVISO_KB`, `FATIA_TOLERANCIA_B`, `FATIA_MAX_LINHAS_ARQUIVO`,
-`FATIA_AVISO_LINHAS`, `FATIA_TOLERANCIA_LINHAS` e `FATIA_IGNORAR`, com os valores desta
-página como padrão. O `ci.yml` do `expxdev` roda o verificador em toda PR.
+`FATIA_AVISO_KB`, `FATIA_TOLERANCIA_B`, `FATIA_MAX_LINHAS_ARQUIVO` (até 5.000:
+acima sai 2), `FATIA_AVISO_LINHAS`, `FATIA_TOLERANCIA_LINHAS`, `FATIA_IGNORAR` (não vazia,
+substitui o padrão; vazia, vale o padrão), `FATIA_IGNORAR_PROJETO` (soma ao `FATIA_IGNORAR`),
+`FATIA_CAPACIDADE_ARQUIVOS` (só mais estrita: acima de 100 sai 2) e `FATIA_CAPACIDADE_EXCLUIDO` (definida e vazia: o
+painel não exclui nada), com os valores desta página como padrão. O cabeçalho do
+script as descreve. O `ci.yml` do `expxdev` roda o verificador em toda PR.
 
 ## O que é do método, e o que ainda não é
 
-Esta página é a regra. Duas coisas dependem dela e **não foram feitas**:
+Feito: o verificador mede F2c e os artefatos de método, e soma
+`FATIA_IGNORAR_PROJETO`; o leitor de `.expx/fatiamento.json` e o `doctor` que o
+valida estão no núcleo. Falta, nos planos de cada skill:
 
-- o `mergex`, que abre a PR (E7), passa a medir a PR contra F2 a F4 antes de
-  abrir e a recusar a abertura com a lista de violações;
-- a `sprintx`, que fatia o plano em tasks, passa a tratar F3 como critério de
-  tamanho de task.
+- a `mergex` (E7) espelhar o corpo deste verificador no `fatiamento-da-pr.sh` e
+  exportar o leitor antes dele (como acima);
+- a `sprintx` (F3 e auditor) ler os limites do leitor, não do texto;
+- a revisão por task (`nucleo/scripts/expx-revisao.mjs`), que é o que torna o
+  afrouxamento válido.
 
 Até lá, a conferência é do `verificar-fatiamento.sh` e de quem abre a PR.
 
@@ -161,4 +239,9 @@ Até lá, a conferência é do `verificar-fatiamento.sh` e de quem abre a PR.
 
 | Data | Mudança |
 |---|---|
-| 2026-10-15 | Contrato criado, depois que o CodeAnt deixou de revisar as PRs de promoção da linha P0.2 (+19 mil e +43 mil linhas). |
+| 2026-10-15 | Contrato criado (F1–F6), depois que o CodeAnt deixou de revisar as PRs de promoção da linha P0.2 (+19 mil e +43 mil linhas). |
+| 2026-10-15 | Os limites do CodeAnt passam a ser citados com a fonte de cada um. |
+| 2026-10-15 | Artefato gerado fica fora de F4 e da revisão do CodeAnt. |
+| 2026-10-15 | F6 registra que a exclusão por arquivo no `.codeant/configuration.json` não bastou na PR, aponta a exclusão no painel e diz que `file_filters` cobre os mesmos caminhos em fnmatch. |
+| 2026-10-16 | F6 ganha a exceção de artefato de método. |
+| 2026-10-18 | v2: capacidade × legibilidade; F2c (100 arquivos visíveis ao revisor); configuração por projeto em `.expx/fatiamento.json`, com afrouxamento só sob revisão por task obrigatória; entrega por sprint; como consumir o leitor (`set -a`); os artefatos de método entram no padrão do verificador, como F6 já dizia. |

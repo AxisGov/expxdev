@@ -314,6 +314,104 @@ describe("verificar-fatiamento.sh", () => {
     expect(r.codigo).toBe(1);
   });
 
+  it("funcional: artefato de método não conta para F2 por padrão", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    for (let i = 0; i < 30; i++) escreve(d, `docs/entregas/x/${String(i)}.md`, "x\n");
+    escreve(d, "src.md", linhas(10));
+    commita(d, "feat: com artefatos de metodo");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(0);
+    expect(r.saida).toContain("PR com 10 linhas em 1 arquivo(s)");
+  });
+
+  // capacidade do revisor: 100 arquivos no painel (FATIA_CAPACIDADE_*), nunca calibrável
+  const muitos = (d: string, dir: string, n: number): void => {
+    for (let i = 0; i < n; i++) escreve(d, `${dir}/${String(i)}.md`, "x\n");
+  };
+
+  it("funcional: F2c — 101 arquivos visíveis ao revisor reprovam mesmo com FATIA_MAX_ARQUIVOS=200 e FATIA_EXCECAO", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    muitos(d, "p", 101);
+    commita(d, "feat: muitos arquivos");
+    const r = verifica(d, { FATIA_MAX_ARQUIVOS: "200", FATIA_EXCECAO: "tentando passar" });
+    expect(r.codigo, r.saida).toBe(1);
+    expect(r.saida).toMatch(/VIOLACAO F2c: a PR altera 101 arquivos .*\(limite 100\)/);
+  });
+
+  it("funcional: F2c conta artefato de método que o painel não exclui (FATIA_CAPACIDADE_EXCLUIDO vazio)", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    muitos(d, "docs/entregas/x", 101);
+    commita(d, "feat: muitos artefatos");
+    expect(verifica(d).codigo).toBe(0);
+    const r = verifica(d, { FATIA_CAPACIDADE_EXCLUIDO: "" });
+    expect(r.codigo, r.saida).toBe(1);
+    expect(r.saida).toContain("F2c:");
+    expect(r.saida).not.toMatch(/F2:/);
+  });
+
+  it("funcional: F2c não se afrouxa — FATIA_CAPACIDADE_ARQUIVOS acima de 100 é uso incorreto", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "a.md", "x\n");
+    commita(d, "feat: a");
+    const r = verifica(d, { FATIA_CAPACIDADE_ARQUIVOS: "101" });
+    expect(r.codigo, r.saida).toBe(2);
+    expect(r.saida).toContain("FATIA_CAPACIDADE_ARQUIVOS");
+    expect(verifica(d, { FATIA_CAPACIDADE_ARQUIVOS: "50" }).codigo).toBe(0);
+  });
+
+  it("funcional: o teto de F4 não se afrouxa — FATIA_MAX_LINHAS_ARQUIVO acima de 5000 é uso incorreto", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "a.md", "x\n");
+    commita(d, "feat: a");
+    const r = verifica(d, { FATIA_MAX_LINHAS_ARQUIVO: "6000" });
+    expect(r.codigo, r.saida).toBe(2);
+    expect(r.saida).toContain("FATIA_MAX_LINHAS_ARQUIVO");
+    expect(verifica(d, { FATIA_MAX_LINHAS_ARQUIVO: "5000" }).codigo).toBe(0);
+  });
+
+  it("funcional: F2c por padrão exclui o que o painel do método exclui (gerados e artefatos de método)", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    muitos(d, "fixtures/candidatos/x", 101);
+    commita(d, "chore: snapshot");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(0);
+    expect(r.saida).not.toContain("F2c:");
+  });
+
+  it("funcional: FATIA_IGNORAR_PROJETO soma ao padrão, nunca o substitui", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "gerado/x.txt", linhas(500));
+    escreve(d, "package-lock.json", linhas(500));
+    escreve(d, "src.md", linhas(10));
+    commita(d, "feat: com gerados");
+    const r = verifica(d, { FATIA_IGNORAR_PROJETO: "^gerado/" });
+    expect(r.codigo, r.saida).toBe(0);
+    expect(r.saida).toContain("PR com 10 linhas em 1 arquivo(s)");
+  });
+
+  it("funcional: o leitor chega ao verificador só com `set -a` (sem ele, mede com os padrões)", () => {
+    const d = repo();
+    escreve(d, ".expx/fatiamento.json", JSON.stringify({ expx_fatiamento: 1, ignorar: ["^gerado/"] }));
+    commita(d, "chore: configuracao");
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "gerado/x.txt", linhas(500));
+    commita(d, "feat: gerado");
+    // caminhos por env: argumento com `\` passado ao bash pelo Node é mutilado no Windows
+    const barra = (c: string): string => c.replace(/\\/g, "/");
+    const env = { ...process.env, NODE: barra(process.execPath), SCRIPT: barra(SCRIPT), LEITOR: barra(join(process.cwd(), "nucleo", "scripts", "expx-fatiamento.mjs")) };
+    const consome = (pre: string, pos: string) =>
+      spawnSync(BASH, ["-c", `${pre} eval "$("$NODE" "$LEITOR")"; ${pos} bash "$SCRIPT" main HEAD`], { cwd: d, encoding: "utf8", env });
+    expect(consome("set -a;", "set +a;").status).toBe(0);
+    expect(consome("", "").stdout).toContain("F2: a PR altera 500 linhas");
+  });
+
   // PR com merge de um lado (lado: s1 → s2): base para os casos de medida impossível
   function comMerge(): { d: string; s1: string } {
     const d = repo();
