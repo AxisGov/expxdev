@@ -54,7 +54,7 @@ Arquivo versionado, **do projeto** (o CLI nunca o escreve, como o `agentes.json`
   "legibilidade": { "pr_linhas": 2500, "pr_arquivos": 80, "commit_linhas": 300 },
   "arquivo": { "kb": 150, "linhas": 4000 },
   "ignorar": ["^gerado/"],
-  "revisao_por_task": { "modo": "se_disponivel", "falha_em": "MAJOR" },
+  "revisao_por_task": { "modo": "se_disponivel" },
   "entrega": "por_sprint"
 }
 ```
@@ -76,7 +76,7 @@ Na ordem obrigatória da F6 (`06-execucao.md:123`), entre "aceite" e `status: co
 
 teste → implementação → suíte afetada → revisor-testes → aceite → **revisão CodeAnt** → `status: concluida` → `tasks.md` → E1
 
-- Comando: `codeant review --uncommitted --headless --fail-on <falha_em>` (ou `--staged` depois de pôr no índice só os arquivos da task — decidir no spike, 6.1), restrito aos `arquivos` da task com `--include`. Task com mais de 10 arquivos revisa em lotes de até 10 (`--include` por lote); o resultado da task é o pior lote.
+- Comando: `codeant review --uncommitted --headless`, restrito aos `arquivos` da task com `--include` (CLI ≥ 0.5.14). O código de saída não é usado: o método lê o JSON (ver 6.0). Task com mais arquivos que o `meta.max_files` informado revisa em lotes (`--include` por lote); a task passa só se todos os lotes passam.
 - Achado no limiar ou acima: a task **não fecha**; a correção entra na mesma task e a revisão roda de novo. Achado abaixo do limiar vai para a evidência, sem bloquear.
 - **Achado que persiste ou falso positivo** *(decisão do usuário, 2026-10-18, depois de segunda opinião do Codex)*:
   1. Até 2 tentativas de correção; o agente pode escalar antes quando diagnosticar que o problema é de desenho e não cabe na task.
@@ -124,10 +124,25 @@ Decisão: o método exige duas provas, sem mexer no CI do projeto.
 - `pr_arquivos: 80` (abaixo dos 100 do revisor, com folga para os artefatos que o painel não exclui).
 - `pr_linhas: 2500`: uma sprint típica da Onda 0b tem ~8 tasks; com F3 em 300 linhas por commit, 8 × 300 = 2.400. O PR de sprint fica dentro do que o CodeAnt revisa por arquivos (≤80) e cada linha já passou pela CLI na task.
 - `commit_linhas: 300` (mantido); F4 como está.
-- `revisao_por_task: { modo: obrigatoria, falha_em: MAJOR }` (é o que torna o afrouxamento válido); `entrega: por_sprint`.
+- `revisao_por_task: { modo: obrigatoria }` (é o que torna o afrouxamento válido); `entrega: por_sprint`.
 - Com isso, as 5 ALTA da reauditoria somem se cada sprint ficar ≤80 arquivos e ≤2.500 linhas e as 4 tasks acima de 300 linhas forem divididas (F3 não muda).
 
 ## 6. O que fica para quem constrói
+
+6.0 **Resultado do spike (2026-10-18, WSL, repositório descartável com 3 injeções de SQL num arquivo alterado e num novo):**
+- `--uncommitted` inclui arquivo não rastreado; `--include` restringe (o resto sai em `meta.skipped` como "excluded by pattern").
+- JSON real: `{issues:[{issue_content, relevant_file, start_line, label}], meta:{reviewed_files, total_changed, skipped, capped, max_files}, error, noFiles}`. **Não há severidade.**
+- **`--fail-on MAJOR` não barra**: código de saída 0 com as 3 injeções, nas versões 0.5.1 e 0.5.14. O portão não pode depender do código de saída nem de severidade.
+- 0.5.1 (instalada desde julho): achou as 3, mas com `issue_content` vazio. 0.5.14 (atual): achou as 3, com explicação, e o mesmo resultado em duas execuções seguidas. Num repositório incoerente (módulo importado ausente) a 0.5.14 relatou só o erro de import e não as injeções.
+- `max_files`: 15 na 0.5.1, 40 na 0.5.14 (a documentação diz 10).
+- Tempo: ~90 s por revisão (2 arquivos pequenos) na 0.5.14.
+- Cota/custo: a CLI não informa; conferir no painel do CodeAnt.
+
+**Mudanças no 4.2 por causa do spike:**
+- O portão é do método, não da CLI: **todo achado em linha alterada pela task bloqueia** (regra 6 do achado que insiste); `falha_em` sai da configuração; o `label` vai para a evidência. Falso positivo segue a regra de contestação.
+- Versão mínima da CLI: **0.5.14** (a 0.5.1 não explica o achado). Versão menor = aviso `indisponivel:versao`, com a orientação de atualizar (`npm i -g codeant-cli@latest`); o agente não instala nem atualiza a CLI.
+- Lotes pelo `meta.max_files` informado pela CLI, não por número fixo; `meta.capped: true` ou arquivo da task em `meta.skipped` sem ser por padrão de exclusão = revisão incompleta (`indisponivel`).
+- `error` não nulo ou JSON ilegível = `indisponivel`, nunca aprovação.
 
 6.1 **Spike da CLI antes de fechar o 4.2** (precisa do seu login, feito por você): `--uncommitted` inclui arquivo novo não rastreado? Formato real do JSON (`suggestions`, `severity`, arquivo/linha)? Roda no Windows (Git Bash) e no WSL? Quanto tempo e quanto da cota uma revisão de task consome? `--include` com 10 caminhos explícitos funciona? O resultado decide `--uncommitted` × `--staged` e o formato da evidência. E o bot de PR: revisa PR com base ≠ main? Revisa de novo depois do redirecionamento?
 6.5 A rodada 3 de achados da #204 mexe em `03-plano.md`, auditor, E7 e E2: o plano das fatias da sprintx e da mergex começa depois do merge dela.
