@@ -352,6 +352,17 @@ describe("verificar-fatiamento.sh", () => {
     expect(r.saida).not.toMatch(/F2:/);
   });
 
+  it("funcional: F2c não se afrouxa — FATIA_CAPACIDADE_ARQUIVOS acima de 100 é uso incorreto", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "a.md", "x\n");
+    commita(d, "feat: a");
+    const r = verifica(d, { FATIA_CAPACIDADE_ARQUIVOS: "101" });
+    expect(r.codigo, r.saida).toBe(2);
+    expect(r.saida).toContain("FATIA_CAPACIDADE_ARQUIVOS");
+    expect(verifica(d, { FATIA_CAPACIDADE_ARQUIVOS: "50" }).codigo).toBe(0);
+  });
+
   it("funcional: FATIA_IGNORAR_PROJETO soma ao padrão, nunca o substitui", () => {
     const d = repo();
     git(d, "switch", "-q", "-c", "feature");

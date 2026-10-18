@@ -215,7 +215,7 @@ e sai com 1 se houver alguma. Os limites vêm das variáveis `FATIA_MAX_LINHAS_P
 `FATIA_AVISO_KB`, `FATIA_TOLERANCIA_B`, `FATIA_MAX_LINHAS_ARQUIVO`,
 `FATIA_AVISO_LINHAS`, `FATIA_TOLERANCIA_LINHAS`, `FATIA_IGNORAR` (definida,
 substitui o padrão), `FATIA_IGNORAR_PROJETO` (soma ao `FATIA_IGNORAR`),
-`FATIA_CAPACIDADE_ARQUIVOS` e `FATIA_CAPACIDADE_EXCLUIDO` (definida e vazia: o
+`FATIA_CAPACIDADE_ARQUIVOS` (só mais estrita: acima de 100 sai 2) e `FATIA_CAPACIDADE_EXCLUIDO` (definida e vazia: o
 painel não exclui nada), com os valores desta página como padrão. O cabeçalho do
 script as descreve. O `ci.yml` do `expxdev` roda o verificador em toda PR.
 

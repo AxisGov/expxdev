@@ -16,7 +16,7 @@
 #   FATIA_MAX_KB_ARQUIVO, FATIA_MAX_LINHAS_ARQUIVO, FATIA_AVISO_*, FATIA_TOLERANCIA_* (F4)
 #   FATIA_IGNORAR          fora de F2/F3/F4; o padrão inclui os artefatos de método
 #   FATIA_IGNORAR_PROJETO  regex do projeto que SOMA ao FATIA_IGNORAR, nunca o substitui
-#   FATIA_CAPACIDADE_ARQUIVOS  F2c: arquivos que o revisor lê numa PR (100)
+#   FATIA_CAPACIDADE_ARQUIVOS  F2c: arquivos que o revisor lê numa PR (100; acima: saída 2)
 #   FATIA_CAPACIDADE_EXCLUIDO  fora de F2c (o painel não os mostra); vazio = nenhum
 #   FATIA_EXCECAO          rebaixa F2 e F3 a aviso; nunca F2c nem F4
 
@@ -43,6 +43,9 @@ metodo='^docs/(sprintx|entregas|eventos)/'
 ignorar="${FATIA_IGNORAR:-(^|/)(package-lock\.json$|fixtures/candidatos/)|$metodo}"
 [ -z "${FATIA_IGNORAR_PROJETO:-}" ] || ignorar="($ignorar)|($FATIA_IGNORAR_PROJETO)"
 cap_arquivos="${FATIA_CAPACIDADE_ARQUIVOS:-100}"
+# capacidade nao se afrouxa: mais estrito vale, acima de 100 e uso incorreto
+[[ $cap_arquivos =~ ^[0-9]+$ ]] && [ "$cap_arquivos" -le 100 ] \
+  || { echo "FATIA_CAPACIDADE_ARQUIVOS=$cap_arquivos: inteiro ate 100 (capacidade do revisor)" >&2; exit 2; }
 # sem `:`: definida e vazia quer dizer que o painel nao exclui nada
 cap_excluido="${FATIA_CAPACIDADE_EXCLUIDO-$metodo}"
 excecao="${FATIA_EXCECAO:-}"
