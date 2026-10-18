@@ -358,3 +358,32 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
   });
 });
+
+describe("expx-revisao.mjs id de task", () => {
+  it("funcional: T-NN.MM (o id da sprintx e da runx) é aceito nos três subcomandos e a evidência vai para revisao/T-NN.MM.json", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js", "T-01.03");
+    expect(r).toMatchObject({ rc: 1, ev: { task: "T-01.03", resultado: "achados" } });
+    const id = r.ev.achados[0]?.identidade ?? "";
+    expect(roda(c.raiz, "rejeitar", "--task", "T-01.03", "--identidade", id, "--motivo", "fp").rc).toBe(0);
+    expect(conferir(c.raiz, "obrigatoria", `T-01.03=${commita(c.raiz)}`)).toMatchObject({ rc: 0, out: "T-01.03 ok" });
+    expect(git(c.raiz, "ls-files", "docs")).toBe("docs/entregas/w/revisao/T-01.03.json");
+  });
+
+  it.each(["T-01..03", "T-01/03", "T-01\\03", "../x", "T-1.03", "T-01.3", "T-01.03.04", ""])(
+    "funcional: id de task %j é uso errado (64) nos três subcomandos e nada é gravado", (task) => {
+      const c = cenario();
+      const sha = git(c.raiz, "rev-parse", "HEAD");
+      expect(revisar(c, "src/a.js", task).rc).toBe(64);
+      expect(conferir(c.raiz, "se_disponivel", `${task}=${sha}`).rc).toBe(64);
+      expect(roda(c.raiz, "rejeitar", "--task", task, "--identidade", "a".repeat(64), "--motivo", "fp").rc).toBe(64);
+      expect(existsSync(join(c.raiz, "docs"))).toBe(false);
+    });
+
+  it("funcional: T-NN (legado) continua aceito", () => {
+    const c = cenario();
+    const sha = git(c.raiz, "rev-parse", "HEAD");
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${sha}`)).toMatchObject({ rc: 3, out: "T-01 AVISO evidencia-ausente" });
+  });
+});

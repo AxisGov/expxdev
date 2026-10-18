@@ -27,14 +27,20 @@ de revisão da F6) e a mergex (V12 no E2), nos planos delas. O modo vem de
 
 ## A evidência
 
-`docs/entregas/<trabalho>/revisao/<T-NN>.json`, commitada pelo E1 no commit da
+O id da task é o da sprintx e da runx, `T-NN.MM` (sprint.task, dois dígitos em cada
+parte: `^T-[0-9]{2}\.[0-9]{2}$`); o legado sem ponto continua aceito como
+antes, com qualquer número de dígitos (`^T-[0-9]+$`: `T-1`, `T-01`, `T-123`). Como o id
+vira nome de arquivo, qualquer outra forma (`T-01..03`, `T-01/03`, `T-01\03`, `../x`,
+vazio) é uso errado (**64**) nos três subcomandos, antes de qualquer leitura ou gravação.
+
+`docs/entregas/<trabalho>/revisao/<T-NN.MM>.json`, commitada pelo E1 no commit da
 task (artefato de método: fora de F2/F3 e da revisão de PR). Chaves, todas sempre
 presentes (R6) exceto `motivo`:
 
 | Chave | O que é |
 |---|---|
 | `expx_revisao` | `1` |
-| `trabalho`, `task` | o slug e o `T-NN` |
+| `trabalho`, `task` | o slug e o id da task (`T-NN.MM`) |
 | `cli.versao` | a versão informada por `codeant --version`; `null` se não houve |
 | `executada_em` | timestamp ISO (R4) |
 | `arquivos` | `{<caminho>: <blob>}`: o sha1 do blob que vai para o commit (`git hash-object`, com os filtros de fim de linha); `null` para arquivo removido |
@@ -53,7 +59,7 @@ ou a versão da CLI muda a identidade e reabre o achado.
 
 ## `revisar`
 
-`node expx-revisao.mjs revisar --trabalho <slug> --task <T-NN> --arquivos <a,b,...> [--raiz <dir>]`
+`node expx-revisao.mjs revisar --trabalho <slug> --task <T-NN.MM> --arquivos <a,b,...> [--raiz <dir>]`
 
 Sai **0** (ok), **1** (achado aberto) ou **2** (`indisponivel`); uso errado
 (inclusive `--arquivos` sem nenhum caminho), **64**.
@@ -72,7 +78,7 @@ Imprime uma linha de resumo.
 - O blob de cada arquivo é tirado antes e depois da chamada da CLI: a evidência
   nunca fica amarrada a bytes que a CLI não viu.
 - `revisar` e `rejeitar` releem e gravam a evidência (temporário + `rename`) sob a trava
-  `<T-NN>.json.trava` (`mkdir` exclusivo; abandonada após 2 min; ocupada por 30 s: sai **75**).
+  `<T-NN.MM>.json.trava` (`mkdir` exclusivo; abandonada após 2 min; ocupada por 30 s: sai **75**).
 
 | Motivo de `indisponivel` | Quando |
 |---|---|
@@ -86,10 +92,10 @@ Imprime uma linha de resumo.
 
 ## `conferir`
 
-`node expx-revisao.mjs conferir --trabalho <slug> --modo <obrigatoria|se_disponivel|desligada> --task <T-NN>=<sha> [...]`
+`node expx-revisao.mjs conferir --trabalho <slug> --modo <obrigatoria|se_disponivel|desligada> --task <T-NN.MM>=<sha> [...]`
 
-A regra da V12. Uma linha por task, `T-NN ok`, `T-NN AVISO <motivo>` ou
-`T-NN FALHA <motivo>`; sai **0** (tudo ok), **1** (alguma FALHA) ou **3** (só AVISO).
+A regra da V12. Uma linha por task, `T-NN.MM ok`, `T-NN.MM AVISO <motivo>` ou
+`T-NN.MM FALHA <motivo>`; sai **0** (tudo ok), **1** (alguma FALHA) ou **3** (só AVISO).
 A evidência lida é a que está **no commit da task** (`<sha>`), nunca a do disco:
 editar o arquivo depois do commit não muda o veredito. As linhas abaixo valem na
 ordem em que aparecem.
@@ -107,7 +113,7 @@ ordem em que aparecem.
 
 ## `rejeitar`
 
-`node expx-revisao.mjs rejeitar --trabalho <slug> --task <T-NN> --identidade <hex> --motivo <texto>`
+`node expx-revisao.mjs rejeitar --trabalho <slug> --task <T-NN.MM> --identidade <hex> --motivo <texto>`
 
 Acrescenta `{identidade, motivo, em}` em `rejeicoes` e muda o achado para
 `rejeitado`; o `resultado` é recalculado, exceto `indisponivel`, que não muda.
