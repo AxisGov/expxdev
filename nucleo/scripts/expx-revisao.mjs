@@ -181,6 +181,23 @@ function achados(issues, ev) {
   if (ev.achados.some((a) => a.estado === "aberto")) ev.resultado = "achados";
 }
 
+const ehMapa = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+/** Em `ok`/`achados`, o campo que falta para provar que a CLI rodou (ou undefined): versão ≥ mínima,
+ *  `executada_em` ISO 8601 e, se há arquivo presente, lotes com `meta` e sem erro que o incluem. */
+function semSinalDaCli(ev) {
+  const v = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(typeof ev.cli?.versao === "string" ? ev.cli.versao : "");
+  if (!v || (v.slice(1).map(Number).map((n, i) => n - VERSAO_MINIMA[i]).find((d) => d !== 0) ?? 0) < 0) return "cli.versao";
+  const iso = /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d+)?)?(Z|[+-]([01]\d|2[0-3]):[0-5]\d)$/
+    .exec(typeof ev.executada_em === "string" ? ev.executada_em : "");
+  // o Date normaliza 30/02 para 02/03: a data tem de voltar igual
+  const dia = iso && new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])));
+  if (!iso || dia.getUTCMonth() !== Number(iso[2]) - 1 || dia.getUTCDate() !== Number(iso[3])) return "executada_em";
+  const presentes = Object.keys(ev.arquivos).filter((f) => ev.arquivos[f] !== null);
+  if (!Array.isArray(ev.lotes) || (presentes.length > 0 && ev.lotes.length === 0)
+    || !ev.lotes.every((l) => ehMapa(l) && ehMapa(l.meta) && Array.isArray(l.include) && l.error === null)
+    || !presentes.every((f) => ev.lotes.some((l) => l.include.includes(f)))) return "lotes";
+}
+
 /** O veredito de uma task: a evidência tem de existir, bater com o commit e não ter achado aberto. */
 function veredito(task, sha) {
   if (op.modo === "desligada") return "ok";
@@ -191,11 +208,12 @@ function veredito(task, sha) {
   if (doCommit.status !== 0) return `${nivel} evidencia-ausente`;
   let ev;
   try { ev = JSON.parse(doCommit.stdout.replace(/^\uFEFF/, "")); } catch { return "FALHA evidencia-invalida"; }
-  const ehMapa = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
   if (!ehMapa(ev) || ev.expx_revisao !== 1 || ev.task !== task || ev.trabalho !== op.trabalho || !ehMapa(ev.arquivos)
     || Object.keys(ev.arquivos).length === 0 || !Array.isArray(ev.achados)
     || !ev.achados.every((a) => ehMapa(a) && /^[0-9a-f]{64}$/.test(a.identidade) && ["aberto", "anterior", "rejeitado"].includes(a.estado))
     || !["ok", "achados", "indisponivel"].includes(ev.resultado)) return "FALHA evidencia-invalida";
+  const falta = ev.resultado === "indisponivel" ? undefined : semSinalDaCli(ev);
+  if (falta) return `FALHA evidencia-invalida:${falta}`;
   for (const [f, b] of Object.entries(ev.arquivos)) {
     const r = git("rev-parse", "--verify", "-q", `${sha}:./${f}`);
     if ((r.status === 0 ? r.stdout.trim() : null) !== b) return `FALHA evidencia-nao-bate:${f}`;
