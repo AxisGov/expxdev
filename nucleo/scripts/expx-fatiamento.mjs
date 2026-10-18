@@ -81,7 +81,11 @@ function foraDoEre(p) {
     if (c === "{" && (ramo !== "cheio" || ancora)) return CHAVE;
     ramo = "cheio";
     ancora = c === "^";
-    if (c === "\\") { i++; quant = false; continue; }
+    if (c === "\\") {
+      // `\d`, `\w`, `\1` só existem no JavaScript; em classe (`[\w]`) a barra é literal e não chega aqui
+      if (/[A-Za-z0-9]/.test(p[i + 1] ?? "")) return "escape do JavaScript (\\d, \\w, \\1)";
+      i++; quant = false; continue;
+    }
     if (c === "[") {
       let j = i + 1;
       if (p[j] === "^") j++;
@@ -120,8 +124,7 @@ function regexes(v, nome) {
   if (!Array.isArray(v)) return erro(nome, "deve ser uma lista de expressoes regulares"), [];
   v.forEach((p, i) => {
     if (typeof p !== "string" || p === "") return erro(`${nome}[${i}]`, "deve ser texto nao vazio");
-    // quem aplica é o bash (`[[ =~ ]]`, ERE): `\d`, `\w`, `\1` só existem no JavaScript; `(?…)` fica com `foraDoEre`
-    if (/\\[A-Za-z0-9]/.test(p)) return erro(`${nome}[${i}]`, "fora do ERE do verificador (\\d, \\w, \\1)");
+    // quem aplica é o bash (`[[ =~ ]]`, ERE): o que só existe no JavaScript, ou que o Git Bash recusa, fica com `foraDoEre`
     const motivo = foraDoEre(p);
     if (motivo) return erro(`${nome}[${i}]`, `${motivo}, que o ERE do verificador recusa`);
     try { new RegExp(p); } catch (e) { erro(`${nome}[${i}]`, `expressao regular invalida (${e.message})`); }

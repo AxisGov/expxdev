@@ -73,7 +73,7 @@ describe("expx-fatiamento.mjs", () => {
   });
 
   it("funcional: ERE que o Git Bash aceita continua válido", () => {
-    const ignorar = ["[+?]", "\\+?", "a+|b?", "()", "^|a", "a|$", "(^a|b$)", "a{0,}", "a{0,1}", "a{1,255}", "(){1}", "\\{", "[{]", "a}", "\\(?", "[(?]", "a\\(?b\\)?"];
+    const ignorar = ["[+?]", "\\+?", "a+|b?", "()", "^|a", "a|$", "(^a|b$)", "a{0,}", "a{0,1}", "a{1,255}", "(){1}", "\\{", "[{]", "a}", "\\(?", "[(?]", "a\\(?b\\)?", "[\\w]", "[\\d]", "a\\\\d"];
     const r = roda(projeto({ expx_fatiamento: 1, ignorar }), "--formato", "json");
     expect(r).toMatchObject({ rc: 0, err: "" });
     expect(JSON.parse(r.out).ignorar).toEqual(ignorar);
