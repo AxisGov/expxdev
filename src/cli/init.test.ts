@@ -297,8 +297,7 @@ describe(".expx/fatiamento.json é do projeto", () => {
     writeFileSync(join(repo, ".claude/skills/sprintx/references/01.md"), "# v1.1.0\n");
     execFileSync("git", ["-c", "user.name=e", "-c", "user.email=e@e.invalid", "commit", "-qam", "v1.1.0"], { cwd: repo });
     execFileSync("git", ["tag", "v1.1.0"], { cwd: repo });
-    const u = await executarUpdate({ raiz: p.raiz, sim: true, origens: { sprintx: repo } });
-    expect(u.aplicou).toBe(true);
+    expect((await executarUpdate({ raiz: p.raiz, sim: true, origens: { sprintx: repo } })).aplicou).toBe(true);
     expect(readFileSync(join(p.raiz, ".expx/fatiamento.json")).equals(bytes)).toBe(true);
   });
 

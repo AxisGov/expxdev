@@ -6,7 +6,6 @@ import { join } from "node:path";
 import { bashDosHooks, RAIZ_DO_REPO } from "../teste/candidatos.js";
 import { suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
 
-// O leitor único de `.expx/fatiamento.json` (sprintx, mergex, doctor), rodado de verdade.
 const SCRIPT = join(RAIZ_DO_REPO, "nucleo", "scripts", "expx-fatiamento.mjs");
 const criados: string[] = [];
 afterEach(() => {
@@ -36,9 +35,7 @@ describe("expx-fatiamento.mjs", () => {
     const r = roda(projeto());
     expect(r.rc).toBe(0);
     const esperado = "FATIA_MAX_LINHAS_PR=400 FATIA_MAX_ARQUIVOS=20 FATIA_MAX_LINHAS_COMMIT=300 FATIA_CAPACIDADE_ARQUIVOS=100";
-    for (const l of `${esperado} EXPX_REVISAO_POR_TASK=se_disponivel EXPX_ENTREGA=por_trabalho EXPX_FATIAMENTO_ORIGEM=padrao`.split(" ")) {
-      expect(r.out.split("\n")).toContain(l);
-    }
+    for (const l of `${esperado} EXPX_REVISAO_POR_TASK=se_disponivel EXPX_ENTREGA=por_trabalho EXPX_FATIAMENTO_ORIGEM=padrao`.split(" ")) expect(r.out.split("\n")).toContain(l);
   });
 
   it("funcional: a calibragem do conselho é válida", () => {

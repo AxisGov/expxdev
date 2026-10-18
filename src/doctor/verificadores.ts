@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { lerLock, type InstalacaoTravada } from "../nucleo/lock.js";
 import { hashDoArquivo } from "../nucleo/integridade.js";
@@ -500,18 +500,15 @@ function verificarModoNoHead(
 /**
  * `.expx/fatiamento.json` presente exige o leitor instalado (o que as skills chamam),
  * mas quem valida é a cópia do próprio CLI: a do checkout é gravável por quem mexe no
- * projeto, e o doctor não executa código do checkout.
+ * projeto, e o doctor não executa código do checkout. Link quebrado ou diretório é presente.
  */
 function verificarFatiamento(raiz: string, push: (a: Achado) => void): void {
-  if (!existsSync(join(raiz, ".expx", "fatiamento.json"))) return;
+  try { lstatSync(join(raiz, ".expx", "fatiamento.json")); } catch (e) { if ((e as NodeJS.ErrnoException).code === "ENOENT") return; }
   const script = join(raiz, ".expx", "marketplace", "plugins", "expx", "nucleo", "scripts", "expx-fatiamento.mjs");
   if (!existsSync(script)) {
-    push({
-      id: "fatiamento-sem-leitor",
-      severidade: "erro",
+    push({ id: "fatiamento-sem-leitor", severidade: "erro",
       problema: ".expx/fatiamento.json existe, mas o nucleo instalado nao tem o leitor (nucleo/scripts/expx-fatiamento.mjs)",
-      correcao: "rode `expx update` (ou `expx init`) para instalar o nucleo com o leitor",
-    });
+      correcao: "rode `expx update` (ou `expx init`) para instalar o nucleo com o leitor" });
     return;
   }
   const leitor = join(raizDoNucleo(), "scripts", "expx-fatiamento.mjs");

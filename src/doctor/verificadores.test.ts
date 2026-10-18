@@ -1,10 +1,11 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { existsSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
 import { executarInit } from "../cli/init.js";
 import { diagnosticar } from "./verificadores.js";
+import { suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
 
 let p: ProjetoTemporario | undefined;
 const repos: string[] = [];
@@ -140,6 +141,12 @@ describe("diagnóstico de .expx/fatiamento.json", () => {
     escreve(p.raiz, { expx_fatiamento: 1 });
     rmSync(join(p.raiz, ".expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs"));
     expect(achado(p.raiz, "fatiamento-sem-leitor")).toMatchObject({ severidade: "erro", correcao: expect.stringContaining("expx update") });
+  });
+
+  it.skipIf(!suportaSymlinkDeDiretorio())("funcional: link quebrado no lugar do arquivo é fatiamento-invalido, não ausência", async () => {
+    p = await projetoSadio();
+    symlinkSync(join(p.raiz, "nao-existe.json"), join(p.raiz, ".expx/fatiamento.json"));
+    expect(achado(p.raiz, "fatiamento-invalido")?.severidade).toBe("erro");
   });
 
   it("funcional: o doctor nunca executa a cópia do leitor que está no checkout", async () => {

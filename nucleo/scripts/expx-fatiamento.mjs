@@ -1,8 +1,5 @@
-// Leitor único de `.expx/fatiamento.json` (contrato expx-instalacao §5.2); cópia
-// do expxdev, chamada por sprintx, mergex e o doctor, para a regra existir uma vez só.
-//
+// Leitor único de `.expx/fatiamento.json` (contrato expx-instalacao §5.2), cópia do expxdev.
 //   node expx-fatiamento.mjs [--raiz <dir>] [--formato env|json] [--validar]
-//
 // Sem arquivo: os padrões. Inválido: sai 1, uma linha `expx-fatiamento: <chave>:
 // <motivo>` por erro no stderr, nada no stdout — nunca os padrões. Uso errado: 2.
 import { lstatSync, readFileSync } from "node:fs";
