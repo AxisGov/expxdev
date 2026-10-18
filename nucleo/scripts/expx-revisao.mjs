@@ -29,7 +29,7 @@ for (let i = 0; i < args.length; i += 2) {
 }
 for (const k of ["trabalho", ...OBRIGATORIOS[cmd]]) if (!op[k]?.trim()) uso(`--${k} obrigatorio`);
 if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(op.trabalho)) uso(`trabalho invalido: ${op.trabalho}`);
-// id `T-NN.MM` da sprintx/runx (sprint.task) ou o legado `T-NN`; vira nome de arquivo, então nada além disso
+// id `T-NN.MM` da sprintx/runx (sprint.task) ou o legado `T-<dígitos>` (como antes); vira nome de arquivo, então nada além disso
 const TASK = cmd === "conferir" ? /^T-(\d+|\d{2}\.\d{2})=[^\s:]+$/ : /^T-(\d+|\d{2}\.\d{2})$/;
 for (const t of op.tasks) if (!TASK.test(t)) uso(`task invalida: ${t}`);
 if (cmd !== "conferir" && op.tasks.length > 1) uso("--task uma vez so");

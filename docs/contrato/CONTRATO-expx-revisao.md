@@ -28,7 +28,8 @@ de revisão da F6) e a mergex (V12 no E2), nos planos delas. O modo vem de
 ## A evidência
 
 O id da task é o da sprintx e da runx, `T-NN.MM` (sprint.task, dois dígitos em cada
-parte: `^T-[0-9]{2}\.[0-9]{2}$`); `T-NN` sem ponto continua aceito (legado). Como o id
+parte: `^T-[0-9]{2}\.[0-9]{2}$`); o legado sem ponto continua aceito como
+antes, com qualquer número de dígitos (`^T-[0-9]+$`: `T-1`, `T-01`, `T-123`). Como o id
 vira nome de arquivo, qualquer outra forma (`T-01..03`, `T-01/03`, `T-01\03`, `../x`,
 vazio) é uso errado (**64**) nos três subcomandos, antes de qualquer leitura ou gravação.
 
