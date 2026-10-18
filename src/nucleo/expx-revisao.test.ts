@@ -242,6 +242,8 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     ["arquivos vazio", { arquivos: {} }],
     ["achados ausente", { achados: undefined }],
     ["resultado achados sem achado aberto", { resultado: "achados" }],
+    ["achado nulo", { achados: [null] }],
+    ["achado com estado desconhecido", { achados: [{ identidade: "a".repeat(64), arquivo: "src/a.js", linha: 1, estado: "aceito" }] }],
   ])("funcional: evidência malformada (%s) é FALHA, nunca ok", (_nome, troca) => {
     const c = cenario();
     altera3(c.raiz);

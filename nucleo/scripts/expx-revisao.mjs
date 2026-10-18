@@ -163,6 +163,7 @@ function veredito(task, sha) {
   const ehMapa = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
   if (!ehMapa(ev) || ev.expx_revisao !== 1 || ev.task !== task || ev.trabalho !== op.trabalho || !ehMapa(ev.arquivos)
     || Object.keys(ev.arquivos).length === 0 || !Array.isArray(ev.achados)
+    || !ev.achados.every((a) => ehMapa(a) && /^[0-9a-f]{64}$/.test(a.identidade) && ["aberto", "anterior", "rejeitado"].includes(a.estado))
     || !["ok", "achados", "indisponivel"].includes(ev.resultado)) return "FALHA evidencia-invalida";
   for (const [f, b] of Object.entries(ev.arquivos)) {
     const r = git("rev-parse", "--verify", "-q", `${sha}:./${f}`);
