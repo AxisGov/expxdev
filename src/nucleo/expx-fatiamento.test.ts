@@ -65,6 +65,8 @@ describe("expx-fatiamento.mjs", () => {
     ...["{", "a{", "a{1", "a{,3}", "a{x}", "({)", "a|{b", "a{0}", "a{256}"].map((p) => [`chave ${p}`, { expx_fatiamento: 1, ignorar: ["^a/", p] }, "ignorar[1]"]),
     // grupo do JavaScript continua inválido depois de a checagem passar a ignorar o parêntese escapado
     ...["(?:a)", "(?=a)", "x(?!a)"].map((p) => [`grupo ${p}`, { expx_fatiamento: 1, ignorar: ["\\(?", p] }, "ignorar[1]"]),
+    // em classe, só as 12 classes POSIX em minúsculas e elemento de um caractere (Git Bash e glibc recusam o resto)
+    ...["[[:not_a_class:]]", "[[:ALPHA:]]", "[[.ab.]]", "[[=ab=]]", "[[:alpha]]", "[a[.b]", "[[:alpha:]"].map((p) => [`classe ${p}`, { expx_fatiamento: 1, ignorar: ["^a/", p] }, "ignorar[1]"]),
   ])("funcional: %s é inválido (rc 1, stderr cita a chave, stdout vazio)", (_nome, conteudo, chave) => {
     const r = roda(projeto(conteudo));
     expect(r.rc).toBe(1);
@@ -73,18 +75,19 @@ describe("expx-fatiamento.mjs", () => {
   });
 
   it("funcional: ERE que o Git Bash aceita continua válido", () => {
-    const ignorar = ["[+?]", "\\+?", "a+|b?", "()", "^|a", "a|$", "(^a|b$)", "a{0,}", "a{0,1}", "a{1,255}", "(){1}", "\\{", "[{]", "a}", "\\(?", "[(?]", "a\\(?b\\)?", "[\\w]", "[\\d]", "a\\\\d"];
+    const ignorar = ["[+?]", "\\+?", "a+|b?", "()", "^|a", "a|$", "(^a|b$)", "a{0,}", "a{0,1}", "a{1,255}", "(){1}", "\\{", "[{]", "a}", "\\(?", "[(?]", "a\\(?b\\)?", "[\\w]", "[\\d]", "a\\\\d", "[[:alpha:]]", "[a[:xdigit:]_]", "[[.a.]]", "[[=a=]]", "[[.].]]", "[:alpha:]"];
     const r = roda(projeto({ expx_fatiamento: 1, ignorar }), "--formato", "json");
     expect(r).toMatchObject({ rc: 0, err: "" });
     expect(JSON.parse(r.out).ignorar).toEqual(ignorar);
   });
 
-  it("funcional: classe com muitos `[:` sem `:]` é validada em tempo linear", () => {
+  it("funcional: classe com muitos `[:` é validada em tempo linear", () => {
     // antes, cada `[:` buscava o `:]` até o fim do texto: 300 mil caracteres levavam dezenas de segundos
-    const t = Date.now();
-    const r = roda(projeto({ expx_fatiamento: 1, ignorar: [`[${"[:a".repeat(100_000)}]`] }), "--validar");
-    expect(r.rc).toBe(0);
-    expect(Date.now() - t).toBeLessThan(5000);
+    for (const [classe, rc] of [[`[${"[:a".repeat(100_000)}]`, 1], [`[${"[:alpha:]:a".repeat(30_000)}]`, 0]] as const) {
+      const t = Date.now();
+      expect(roda(projeto({ expx_fatiamento: 1, ignorar: [classe] }), "--validar").rc).toBe(rc);
+      expect(Date.now() - t).toBeLessThan(5000);
+    }
   });
 
   it("funcional: ignorar soma aos padrões e sai em FATIA_IGNORAR_PROJETO", () => {

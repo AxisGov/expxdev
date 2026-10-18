@@ -91,11 +91,16 @@ function foraDoEre(p) {
       if (p[j] === "^") j++;
       if (p[j] === "]") j++;
       for (; j < p.length && p[j] !== "]"; j++) {
-        // `[:alpha:]`, `[.a.]`, `[=a=]`: a busca não passa do próximo `[` ou `]`, para ficar linear
+        // em classe, `[:`, `[.` e `[=` só abrem uma das 12 classes POSIX ou um elemento de um caractere
+        // (`[:alpha:]`, `[.a.]`, `[=a=]`); o resto o Git Bash e o glibc recusam. Busca de tamanho fixo: linear
+        if (p[j] !== "[" || !":.=".includes(p[j + 1] ?? "x")) continue;
         ELEMENTO.lastIndex = j;
-        const el = p[j] === "[" ? ELEMENTO.exec(p) : null;
-        if (el) j += el[0].length - 1;
+        const el = ELEMENTO.exec(p);
+        if (!el) return "classe POSIX ou elemento de colacao invalido ([[:alpha:]], [[.a.]], [[=a=]])";
+        j += el[0].length - 1;
       }
+      // `[[:alpha:]`: no JavaScript o `]` do elemento fecha a classe; no ERE ela fica aberta
+      if (j >= p.length) return "classe sem ] de fechamento";
       i = j; quant = false; continue;
     }
     if (c === "*" || c === "+" || c === "?" || c === "{") {
@@ -118,7 +123,7 @@ function foraDoEre(p) {
   return ramo === "alt" ? "alternativa vazia (a|, |a, (|a), a||b)" : null;
 }
 const REPETIDO = "quantificador repetido (a+?, a*+, x{2}?)";
-const ELEMENTO = /\[(?::[^[\]]*:|\.[^[\]]*\.|=[^[\]]*=)\]/y; // o nome não tem `[` nem `]`: cada busca para no próximo
+const ELEMENTO = /\[(?::(?:alnum|alpha|blank|cntrl|digit|graph|lower|print|punct|space|upper|xdigit):|\.[^]\.|=[^]=)\]/y;
 const CHAVE = "chave que nao forma intervalo ({, a{, a{1, a{,3}, a{0}, a{256})";
 
 function regexes(v, nome) {
