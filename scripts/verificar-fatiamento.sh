@@ -13,7 +13,7 @@
 # Variáveis (padrões no contrato; o leitor `expx-fatiamento.mjs` as preenche a
 # partir de .expx/fatiamento.json):
 #   FATIA_MAX_LINHAS_PR, FATIA_MAX_ARQUIVOS (F2), FATIA_MAX_LINHAS_COMMIT (F3),
-#   FATIA_MAX_KB_ARQUIVO, FATIA_MAX_LINHAS_ARQUIVO, FATIA_AVISO_*, FATIA_TOLERANCIA_* (F4)
+#   FATIA_MAX_KB_ARQUIVO, FATIA_MAX_LINHAS_ARQUIVO (até 5000), FATIA_AVISO_*, FATIA_TOLERANCIA_* (F4)
 #   FATIA_IGNORAR          fora de F2/F3/F4; o padrão inclui os artefatos de método
 #   FATIA_IGNORAR_PROJETO  regex do projeto que SOMA ao FATIA_IGNORAR, nunca o substitui
 #   FATIA_CAPACIDADE_ARQUIVOS  F2c: arquivos que o revisor lê numa PR (100; acima: saída 2)
@@ -43,9 +43,13 @@ padrao='(^|/)(package-lock\.json$|fixtures/candidatos/)|^docs/(sprintx|entregas|
 ignorar="${FATIA_IGNORAR:-$padrao}"
 [ -z "${FATIA_IGNORAR_PROJETO:-}" ] || ignorar="($ignorar)|($FATIA_IGNORAR_PROJETO)"
 cap_arquivos="${FATIA_CAPACIDADE_ARQUIVOS:-100}"
-# capacidade nao se afrouxa: mais estrito vale, acima de 100 e uso incorreto
-[[ $cap_arquivos =~ ^[0-9]+$ ]] && [ "$cap_arquivos" -le 100 ] \
-  || { echo "FATIA_CAPACIDADE_ARQUIVOS=$cap_arquivos: inteiro ate 100 (capacidade do revisor)" >&2; exit 2; }
+# capacidade nao se afrouxa: mais estrito vale, acima do teto e uso incorreto
+teto() { # <variavel> <valor> <teto>
+  [[ $2 =~ ^[0-9]+$ ]] && [ "$2" -le "$3" ] \
+    || { echo "$1=$2: inteiro ate $3 (capacidade do revisor)" >&2; exit 2; }
+}
+teto FATIA_CAPACIDADE_ARQUIVOS "$cap_arquivos" 100
+teto FATIA_MAX_LINHAS_ARQUIVO "$max_linhas_arq" 5000
 # sem leitor, o painel e o dos repositorios do metodo, que exclui o mesmo padrao
 # (contrato, F6); num projeto o leitor o informa. Sem `:`: definida e vazia quer
 # dizer que o painel nao exclui nada

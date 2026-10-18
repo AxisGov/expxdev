@@ -363,6 +363,17 @@ describe("verificar-fatiamento.sh", () => {
     expect(verifica(d, { FATIA_CAPACIDADE_ARQUIVOS: "50" }).codigo).toBe(0);
   });
 
+  it("funcional: o teto de F4 não se afrouxa — FATIA_MAX_LINHAS_ARQUIVO acima de 5000 é uso incorreto", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "a.md", "x\n");
+    commita(d, "feat: a");
+    const r = verifica(d, { FATIA_MAX_LINHAS_ARQUIVO: "6000" });
+    expect(r.codigo, r.saida).toBe(2);
+    expect(r.saida).toContain("FATIA_MAX_LINHAS_ARQUIVO");
+    expect(verifica(d, { FATIA_MAX_LINHAS_ARQUIVO: "5000" }).codigo).toBe(0);
+  });
+
   it("funcional: F2c por padrão exclui o que o painel do método exclui (gerados e artefatos de método)", () => {
     const d = repo();
     git(d, "switch", "-q", "-c", "feature");
