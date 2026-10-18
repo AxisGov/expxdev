@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -231,5 +231,52 @@ describe("skill sem tag publicada", () => {
     if (!l.ok) return;
     expect(l.lock.skills["sprintx"]?.referencia).toBe("v1.10.0");
     expect(l.lock.skills["sprintx"]?.travado).toBe(true);
+  });
+});
+
+/**
+ * `resolvido_em` é a data em que a versão travada foi resolvida. Um `init`
+ * repetido que resolve EXATAMENTE a mesma coisa não é uma resolução nova: se
+ * reescrevesse a data, a árvore sujaria só por ter virado o dia (foi o que o CI
+ * pegou às 00:00 UTC). O relógio é fixado dos dois lados da meia-noite.
+ */
+describe("init repetido e a data da resolução", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function initEm(iso: string, origens: Record<string, string>): Promise<string> {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(iso));
+    const r = await executarInit({ raiz: p!.raiz, skills: ["sprintx"], harness: ["claude"], origens });
+    vi.useRealTimers();
+    expect(r.ok).toBe(true);
+    return readFileSync(join(p!.raiz, ".expx/expx-lock.json"), "utf8");
+  }
+
+  it("funcional: a mesma resolucao no dia seguinte nao reescreve o lock", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    const origens = catalogoLocal(["sprintx"]);
+    const antes = await initEm("2026-10-17T23:59:59Z", origens);
+    const depois = await initEm("2026-10-18T00:00:01Z", origens);
+    expect(depois).toBe(antes);
+    expect(depois).toContain('"resolvido_em": "2026-10-17"');
+  });
+
+  it("funcional: resolucao diferente (outra origem) grava a data nova", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    await initEm("2026-10-17T23:59:59Z", catalogoLocal(["sprintx"]));
+    const depois = await initEm("2026-10-18T00:00:01Z", catalogoLocal(["sprintx"]));
+    expect(depois).toContain('"resolvido_em": "2026-10-18"');
+  });
+
+  it("funcional: resolvido_em que nao e data nao e preservado, mesmo na mesma resolucao", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    const origens = catalogoLocal(["sprintx"]);
+    const antes = await initEm("2026-10-17T12:00:00Z", origens);
+    const lock = join(p.raiz, ".expx/expx-lock.json");
+    writeFileSync(lock, antes.replace('"resolvido_em": "2026-10-17"', '"resolvido_em": "ontem"'));
+    const depois = await initEm("2026-10-18T12:00:00Z", origens);
+    expect(depois).toContain('"resolvido_em": "2026-10-18"');
   });
 });

@@ -296,7 +296,35 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
   return erros.length > 0 ? { ok: false, erros } : { ok: true, plano };
 }
 
+/** A mesma resolução: mesma origem, referência, commit e bytes da skill. */
+function mesmaResolucao(a: Omit<SkillTravada, "resolvido_em">, b: SkillTravada): boolean {
+  const hashes = (x: Record<string, string>): string => JSON.stringify(Object.entries(x).sort(([p], [q]) => (p < q ? -1 : p > q ? 1 : 0)));
+  return (
+    a.repositorio === b.repositorio &&
+    a.referencia === b.referencia &&
+    a.travado === b.travado &&
+    a.commit === b.commit &&
+    hashes(a.arquivos) === hashes(b.arquivos)
+  );
+}
+
+/**
+ * A data da resolução de uma skill. Se o lock já travava EXATAMENTE esta
+ * resolução, a data dele é mantida: um `init` repetido não resolveu nada novo,
+ * e reescrever a data sujaria a árvore só porque o dia virou.
+ */
+function dataDaResolucao(nova: Omit<SkillTravada, "resolvido_em">, anterior: SkillTravada | undefined): string {
+  // só uma data de verdade é preservada: o schema aceita qualquer texto, e
+  // manter um valor inválido o perpetuaria em todo `init` seguinte
+  if (anterior !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(anterior.resolvido_em) && mesmaResolucao(nova, anterior)) {
+    return anterior.resolvido_em;
+  }
+  return new Date().toISOString().slice(0, 10);
+}
+
 export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
+  const lockAnterior = lerLock(op.raiz);
+  const travadasAntes = lockAnterior.ok ? lockAnterior.lock.skills : {};
   const instaladas: string[] = [];
   const falhas: Falha[] = [];
   const naoTravadas: string[] = [];
@@ -366,13 +394,21 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
       ...(layout.modos !== undefined ? { modos: layout.modos } : {}),
       ...(layout.agentes !== undefined ? { agentes: layout.agentes } : {}),
     });
-    travadas[nome] = {
+    const resolucao = {
       repositorio,
       referencia: alvo.referencia,
       travado: alvo.travado,
       commit: busca.commit,
-      resolvido_em: new Date().toISOString().slice(0, 10),
       arquivos: hashearPasta(layout.raizSkill),
+    };
+    // ordem das chaves igual à de sempre: o lock é comparado byte a byte no git
+    travadas[nome] = {
+      repositorio: resolucao.repositorio,
+      referencia: resolucao.referencia,
+      travado: resolucao.travado,
+      commit: resolucao.commit,
+      resolvido_em: dataDaResolucao(resolucao, travadasAntes[nome]),
+      arquivos: resolucao.arquivos,
     };
     instaladas.push(nome);
   }
