@@ -115,6 +115,13 @@ function revisar() {
     else if (presentes.some((f) => blob(f) !== ev.arquivos[f])) indisponivel("arquivo-mudou-durante-revisao");
     else achados(lotes.flatMap((l) => l.issues), ev);
   }
+  // rejeição gravada (rejeitar) enquanto a CLI rodava não se perde ao regravar
+  const agora = le(caminhoEv(op.task))?.rejeicoes;
+  for (const r of Array.isArray(agora) ? agora : []) {
+    if (!ev.rejeicoes.some((x) => x?.identidade === r?.identidade)) ev.rejeicoes.push(r);
+    for (const a of ev.achados) if (a.identidade === r?.identidade) a.estado = "rejeitado";
+  }
+  if (ev.resultado === "achados" && !ev.achados.some((a) => a.estado === "aberto")) ev.resultado = "ok";
   mkdirSync(pasta, { recursive: true });
   writeFileSync(caminhoEv(op.task), `${JSON.stringify(ev, null, 2)}\n`);
   const abertos = ev.achados.filter((a) => a.estado === "aberto").length;

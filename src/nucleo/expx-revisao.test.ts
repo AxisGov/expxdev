@@ -36,6 +36,7 @@ const cfg = JSON.parse(readFileSync(dir + "/cfg.json", "utf8"));
 appendFileSync(dir + "/chamadas.jsonl", JSON.stringify(a) + "\\n");
 if (a[0] === "--version") { console.log(cfg.versao); process.exit(0); }
 const inc = a[a.indexOf("--include") + 1].split(",");
+if (cfg.durante) writeFileSync(cfg.durante[0], cfg.durante[1]);
 if (cfg.reescreve) writeFileSync(cfg.reescreve, "mudou\\n");
 process.stdout.write((cfg.avisos ?? "") + JSON.stringify({ issues: cfg.issues.filter((i) => inc.includes(i.relevant_file)),
   meta: { reviewed_files: cfg.reviewed_files ?? inc.length, total_changed: inc.length, skipped: cfg.skipped ?? [], capped: cfg.capped ?? false, max_files: cfg.max_files ?? 40 },
@@ -159,6 +160,15 @@ describe("expx-revisao.mjs revisar", () => {
     const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
     rejeita(c.raiz, "T-01", [id]);
     expect(revisar(c, "src/a.js")).toMatchObject({ rc: 0, ev: { rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] } });
+  });
+
+  it("funcional: rejeição gravada (rejeitar) enquanto a CLI roda não se perde", () => {
+    const id = identidade("security", "src/a.js", ["l2", "novo3", "l4"]);
+    const durante = JSON.stringify({ expx_revisao: 1, achados: [], rejeicoes: [{ identidade: id, motivo: "fp", em: "x" }] });
+    const c = cenario({ issues: [achado("src/a.js", 3)], durante: [EV, durante] });
+    altera3(c.raiz);
+    rejeita(c.raiz, "T-00", []);
+    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 0, ev: { resultado: "ok", rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] } });
   });
 
   it("funcional: linhas de texto idêntico com vizinhas diferentes têm identidades diferentes", () => {
