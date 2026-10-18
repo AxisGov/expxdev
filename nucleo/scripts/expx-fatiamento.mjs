@@ -72,7 +72,11 @@ function foraDoEre(p) {
       if (ramo === "alt" || (c === "|" && ramo === "inicio")) return "alternativa vazia (a|, |a, (|a), a||b)";
       ramo = c === "|" ? "alt" : "cheio"; quant = ancora = false; continue;
     }
-    if (c === "(") { ramo = "inicio"; quant = ancora = false; continue; }
+    if (c === "(") {
+      // `(?…)` só existe no JavaScript; `\(?` (parêntese escapado e opcional) é ERE válido
+      if (p[i + 1] === "?") return "grupo (?...) do JavaScript";
+      ramo = "inicio"; quant = ancora = false; continue;
+    }
     // `{` sem operando (no começo, depois de `(`, `|` ou `^`) é recusado, mesmo sendo literal no JavaScript
     if (c === "{" && (ramo !== "cheio" || ancora)) return CHAVE;
     ramo = "cheio";
@@ -116,8 +120,8 @@ function regexes(v, nome) {
   if (!Array.isArray(v)) return erro(nome, "deve ser uma lista de expressoes regulares"), [];
   v.forEach((p, i) => {
     if (typeof p !== "string" || p === "") return erro(`${nome}[${i}]`, "deve ser texto nao vazio");
-    // quem aplica é o bash (`[[ =~ ]]`, ERE): `(?…)`, `\d`, `\w`, `\1` só existem no JavaScript
-    if (/\(\?|\\[A-Za-z0-9]/.test(p)) return erro(`${nome}[${i}]`, "fora do ERE do verificador ((?...), \\d, \\w, \\1)");
+    // quem aplica é o bash (`[[ =~ ]]`, ERE): `\d`, `\w`, `\1` só existem no JavaScript; `(?…)` fica com `foraDoEre`
+    if (/\\[A-Za-z0-9]/.test(p)) return erro(`${nome}[${i}]`, "fora do ERE do verificador (\\d, \\w, \\1)");
     const motivo = foraDoEre(p);
     if (motivo) return erro(`${nome}[${i}]`, `${motivo}, que o ERE do verificador recusa`);
     try { new RegExp(p); } catch (e) { erro(`${nome}[${i}]`, `expressao regular invalida (${e.message})`); }

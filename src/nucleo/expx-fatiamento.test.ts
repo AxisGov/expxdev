@@ -63,6 +63,8 @@ describe("expx-fatiamento.mjs", () => {
     ...["a|", "|a", "(|a)", "a||b"].map((p) => [`alternativa vazia ${p}`, { expx_fatiamento: 1, ignorar: ["^a/", p] }, "ignorar[1]"]),
     // chave que não forma intervalo: literal no JavaScript, recusada pelo Git Bash e pelo macOS
     ...["{", "a{", "a{1", "a{,3}", "a{x}", "({)", "a|{b", "a{0}", "a{256}"].map((p) => [`chave ${p}`, { expx_fatiamento: 1, ignorar: ["^a/", p] }, "ignorar[1]"]),
+    // grupo do JavaScript continua inválido depois de a checagem passar a ignorar o parêntese escapado
+    ...["(?:a)", "(?=a)", "x(?!a)"].map((p) => [`grupo ${p}`, { expx_fatiamento: 1, ignorar: ["\\(?", p] }, "ignorar[1]"]),
   ])("funcional: %s é inválido (rc 1, stderr cita a chave, stdout vazio)", (_nome, conteudo, chave) => {
     const r = roda(projeto(conteudo));
     expect(r.rc).toBe(1);
@@ -71,7 +73,7 @@ describe("expx-fatiamento.mjs", () => {
   });
 
   it("funcional: ERE que o Git Bash aceita continua válido", () => {
-    const ignorar = ["[+?]", "\\+?", "a+|b?", "()", "^|a", "a|$", "(^a|b$)", "a{0,}", "a{0,1}", "a{1,255}", "(){1}", "\\{", "[{]", "a}"];
+    const ignorar = ["[+?]", "\\+?", "a+|b?", "()", "^|a", "a|$", "(^a|b$)", "a{0,}", "a{0,1}", "a{1,255}", "(){1}", "\\{", "[{]", "a}", "\\(?", "[(?]", "a\\(?b\\)?"];
     const r = roda(projeto({ expx_fatiamento: 1, ignorar }), "--formato", "json");
     expect(r).toMatchObject({ rc: 0, err: "" });
     expect(JSON.parse(r.out).ignorar).toEqual(ignorar);
