@@ -187,8 +187,11 @@ const ehMapa = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 function semSinalDaCli(ev) {
   const v = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(typeof ev.cli?.versao === "string" ? ev.cli.versao : "");
   if (!v || (v.slice(1).map(Number).map((n, i) => n - VERSAO_MINIMA[i]).find((d) => d !== 0) ?? 0) < 0) return "cli.versao";
-  const iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
-  if (typeof ev.executada_em !== "string" || !iso.test(ev.executada_em) || Number.isNaN(Date.parse(ev.executada_em))) return "executada_em";
+  const iso = /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d+)?)?(Z|[+-]([01]\d|2[0-3]):[0-5]\d)$/
+    .exec(typeof ev.executada_em === "string" ? ev.executada_em : "");
+  // o Date normaliza 30/02 para 02/03: a data tem de voltar igual
+  const dia = iso && new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])));
+  if (!iso || dia.getUTCMonth() !== Number(iso[2]) - 1 || dia.getUTCDate() !== Number(iso[3])) return "executada_em";
   const presentes = Object.keys(ev.arquivos).filter((f) => ev.arquivos[f] !== null);
   if (!Array.isArray(ev.lotes) || (presentes.length > 0 && ev.lotes.length === 0)
     || !ev.lotes.every((l) => ehMapa(l) && ehMapa(l.meta) && Array.isArray(l.include) && l.error === null)

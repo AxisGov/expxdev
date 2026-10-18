@@ -261,6 +261,8 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     ["cli.versao com zero à esquerda no patch", { cli: { versao: "0.5.014" } }, "cli.versao"],
     ["sem executada_em", { executada_em: undefined }, "executada_em"],
     ["executada_em que não é ISO 8601", { executada_em: "ontem" }, "executada_em"],
+    ["executada_em em data impossível", { executada_em: "2026-02-30T10:00:00Z" }, "executada_em"],
+    ["executada_em em hora impossível", { executada_em: "2026-02-10T24:30:00Z" }, "executada_em"],
     ["lotes vazio com arquivo presente", { lotes: [] }, "lotes"],
     ["sem lotes", { lotes: undefined }, "lotes"],
     ["lote sem meta", { lotes: [{ include: ["src/a.js"], error: null }] }, "lotes"],
