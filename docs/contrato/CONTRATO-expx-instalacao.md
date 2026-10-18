@@ -186,7 +186,7 @@ O projeto calibra o fatiamento (contrato `expx-fatiamento`) de forma versionada:
 - `ignorar` sai em `FATIA_IGNORAR_PROJETO`, que **soma** às exclusões padrão (`FATIA_IGNORAR`), nunca as substitui: quem soma é o verificador do contrato `expx-fatiamento` v2, com a variável exportada pelo E7 da mergex; até lá ela não tem efeito. Regex que não compila, ou fora do ERE que o bash aplica (`(?…)`, `\d`, `\w`, retrovisor), é inválida;
 - validação estrita: chave desconhecida em qualquer nível, `expx_fatiamento` ≠ 1, inteiro fora de 1 a 2^31−1, `modo` fora de `obrigatoria`/`se_disponivel`/`desligada` e `entrega` fora de `por_trabalho`/`por_sprint` invalidam o arquivo; BOM e CRLF são aceitos;
 - ausente → padrões, e tudo como antes; presente e inválido → **erro**, nunca queda calada nos padrões; o arquivo é do projeto: `init`, `add`, `remove` e `update` nunca o escrevem;
-- **leitor único**: `.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs` (README do núcleo). Quem lê: sprintx (F3 e auditor), mergex (E7) e o `doctor` (`fatiamento-invalido`, `fatiamento-sem-leitor`; valida com a cópia do próprio CLI, nunca executa a do checkout). Arquivo presente e leitor ausente é erro, com a instrução de atualizar o expx.
+- **leitor único**: `.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs` (README do núcleo). Hoje só o `doctor` o usa (`fatiamento-invalido`, `fatiamento-sem-leitor`; valida com a cópia do próprio CLI, nunca executa a do checkout); a sprintx (F3 e auditor) e a mergex (E7) passam a chamá-lo nos planos delas. Arquivo presente e leitor ausente é erro, com a instrução de atualizar o expx.
 
 ## 6. O que o `init` não apaga
 
