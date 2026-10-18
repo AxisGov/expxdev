@@ -57,14 +57,22 @@ function limites(cfg, nome, padrao) {
 }
 
 /**
- * Quantificador aplicado a quantificador (`a+?`, `a*+`, `x{2}?`): o `new RegExp` aceita parte deles,
- * o ERE do Git Bash e do macOS recusa ("repetition-operator operand invalid") e a exclusão não exclui
- * nada. Não conta o escapado nem o que está em classe (no ERE, `\` dentro de `[...]` é literal).
+ * O que o `new RegExp` aceita e o ERE do Git Bash e do macOS recusa: o `[[ =~ ]]` sai com 2 e a
+ * exclusão não exclui nada. Na dúvida entre o glibc e o Git Bash/macOS, vale o mais estrito. Não
+ * olha o escapado nem o que está em classe (no ERE, `\` dentro de `[...]` é literal). Devolve o
+ * motivo, ou `null`.
  */
-function quantificadorRepetido(p) {
+function foraDoEre(p) {
   let quant = false;
+  let ramo = "inicio"; // inicio: começo ou depois de `(`; alt: depois de `|`; cheio: ramo com conteúdo
   for (let i = 0; i < p.length; i++) {
     const c = p[i];
+    if (c === "|" || c === ")") {
+      if (ramo === "alt" || (c === "|" && ramo === "inicio")) return "alternativa vazia (a|, |a, (|a), a||b)";
+      ramo = c === "|" ? "alt" : "cheio"; quant = false; continue;
+    }
+    if (c === "(") { ramo = "inicio"; quant = false; continue; }
+    ramo = "cheio";
     if (c === "\\") { i++; quant = false; continue; }
     if (c === "[") {
       let j = i + 1;
@@ -79,16 +87,17 @@ function quantificadorRepetido(p) {
     }
     const intervalo = c === "{" ? /^\{\d+(,\d*)?\}/.exec(p.slice(i)) : null;
     if (c === "*" || c === "+" || c === "?" || intervalo) {
-      if (quant) return true;
+      if (quant) return REPETIDO;
       quant = true;
       if (intervalo) i += intervalo[0].length - 1;
       continue;
     }
-    if (c === "{" && quant) return true;
+    if (c === "{" && quant) return REPETIDO;
     quant = false;
   }
-  return false;
+  return ramo === "alt" ? "alternativa vazia (a|, |a, (|a), a||b)" : null;
 }
+const REPETIDO = "quantificador repetido (a+?, a*+, x{2}?)";
 
 function regexes(v, nome) {
   if (v === undefined) return undefined;
@@ -97,7 +106,8 @@ function regexes(v, nome) {
     if (typeof p !== "string" || p === "") return erro(`${nome}[${i}]`, "deve ser texto nao vazio");
     // quem aplica é o bash (`[[ =~ ]]`, ERE): `(?…)`, `\d`, `\w`, `\1` só existem no JavaScript
     if (/\(\?|\\[A-Za-z0-9]/.test(p)) return erro(`${nome}[${i}]`, "fora do ERE do verificador ((?...), \\d, \\w, \\1)");
-    if (quantificadorRepetido(p)) return erro(`${nome}[${i}]`, "quantificador repetido (a+?, a*+, x{2}?), que o ERE do verificador recusa");
+    const motivo = foraDoEre(p);
+    if (motivo) return erro(`${nome}[${i}]`, `${motivo}, que o ERE do verificador recusa`);
     try { new RegExp(p); } catch (e) { erro(`${nome}[${i}]`, `expressao regular invalida (${e.message})`); }
   });
   return v;

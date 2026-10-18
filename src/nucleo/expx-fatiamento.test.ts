@@ -59,6 +59,8 @@ describe("expx-fatiamento.mjs", () => {
     ["quantificador repetido a*+", { expx_fatiamento: 1, capacidade: { excluido_no_painel: ["^b/", "^c/", "a*+"] } }, "capacidade.excluido_no_painel[2]"],
     ["quantificador repetido x{2}?", { expx_fatiamento: 1, ignorar: ["x{2}?"] }, "ignorar[0]"],
     ["quantificador repetido após barra escapada", { expx_fatiamento: 1, ignorar: ["^a/", "a\\\\+?"] }, "ignorar[1]"],
+    // alternativa vazia: o Git Bash e o macOS recusam ("empty (sub)expression"); o glibc aceita, vale o mais estrito
+    ...["a|", "|a", "(|a)", "a||b"].map((p) => [`alternativa vazia ${p}`, { expx_fatiamento: 1, ignorar: ["^a/", p] }, "ignorar[1]"]),
   ])("funcional: %s é inválido (rc 1, stderr cita a chave, stdout vazio)", (_nome, conteudo, chave) => {
     const r = roda(projeto(conteudo));
     expect(r.rc).toBe(1);
@@ -66,8 +68,8 @@ describe("expx-fatiamento.mjs", () => {
     expect(r.err).toContain(`expx-fatiamento: ${chave}:`);
   });
 
-  it("funcional: quantificador em classe, escapado ou em alternativas distintas continua válido", () => {
-    const ignorar = ["[+?]", "\\+?", "a+|b?"];
+  it("funcional: ERE que o Git Bash aceita continua válido", () => {
+    const ignorar = ["[+?]", "\\+?", "a+|b?", "()", "^|a", "a|$", "(^a|b$)"];
     const r = roda(projeto({ expx_fatiamento: 1, ignorar }), "--formato", "json");
     expect(r).toMatchObject({ rc: 0, err: "" });
     expect(JSON.parse(r.out).ignorar).toEqual(ignorar);
