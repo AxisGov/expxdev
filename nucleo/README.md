@@ -51,8 +51,8 @@ Variáveis que o rastro lê, todas opcionais:
 ## `scripts/`
 
 Ferramentas Node (ESM, só `node:`), copiadas daqui como o resto do núcleo e
-chamadas por caminho: sprintx, mergex e o `doctor` rodam o mesmo arquivo
-instalado. `expx-fatiamento.mjs` (formato no contrato de instalação, §5.2):
+chamadas por caminho. Hoje só o `doctor` usa o leitor; sprintx (F3/auditor) e
+mergex (E7) passam a chamá-lo nos planos delas. `expx-fatiamento.mjs` (formato no contrato de instalação, §5.2):
 `node <L>` imprime `FATIA_*`/`EXPX_*` para `eval`, `--formato json` os limites
 efetivos, `--validar` só valida; arquivo inválido sai 1. `<L>` é
 `.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs`.
