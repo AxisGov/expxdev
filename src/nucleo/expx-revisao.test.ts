@@ -257,6 +257,8 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     ["cli.versao nula", { cli: { versao: null } }, "cli.versao"],
     ["cli.versao abaixo da mínima", { cli: { versao: "0.5.13" } }, "cli.versao"],
     ["cli.versao que não é semver", { cli: { versao: "0.5" } }, "cli.versao"],
+    ["cli.versao com zero à esquerda", { cli: { versao: "00.5.14" } }, "cli.versao"],
+    ["cli.versao com zero à esquerda no patch", { cli: { versao: "0.5.014" } }, "cli.versao"],
     ["sem executada_em", { executada_em: undefined }, "executada_em"],
     ["executada_em que não é ISO 8601", { executada_em: "ontem" }, "executada_em"],
     ["lotes vazio com arquivo presente", { lotes: [] }, "lotes"],

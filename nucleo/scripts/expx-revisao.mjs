@@ -185,7 +185,7 @@ const ehMapa = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 /** Em `ok`/`achados`, o campo que falta para provar que a CLI rodou (ou undefined): versão ≥ mínima,
  *  `executada_em` ISO 8601 e, se há arquivo presente, lotes com `meta` e sem erro que o incluem. */
 function semSinalDaCli(ev) {
-  const v = /^(\d+)\.(\d+)\.(\d+)$/.exec(typeof ev.cli?.versao === "string" ? ev.cli.versao : "");
+  const v = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(typeof ev.cli?.versao === "string" ? ev.cli.versao : "");
   if (!v || (v.slice(1).map(Number).map((n, i) => n - VERSAO_MINIMA[i]).find((d) => d !== 0) ?? 0) < 0) return "cli.versao";
   const iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
   if (typeof ev.executada_em !== "string" || !iso.test(ev.executada_em) || Number.isNaN(Date.parse(ev.executada_em))) return "executada_em";
