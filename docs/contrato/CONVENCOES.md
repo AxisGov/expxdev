@@ -157,7 +157,7 @@ citar quatro das nove regras e perder as outras cinco.
 | Rastro de eventos | `CONTRATO-expx-eventos.md` | a linha JSONL, seu vocabulário |
 | Hooks | `CONTRATO-expx-eventos.md` | mecânica, modos, regras de hook |
 | Agentes | `CONTRATO-expx-eventos.md` | frontmatter e ferramentas por agente |
-| Fatiamento de mudanças | `CONTRATO-expx-fatiamento.md` | F1–F6: tamanho da PR, do commit e do arquivo, e a promoção de linhas longas |
+| Fatiamento de mudanças | `CONTRATO-expx-fatiamento.md` | F1–F6: tamanho da PR, do commit e do arquivo, e a promoção de linhas longas; F2c, a capacidade do revisor; a configuração por projeto |
 
 ## Histórico
 
