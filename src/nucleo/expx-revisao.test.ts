@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -36,6 +36,7 @@ const cfg = JSON.parse(readFileSync(dir + "/cfg.json", "utf8"));
 appendFileSync(dir + "/chamadas.jsonl", JSON.stringify(a) + "\\n");
 if (a[0] === "--version") { console.log(cfg.versao); process.exit(0); }
 const inc = a[a.indexOf("--include") + 1].split(",");
+if (cfg.durante) writeFileSync(cfg.durante[0], cfg.durante[1]);
 if (cfg.reescreve) writeFileSync(cfg.reescreve, "mudou\\n");
 process.stdout.write((cfg.avisos ?? "") + JSON.stringify({ issues: cfg.issues.filter((i) => inc.includes(i.relevant_file)),
   meta: { reviewed_files: cfg.reviewed_files ?? inc.length, total_changed: inc.length, skipped: cfg.skipped ?? [], capped: cfg.capped ?? false, max_files: cfg.max_files ?? 40 },
@@ -48,9 +49,9 @@ process.stdout.write((cfg.avisos ?? "") + JSON.stringify({ issues: cfg.issues.fi
 const PATH = process.env["PATH"] ?? process.env["Path"] ?? "";
 type Ev = { resultado: string; motivo?: string; arquivos: Record<string, string | null>; lotes: { include: string[] }[];
   achados: { identidade: string; arquivo: string; linha: number; estado: string }[]; rejeicoes: { identidade: string }[]; removidos_sem_revisao: string[] };
-function revisar(c: { raiz: string; falsa: string }, arquivos: string, task = "T-01", path = `${c.falsa}${delimiter}${PATH}`) {
+function revisar(c: { raiz: string; falsa: string }, arquivos: string, task = "T-01", path = `${c.falsa}${delimiter}${PATH}`, extra: Record<string, string> = {}) {
   const r = spawnSync(process.execPath, [SCRIPT, "revisar", "--trabalho", "w", "--task", task, "--arquivos", arquivos, "--raiz", c.raiz],
-    { encoding: "utf8", env: ambienteCom(path) });
+    { encoding: "utf8", env: ambienteCom(path, extra) });
   const ev = join(c.raiz, "docs", "entregas", "w", "revisao", `${task}.json`);
   const ch = join(c.falsa, "chamadas.jsonl");
   return { rc: r.status, out: r.stdout, err: r.stderr, ev: (existsSync(ev) ? JSON.parse(readFileSync(ev, "utf8")) : undefined) as Ev,
@@ -161,6 +162,15 @@ describe("expx-revisao.mjs revisar", () => {
     expect(revisar(c, "src/a.js")).toMatchObject({ rc: 0, ev: { rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] } });
   });
 
+  it("funcional: rejeição gravada (rejeitar) enquanto a CLI roda não se perde", () => {
+    const id = identidade("security", "src/a.js", ["l2", "novo3", "l4"]);
+    const durante = JSON.stringify({ expx_revisao: 1, achados: [], rejeicoes: [{ identidade: id, motivo: "fp", em: "x" }] });
+    const c = cenario({ issues: [achado("src/a.js", 3)], durante: [EV, durante] });
+    altera3(c.raiz);
+    rejeita(c.raiz, "T-00", []);
+    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 0, ev: { resultado: "ok", rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] } });
+  });
+
   it("funcional: linhas de texto idêntico com vizinhas diferentes têm identidades diferentes", () => {
     const c = cenario({ issues: [achado("src/b.js", 2), achado("src/b.js", 5)] });
     escreve(c.raiz, "src/b.js", "a\nx\nb\nc\nx\nd\n");
@@ -183,5 +193,123 @@ describe("expx-revisao.mjs revisar", () => {
     const c = cenario({ reescreve: "src/a.js" }); // a falsa reescreve o arquivo antes de responder
     altera3(c.raiz);
     expect(revisar(c, "src/a.js")).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "arquivo-mudou-durante-revisao" } });
+  });
+});
+
+const roda = (raiz: string, ...a: string[]) => {
+  const r = spawnSync(process.execPath, [SCRIPT, ...a, "--trabalho", "w", "--raiz", raiz], { encoding: "utf8" });
+  return { rc: r.status, out: r.stdout.trim(), err: r.stderr };
+};
+const conferir = (raiz: string, modo: string, ...pares: string[]) => roda(raiz, "conferir", "--modo", modo, ...pares.flatMap((p) => ["--task", p]));
+const EV = "docs/entregas/w/revisao/T-01.json";
+const evidencia = (raiz: string): unknown => JSON.parse(readFileSync(join(raiz, EV), "utf8"));
+/** O commit da task leva a evidência junto (E1); `soEvidencia` deixa o código fora. */
+const commita = (raiz: string, soEvidencia = false): string => {
+  git(raiz, "add", "-A", ...(soEvidencia ? ["docs"] : ["src", "docs"]));
+  git(raiz, "commit", "-q", "-m", "task");
+  return git(raiz, "rev-parse", "HEAD");
+};
+
+describe("expx-revisao.mjs conferir e rejeitar", () => {
+  it("funcional: evidência ok que bate com o commit passa; desligada aceita tudo", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    const sha = commita(c.raiz);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+    expect(conferir(c.raiz, "desligada", `T-09=${sha}`)).toMatchObject({ rc: 0, out: "T-09 ok" });
+  });
+
+  it("funcional: evidência ausente é FALHA em obrigatoria e AVISO em se_disponivel; commit inexistente é sempre FALHA", () => {
+    const c = cenario();
+    const sha = git(c.raiz, "rev-parse", "HEAD");
+    expect(conferir(c.raiz, "obrigatoria", `T-09=${sha}`)).toMatchObject({ rc: 1, out: "T-09 FALHA evidencia-ausente" });
+    expect(conferir(c.raiz, "se_disponivel", `T-09=${sha}`)).toMatchObject({ rc: 3, out: "T-09 AVISO evidencia-ausente" });
+    expect(conferir(c.raiz, "se_disponivel", `T-09=${"0".repeat(40)}`)).toMatchObject({ rc: 1, out: `T-09 FALHA commit-inexistente:${"0".repeat(40)}` });
+  });
+
+  it("funcional: a evidência vale como está no commit, não como está no disco", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
+    const sha = commita(c.raiz);
+    expect(roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp").rc).toBe(0);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
+  });
+
+  it.each([
+    ["arquivos nulo", { arquivos: null }],
+    ["arquivos vazio", { arquivos: {} }],
+    ["achados ausente", { achados: undefined }],
+    ["resultado achados sem achado aberto", { resultado: "achados" }],
+    ["achado nulo", { achados: [null] }],
+    ["achado com estado desconhecido", { achados: [{ identidade: "a".repeat(64), arquivo: "src/a.js", linha: 1, estado: "aceito" }] }],
+  ])("funcional: evidência malformada (%s) é FALHA, nunca ok", (_nome, troca) => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    escreve(c.raiz, EV, JSON.stringify({ ...(evidencia(c.raiz) as object), ...troca }));
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: expect.stringMatching(/^T-01 FALHA /) });
+  });
+
+  it("funcional: indisponivel é FALHA em obrigatoria e AVISO em se_disponivel", () => {
+    const c = cenario({ error: "falhou" });
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    const sha = commita(c.raiz);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA indisponivel:erro" });
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${sha}`)).toMatchObject({ rc: 3, out: "T-01 AVISO indisponivel:erro" });
+  });
+
+  it("funcional: achado aberto reprova; rejeitar um achado aberto faz conferir passar", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
+    expect(roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", "f".repeat(64), "--motivo", "fp").rc).toBe(1);
+    expect(roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "falso positivo").rc).toBe(0);
+    expect(evidencia(c.raiz)).toMatchObject({ resultado: "ok", achados: [{ estado: "rejeitado" }], rejeicoes: [{ identidade: id, motivo: "falso positivo" }] });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it("funcional: rejeitar entre a releitura e a gravação do revisar não se perde (trava por evidência)", async () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
+    const dir = temp("expx-pausa-");
+    const filho = (a: string[], env?: NodeJS.ProcessEnv) => new Promise<number | null>((ok) =>
+      spawn(process.execPath, [SCRIPT, ...a, "--trabalho", "w", "--raiz", c.raiz], { env, stdio: "ignore" }).on("close", ok));
+    const espera = async (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+    const rev = filho(["revisar", "--task", "T-01", "--arquivos", "src/a.js"], ambienteCom(`${c.falsa}${delimiter}${PATH}`, { EXPX_REVISAO_TESTE_PAUSA: dir }));
+    for (const ate = Date.now() + 20000; !existsSync(join(dir, "pronto")) && Date.now() < ate;) await espera(50);
+    const rej = filho(["rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp"]);
+    await espera(1500); // sem a trava, o rejeitar grava aqui, com o revisar parado, e o revisar o apaga
+    writeFileSync(join(dir, "continuar"), "");
+    expect([await rev, await rej]).toEqual([1, 0]);
+    expect(evidencia(c.raiz)).toMatchObject({ resultado: "ok", rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] });
+  });
+
+  it("funcional: rejeitar não muda o resultado de indisponivel", () => {
+    const c = cenario();
+    escreve(c.raiz, EV, JSON.stringify({ expx_revisao: 1, trabalho: "w", task: "T-01", resultado: "indisponivel", motivo: "erro",
+      arquivos: {}, achados: [{ identidade: "a".repeat(64), estado: "aberto" }], rejeicoes: [] }));
+    expect(roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", "a".repeat(64), "--motivo", "fp").rc).toBe(0);
+    expect(evidencia(c.raiz)).toMatchObject({ resultado: "indisponivel", achados: [{ estado: "rejeitado" }] });
+  });
+
+  it("funcional: evidência que não bate com o commit reprova nomeando o arquivo", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    escreve(c.raiz, "src/a.js", "editado depois da revisao\n");
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-nao-bate:src/a.js" });
+  });
+
+  it("funcional: arquivo removido na evidência: aceito se o commit o remove, FALHA se o commit o tem", () => {
+    const c = cenario();
+    rmSync(join(c.raiz, "src/a.js"));
+    revisar(c, "src/a.js");
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-nao-bate:src/a.js" });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
   });
 });
