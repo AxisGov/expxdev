@@ -221,7 +221,10 @@ Além de `skills` (versão e hash da cópia de cada skill no plugin), o lock tem
 Tudo em ordem canônica. O único campo que varia entre duas instalações das
 mesmas skills é `skills.<nome>.resolvido_em` (a data da resolução), que já
 existia no lock 1 e é mantido como registro; comparações de equivalência o
-ignoram. `skills.<nome>.repositorio` é a origem usada e, para uma origem
+ignoram. Um `init` repetido que resolve a mesma coisa (mesma origem,
+referência, commit e hashes da skill) mantém a data que já estava no lock: só
+uma resolução nova grava a data do dia, e repetir a instalação não suja a
+árvore porque o dia virou. `skills.<nome>.repositorio` é a origem usada e, para uma origem
 local, o caminho dela.
 
 O `expx doctor` confere o lock contra o disco: arquivo ausente ou alterado,
