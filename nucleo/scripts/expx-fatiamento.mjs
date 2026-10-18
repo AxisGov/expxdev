@@ -91,9 +91,10 @@ function foraDoEre(p) {
       if (p[j] === "^") j++;
       if (p[j] === "]") j++;
       for (; j < p.length && p[j] !== "]"; j++) {
-        if (p[j] !== "[" || !":.=".includes(p[j + 1] ?? "x")) continue;
-        const fim = p.indexOf(`${p[j + 1]}]`, j + 2);
-        if (fim !== -1) j = fim + 1;
+        // `[:alpha:]`, `[.a.]`, `[=a=]`: a busca não passa do próximo `[` ou `]`, para ficar linear
+        ELEMENTO.lastIndex = j;
+        const el = p[j] === "[" ? ELEMENTO.exec(p) : null;
+        if (el) j += el[0].length - 1;
       }
       i = j; quant = false; continue;
     }
@@ -117,6 +118,7 @@ function foraDoEre(p) {
   return ramo === "alt" ? "alternativa vazia (a|, |a, (|a), a||b)" : null;
 }
 const REPETIDO = "quantificador repetido (a+?, a*+, x{2}?)";
+const ELEMENTO = /\[(?::[^[\]]*:|\.[^[\]]*\.|=[^[\]]*=)\]/y; // o nome não tem `[` nem `]`: cada busca para no próximo
 const CHAVE = "chave que nao forma intervalo ({, a{, a{1, a{,3}, a{0}, a{256})";
 
 function regexes(v, nome) {

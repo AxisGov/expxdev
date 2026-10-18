@@ -79,6 +79,14 @@ describe("expx-fatiamento.mjs", () => {
     expect(JSON.parse(r.out).ignorar).toEqual(ignorar);
   });
 
+  it("funcional: classe com muitos `[:` sem `:]` é validada em tempo linear", () => {
+    // antes, cada `[:` buscava o `:]` até o fim do texto: 300 mil caracteres levavam dezenas de segundos
+    const t = Date.now();
+    const r = roda(projeto({ expx_fatiamento: 1, ignorar: [`[${"[:a".repeat(100_000)}]`] }), "--validar");
+    expect(r.rc).toBe(0);
+    expect(Date.now() - t).toBeLessThan(5000);
+  });
+
   it("funcional: ignorar soma aos padrões e sai em FATIA_IGNORAR_PROJETO", () => {
     const r = roda(projeto({ expx_fatiamento: 1, ignorar: ["^gerado/"] }));
     expect(r.rc).toBe(0);
