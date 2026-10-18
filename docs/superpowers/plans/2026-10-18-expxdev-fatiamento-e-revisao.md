@@ -76,12 +76,12 @@
 - Test: `src/doctor/verificadores.test.ts`
 
 **Interfaces:**
-- Consumes: o script da Task 1, no caminho instalado `.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs`, chamado com `--validar` por `process.execPath`.
+- Consumes: o script da Task 1. O doctor exige que a cópia instalada (`.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs`, a que as skills chamam) exista como arquivo regular, mas VALIDA com a cópia do pacote do próprio CLI (`nucleo/scripts/` ao lado do `dist/`), por `process.execPath` com `--validar`: nunca executa código que o repositório do projeto pode ter alterado (feito assim na expxdev#45).
 - Produces: achados `fatiamento-invalido` (erro, problema = stderr do script) e `fatiamento-sem-leitor` (erro: arquivo presente, script ausente; correção "rode `expx update`").
 
 - [ ] **Step 1: Write the failing tests:** `projeto sem .expx/fatiamento.json: nenhum achado de fatiamento`; `arquivo válido: nenhum achado`; `arquivo inválido: erro fatiamento-invalido com a mensagem do script`; `arquivo presente e núcleo sem o script: erro fatiamento-sem-leitor`.
 - [ ] **Step 2: Run** `npx vitest run src/doctor/verificadores.test.ts` — Expected: FAIL nos três últimos.
-- [ ] **Step 3: Implement** `verificarFatiamento(raiz: string, push: (a: Achado) => void): void` com `spawnSync(process.execPath, [script, "--validar", "--raiz", raiz])`.
+- [ ] **Step 3: Implement** `verificarFatiamento(raiz: string, push: (a: Achado) => void): void` com `spawnSync(process.execPath, [scriptDoPacote, "--validar", "--raiz", raiz])`.
 - [ ] **Step 4: Run** — Expected: PASS.
 - [ ] **Step 5: Commit** `feat(expxdev): doctor valida .expx/fatiamento.json`.
 
@@ -141,7 +141,7 @@
 **Interfaces:**
 - Produces: `node expx-revisao.mjs revisar --trabalho <slug> --task <T-NN> --arquivos <a,b,...> [--raiz <dir>]`. Grava `docs/entregas/<slug>/revisao/<T-NN>.json` e sai 0 (passou), 1 (achado bloqueante aberto) ou 2 (`indisponivel`). Imprime no stdout um resumo de uma linha.
 - Evidência (`expx_revisao: 1`): `{expx_revisao, trabalho, task, cli:{versao}, executada_em, arquivos:{<caminho>: <blob-sha1 do conteúdo revisado> | null se removido}, lotes:[{include:[...], meta, error}], resultado: "ok"|"achados"|"indisponivel", motivo?, achados:[{identidade, arquivo, linha, label, texto, estado: "aberto"|"anterior"|"rejeitado"}], rejeicoes:[{identidade, motivo, em}]}`.
-- `identidade` = sha256 de `label + "\0" + arquivo + "\0" + (linha do arquivo, sem espaços nas pontas) + "\0" + versão da CLI`, em hex.
+- `identidade` = sha256 de `label + "\0" + arquivo + "\0" + linha anterior + "\0" + linha apontada + "\0" + linha seguinte + "\0" + versão da CLI` (linhas sem espaços nas pontas; vazio fora do arquivo), em hex.
 
 - [ ] **Step 1: Write the failing tests:**
   - `achado em linha alterada bloqueia` — task altera a linha 3 de `src/a.js`; a CLI falsa devolve achado na linha 3 → rc 1, `resultado:"achados"`, achado `estado:"aberto"`.
@@ -155,9 +155,11 @@
   - `arquivo apagado pela task não é revisado e fica null em arquivos` (Review Focus 4).
   - `rejeição anterior com a mesma identidade vale nesta task` — evidência de outra task do mesmo trabalho com `rejeicoes:[{identidade}]` → o achado entra como `rejeitado` e rc 0.
   - `revisar de novo preserva as rejeições da própria task`.
+  - `duas linhas de texto idêntico com vizinhas diferentes têm identidades diferentes; rejeitar uma não rejeita a outra`.
+  - `arquivo com CRLF no checkout (core.autocrlf=true): o blob da evidência é igual ao do commit`.
   - `arquivo alterado durante a chamada da CLI → indisponivel com motivo arquivo-mudou-durante-revisao` (a CLI falsa reescreve o arquivo antes de responder).
 - [ ] **Step 2: Run** `npx vitest run src/nucleo/expx-revisao.test.ts` — Expected: FAIL.
-- [ ] **Step 3: Implement**: linhas alteradas por `git diff -U0 HEAD -- <arq>` (hunks `+a,b`); não rastreado = todas; blob por `git hash-object <arq>` ANTES e DEPOIS da chamada da CLI — se mudou durante a revisão, `indisponivel` com motivo `arquivo-mudou-durante-revisao` (a evidência nunca fica amarrada a bytes não revisados); versão por `codeant --version` comparada por semver; JSON extraído do primeiro `{` que faz `JSON.parse` do resto. Nunca lê nem imprime `~/.codeant/config.json`.
+- [ ] **Step 3: Implement**: linhas alteradas por `git diff -U0 HEAD -- <arq>` (hunks `+a,b`); não rastreado = todas; blob por `git hash-object -- <arq>` SEM `--no-filters` (assim ele aplica a conversão de fim de linha do `git add` e dá o blob que vai para o commit, também no Windows com CRLF) ANTES e DEPOIS da chamada da CLI — se mudou durante a revisão, `indisponivel` com motivo `arquivo-mudou-durante-revisao` (a evidência nunca fica amarrada a bytes não revisados); versão por `codeant --version` comparada por semver; JSON extraído do primeiro `{` que faz `JSON.parse` do resto. Nunca lê nem imprime `~/.codeant/config.json`.
 - [ ] **Step 4: Run** — Expected: PASS.
 - [ ] **Step 5: Commit** `feat(expxdev): revisao por task pela CLI do CodeAnt no nucleo`.
 
