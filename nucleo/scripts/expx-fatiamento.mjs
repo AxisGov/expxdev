@@ -65,11 +65,9 @@ function regexes(v, nome) {
   if (!Array.isArray(v)) return erro(nome, "deve ser uma lista de expressoes regulares"), [];
   v.forEach((p, i) => {
     if (typeof p !== "string" || p === "") return erro(`${nome}[${i}]`, "deve ser texto nao vazio");
-    try {
-      new RegExp(p);
-    } catch (e) {
-      erro(`${nome}[${i}]`, `expressao regular invalida (${e.message})`);
-    }
+    // quem aplica é o bash (`[[ =~ ]]`, ERE): `(?…)`, `\d`, `\w`, `\1` só existem no JavaScript
+    if (/\(\?|\\[A-Za-z0-9]/.test(p)) return erro(`${nome}[${i}]`, "fora do ERE do verificador ((?...), \\d, \\w, \\1)");
+    try { new RegExp(p); } catch (e) { erro(`${nome}[${i}]`, `expressao regular invalida (${e.message})`); }
   });
   return v;
 }

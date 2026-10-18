@@ -61,6 +61,7 @@ describe("expx-fatiamento.mjs", () => {
     ["chave desconhecida", { expx_fatiamento: 1, limites: {} }, "limites"],
     ["versão desconhecida", { expx_fatiamento: 2 }, "expx_fatiamento"],
     ["ignorar com regex inválida", { expx_fatiamento: 1, ignorar: ["(sem-fechar"] }, "ignorar[0]"],
+    ["regex só do JavaScript (o verificador usa ERE)", { expx_fatiamento: 1, ignorar: ["^a/", "(?=src/)", "\\d"] }, "ignorar[1]"],
   ])("funcional: %s é inválido (rc 1, stderr cita a chave, stdout vazio)", (_nome, conteudo, chave) => {
     const r = roda(projeto(conteudo));
     expect(r.rc).toBe(1);
