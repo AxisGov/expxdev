@@ -38,8 +38,8 @@ if (a[0] === "--version") { console.log(cfg.versao); process.exit(0); }
 const inc = a[a.indexOf("--include") + 1].split(",");
 if (cfg.reescreve) writeFileSync(cfg.reescreve, "mudou\\n");
 process.stdout.write((cfg.avisos ?? "") + JSON.stringify({ issues: cfg.issues.filter((i) => inc.includes(i.relevant_file)),
-  meta: { reviewed_files: inc.length, total_changed: inc.length, skipped: cfg.skipped ?? [], capped: cfg.capped ?? false, max_files: cfg.max_files ?? 40 },
-  error: cfg.error ?? null, noFiles: false }));
+  meta: { reviewed_files: cfg.reviewed_files ?? inc.length, total_changed: inc.length, skipped: cfg.skipped ?? [], capped: cfg.capped ?? false, max_files: cfg.max_files ?? 40 },
+  error: cfg.error ?? null, noFiles: cfg.noFiles ?? false }));
 `);
   writeFileSync(join(falsa, "codeant"), `#!/bin/sh\nexec "${process.execPath}" "${falsa}/codeant.mjs" "$@"\n`, { mode: 0o755 });
   writeFileSync(join(falsa, "codeant.cmd"), `@"${process.execPath}" "${join(falsa, "codeant.mjs")}" %*\r\n`);
@@ -104,11 +104,23 @@ describe("expx-revisao.mjs revisar", () => {
     ["versão abaixo de 0.5.14", { versao: "0.5.9" }, "versao"],
     ["error não nulo", { error: "falhou" }, "erro"],
     ["capped", { capped: true }, "incompleta"],
+    ["noFiles", { noFiles: true }, "incompleta"],
+    ["meta.reviewed_files abaixo dos arquivos pedidos", { reviewed_files: 0 }, "incompleta"],
     ["arquivo da task em skipped sem ser por padrão", { skipped: [{ file: "src/a.js", reason: "too large" }] }, "incompleta"],
   ])("funcional: %s → indisponivel (rc 2) com motivo", (nome, cfg, motivo) => {
     const c = cenario(cfg);
     altera3(c.raiz);
     expect(revisar(c, "src/a.js", "T-01", nome === "CLI ausente" ? dirname(noPath("git") ?? "") : undefined)).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo } });
+  });
+
+  it("funcional: --arquivos sem nenhum caminho (`,,`) é uso errado, nunca ok", () => {
+    expect(revisar(cenario(), ",,")).toMatchObject({ rc: 64, ev: undefined });
+  });
+
+  it("funcional: HEAD sem commit (git diff HEAD falha): o arquivo no índice conta inteiro como alterado", () => {
+    const c = cenario({ issues: [achado("src/a.js", 1)] });
+    git(c.raiz, "update-ref", "-d", "refs/heads/main");
+    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 1, ev: { achados: [{ estado: "aberto" }] } });
   });
 
   it("funcional: vírgula no caminho → indisponivel com motivo caminho-com-virgula, sem revisão parcial", () => {

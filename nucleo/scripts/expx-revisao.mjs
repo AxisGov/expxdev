@@ -46,7 +46,9 @@ function json(texto) {
 function alteradas(f) {
   if (git("ls-files", "--error-unmatch", "--", f).status !== 0) return true;
   const s = new Set();
-  for (const m of git("diff", "-U0", "HEAD", "--", f).stdout.matchAll(/^@@ [^+]*\+(\d+)(?:,(\d+))? @@/gm)) {
+  const d = git("diff", "-U0", "HEAD", "--", f);
+  if (d.status !== 0) return true; // sem HEAD (ou diff que falha): tudo conta, nunca menos
+  for (const m of d.stdout.matchAll(/^@@ [^+]*\+(\d+)(?:,(\d+))? @@/gm)) {
     for (let n = 0; n < Number(m[2] ?? 1); n++) s.add(Number(m[1]) + n);
   }
   return s;
@@ -54,6 +56,7 @@ function alteradas(f) {
 
 function revisar() {
   const arquivos = op.arquivos.split(",").map((f) => f.trim().replace(/\\/g, "/").replace(/^\.\//, "")).filter(Boolean);
+  if (arquivos.length === 0) uso("--arquivos sem nenhum caminho");
   const anterior = le(caminhoEv(op.task));
   const ev = { expx_revisao: 1, trabalho: op.trabalho, task: op.task, cli: { versao: null }, executada_em: new Date().toISOString(),
     arquivos: {}, lotes: [], resultado: "ok", achados: [], rejeicoes: Array.isArray(anterior?.rejeicoes) ? anterior.rejeicoes : [], removidos_sem_revisao: [] };
@@ -79,7 +82,7 @@ function revisar() {
     const roda = (include) => {
       const r = codeant(["review", "--uncommitted", "--headless", "--include", include.join(",")]);
       const j = json(r.stdout ?? "");
-      return { include, meta: j?.meta ?? null, error: j ? j.error ?? null : `json ilegivel (rc ${r.status})`, issues: j?.issues ?? [] };
+      return { include, meta: j?.meta ?? null, error: j ? j.error ?? null : `json ilegivel (rc ${r.status})`, issues: j?.issues ?? [], noFiles: j?.noFiles === true };
     };
     let lotes = [roda(presentes)];
     const max = lotes[0].meta?.max_files;
@@ -88,9 +91,18 @@ function revisar() {
       for (let i = 0; i < presentes.length; i += max) lotes.push(roda(presentes.slice(i, i + max)));
     }
     ev.lotes = lotes.map(({ include, meta, error }) => ({ include, meta, error }));
-    const pulado = (s, f) => (typeof s === "string" ? s.includes(f) && !/pattern/i.test(s) : [s?.file, s?.path].includes(f) && !/pattern/i.test(s?.reason ?? ""));
+    const cita = (s, f) => (typeof s === "string" ? s.includes(f) : [s?.file, s?.path].includes(f));
+    const porPadrao = (s) => /pattern/i.test(typeof s === "string" ? s : String(s?.reason ?? ""));
+    // incompleta: cortada, arquivo da task pulado sem ser por padrão, ou menos revisados que pedidos
+    const incompleta = ({ include, meta, noFiles }) => {
+      const sk = Array.isArray(meta.skipped) ? meta.skipped : [];
+      if (meta.capped || sk.some((s) => !porPadrao(s) && include.some((f) => cita(s, f)))) return true;
+      const pedidos = include.filter((f) => !sk.some((s) => porPadrao(s) && cita(s, f))).length;
+      const revistos = noFiles ? 0 : Array.isArray(meta.reviewed_files) ? meta.reviewed_files.length : Number(meta.reviewed_files);
+      return !(revistos >= pedidos);
+    };
     if (lotes.some((l) => l.error !== null || !l.meta)) indisponivel("erro");
-    else if (lotes.some((l) => l.meta.capped || (l.meta.skipped ?? []).some((s) => l.include.some((f) => pulado(s, f))))) indisponivel("incompleta");
+    else if (lotes.some(incompleta)) indisponivel("incompleta");
     else if (presentes.some((f) => blob(f) !== ev.arquivos[f])) indisponivel("arquivo-mudou-durante-revisao");
     else achados(lotes.flatMap((l) => l.issues), ev);
   }
