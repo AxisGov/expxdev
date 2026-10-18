@@ -15,6 +15,7 @@ import {
   type ConsultaAoHead,
 } from "../nucleo/modo-executavel.js";
 import { jsonCanonico } from "../plugin/plano.js";
+import { raizDoNucleo } from "../plugin/montagem.js";
 import {
   descreverEntrada,
   entradasDivergentes,
@@ -498,9 +499,10 @@ function verificarModoNoHead(
  */
 /**
  * `.expx/fatiamento.json` é do projeto e tem um leitor só: o script do núcleo
- * instalado, o mesmo que sprintx e mergex chamam. O doctor o roda em vez de
- * repetir a regra. Sem o arquivo, nada a conferir; arquivo presente e script
- * ausente é erro, porque as skills também não teriam como lê-lo.
+ * instalado, o mesmo que sprintx e mergex chamam. Sem o arquivo, nada a conferir;
+ * arquivo presente e cópia instalada ausente é erro (as skills não o leriam). Quem
+ * valida é a cópia do próprio CLI, a fonte da instalada: a do checkout é gravável
+ * por quem mexe no projeto, e o doctor não executa código do checkout.
  */
 function verificarFatiamento(raiz: string, push: (a: Achado) => void): void {
   if (!existsSync(join(raiz, ".expx", "fatiamento.json"))) return;
@@ -514,7 +516,8 @@ function verificarFatiamento(raiz: string, push: (a: Achado) => void): void {
     });
     return;
   }
-  const r = spawnSync(process.execPath, [script, "--validar", "--raiz", raiz], { encoding: "utf8" });
+  const leitor = join(raizDoNucleo(), "scripts", "expx-fatiamento.mjs");
+  const r = spawnSync(process.execPath, [leitor, "--validar", "--raiz", raiz], { encoding: "utf8" });
   if (r.status === 0) return;
   push({
     id: "fatiamento-invalido",
