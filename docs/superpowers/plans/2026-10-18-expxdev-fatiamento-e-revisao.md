@@ -64,7 +64,7 @@
   - `env é seguro para eval` — `ignorar:["^a b/","^x'y/"]`; rodar `bash -c 'eval "$(node script)"; printf %s "$FATIA_IGNORAR_PROJETO"'` devolve `^a b/|^x'y/`.
 
 - [ ] **Step 2: Run** `npx vitest run src/nucleo/expx-fatiamento.test.ts` — Expected: FAIL (script não existe).
-- [ ] **Step 3: Implement** o script: lê o arquivo (tira BOM), `JSON.parse`, valida estritamente (chaves conhecidas por nível; inteiros positivos; enums `modo ∈ {obrigatoria, se_disponivel, desligada}`, `entrega ∈ {por_trabalho, por_sprint}`; regex compilam com `new RegExp`), acumula todos os erros antes de sair.
+- [ ] **Step 3: Implement** o script: lê o arquivo (tira BOM), `JSON.parse`, valida estritamente (chaves conhecidas por nível; inteiros positivos; enums `modo ∈ {obrigatoria, se_disponivel, desligada}`, `entrega ∈ {por_trabalho, por_sprint}`; regex válidos como ERE do `grep -E`, porque é o bash que os aplica — sintaxe só do JavaScript, como lookahead e `\d`, é recusada), acumula todos os erros antes de sair.
 - [ ] **Step 4: Run** o teste — Expected: PASS.
 - [ ] **Step 5: Commit** `feat(expxdev): leitor de .expx/fatiamento.json no nucleo`.
 

@@ -12,7 +12,7 @@ A revisão do CodeAnt tem valor provado no conselho (#202: falhas Critical/Secur
 ## 2. Objetivos, não-objetivos e anti-objetivos
 
 Objetivos
-- O1. Cada task passa pela revisão da CLI do CodeAnt antes do commit; achado no limiar ou acima não deixa a task fechar.
+- O1. Cada task passa pela revisão da CLI do CodeAnt antes do commit; achado aberto em linha alterada pela task não deixa a task fechar.
 - O2. Um trabalho pode entregar um PR por sprint, empilhados, sem virar vários trabalhos.
 - O3. Limites de fatiamento calibráveis por projeto, num arquivo versionado, lidos igualmente pela sprintx (F3 e auditor) e pela mergex (E7).
 - O4. PR empilhado nunca chega à main com um verde que não rodou a suíte contra a base real.
@@ -54,7 +54,7 @@ Arquivo versionado, **do projeto** (o CLI nunca o escreve, como o `agentes.json`
   "legibilidade": { "pr_linhas": 2500, "pr_arquivos": 80, "commit_linhas": 300 },
   "arquivo": { "kb": 150, "linhas": 4000 },
   "ignorar": ["^gerado/"],
-  "revisao_por_task": { "modo": "se_disponivel" },
+  "revisao_por_task": { "modo": "obrigatoria" },
   "entrega": "por_sprint"
 }
 ```
@@ -63,12 +63,12 @@ Arquivo versionado, **do projeto** (o CLI nunca o escreve, como o `agentes.json`
 - **Legibilidade (calibrável):** `pr_linhas`, `pr_arquivos`, `commit_linhas` e os de arquivo dentro da capacidade; qualquer valor diferente do padrão exige `justificativa`.
 - **Afrouxamento condicionado à revisão por task** *(decisão minha)*: limites de legibilidade acima do padrão (400/20) só são válidos com `revisao_por_task.modo: obrigatoria`. Com `se_disponivel` ou `desligada`, o arquivo é **inválido** se afrouxar algum desses limites (o script recusa e o doctor aponta). Assim o plano e o E7 usam o mesmo conjunto, sem surpresa no fim: em `obrigatoria` nenhuma task fecha sem revisão passada — CLI ausente, abaixo da versão mínima ou com revisão incompleta (`indisponivel`) impede a task de fechar, que vira bloqueio (classe de recurso externo) até a CLI voltar —, então o PR nunca chega ao E7 com task sem revisão. "Passou" = nenhum achado aberto em linha alterada pela task (`ok`, ou só achados `anterior`/`rejeitado`, pela regra de 4.2).
 - **Duas medidas no E7** *(decisão minha)*: **legibilidade** (exclui artefatos de método e `ignorar`, como hoje) e **capacidade** (≤ 100 arquivos, contando tudo menos o que o projeto declara excluído no painel do CodeAnt em `capacidade.excluido_no_painel`, cujo padrão são os três diretórios de artefato de método que o E7 já manda excluir no painel). O script imprime os limites efetivos das duas.
-- **Onde o script está** *(decisão minha)*: caminho fixo `.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.sh` (o `init` instala o núcleo ali). Arquivo de configuração presente e script ausente é **erro** com a instrução de atualizar o expx, nunca queda calada nos padrões (seria divergência entre as skills). Sem arquivo de configuração, as skills nem procuram o script e usam os padrões, como hoje — instalações antigas não quebram.
+- **Onde o script está** *(decisão minha)*: caminho fixo `.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs` (o `init` instala o núcleo ali). Arquivo de configuração presente e script ausente é **erro** com a instrução de atualizar o expx, nunca queda calada nos padrões (seria divergência entre as skills). Sem arquivo de configuração, as skills nem procuram o script e usam os padrões, como hoje — instalações antigas não quebram.
 - **Divergência atual do contrato** *(decisão minha)*: o padrão do `verificar-fatiamento.sh` passa a excluir os artefatos de método, como o contrato já diz.
 - `ignorar` **soma** aos padrões (como o `FATIA_IGNORAR` do E7 já faz), nunca os substitui.
 - `entrega`: `por_trabalho` (padrão) ou `por_sprint` (4.3); o plano pode sobrescrever por trabalho.
 
-Leitura única: um script no **núcleo** do expxdev (`nucleo/scripts/expx-fatiamento.sh`), que o CLI já copia para todo projeto. Ele valida o arquivo e imprime os `FATIA_*` efetivos (formato `export`), e é a única fonte para: mergex E7 (exporta antes do `fatiamento-da-pr.sh`), sprintx F3 e auditor (leem o resultado, não o JSON cru) e `scripts/verificar-fatiamento.sh` do expxdev. O `doctor` valida o arquivo. Por que `.expx/` e não `CONVENCOES.md`: o `CONVENCOES.md` é da stackx/buildx e a sprintx não pode escrevê-lo; é prosa, não máquina; e `.expx/` já tem o precedente do `agentes.json` com a garantia de preservação no contrato de instalação.
+Leitura única: um script no **núcleo** do expxdev (`nucleo/scripts/expx-fatiamento.mjs`), que o CLI já copia para todo projeto. Ele valida o arquivo e imprime os `FATIA_*` efetivos (formato `export`), e é a única fonte para: mergex E7 (exporta antes do `fatiamento-da-pr.sh`), sprintx F3 e auditor (leem o resultado, não o JSON cru) e `scripts/verificar-fatiamento.sh` do expxdev. O `doctor` valida o arquivo. Por que `.expx/` e não `CONVENCOES.md`: o `CONVENCOES.md` é da stackx/buildx e a sprintx não pode escrevê-lo; é prosa, não máquina; e `.expx/` já tem o precedente do `agentes.json` com a garantia de preservação no contrato de instalação.
 
 ### 4.2 Revisão por task na F6 (mudança principal)
 
@@ -77,19 +77,19 @@ Na ordem obrigatória da F6 (`06-execucao.md:123`), entre "aceite" e `status: co
 teste → implementação → suíte afetada → revisor-testes → aceite → **revisão CodeAnt** → `status: concluida` → `tasks.md` → E1
 
 - Comando: `codeant review --uncommitted --headless`, restrito aos `arquivos` da task com `--include` (CLI ≥ 0.5.14). O código de saída não é usado: o método lê o JSON (ver 6.0). Task com mais arquivos que o `meta.max_files` informado revisa em lotes (`--include` por lote); a task passa só se todos os lotes passam.
-- Achado no limiar ou acima: a task **não fecha**; a correção entra na mesma task e a revisão roda de novo. Achado abaixo do limiar vai para a evidência, sem bloquear.
+- Achado aberto em linha alterada pela task: a task **não fecha**; a correção entra na mesma task e a revisão roda de novo. Não há limiar de severidade: a CLI não informa severidade (6.0), então todo achado nessas linhas conta; achado em linha não alterada segue a regra 6 abaixo.
 - **Achado que persiste ou falso positivo** *(decisão do usuário, 2026-10-18, depois de segunda opinião do Codex)*:
   1. Até 2 tentativas de correção; o agente pode escalar antes quando diagnosticar que o problema é de desenho e não cabe na task.
-  2. Duas classes de bloqueio novas: `revisao_defeito` (achado real que não cabe na task) e `revisao_contestada` (o agente argumenta falso positivo, com o argumento registrado). CLI indisponível não é bloqueio de revisão: é aviso e evidência `indisponivel`, nunca aprovação.
+  2. Duas classes de bloqueio novas: `revisao_defeito` (achado real que não cabe na task) e `revisao_contestada` (o agente argumenta falso positivo, com o argumento registrado). CLI indisponível não é bloqueio por achado: em `se_disponivel` é aviso, em `obrigatoria` impede a task de fechar como bloqueio de recurso externo (4.1); nunca é aprovação.
   3. O agente nunca aceita risco: classifica, deduplica e contesta, nada além.
   4. Só o desenvolvedor destrava: corrige, ou rejeita o achado com motivo no bloqueio, o que libera a execução. A rejeição gravada em arquivo não basta, porque o agente pode escrevê-lo: todo achado rejeitado vira **confirmação obrigatória no PR**, e o E9 não mergeia sem a confirmação explícita do desenvolvedor no PR para cada um (prova fora de qualquer arquivo que o agente escreva). A V12 aceita o achado rejeitado; a descrição do PR o lista.
-  5. Rejeição vale para o mesmo achado nas tasks seguintes enquanto o trecho não mudar: identidade = regra + arquivo + hash do trecho + versão da CLI; trecho alterado reabre.
+  5. Rejeição vale para o mesmo achado nas tasks seguintes enquanto o trecho não mudar: identidade = sha256 de `label` do achado + arquivo + conteúdo da linha apontada (sem espaços nas pontas) + versão da CLI; linha alterada ou CLI nova reabre.
   6. Achado em linha que a task não alterou não bloqueia: vai para a evidência como achado anterior e para PR própria (F1 do contrato).
   7. Tasks que dependem (`depende_de`) da bloqueada param; as independentes seguem.
   Não adotado: confirmar a correção com duas execuções seguidas sem o achado (dobra o custo por task; a revisão de PR do CodeAnt no PR da sprint, dentro dos 100 arquivos, cobre o diff integrado e o que escapar por não determinismo).
-- Evidência versionada: `docs/entregas/<trabalho>/revisao/<task>.json` (o JSON da CLI + metadados: versão da CLI, limiar, lotes, hash do diff revisado), commitada pelo E1 no mesmo commit da task (é artefato de método: fora de F2/F3 e da revisão de PR). No item de `ENTREGA.commits`, um campo `revisao: ok | achados | indisponivel:<motivo>`.
-- Portão: **V12** no E2, no molde da V11 (script `prova-de-revisao.sh`): toda task `concluida` do escopo tem evidência; `ok` passa; `indisponivel` é AVISO em `modo: se_disponivel` e FALHA em `modo: obrigatoria`; evidência cujo hash não bate com o diff da task no commit é FALHA.
-- Sem CLI, sem login ou CLI que falha: **aviso**, evidência `indisponivel:<motivo>`, e o método segue como hoje. O agente nunca roda `codeant login`, `set-codeant-api-key` nem define `CODEANT_API_TOKEN`.
+- Evidência versionada: `docs/entregas/<trabalho>/revisao/<task>.json` (o JSON da CLI normalizado + metadados: versão da CLI, lotes, blob de cada arquivo revisado; formato no contrato da revisão por task), commitada pelo E1 no mesmo commit da task (é artefato de método: fora de F2/F3 e da revisão de PR). No item de `ENTREGA.commits`, um campo `revisao: ok | achados | indisponivel:<motivo>`.
+- Portão: **V12** no E2, no molde da V11, chamando `node …/nucleo/scripts/expx-revisao.mjs conferir`: toda task `concluida` do escopo tem evidência; `ok` passa; `indisponivel` é AVISO em `modo: se_disponivel` e FALHA em `modo: obrigatoria`; evidência cujo blob não bate com o arquivo no commit da task é FALHA.
+- Sem CLI, sem login, abaixo da versão mínima ou CLI que falha: evidência `indisponivel:<motivo>`, nunca aprovação. Em `se_disponivel` é aviso e o método segue como hoje; em `obrigatoria` a task não fecha (4.1). O agente nunca roda `codeant login`, `set-codeant-api-key` nem define `CODEANT_API_TOKEN`.
 - Rastro: sem evento novo; o resultado vai no detalhe do `task-concluida` (DS-180). O portão não lê rastro.
 - Hook: o `task-so-fecha-verde.sh` passa a exigir a evidência quando o modo for `obrigatoria` (é o único hook de evidência; fica no modo dele, aviso por padrão).
 
@@ -153,7 +153,7 @@ Decisão: o método exige duas provas, sem mexer no CI do projeto.
 ## 7. Ordem de entrega
 
 1. Spike da CLI (6.1), sem PR.
-2. expxdev: contrato v2, `nucleo/scripts/expx-fatiamento.sh`, doctor; release.
+2. expxdev: contrato v2, `nucleo/scripts/expx-fatiamento.mjs`, doctor; release.
 3. mergex: E7 lê a configuração; V12; entrega por sprint (E0, V1/V2/V9/V11 por escopo, E7 contra a sprint anterior); E9 com a revalidação ao chegar à main.
 4. sprintx: F3 e auditor pela configuração; passo de revisão por task na F6; entrega por sprint no portão de sprint; hook.
 5. expxdev: repin das candidatas e os testes de consistência (4.5); release.
