@@ -140,7 +140,7 @@
 
 **Interfaces:**
 - Produces: `node expx-revisao.mjs revisar --trabalho <slug> --task <T-NN> --arquivos <a,b,...> [--raiz <dir>]`. Grava `docs/entregas/<slug>/revisao/<T-NN>.json` e sai 0 (passou), 1 (achado bloqueante aberto) ou 2 (`indisponivel`). Imprime no stdout um resumo de uma linha.
-- Evidência (`expx_revisao: 1`): `{expx_revisao, trabalho, task, cli:{versao}, executada_em, arquivos:{<caminho>: <blob-sha1 do conteúdo revisado> | null se removido}, lotes:[{include:[...], meta, error}], resultado: "ok"|"achados"|"indisponivel", motivo?, achados:[{identidade, arquivo, linha, label, texto, estado: "aberto"|"anterior"|"rejeitado"}], rejeicoes:[{identidade, motivo, em}]}`.
+- Evidência (`expx_revisao: 1`): `{expx_revisao, trabalho, task, cli:{versao}, executada_em, arquivos:{<caminho>: <blob-sha1 do conteúdo revisado> | null se removido}, lotes:[{include:[...], meta, error}], resultado: "ok"|"achados"|"indisponivel", motivo?, achados:[{identidade, arquivo, linha, label, texto, estado: "aberto"|"anterior"|"rejeitado"}], rejeicoes:[{identidade, motivo, em}], removidos_sem_revisao:[<caminho>]}`.
 - `identidade` = sha256 de `label + "\0" + arquivo + "\0" + linha anterior + "\0" + linha apontada + "\0" + linha seguinte + "\0" + versão da CLI` (linhas sem espaços nas pontas; vazio fora do arquivo), em hex.
 
 - [ ] **Step 1: Write the failing tests:**
@@ -152,7 +152,7 @@
   - `CLI ausente / versão < 0.5.14 / error não nulo / capped / arquivo da task em skipped sem ser por padrão` → rc 2, `resultado:"indisponivel"` com `motivo` (`cli-ausente`, `versao`, `erro`, `incompleta`).
   - `vírgula no caminho do arquivo → indisponivel com motivo caminho-com-virgula` (Review Focus 2).
   - `JSON precedido de avisos no stdout é lido` (Review Focus 3).
-  - `arquivo apagado pela task não é revisado e fica null em arquivos` (Review Focus 4).
+  - `arquivo apagado pela task não é revisado, fica null em arquivos e entra em removidos_sem_revisao` (Review Focus 4): a CLI não tem linha onde ancorar achado num arquivo removido; a remoção não bloqueia a task, mas fica registrada na evidência e o E4 da mergex a lista na descrição do PR ("removidos sem revisão por task"), para a revisão de PR e o revisor humano a olharem.
   - `rejeição anterior com a mesma identidade vale nesta task` — evidência de outra task do mesmo trabalho com `rejeicoes:[{identidade}]` → o achado entra como `rejeitado` e rc 0.
   - `revisar de novo preserva as rejeições da própria task`.
   - `duas linhas de texto idêntico com vizinhas diferentes têm identidades diferentes; rejeitar uma não rejeita a outra`.
