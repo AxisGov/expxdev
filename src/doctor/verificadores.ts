@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { lerLock, type InstalacaoTravada } from "../nucleo/lock.js";
@@ -216,6 +217,7 @@ export function diagnosticar(raiz: string): Diagnostico {
   }
   verificarHooks(raiz, push);
   verificarRastro(raiz, push);
+  verificarFatiamento(raiz, push);
 
   return { saudavel: achados.filter((a) => a.severidade === "erro").length === 0, achados };
 }
@@ -494,6 +496,34 @@ function verificarModoNoHead(
  * doctor que as pessoas param de rodar. As quatro skills que escrevem o rastro
  * têm implementações independentes — é justamente onde a divergência aparece.
  */
+/**
+ * `.expx/fatiamento.json` é do projeto e tem um leitor só: o script do núcleo
+ * instalado, o mesmo que sprintx e mergex chamam. O doctor o roda em vez de
+ * repetir a regra. Sem o arquivo, nada a conferir; arquivo presente e script
+ * ausente é erro, porque as skills também não teriam como lê-lo.
+ */
+function verificarFatiamento(raiz: string, push: (a: Achado) => void): void {
+  if (!existsSync(join(raiz, ".expx", "fatiamento.json"))) return;
+  const script = join(raiz, ".expx", "marketplace", "plugins", "expx", "nucleo", "scripts", "expx-fatiamento.mjs");
+  if (!existsSync(script)) {
+    push({
+      id: "fatiamento-sem-leitor",
+      severidade: "erro",
+      problema: ".expx/fatiamento.json existe, mas o nucleo instalado nao tem o leitor (nucleo/scripts/expx-fatiamento.mjs)",
+      correcao: "rode `expx update` (ou `expx init`) para instalar o nucleo com o leitor",
+    });
+    return;
+  }
+  const r = spawnSync(process.execPath, [script, "--validar", "--raiz", raiz], { encoding: "utf8" });
+  if (r.status === 0) return;
+  push({
+    id: "fatiamento-invalido",
+    severidade: "erro",
+    problema: r.stderr.trim() || `o leitor saiu ${String(r.status)} ${r.error?.message ?? ""}`.trim(),
+    correcao: "corrija .expx/fatiamento.json (contrato expx-instalacao, secao 5.2): invalido nunca vale como padrao",
+  });
+}
+
 function verificarRastro(raiz: string, push: (a: Achado) => void): void {
   const dir = join(raiz, "docs", "eventos");
   if (!existsSync(dir)) return;
