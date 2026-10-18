@@ -5,7 +5,8 @@
 // revisar: grava docs/entregas/<slug>/revisao/<T-NN>.json; sai 0 (ok), 1 (achado aberto),
 // 2 (indisponivel). conferir: 0 (ok), 1 (FALHA), 3 (só AVISO). Uso errado: 64. O código
 // de saída da CLI não é usado: ele é 0 mesmo com achados (spike 6.0 do desenho); vale o
-// JSON. Nunca lê credencial da CLI.
+// JSON. Nunca lê credencial da CLI. EXPX_REVISAO_TESTE_PAUSA é só para teste: um diretório
+// em que o `revisar` cria `pronto` e espera `continuar` entre a releitura e a gravação.
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -54,6 +55,13 @@ function comTrava(task, fn) {
     }
   }
   try { return fn(); } finally { rmSync(trava, { recursive: true, force: true }); }
+}
+// Só para teste (cabeçalho): nada do ambiente é executado; valor que não é diretório é ignorado.
+function pausaDeTeste() {
+  const dir = process.env.EXPX_REVISAO_TESTE_PAUSA;
+  if (!dir || !statSync(dir, { throwIfNoEntry: false })?.isDirectory()) return;
+  writeFileSync(join(dir, "pronto"), "");
+  for (const ate = Date.now() + 10000; Date.now() < ate && !existsSync(join(dir, "continuar"));) pausa(50);
 }
 /** Grava por arquivo temporário + rename: ninguém lê evidência pela metade. */
 function grava(task, ev) {
@@ -139,8 +147,7 @@ function revisar() {
   // rejeição gravada (rejeitar) enquanto a CLI rodava não se perde: releitura e gravação sob a trava
   const abertos = comTrava(op.task, () => {
     const agora = le(caminhoEv(op.task))?.rejeicoes;
-    // só para teste: roda um script entre a releitura e a gravação (simula a intercalação)
-    if (process.env.EXPX_REVISAO_TESTE_ENTRE) spawnSync(process.execPath, [process.env.EXPX_REVISAO_TESTE_ENTRE], { stdio: "ignore" });
+    pausaDeTeste();
     for (const r of Array.isArray(agora) ? agora : []) {
       if (!ev.rejeicoes.some((x) => x?.identidade === r?.identidade)) ev.rejeicoes.push(r);
       for (const a of ev.achados) if (a.identidade === r?.identidade) a.estado = "rejeitado";

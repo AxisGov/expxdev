@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -272,22 +272,20 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
   });
 
-  it("funcional: rejeitar entre a releitura e a gravação do revisar não se perde (trava por evidência)", () => {
+  it("funcional: rejeitar entre a releitura e a gravação do revisar não se perde (trava por evidência)", async () => {
     const c = cenario({ issues: [achado("src/a.js", 3)] });
     altera3(c.raiz);
     const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
-    const [fim, gancho] = [join(c.falsa, "rejeitar.out"), join(c.falsa, "entre.mjs")];
-    const pausa = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-    // o gancho dispara o rejeitar em paralelo e segura o revisar entre a releitura e a gravação
-    writeFileSync(gancho, `import { spawn } from "node:child_process"; import { openSync } from "node:fs";
-const out = openSync(${JSON.stringify(fim)}, "w");
-spawn(process.execPath, ${JSON.stringify([SCRIPT, "rejeitar", "--trabalho", "w", "--task", "T-01", "--identidade", id, "--motivo", "fp", "--raiz", c.raiz])},
-  { detached: true, stdio: ["ignore", out, out] }).unref();
-Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500);
-`);
-    revisar(c, "src/a.js", "T-01", undefined, { EXPX_REVISAO_TESTE_ENTRE: gancho });
-    for (const ate = Date.now() + 20000; Date.now() < ate && !/T-01|expx-revisao/.test(existsSync(fim) ? readFileSync(fim, "utf8") : "");) pausa(100);
-    expect(readFileSync(fim, "utf8")).toContain("T-01 ok");
+    const dir = temp("expx-pausa-");
+    const filho = (a: string[], env?: NodeJS.ProcessEnv) => new Promise<number | null>((ok) =>
+      spawn(process.execPath, [SCRIPT, ...a, "--trabalho", "w", "--raiz", c.raiz], { env, stdio: "ignore" }).on("close", ok));
+    const espera = async (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+    const rev = filho(["revisar", "--task", "T-01", "--arquivos", "src/a.js"], ambienteCom(`${c.falsa}${delimiter}${PATH}`, { EXPX_REVISAO_TESTE_PAUSA: dir }));
+    for (const ate = Date.now() + 20000; !existsSync(join(dir, "pronto")) && Date.now() < ate;) await espera(50);
+    const rej = filho(["rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp"]);
+    await espera(1500); // sem a trava, o rejeitar grava aqui, com o revisar parado, e o revisar o apaga
+    writeFileSync(join(dir, "continuar"), "");
+    expect([await rev, await rej]).toEqual([1, 0]);
     expect(evidencia(c.raiz)).toMatchObject({ resultado: "ok", rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] });
   });
 
