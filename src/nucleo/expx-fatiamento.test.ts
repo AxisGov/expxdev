@@ -35,22 +35,16 @@ describe("expx-fatiamento.mjs", () => {
   it("funcional: sem arquivo, sai 0 com os padrões", () => {
     const r = roda(projeto());
     expect(r.rc).toBe(0);
-    for (const l of [
-      "FATIA_MAX_LINHAS_PR=400",
-      "FATIA_MAX_ARQUIVOS=20",
-      "FATIA_MAX_LINHAS_COMMIT=300",
-      "FATIA_CAPACIDADE_ARQUIVOS=100",
-      "EXPX_REVISAO_POR_TASK=se_disponivel",
-      "EXPX_ENTREGA=por_trabalho",
-      "EXPX_FATIAMENTO_ORIGEM=padrao",
-    ]) expect(r.out.split("\n")).toContain(l);
+    const esperado = "FATIA_MAX_LINHAS_PR=400 FATIA_MAX_ARQUIVOS=20 FATIA_MAX_LINHAS_COMMIT=300 FATIA_CAPACIDADE_ARQUIVOS=100";
+    for (const l of `${esperado} EXPX_REVISAO_POR_TASK=se_disponivel EXPX_ENTREGA=por_trabalho EXPX_FATIAMENTO_ORIGEM=padrao`.split(" ")) {
+      expect(r.out.split("\n")).toContain(l);
+    }
   });
 
   it("funcional: a calibragem do conselho é válida", () => {
     const r = roda(projeto(CONSELHO));
     expect(r.rc).toBe(0);
-    const linhas = r.out.split("\n");
-    for (const l of ["FATIA_MAX_LINHAS_PR=2500", "FATIA_MAX_ARQUIVOS=80", "EXPX_ENTREGA=por_sprint"]) expect(linhas).toContain(l);
+    for (const l of ["FATIA_MAX_LINHAS_PR=2500", "FATIA_MAX_ARQUIVOS=80", "EXPX_ENTREGA=por_sprint"]) expect(r.out.split("\n")).toContain(l);
   });
 
   it.each([

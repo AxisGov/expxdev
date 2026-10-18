@@ -498,11 +498,9 @@ function verificarModoNoHead(
  * têm implementações independentes — é justamente onde a divergência aparece.
  */
 /**
- * `.expx/fatiamento.json` é do projeto e tem um leitor só: o script do núcleo
- * instalado, o mesmo que sprintx e mergex chamam. Sem o arquivo, nada a conferir;
- * arquivo presente e cópia instalada ausente é erro (as skills não o leriam). Quem
- * valida é a cópia do próprio CLI, a fonte da instalada: a do checkout é gravável
- * por quem mexe no projeto, e o doctor não executa código do checkout.
+ * `.expx/fatiamento.json` presente exige o leitor instalado (o que as skills chamam),
+ * mas quem valida é a cópia do próprio CLI: a do checkout é gravável por quem mexe no
+ * projeto, e o doctor não executa código do checkout.
  */
 function verificarFatiamento(raiz: string, push: (a: Achado) => void): void {
   if (!existsSync(join(raiz, ".expx", "fatiamento.json"))) return;

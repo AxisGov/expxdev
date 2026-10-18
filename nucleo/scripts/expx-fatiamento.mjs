@@ -21,7 +21,6 @@ function uso(msg) {
   process.stderr.write(`expx-fatiamento: ${msg}\nuso: node expx-fatiamento.mjs [--raiz <dir>] [--formato env|json] [--validar]\n`);
   process.exit(2);
 }
-
 const op = { raiz: process.cwd(), formato: "env", validar: false };
 const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i++) {
@@ -90,7 +89,6 @@ function resolver(cfg, origem) {
   if (!ENTREGAS.includes(entrega)) erro("entrega", `deve ser ${ENTREGAS.join(", ")}`);
   const just = cfg.justificativa;
   if (just !== undefined && typeof just !== "string") erro("justificativa", "deve ser texto");
-
   const difere = (v, p) => Object.keys(p).some((k) => v[k] !== p[k]);
   if ((difere(legibilidade, LEGIBILIDADE) || difere(arquivo, ARQUIVO)) && !(typeof just === "string" && just.trim())) {
     erro("justificativa", "obrigatoria quando algum limite difere do padrao");
@@ -110,8 +108,8 @@ try {
 } catch (e) {
   erro(".expx/fatiamento.json", `JSON invalido (${e.message})`);
 }
-const efetivo = erros.length > 0 ? undefined : resolver(lido, existsSync(caminho) ? "projeto" : "padrao");
-if (erros.length > 0 || efetivo === undefined) {
+const e = erros.length > 0 ? undefined : resolver(lido, existsSync(caminho) ? "projeto" : "padrao");
+if (erros.length > 0 || e === undefined) {
   process.stderr.write(`${erros.join("\n")}\n`);
   process.exit(1);
 }
@@ -119,7 +117,6 @@ if (op.validar) process.exit(0);
 
 // Aspas simples quando o valor tem algo além do que o shell lê literalmente.
 const shell = (v) => (/^[A-Za-z0-9_./:^=+-]*$/.test(String(v)) ? String(v) : `'${String(v).replace(/'/g, "'\\''")}'`);
-const e = efetivo;
 const env = {
   FATIA_MAX_LINHAS_PR: e.legibilidade.pr_linhas,
   FATIA_MAX_ARQUIVOS: e.legibilidade.pr_arquivos,
@@ -133,8 +130,5 @@ const env = {
   EXPX_ENTREGA: e.entrega,
   EXPX_FATIAMENTO_ORIGEM: e.origem,
 };
-process.stdout.write(
-  op.formato === "json"
-    ? `${JSON.stringify(e, null, 2)}\n`
-    : Object.entries(env).map(([k, v]) => `${k}=${shell(v)}\n`).join(""),
-);
+const texto = Object.entries(env).map(([k, v]) => `${k}=${shell(v)}\n`).join("");
+process.stdout.write(op.formato === "json" ? `${JSON.stringify(e, null, 2)}\n` : texto);
