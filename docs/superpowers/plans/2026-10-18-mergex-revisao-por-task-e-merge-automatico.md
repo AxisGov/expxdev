@@ -208,3 +208,177 @@
 - [ ] **Step 3: Write** o bloco, o texto (de onde vêm os limites, por que do SHA publicado, o que é saída 2) e as DM.
 - [ ] **Step 4: Run** `bash scripts/ci/test-fatiamento-e7.sh && bash scripts/ci/test-leitor-do-projeto.sh && bash scripts/ci/validate-mergex-contract.sh` — Expected: verdes.
 - [ ] **Step 5: Commit** `feat(mergex): E7 mede o PR com os limites de .expx/fatiamento.json`. Abra a PR 2 (≈ 380 linhas, 7 arquivos).
+
+## Bloco B1 (PR 3) — a V12 executável
+
+> A correção do id com ponto já está no núcleo (expxdev#51, 05847fd); a cópia da Task A1 sai dessa revisão ou de uma posterior.
+
+### Task B1: `scripts/portao-v12.sh`
+
+**Files:**
+- Create: `.claude/skills/mergex/scripts/portao-v12.sh`
+- Create: `scripts/ci/test-portao-v12.sh`
+- Modify: `.github/workflows/ci.yml` (passo `Test E2 V12`)
+
+**Interfaces:**
+- Produces: `portao-v12.sh --verificar --entrega <ENTREGA.md> --trabalho <slug> [--raiz <dir>] -- <tasks.md>...`. Primeira linha `V12=OK|AVISO|FALHA|SEM_PROVA|n/a`, depois as linhas do `conferir` como vieram e `motivo=` quando houver. Códigos no molde da V11: 0 (OK, AVISO, n/a), 1 (FALHA), 2 (SEM_PROVA), 64 (uso).
+- Consumes: `leitor-do-projeto.sh --rev HEAD` (`EXPX_REVISAO_POR_TASK`); `prova-de-commit.sh --concluidas <tasks.md>...` e `--commits <ENTREGA.md>` (o commit do **último** item da task na ordem efetiva); `node <raiz>/.expx/marketplace/plugins/expx/nucleo/scripts/expx-revisao.mjs conferir --trabalho <slug> --modo <modo> --task <T>=<commit>...`.
+- Mapeamento (DM-238):
+
+| Situação | `obrigatoria` | `se_disponivel` | `desligada` |
+|---|---|---|---|
+| sem `.expx/fatiamento.json` (`EXPX_FATIAMENTO_ORIGEM=padrao`) | `n/a`, sem node | `n/a`, sem node | `n/a`, sem node |
+| modo `desligada`; `versionado: false`; nenhuma task concluída | — | — | `n/a`, sem node |
+| task concluída sem item em `commits` | fora da V12 (é da V11) | idem | — |
+| configuração inválida ou leitor ausente (`leitor-do-projeto` 1 ou 3) | `SEM_PROVA` | `SEM_PROVA` | `SEM_PROVA` |
+| node ausente ou núcleo sem `expx-revisao.mjs` | `SEM_PROVA` | `AVISO revisao-nao-conferida:<motivo>` | — |
+| `conferir` 0 / 3 / 1 | OK / AVISO / FALHA | OK / AVISO / FALHA | — |
+| `conferir` 64, outro código, ou saída sem exatamente uma linha `T-… ok|AVISO …|FALHA …` por task pedida | `SEM_PROVA` | `SEM_PROVA` | — |
+
+- [ ] **Step 1: Write the failing tests** (repositório temporário com núcleo copiado, `tasks.md` de duas tasks, commits de task e evidências montadas com `cli.versao: 0.5.14`, `executada_em` ISO e `lotes` que cobrem os arquivos):
+  - `obrigatoria com evidencia ok no commit da task: V12=OK`;
+  - `obrigatoria sem evidencia: V12=FALHA e a linha T-… FALHA evidencia-ausente`;
+  - `se_disponivel sem evidencia: V12=AVISO, codigo 0`;
+  - `sem .expx/fatiamento.json: n/a sem chamar node` (decisão do coordenador, 2026-10-18);
+  - `id com ponto (T-01.03) e conferido de verdade` (cópia 05847fd);
+  - `desligada: n/a sem chamar node` (PATH sem node);
+  - `achado aberto: FALHA achados-abertos:1`;
+  - `evidencia editada no disco depois do commit nao muda o veredito`;
+  - `task com dois itens em commits: confere o commit do ultimo`;
+  - `conferir que sai 64 vira SEM_PROVA em qualquer modo` (`node` falso que sai 64);
+  - `node ausente: SEM_PROVA em obrigatoria, AVISO em se_disponivel`;
+  - `conferir que sai 0 com uma linha a menos: SEM_PROVA`;
+  - `task concluida sem item em commits nao e alvo da V12`.
+- [ ] **Step 2: Run** `bash scripts/ci/test-portao-v12.sh` — Expected: FAIL (script ausente).
+- [ ] **Step 3: Implement** o script (usa o leitor de `commits` do `prova-de-commit.sh`, nunca um segundo parser).
+- [ ] **Step 4: Run** — Expected: `13 ok, 0 falha(s)`.
+- [ ] **Step 5: Commit** `feat(mergex): portao-v12 confere a revisao por task pelo nucleo`. Abra a PR 3 (≈ 390 linhas, 3 arquivos mais a cópia regenerada, que fica fora da conta).
+
+## Bloco B2 (PR 4) — a V12 no portão: causa, schema e texto
+
+### Task B2: `causa-do-portao.sh` e o schema conhecem a V12
+
+**Files:**
+- Modify: `.claude/skills/mergex/scripts/causa-do-portao.sh` (comentário l.13-14; `ORDEM` l.34; `CAUSAS` l.37-47; `numero` l.57-58)
+- Modify: `.claude/skills/mergex/references/00-schema.md` (enum l.67; tabela l.430-442 ganha `| 12 | \`v12\` | \`revisao_reprovada\` |`; prosa l.452-466: o último grupo é "v1 a v5, v11 e v12")
+- Modify: `.claude/skills/mergex/assets/TEMPLATE-ENTREGA.md` (l.63: `v1..v12`)
+- Modify: `scripts/ci/validate-mergex-contract.sh` (l.504: 12→13; l.600: `` `v1` … `v12` ``; asserções da v12 depois de l.606, no molde de l.601-606)
+- Modify: `scripts/ci/test-causa-portao.sh` (l.117-130 e l.164, l.194-195)
+
+**Interfaces:**
+- Produces: `ORDEM='v10 v6 v7 v8 v9 v1 v2 v3 v4 v5 v11 v12'`; `v12|revisao_reprovada`; `v12_sem_prova` aceito. O `registrar-portao.sh` não muda: ele valida por `causa-do-portao.sh --lista` (l.86 de `registrar-portao.sh`), e o teste prova isso.
+- DM-239: V12 por último (sem commit de task não há evidência para conferir: a V12 é consequência da V11 e de V1).
+
+- [ ] **Step 1: Write the failing tests** em `test-causa-portao.sh`: `ordem declarada termina em v11 v12`; `deriva revisao_reprovada "V12 sozinha" v12`; `deriva commit_nao_registrado v11 v12`; `deriva tarefa_nao_concluida v1 v12`; `deriva indeterminada v12_sem_prova`; `--lista v12 v1 imprime [v1, v12]`; `registrar-portao --resultado bloqueado --falhas v12 grava falhas_portao: [v12]` (bloqueado não exige a prova do pre-push).
+- [ ] **Step 2: Run** `bash scripts/ci/test-causa-portao.sh` — Expected: FAIL nos novos e no da ordem.
+- [ ] **Step 3: Implement** script, schema, template e o validador.
+- [ ] **Step 4: Run** `bash scripts/ci/test-causa-portao.sh && bash scripts/ci/validate-mergex-contract.sh` — Expected: verdes.
+- [ ] **Step 5: Commit** `feat(mergex): causa do portao conhece a V12 (revisao_reprovada)`.
+
+### Task B3: o E2 tem doze verificações
+
+**Files:**
+- Modify: `.claude/skills/mergex/references/02-prontidao.md` (l.46, l.52, l.267, l.295, l.349; seção `### V12 — Task concluída sem revisão por task aprovada` depois da V11, l.246; "Quando falha" l.354-368 ganha as linhas da V12)
+- Modify: `.claude/skills/mergex/assets/TEMPLATE-prontidao.md` (l.4, l.28 + linha `| V12 |`, l.49)
+- Modify: `.claude/commands/mergex-check.md` e `.opencode/commands/mergex-check.md` (l.42, l.44, l.58 + `| V12 |`, parágrafo como o da l.64)
+- Modify: `.claude/hooks/mergex/pr-so-com-portao.sh` (l.447, l.466: `doze verificações (V1..V12)`)
+- Modify: `README.md` (l.199) e `.github/assets/badge-portao.svg` (`12 verificacoes`, l.1-14)
+- Modify: `.claude/skills/mergex/references/11-reconciliacao-base.md` (l.316) e `13-predecessores-sprintx.md` (l.24): `V1–V12`
+- Modify: `scripts/ci/test-r3-predecessores-sprintx.sh` (l.737, l.856) e `scripts/ci/mutacao-r3-predecessores-sprintx.sh` (l.149)
+- Modify: `scripts/ci/validate-mergex-contract.sh` (l.549-565: doze; a varredura de l.553 passa a proibir também `onze verifica`, `11 verifica`, `V1..V11)`, `V1–V11`)
+
+**Interfaces:**
+- Consumes: `portao-v12.sh` (Task B1), `causa-do-portao.sh` com v12 (Task B2).
+- A seção da V12 diz: a pergunta (cada task `concluida` do escopo tem evidência de revisão aprovada no commit dela?), o comando, a tabela da Task B1, `v12_sem_prova` como FALHA registrada, e que a V12 não lê `revisao:` de `ENTREGA.commits` (lê a evidência no commit, pelo núcleo).
+
+- [ ] **Step 1: Run** `bash scripts/ci/validate-mergex-contract.sh` depois de mudar só a l.549-565 do validador — Expected: FAIL (`README no longer announces twelve checks` etc.), prova de que o texto anterior reprova.
+- [ ] **Step 2: Write** o texto nos arquivos acima.
+- [ ] **Step 3: Run** `bash scripts/ci/validate-mergex-contract.sh && bash scripts/ci/test-r3-predecessores-sprintx.sh && bash .claude/hooks/teste.sh` — Expected: verdes (o `teste.sh` não muda; ele só tem de continuar passando com o hook novo).
+- [ ] **Step 4: Commit** `feat(mergex): portao de prontidao com doze verificacoes (V12 revisao por task)`. Abra a PR 4 (≈ 300 linhas, 18 arquivos).
+
+## Bloco C (PR 5) — E1: a evidência entra no commit da task
+
+### Task C1: `ENTREGA.commits` ganha `revisao:`
+
+**Files:**
+- Modify: `.claude/skills/mergex/scripts/sequencia-de-commits.sh` (uso l.42-44; gravador l.297-305; opção l.350)
+- Modify: `.claude/skills/mergex/references/00-schema.md` ("A ordem de registro", l.177-209; campo `commits`, l.162)
+- Modify: `.claude/skills/mergex/assets/TEMPLATE-ENTREGA.md` (l.47-50)
+- Create: `scripts/ci/test-e1-evidencia-revisao.sh`
+
+**Interfaces:**
+- Produces: `sequencia-de-commits.sh --acrescentar <ENTREGA.md> <task> <commit> [<revisao>]`, que grava `revisao: <valor>` como quarta chave do item. Gramática do valor: `ok`, `achados`, `indisponivel:<classe>` (`[a-z][a-z-]*`, a classe do motivo antes do segundo `:`) ou `null` quando não há evidência (decisão do coordenador, 2026-10-18). Valor fora da gramática: não grava nada (código 1). Leitura (`--ler`, `--validar`, `prova-de-commit.sh --commits`) ignora a chave e continua aceitando itens sem ela (legado).
+- DM-241.
+
+- [ ] **Step 1: Write the failing tests**: `acrescentar com revisao ok grava a quarta chave`; `sem o quarto argumento grava revisao: null`; `motivo com caminho nao entra no YAML` (`indisponivel:arquivo-inexistente:src/a: b.js` → `indisponivel:arquivo-inexistente`; `--validar` e `prova-de-commit.sh --commits` continuam lendo a lista); `valor fora da gramatica nao grava`; `lista legada sem revisao continua valida`.
+- [ ] **Step 2: Run** `bash scripts/ci/test-e1-evidencia-revisao.sh` — Expected: FAIL.
+- [ ] **Step 3: Implement**.
+- [ ] **Step 4: Run** o teste e `bash scripts/ci/test-sequencia-commits.sh` — Expected: verdes.
+- [ ] **Step 5: Commit** `feat(mergex): item de ENTREGA.commits registra a revisao da task`.
+
+### Task C2: o E1 commita a evidência da task atual
+
+**Files:**
+- Modify: `.claude/skills/mergex/scripts/fechamento-do-e1.sh` (`separa_metodo` l.524-558: passo novo logo depois, que separa `docs/entregas/<trabalho>/revisao/*.json`; staging A; chamadas a `--acrescentar` l.318 e l.655 passam o valor lido da evidência em stage com `git show ":<caminho>" | jq`)
+- Modify: `.claude/hooks/mergex/commit-por-task.sh` (antes da classificação por ownership: a evidência da task atual não é produto)
+- Modify: `.claude/skills/mergex/references/01-commits.md` (tabela l.319-325 e "Eles **nunca contam como desvio** e **não entram no commit de uma task**", l.341: a exceção exata; Passo 4 l.580-590: o item com `revisao`)
+- Modify: `scripts/ci/test-e1-evidencia-revisao.sh`
+
+**Interfaces:**
+- Regra (DM-240): `docs/entregas/<trabalho_id>/revisao/<task atual>.json` suja entra no commit da task sem precisar estar na lista do chamador; `revisao/<outra task>.json` suja fica na árvore, não entra e não para; qualquer outro nome sob `revisao/` (temporário, trava) é produto e segue a regra de desvio (falha fechada). `ownership-da-task.sh` não muda (o validador exige exatamente quatro situações, `validate-mergex-contract.sh` l.873).
+- Consumes: o formato da evidência do contrato `expx-revisao` v1 (`resultado`, `motivo`).
+
+- [ ] **Step 1: Write the failing tests**: `evidencia da task atual suja entra no commit sem ser listada`; `evidencia de outra task fica na arvore e nao para o E1`; `item novo tem revisao: ok lido da evidencia em stage`; `sem evidencia: revisao: null`; `T-01.01.json.123.tmp sob revisao/ e desvio`; `hook commit-por-task aceita a evidencia da task atual no stage`; contrato: `01-commits nomeia a excecao da evidencia de revisao` e a frase antiga sem exceção não existe mais.
+- [ ] **Step 2: Run** — Expected: FAIL nos sete.
+- [ ] **Step 3: Implement**.
+- [ ] **Step 4: Run** `bash scripts/ci/test-e1-evidencia-revisao.sh && bash scripts/ci/test-trava-e1.sh && bash scripts/ci/test-m4b-arvore-inteira.sh && bash .claude/hooks/teste.sh` — Expected: verdes.
+- [ ] **Step 5: Commit** `feat(mergex): E1 commita a evidencia de revisao junto com a task`.
+
+### Task C3: o E3 classifica a evidência
+
+**Files:**
+- Modify: `.claude/skills/mergex/scripts/classificar-atencao.sh` (catálogo l.95-98: linha `mergex|docs/entregas/<trabalho_id>/revisao/<T-NN.MM>.json|-|L4|evidência da revisão por task`; casamento l.338-345)
+- Modify: `.claude/skills/mergex/references/03-atencao-humana.md` (tabela l.284-287, a mesma linha)
+- Modify: `scripts/ci/test-e1-evidencia-revisao.sh` e `.github/workflows/ci.yml` (passo do teste)
+
+**Interfaces:**
+- DM-242: LEITURA RÁPIDA (L4), não DISPENSÁVEL: a evidência não prova conteúdo para o revisor (mesma razão do contrato do E3 sobre o D4); os achados rejeitados vão destacados no PR (Bloco D).
+- [ ] **Step 1: Write the failing tests**: `revisao/T-01.01.json do trabalho corrente e L4`; `revisao de outro trabalho e OLHO OBRIGATORIO fora do catalogo`.
+- [ ] **Step 2: Run** — Expected: FAIL.
+- [ ] **Step 3: Implement** script e tabela (o validador já confere que os dois catálogos batem).
+- [ ] **Step 4: Run** o teste, `bash scripts/ci/test-atencao-metodo.sh` e `bash scripts/ci/validate-mergex-contract.sh` — Expected: verdes.
+- [ ] **Step 5: Commit** `feat(mergex): E3 classifica a evidencia de revisao por task`. Abra a PR 5 (≈ 360 linhas, 11 arquivos).
+
+## Bloco D1 (PR 6) — E4 e E9: achados rejeitados
+
+### Task D1: o PR lista os achados rejeitados e os removidos sem revisão
+
+**Files:**
+- Modify: `.claude/skills/mergex/references/04-descricao-pr.md` (§6, l.147-154: subseção "Revisão por task", com o bloco que lê as evidências do PR)
+- Modify: `.claude/skills/mergex/assets/TEMPLATE-PR.md` (depois de l.52: `### Revisão por task`, omitida sem insumo pela regra 10)
+- Create: `scripts/ci/test-e4-revisao-por-task.sh`
+
+**Interfaces:**
+- Fonte: as evidências alteradas no PR, `git diff --name-only <branch_base>...HEAD -- 'docs/entregas/<trabalho_id>/revisao/*.json'`, lidas em `HEAD` com `jq`. Lista: cada achado `rejeitado` (`arquivo:linha — label — motivo da rejeição`, o motivo de `rejeicoes` pela `identidade`), cada `removidos_sem_revisao`, e cada task `indisponivel:<motivo>`. A seção 6 continua na posição 6; a ordem das onze seções não muda.
+- DM-244.
+- [ ] **Step 1: Write the failing tests** (bloco extraído do `04-descricao-pr.md` e rodado numa fixture): `lista o achado rejeitado com o motivo`; `lista removidos_sem_revisao`; `sem rejeicao nem removido: a secao e omitida`; `evidencia de outro trabalho nao entra`; contrato: `TEMPLATE-PR tem ### Revisão por task dentro de O que foi testado`.
+- [ ] **Step 2: Run** — Expected: FAIL. **Step 3: Write**. **Step 4: Run** — Expected: `5 ok, 0 falha(s)`.
+- [ ] **Step 5: Commit** `feat(mergex): descricao do PR lista os achados rejeitados da revisao por task`.
+
+### Task D2: o E9 exige confirmação por achado rejeitado
+
+**Files:**
+- Modify: `.claude/skills/mergex/references/09-revisao.md` (Passo 2, l.46-61: coleta dos achados rejeitados no `headRefOid`; "As seis situações", l.375-391, e R6, l.392-404: o achado rejeitado na revisão por task é finding `REJECTED_WITH_EVIDENCE` sem resposta de reviewer, confirmável só pelo operador; "Confirmação humana", l.454-480: a pergunta específica por achado; recusa dura 6 inalterada)
+- Modify: `.claude/skills/mergex/assets/TEMPLATE-revisao.md` (bloco de confirmações)
+- Create: `scripts/ci/test-e9-revisao-por-task.sh`; Modify: `.github/workflows/ci.yml`
+
+**Interfaces:**
+- Fonte: `git diff --name-only <baseRefOid>...<headRefOid> -- 'docs/entregas/*/revisao/*.json'` e `git show <headRefOid>:<caminho>`; buscar o `headRefOid` como o R4 já faz (DM-213).
+- Regra (DM-243): uma confirmação HUMANO OPERADOR por achado (identidade, arquivo:linha, label, motivo), nesta execução; não persiste (DM-224), não vira closure histórico, não resolve thread nenhuma. Sem as confirmações o gate é `BLOQUEADO` confirmável humanamente; recusa → recusa dura 6 (decisão do coordenador, 2026-10-18: interativa, uma por achado). Qualquer achado rejeitado também impede o merge automático (Task M2, condição 6).
+- [ ] **Step 1: Write the failing tests**: contrato (o passo 2 coleta as evidências do `headRefOid`; a pergunta por achado existe; o texto diz que não persiste); execução do trecho de coleta numa fixture (`dois achados rejeitados em duas evidencias: duas confirmacoes`; `evidencia so no disco, nao no head: nenhuma`; `achado rejeitado que voltou a aberto no head: nao e confirmacao, e R3`).
+- [ ] **Step 2: Run** — Expected: FAIL. **Step 3: Write**. **Step 4: Run** o teste e `bash scripts/ci/validate-review-evidence-contract.sh` — Expected: verdes.
+- [ ] **Step 5: Commit** `feat(mergex): E9 pede confirmacao por achado rejeitado na revisao por task`. Abra a PR 6 (≈ 330 linhas, 7 arquivos).
+
+
+
+*Continua em `2026-10-18-mergex-revisao-por-task-e-merge-automatico-parte-2.md` (blocos D2, S1–S2 e M1–M4, PRs 7 a 13, tabela de PRs e dependências externas).*
