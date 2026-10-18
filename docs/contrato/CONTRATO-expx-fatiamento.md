@@ -225,13 +225,15 @@ script as descreve. O `ci.yml` do `expxdev` roda o verificador em toda PR.
 
 Feito: o verificador mede F2c e os artefatos de método, e soma
 `FATIA_IGNORAR_PROJETO`; o leitor de `.expx/fatiamento.json` e o `doctor` que o
-valida estão no núcleo. Falta, nos planos de cada skill:
+valida estão no núcleo; a revisão por task (`nucleo/scripts/expx-revisao.mjs`:
+`revisar`, `conferir` e `rejeitar`), que é o que torna o afrouxamento válido,
+também está, com o contrato em `CONTRATO-expx-revisao.md`. Falta, nos planos de
+cada skill:
 
 - a `mergex` (E7) espelhar o corpo deste verificador no `fatiamento-da-pr.sh` e
-  exportar o leitor antes dele (como acima);
-- a `sprintx` (F3 e auditor) ler os limites do leitor, não do texto;
-- a revisão por task (`nucleo/scripts/expx-revisao.mjs`), que é o que torna o
-  afrouxamento válido.
+  exportar o leitor antes dele (como acima), e o E2 chamar o `conferir` (V12);
+- a `sprintx` (F3 e auditor) ler os limites do leitor, não do texto, e a F6
+  chamar o `revisar` antes de a task fechar.
 
 Até lá, a conferência é do `verificar-fatiamento.sh` e de quem abre a PR.
 
