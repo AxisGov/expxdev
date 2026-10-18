@@ -56,6 +56,40 @@ function limites(cfg, nome, padrao) {
   return r;
 }
 
+/**
+ * Quantificador aplicado a quantificador (`a+?`, `a*+`, `x{2}?`): o `new RegExp` aceita parte deles,
+ * o ERE do Git Bash e do macOS recusa ("repetition-operator operand invalid") e a exclusão não exclui
+ * nada. Não conta o escapado nem o que está em classe (no ERE, `\` dentro de `[...]` é literal).
+ */
+function quantificadorRepetido(p) {
+  let quant = false;
+  for (let i = 0; i < p.length; i++) {
+    const c = p[i];
+    if (c === "\\") { i++; quant = false; continue; }
+    if (c === "[") {
+      let j = i + 1;
+      if (p[j] === "^") j++;
+      if (p[j] === "]") j++;
+      for (; j < p.length && p[j] !== "]"; j++) {
+        if (p[j] !== "[" || !":.=".includes(p[j + 1] ?? "x")) continue;
+        const fim = p.indexOf(`${p[j + 1]}]`, j + 2);
+        if (fim !== -1) j = fim + 1;
+      }
+      i = j; quant = false; continue;
+    }
+    const intervalo = c === "{" ? /^\{\d+(,\d*)?\}/.exec(p.slice(i)) : null;
+    if (c === "*" || c === "+" || c === "?" || intervalo) {
+      if (quant) return true;
+      quant = true;
+      if (intervalo) i += intervalo[0].length - 1;
+      continue;
+    }
+    if (c === "{" && quant) return true;
+    quant = false;
+  }
+  return false;
+}
+
 function regexes(v, nome) {
   if (v === undefined) return undefined;
   if (!Array.isArray(v)) return erro(nome, "deve ser uma lista de expressoes regulares"), [];
@@ -63,6 +97,7 @@ function regexes(v, nome) {
     if (typeof p !== "string" || p === "") return erro(`${nome}[${i}]`, "deve ser texto nao vazio");
     // quem aplica é o bash (`[[ =~ ]]`, ERE): `(?…)`, `\d`, `\w`, `\1` só existem no JavaScript
     if (/\(\?|\\[A-Za-z0-9]/.test(p)) return erro(`${nome}[${i}]`, "fora do ERE do verificador ((?...), \\d, \\w, \\1)");
+    if (quantificadorRepetido(p)) return erro(`${nome}[${i}]`, "quantificador repetido (a+?, a*+, x{2}?), que o ERE do verificador recusa");
     try { new RegExp(p); } catch (e) { erro(`${nome}[${i}]`, `expressao regular invalida (${e.message})`); }
   });
   return v;

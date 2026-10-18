@@ -54,11 +54,23 @@ describe("expx-fatiamento.mjs", () => {
     ["inteiro que estoura a aritmética do bash", { ...CONSELHO, arquivo: { kb: 2 ** 53 } }, "arquivo.kb"],
     ["ignorar com regex inválida", { expx_fatiamento: 1, ignorar: ["(sem-fechar"] }, "ignorar[0]"],
     ["regex só do JavaScript (o verificador usa ERE)", { expx_fatiamento: 1, ignorar: ["^a/", "(?=src/)", "\\d"] }, "ignorar[1]"],
+    // o Git Bash e o macOS recusam ("repetition-operator operand invalid") e a exclusão não exclui nada
+    ["quantificador repetido a+?", { expx_fatiamento: 1, ignorar: ["^a/", "a+?"] }, "ignorar[1]"],
+    ["quantificador repetido a*+", { expx_fatiamento: 1, capacidade: { excluido_no_painel: ["^b/", "^c/", "a*+"] } }, "capacidade.excluido_no_painel[2]"],
+    ["quantificador repetido x{2}?", { expx_fatiamento: 1, ignorar: ["x{2}?"] }, "ignorar[0]"],
+    ["quantificador repetido após barra escapada", { expx_fatiamento: 1, ignorar: ["^a/", "a\\\\+?"] }, "ignorar[1]"],
   ])("funcional: %s é inválido (rc 1, stderr cita a chave, stdout vazio)", (_nome, conteudo, chave) => {
     const r = roda(projeto(conteudo));
     expect(r.rc).toBe(1);
     expect(r.out).toBe("");
     expect(r.err).toContain(`expx-fatiamento: ${chave}:`);
+  });
+
+  it("funcional: quantificador em classe, escapado ou em alternativas distintas continua válido", () => {
+    const ignorar = ["[+?]", "\\+?", "a+|b?"];
+    const r = roda(projeto({ expx_fatiamento: 1, ignorar }), "--formato", "json");
+    expect(r).toMatchObject({ rc: 0, err: "" });
+    expect(JSON.parse(r.out).ignorar).toEqual(ignorar);
   });
 
   it("funcional: ignorar soma aos padrões e sai em FATIA_IGNORAR_PROJETO", () => {
