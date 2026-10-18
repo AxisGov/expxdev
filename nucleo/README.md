@@ -10,6 +10,7 @@ foram selecionadas.
 |---|---|
 | `hooks/expx-rastro.sh` | O rastro de eventos, os modos de hook e o `trabalho_id` |
 | `scripts/expx-fatiamento.mjs` | O leitor único de `.expx/fatiamento.json` (seção `scripts/` abaixo) |
+| `scripts/expx-revisao.mjs` | A revisão por task pela CLI do CodeAnt: `revisar`, `conferir`, `rejeitar` (seção `scripts/` abaixo) |
 | `commands/onboarding.md` | `/expx:onboarding` — orquestra o mapeamento inicial (stackx, designx, legadox, memox, prodx) das camadas instaladas. Não é núcleo de hook: `montarPlugin` o copia à parte, direto para `commands/` na raiz do plugin — não para dentro de `nucleo/` — porque é assim que o Claude Code descobre um comando. |
 
 ## Como chega até um projeto
@@ -56,6 +57,12 @@ mergex (E7) passam a chamá-lo nos planos delas. `expx-fatiamento.mjs` (formato 
 `node <L>` imprime `FATIA_*`/`EXPX_*` para `eval`, `--formato json` os limites
 efetivos, `--validar` só valida; arquivo inválido sai 1. `<L>` é
 `.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs`.
+
+`expx-revisao.mjs` (contrato em `docs/contrato/CONTRATO-expx-revisao.md`):
+`revisar` roda a CLI do CodeAnt nos arquivos de uma task e grava a evidência em
+`docs/entregas/<trabalho>/revisao/<T-NN>.json`; `conferir` é a regra da V12 da
+mergex; `rejeitar` registra a rejeição de um achado pelo desenvolvedor. A sprintx
+(passo de revisão da F6) e a mergex (E2, V12) passam a chamá-lo nos planos delas.
 
 ## Por que existe
 
