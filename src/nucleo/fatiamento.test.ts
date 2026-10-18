@@ -363,6 +363,16 @@ describe("verificar-fatiamento.sh", () => {
     expect(verifica(d, { FATIA_CAPACIDADE_ARQUIVOS: "50" }).codigo).toBe(0);
   });
 
+  it("funcional: F2c por padrão exclui o que o painel do método exclui (gerados e artefatos de método)", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    muitos(d, "fixtures/candidatos/x", 101);
+    commita(d, "chore: snapshot");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(0);
+    expect(r.saida).not.toContain("F2c:");
+  });
+
   it("funcional: FATIA_IGNORAR_PROJETO soma ao padrão, nunca o substitui", () => {
     const d = repo();
     git(d, "switch", "-q", "-c", "feature");

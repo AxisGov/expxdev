@@ -77,9 +77,11 @@ PR entre os dois é revisada, mas a pessoa que lê não a lê inteira.
 ### F2c — Capacidade do revisor
 
 No máximo **100 arquivos visíveis ao revisor** na PR: todos os alterados, menos
-os que o projeto exclui no painel do CodeAnt (`FATIA_CAPACIDADE_EXCLUIDO`, cujo
-padrão são os artefatos de método, `^docs/(sprintx|entregas|eventos)/`). Gerado
-que o painel não exclui conta aqui, porque o bot o vê. Acima de 100 o bot não
+os que o projeto exclui no painel do CodeAnt (`FATIA_CAPACIDADE_EXCLUIDO`). Num
+projeto, o leitor a preenche com `capacidade.excluido_no_painel`, cujo padrão são
+os artefatos de método, `^docs/(sprintx|entregas|eventos)/`. Sem leitor, nos
+repositórios do método, o padrão é o mesmo de `FATIA_IGNORAR`, que o painel deles
+exclui (F6). Gerado que o painel não exclui conta aqui, porque o bot o vê. Acima de 100 o bot não
 revisa a PR (tabela acima): F2c não se calibra e `FATIA_EXCECAO` não a rebaixa.
 
 ### F3 — Tamanho do commit

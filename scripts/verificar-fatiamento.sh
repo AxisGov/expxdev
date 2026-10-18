@@ -17,7 +17,7 @@
 #   FATIA_IGNORAR          fora de F2/F3/F4; o padrão inclui os artefatos de método
 #   FATIA_IGNORAR_PROJETO  regex do projeto que SOMA ao FATIA_IGNORAR, nunca o substitui
 #   FATIA_CAPACIDADE_ARQUIVOS  F2c: arquivos que o revisor lê numa PR (100; acima: saída 2)
-#   FATIA_CAPACIDADE_EXCLUIDO  fora de F2c (o painel não os mostra); vazio = nenhum
+#   FATIA_CAPACIDADE_EXCLUIDO  fora de F2c (o painel não os mostra; padrão: o de FATIA_IGNORAR); vazio = nenhum
 #   FATIA_EXCECAO          rebaixa F2 e F3 a aviso; nunca F2c nem F4
 
 set -uo pipefail
@@ -39,15 +39,17 @@ aviso_linhas_arq="${FATIA_AVISO_LINHAS:-3000}"
 tolerancia_l="${FATIA_TOLERANCIA_LINHAS:-20}"
 # o lock casa o nome inteiro (`$`): `package-lock.json.backup` e revisado. Os
 # artefatos de metodo (docs/sprintx, entregas, eventos) nao sao codigo revisado
-metodo='^docs/(sprintx|entregas|eventos)/'
-ignorar="${FATIA_IGNORAR:-(^|/)(package-lock\.json$|fixtures/candidatos/)|$metodo}"
+padrao='(^|/)(package-lock\.json$|fixtures/candidatos/)|^docs/(sprintx|entregas|eventos)/'
+ignorar="${FATIA_IGNORAR:-$padrao}"
 [ -z "${FATIA_IGNORAR_PROJETO:-}" ] || ignorar="($ignorar)|($FATIA_IGNORAR_PROJETO)"
 cap_arquivos="${FATIA_CAPACIDADE_ARQUIVOS:-100}"
 # capacidade nao se afrouxa: mais estrito vale, acima de 100 e uso incorreto
 [[ $cap_arquivos =~ ^[0-9]+$ ]] && [ "$cap_arquivos" -le 100 ] \
   || { echo "FATIA_CAPACIDADE_ARQUIVOS=$cap_arquivos: inteiro ate 100 (capacidade do revisor)" >&2; exit 2; }
-# sem `:`: definida e vazia quer dizer que o painel nao exclui nada
-cap_excluido="${FATIA_CAPACIDADE_EXCLUIDO-$metodo}"
+# sem leitor, o painel e o dos repositorios do metodo, que exclui o mesmo padrao
+# (contrato, F6); num projeto o leitor o informa. Sem `:`: definida e vazia quer
+# dizer que o painel nao exclui nada
+cap_excluido="${FATIA_CAPACIDADE_EXCLUIDO-$padrao}"
 excecao="${FATIA_EXCECAO:-}"
 
 # os limites em KB são comparados em BYTES: dividir por 1024 truncaria, e um
