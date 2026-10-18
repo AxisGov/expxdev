@@ -181,8 +181,9 @@ function achados(issues, ev) {
   if (ev.achados.some((a) => a.estado === "aberto")) ev.resultado = "achados";
 }
 
+const ehMapa = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 /** Em `ok`/`achados`, o campo que falta para provar que a CLI rodou (ou undefined): versão ≥ mínima,
- *  `executada_em` ISO 8601 e, se há arquivo presente, lotes sem erro que o incluem. */
+ *  `executada_em` ISO 8601 e, se há arquivo presente, lotes com `meta` e sem erro que o incluem. */
 function semSinalDaCli(ev) {
   const v = /^(\d+)\.(\d+)\.(\d+)$/.exec(typeof ev.cli?.versao === "string" ? ev.cli.versao : "");
   if (!v || (v.slice(1).map(Number).map((n, i) => n - VERSAO_MINIMA[i]).find((d) => d !== 0) ?? 0) < 0) return "cli.versao";
@@ -190,7 +191,7 @@ function semSinalDaCli(ev) {
   if (typeof ev.executada_em !== "string" || !iso.test(ev.executada_em) || Number.isNaN(Date.parse(ev.executada_em))) return "executada_em";
   const presentes = Object.keys(ev.arquivos).filter((f) => ev.arquivos[f] !== null);
   if (!Array.isArray(ev.lotes) || (presentes.length > 0 && ev.lotes.length === 0)
-    || !ev.lotes.every((l) => typeof l === "object" && l !== null && Array.isArray(l.include) && l.error === null)
+    || !ev.lotes.every((l) => ehMapa(l) && ehMapa(l.meta) && Array.isArray(l.include) && l.error === null)
     || !presentes.every((f) => ev.lotes.some((l) => l.include.includes(f)))) return "lotes";
 }
 
@@ -204,7 +205,6 @@ function veredito(task, sha) {
   if (doCommit.status !== 0) return `${nivel} evidencia-ausente`;
   let ev;
   try { ev = JSON.parse(doCommit.stdout.replace(/^\uFEFF/, "")); } catch { return "FALHA evidencia-invalida"; }
-  const ehMapa = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
   if (!ehMapa(ev) || ev.expx_revisao !== 1 || ev.task !== task || ev.trabalho !== op.trabalho || !ehMapa(ev.arquivos)
     || Object.keys(ev.arquivos).length === 0 || !Array.isArray(ev.achados)
     || !ev.achados.every((a) => ehMapa(a) && /^[0-9a-f]{64}$/.test(a.identidade) && ["aberto", "anterior", "rejeitado"].includes(a.estado))

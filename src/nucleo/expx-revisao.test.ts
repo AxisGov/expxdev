@@ -261,7 +261,8 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     ["executada_em que não é ISO 8601", { executada_em: "ontem" }, "executada_em"],
     ["lotes vazio com arquivo presente", { lotes: [] }, "lotes"],
     ["sem lotes", { lotes: undefined }, "lotes"],
-    ["lote com erro", { lotes: [{ include: ["src/a.js"], meta: {}, error: "x" }] }, "lotes"],
+    ["lote sem meta", { lotes: [{ include: ["src/a.js"], error: null }] }, "lotes"],
+    ["lote com erro",{ lotes: [{ include: ["src/a.js"], meta: {}, error: "x" }] }, "lotes"],
     ["lotes que não incluem o arquivo presente", { lotes: [{ include: ["src/b.js"], meta: {}, error: null }] }, "lotes"],
   ])("funcional: ok sem sinal de que a CLI rodou (%s) é FALHA evidencia-invalida nomeando o campo", (_nome, troca, campo) => {
     const c = cenario();
