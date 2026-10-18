@@ -1,8 +1,8 @@
 // Revisão por task pela CLI do CodeAnt (contrato expx-revisao), cópia do expxdev.
-//   node expx-revisao.mjs revisar --trabalho <slug> --task <T-NN> --arquivos <a,b,...> [--raiz <dir>]
-//   node expx-revisao.mjs conferir --trabalho <slug> --modo <obrigatoria|se_disponivel|desligada> --task <T-NN>=<sha> [...]
-//   node expx-revisao.mjs rejeitar --trabalho <slug> --task <T-NN> --identidade <hex> --motivo <texto>
-// revisar: grava docs/entregas/<slug>/revisao/<T-NN>.json; sai 0 (ok), 1 (achado aberto),
+//   node expx-revisao.mjs revisar --trabalho <slug> --task <T-NN.MM> --arquivos <a,b,...> [--raiz <dir>]
+//   node expx-revisao.mjs conferir --trabalho <slug> --modo <obrigatoria|se_disponivel|desligada> --task <T-NN.MM>=<sha> [...]
+//   node expx-revisao.mjs rejeitar --trabalho <slug> --task <T-NN.MM> --identidade <hex> --motivo <texto>
+// revisar: grava docs/entregas/<slug>/revisao/<T-NN.MM>.json; sai 0 (ok), 1 (achado aberto),
 // 2 (indisponivel). conferir: 0 (ok), 1 (FALHA), 3 (só AVISO). Uso errado: 64. O código
 // de saída da CLI não é usado: ele é 0 mesmo com achados (spike 6.0 do desenho); vale o
 // JSON. Nunca lê credencial da CLI. EXPX_REVISAO_TESTE_PAUSA é só para teste: um diretório
@@ -29,7 +29,8 @@ for (let i = 0; i < args.length; i += 2) {
 }
 for (const k of ["trabalho", ...OBRIGATORIOS[cmd]]) if (!op[k]?.trim()) uso(`--${k} obrigatorio`);
 if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(op.trabalho)) uso(`trabalho invalido: ${op.trabalho}`);
-const TASK = cmd === "conferir" ? /^T-\d+=[^\s:]+$/ : /^T-\d+$/;
+// id `T-NN.MM` da sprintx/runx (sprint.task) ou o legado `T-NN`; vira nome de arquivo, então nada além disso
+const TASK = cmd === "conferir" ? /^T-(\d+|\d{2}\.\d{2})=[^\s:]+$/ : /^T-(\d+|\d{2}\.\d{2})$/;
 for (const t of op.tasks) if (!TASK.test(t)) uso(`task invalida: ${t}`);
 if (cmd !== "conferir" && op.tasks.length > 1) uso("--task uma vez so");
 if (cmd === "conferir" && !["obrigatoria", "se_disponivel", "desligada"].includes(op.modo)) uso(`modo invalido: ${op.modo}`);
