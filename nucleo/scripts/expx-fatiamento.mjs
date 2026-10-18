@@ -56,13 +56,84 @@ function limites(cfg, nome, padrao) {
   return r;
 }
 
+/**
+ * O que o `new RegExp` aceita e o ERE do Git Bash e do macOS recusa: o `[[ =~ ]]` sai com 2 e a
+ * exclusão não exclui nada. Na dúvida entre o glibc e o Git Bash/macOS, vale o mais estrito. Não
+ * olha o escapado nem o que está em classe (no ERE, `\` dentro de `[...]` é literal). Devolve o
+ * motivo, ou `null`.
+ */
+function foraDoEre(p) {
+  let quant = false;
+  let ramo = "inicio"; // inicio: começo ou depois de `(`; alt: depois de `|`; cheio: ramo com conteúdo
+  let ancora = false; // o último token foi `^`
+  for (let i = 0; i < p.length; i++) {
+    const c = p[i];
+    if (c === "|" || c === ")") {
+      if (ramo === "alt" || (c === "|" && ramo === "inicio")) return "alternativa vazia (a|, |a, (|a), a||b)";
+      ramo = c === "|" ? "alt" : "cheio"; quant = ancora = false; continue;
+    }
+    if (c === "(") {
+      // `(?…)` só existe no JavaScript; `\(?` (parêntese escapado e opcional) é ERE válido
+      if (p[i + 1] === "?") return "grupo (?...) do JavaScript";
+      ramo = "inicio"; quant = ancora = false; continue;
+    }
+    // `{` sem operando (no começo, depois de `(`, `|` ou `^`) é recusado, mesmo sendo literal no JavaScript
+    if (c === "{" && (ramo !== "cheio" || ancora)) return CHAVE;
+    ramo = "cheio";
+    ancora = c === "^";
+    if (c === "\\") {
+      // `\d`, `\w`, `\1` só existem no JavaScript; em classe (`[\w]`) a barra é literal e não chega aqui
+      if (/[A-Za-z0-9]/.test(p[i + 1] ?? "")) return "escape do JavaScript (\\d, \\w, \\1)";
+      i++; quant = false; continue;
+    }
+    if (c === "[") {
+      let j = i + 1;
+      if (p[j] === "^") j++;
+      if (p[j] === "]") j++;
+      for (; j < p.length && p[j] !== "]"; j++) {
+        // em classe, `[:`, `[.` e `[=` só abrem uma das 12 classes POSIX ou um elemento de um caractere
+        // (`[:alpha:]`, `[.a.]`, `[=a=]`); o resto o Git Bash e o glibc recusam. Busca de tamanho fixo: linear
+        if (p[j] !== "[" || !":.=".includes(p[j + 1] ?? "x")) continue;
+        ELEMENTO.lastIndex = j;
+        const el = ELEMENTO.exec(p);
+        if (!el) return "classe POSIX ou elemento de colacao invalido ([[:alpha:]], [[.a.]], [[=a=]])";
+        j += el[0].length - 1;
+      }
+      // `[[:alpha:]`: no JavaScript o `]` do elemento fecha a classe; no ERE ela fica aberta
+      if (j >= p.length) return "classe sem ] de fechamento";
+      i = j; quant = false; continue;
+    }
+    if (c === "*" || c === "+" || c === "?" || c === "{") {
+      if (quant) return REPETIDO;
+      quant = true;
+      if (c === "{") {
+        // no ERE, `{` abre intervalo: o que não fecha `{n}`, `{n,}` ou `{n,m}` (n <= m <= 255) é recusado
+        const m = /^\{(\d+)(,(\d*))?\}/.exec(p.slice(i));
+        if (!m) return CHAVE;
+        const n = Number(m[1]), aberto = m[2] !== undefined && m[3] === "";
+        const max = aberto || m[2] === undefined ? n : Number(m[3]);
+        // `{0}` e `{0,0}`: o Git Bash e o macOS recusam ("empty (sub)expression")
+        if (n > 255 || max > 255 || max < n || (!aberto && max === 0)) return CHAVE;
+        i += m[0].length - 1;
+      }
+      continue;
+    }
+    quant = false;
+  }
+  return ramo === "alt" ? "alternativa vazia (a|, |a, (|a), a||b)" : null;
+}
+const REPETIDO = "quantificador repetido (a+?, a*+, x{2}?)";
+const ELEMENTO = /\[(?::(?:alnum|alpha|blank|cntrl|digit|graph|lower|print|punct|space|upper|xdigit):|\.[^]\.|=[^]=)\]/y;
+const CHAVE = "chave que nao forma intervalo ({, a{, a{1, a{,3}, a{0}, a{256})";
+
 function regexes(v, nome) {
   if (v === undefined) return undefined;
   if (!Array.isArray(v)) return erro(nome, "deve ser uma lista de expressoes regulares"), [];
   v.forEach((p, i) => {
     if (typeof p !== "string" || p === "") return erro(`${nome}[${i}]`, "deve ser texto nao vazio");
-    // quem aplica é o bash (`[[ =~ ]]`, ERE): `(?…)`, `\d`, `\w`, `\1` só existem no JavaScript
-    if (/\(\?|\\[A-Za-z0-9]/.test(p)) return erro(`${nome}[${i}]`, "fora do ERE do verificador ((?...), \\d, \\w, \\1)");
+    // quem aplica é o bash (`[[ =~ ]]`, ERE): o que só existe no JavaScript, ou que o Git Bash recusa, fica com `foraDoEre`
+    const motivo = foraDoEre(p);
+    if (motivo) return erro(`${nome}[${i}]`, `${motivo}, que o ERE do verificador recusa`);
     try { new RegExp(p); } catch (e) { erro(`${nome}[${i}]`, `expressao regular invalida (${e.message})`); }
   });
   return v;
