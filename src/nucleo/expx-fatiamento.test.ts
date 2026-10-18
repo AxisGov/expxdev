@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { bashDosHooks, RAIZ_DO_REPO } from "../teste/candidatos.js";
+import { suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
 
 // O leitor único de `.expx/fatiamento.json` (sprintx, mergex, doctor), rodado de verdade.
 const SCRIPT = join(RAIZ_DO_REPO, "nucleo", "scripts", "expx-fatiamento.mjs");
@@ -77,24 +78,21 @@ describe("expx-fatiamento.mjs", () => {
   });
 
   it("funcional: JSON malformado é inválido, nunca os padrões", () => {
-    const r = roda(projeto('{"expx_fatiamento": 1,'));
-    expect(r.rc).toBe(1);
-    expect(r.out).toBe("");
-    expect(r.err).toContain("expx-fatiamento: ");
+    expect(roda(projeto('{"expx_fatiamento": 1,'))).toMatchObject({ rc: 1, out: "", err: expect.stringContaining("expx-fatiamento: ") });
+  });
+
+  // sem privilégio de link (Windows sem modo desenvolvedor) o caso roda no CI Linux/macOS
+  it.skipIf(!suportaSymlinkDeDiretorio())("funcional: link simbólico quebrado é arquivo presente e inválido, nunca os padrões", () => {
+    const raiz = projeto();
+    symlinkSync(join(raiz, "nao-existe.json"), join(raiz, ".expx", "fatiamento.json"));
+    expect(roda(raiz)).toMatchObject({ rc: 1, out: "", err: expect.stringContaining("expx-fatiamento: ") });
   });
 
   it("funcional: --formato json traz os padrões preenchidos; --validar não imprime nada", () => {
     const raiz = projeto({ expx_fatiamento: 1, ignorar: ["^gerado/"] });
-    const j = JSON.parse(roda(raiz, "--formato", "json").out);
-    expect(j).toMatchObject({
-      origem: "projeto",
-      legibilidade: { pr_linhas: 400, pr_arquivos: 20, commit_linhas: 300 },
-      arquivo: { kb: 150, linhas: 4000 },
-      ignorar: ["^gerado/"],
-      capacidade: { pr_arquivos: 100, excluido_no_painel: ["^docs/(sprintx|entregas|eventos)/"] },
-      revisao_por_task: { modo: "se_disponivel" },
-      entrega: "por_trabalho",
-    });
+    expect(JSON.parse(roda(raiz, "--formato", "json").out)).toMatchObject({ origem: "projeto", ignorar: ["^gerado/"], revisao_por_task: { modo: "se_disponivel" }, entrega: "por_trabalho",
+      legibilidade: { pr_linhas: 400, pr_arquivos: 20, commit_linhas: 300 }, arquivo: { kb: 150, linhas: 4000 },
+      capacidade: { pr_arquivos: 100, excluido_no_painel: ["^docs/(sprintx|entregas|eventos)/"] } });
     expect(roda(raiz, "--validar")).toMatchObject({ rc: 0, out: "" });
     expect(roda(raiz, "--formato", "yaml").rc).toBe(2);
   });

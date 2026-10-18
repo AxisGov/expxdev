@@ -5,7 +5,7 @@
 //
 // Sem arquivo: os padrões. Inválido: sai 1, uma linha `expx-fatiamento: <chave>:
 // <motivo>` por erro no stderr, nada no stdout — nunca os padrões. Uso errado: 2.
-import { existsSync, readFileSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const LEGIBILIDADE = { pr_linhas: 400, pr_arquivos: 20, commit_linhas: 300 };
@@ -102,13 +102,15 @@ function resolver(cfg, origem) {
 }
 
 const caminho = join(op.raiz, ".expx", "fatiamento.json");
+// presente = qualquer entrada (link quebrado, diretório): ilegível é inválido, nunca os padrões
+const presente = (() => { try { return lstatSync(caminho), true; } catch (e) { return e.code !== "ENOENT"; } })();
 let lido = {};
 try {
-  if (existsSync(caminho)) lido = JSON.parse(readFileSync(caminho, "utf8").replace(/^\uFEFF/, ""));
+  if (presente) lido = JSON.parse(readFileSync(caminho, "utf8").replace(/^\uFEFF/, ""));
 } catch (e) {
-  erro(".expx/fatiamento.json", `JSON invalido (${e.message})`);
+  erro(".expx/fatiamento.json", `ilegivel ou JSON invalido (${e.message})`);
 }
-const e = erros.length > 0 ? undefined : resolver(lido, existsSync(caminho) ? "projeto" : "padrao");
+const e = erros.length > 0 ? undefined : resolver(lido, presente ? "projeto" : "padrao");
 if (erros.length > 0 || e === undefined) {
   process.stderr.write(`${erros.join("\n")}\n`);
   process.exit(1);
