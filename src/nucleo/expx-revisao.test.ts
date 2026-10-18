@@ -252,6 +252,46 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: expect.stringMatching(/^T-01 FALHA /) });
   });
 
+  it.each([
+    ["sem cli", { cli: undefined }, "cli.versao"],
+    ["cli.versao nula", { cli: { versao: null } }, "cli.versao"],
+    ["cli.versao abaixo da mínima", { cli: { versao: "0.5.13" } }, "cli.versao"],
+    ["cli.versao que não é semver", { cli: { versao: "0.5" } }, "cli.versao"],
+    ["sem executada_em", { executada_em: undefined }, "executada_em"],
+    ["executada_em que não é ISO 8601", { executada_em: "ontem" }, "executada_em"],
+    ["lotes vazio com arquivo presente", { lotes: [] }, "lotes"],
+    ["sem lotes", { lotes: undefined }, "lotes"],
+    ["lote com erro", { lotes: [{ include: ["src/a.js"], meta: {}, error: "x" }] }, "lotes"],
+    ["lotes que não incluem o arquivo presente", { lotes: [{ include: ["src/b.js"], meta: {}, error: null }] }, "lotes"],
+  ])("funcional: ok sem sinal de que a CLI rodou (%s) é FALHA evidencia-invalida nomeando o campo", (_nome, troca, campo) => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    escreve(c.raiz, EV, JSON.stringify({ ...(evidencia(c.raiz) as object), ...troca }));
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: `T-01 FALHA evidencia-invalida:${campo}` });
+  });
+
+  it("funcional: achados sem cli.versao é evidencia-invalida; versão 0.10.0 compara por número e passa", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    escreve(c.raiz, EV, JSON.stringify({ ...(evidencia(c.raiz) as object), cli: {} }));
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:cli.versao" });
+    const d = cenario({ versao: "0.10.0" });
+    altera3(d.raiz);
+    revisar(d, "src/a.js");
+    expect(conferir(d.raiz, "obrigatoria", `T-01=${commita(d.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it("funcional: indisponivel não exige cli.versao, executada_em nem lotes", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js", "T-01", dirname(noPath("git") ?? ""));
+    expect(evidencia(c.raiz)).toMatchObject({ resultado: "indisponivel", motivo: "cli-ausente", cli: { versao: null }, lotes: [] });
+    escreve(c.raiz, EV, JSON.stringify({ ...(evidencia(c.raiz) as object), executada_em: undefined }));
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 3, out: "T-01 AVISO indisponivel:cli-ausente" });
+  });
+
   it("funcional: indisponivel é FALHA em obrigatoria e AVISO em se_disponivel", () => {
     const c = cenario({ error: "falhou" });
     altera3(c.raiz);

@@ -100,6 +100,7 @@ ordem em que aparecem.
 | `<sha>` não é commit | FALHA `commit-inexistente:<sha>` | FALHA |
 | evidência ausente do commit | FALHA `evidencia-ausente` | AVISO `evidencia-ausente` |
 | JSON ilegível; outra task ou trabalho; `expx_revisao` ≠ 1; `arquivos` que não é mapa ou vazio; `achados` que não é lista, ou achado sem `identidade` sha256 ou com `estado` fora de `aberto`, `anterior`, `rejeitado`; `resultado` desconhecido | FALHA `evidencia-invalida` | FALHA |
+| `ok` ou `achados` sem sinal de que a CLI rodou: `cli.versao` que não é semver ≥ 0.5.14; `executada_em` fora de ISO 8601; `lotes` que não é lista, com lote que não é mapa, sem `include` em lista ou com `error` não nulo, ou, havendo arquivo presente (blob não `null`), vazio ou sem incluir cada um deles. Só arquivos removidos admite `lotes` vazio; `indisponivel` não exige esses campos | FALHA `evidencia-invalida:<campo>` (`cli.versao`, `executada_em` ou `lotes`) | FALHA |
 | blob ≠ `git rev-parse <sha>:<arquivo>` (ou `null` e o arquivo existe no commit) | FALHA `evidencia-nao-bate:<arquivo>` | FALHA |
 | `indisponivel` | FALHA `indisponivel:<motivo>` | AVISO `indisponivel:<motivo>` |
 | achado `aberto`, ou `resultado: achados` | FALHA `achados-abertos:<n>` | FALHA |
@@ -123,3 +124,4 @@ desenvolvedor no PR para cada um.
 | Data | Mudança |
 |---|---|
 | 2026-10-18 | Contrato criado: evidência v1, identidade com as linhas vizinhas, `revisar`, `conferir` e `rejeitar`. |
+| 2026-10-18 | `conferir` exige, em `ok`/`achados`, `cli.versao` ≥ 0.5.14, `executada_em` ISO 8601 e `lotes` que cobrem os arquivos presentes (`evidencia-invalida:<campo>`). |
