@@ -119,13 +119,9 @@ describe("diagnóstico de .expx/fatiamento.json", () => {
   const ids = (raiz: string): string[] => diagnosticar(raiz).achados.map((a) => a.id).filter((id) => id.startsWith("fatiamento-"));
   const escreve = (raiz: string, c: object): void => writeFileSync(join(raiz, ".expx/fatiamento.json"), JSON.stringify(c));
 
-  it("funcional: projeto sem .expx/fatiamento.json não tem achado de fatiamento", async () => {
+  it("funcional: sem .expx/fatiamento.json, ou com ele válido, não há achado de fatiamento", async () => {
     p = await projetoSadio();
     expect(ids(p.raiz)).toEqual([]);
-  });
-
-  it("funcional: arquivo válido não tem achado", async () => {
-    p = await projetoSadio();
     escreve(p.raiz, { expx_fatiamento: 1, ignorar: ["^gerado/"] });
     expect(ids(p.raiz)).toEqual([]);
   });
@@ -136,10 +132,11 @@ describe("diagnóstico de .expx/fatiamento.json", () => {
     expect(achado(p.raiz, "fatiamento-invalido")).toMatchObject({ severidade: "erro", problema: "expx-fatiamento: limites: chave desconhecida" });
   });
 
-  it("funcional: arquivo presente e núcleo sem o script é erro fatiamento-sem-leitor", async () => {
+  const viraDiretorio = (c: string): void => (rmSync(c), mkdirSync(c));
+  it.each([["ausente", rmSync], ["diretório", viraDiretorio]])("funcional: leitor instalado %s é erro fatiamento-sem-leitor", async (_n, troca) => {
     p = await projetoSadio();
     escreve(p.raiz, { expx_fatiamento: 1 });
-    rmSync(join(p.raiz, ".expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs"));
+    troca(join(p.raiz, ".expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs"));
     expect(achado(p.raiz, "fatiamento-sem-leitor")).toMatchObject({ severidade: "erro", correcao: expect.stringContaining("expx update") });
   });
 

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { lerLock, type InstalacaoTravada } from "../nucleo/lock.js";
 import { hashDoArquivo } from "../nucleo/integridade.js";
@@ -505,13 +505,15 @@ function verificarModoNoHead(
 function verificarFatiamento(raiz: string, push: (a: Achado) => void): void {
   try { lstatSync(join(raiz, ".expx", "fatiamento.json")); } catch (e) { if ((e as NodeJS.ErrnoException).code === "ENOENT") return; }
   const script = join(raiz, ".expx", "marketplace", "plugins", "expx", "nucleo", "scripts", "expx-fatiamento.mjs");
-  if (!existsSync(script)) {
+  const leitor = join(raizDoNucleo(), "scripts", "expx-fatiamento.mjs");
+  // o instalado (o que as skills chamam) e o do pacote têm de ser arquivo regular
+  const falta = [script, leitor].find((c) => { try { return !statSync(c).isFile(); } catch { return true; } });
+  if (falta !== undefined) {
     push({ id: "fatiamento-sem-leitor", severidade: "erro",
-      problema: ".expx/fatiamento.json existe, mas o nucleo instalado nao tem o leitor (nucleo/scripts/expx-fatiamento.mjs)",
-      correcao: "rode `expx update` (ou `expx init`) para instalar o nucleo com o leitor" });
+      problema: `.expx/fatiamento.json existe, mas o leitor nao e um arquivo regular: ${falta}`,
+      correcao: "rode `expx update` (ou `expx init`); se o caminho e do pacote do expx, reinstale o expxdev" });
     return;
   }
-  const leitor = join(raizDoNucleo(), "scripts", "expx-fatiamento.mjs");
   const r = spawnSync(process.execPath, [leitor, "--validar", "--raiz", raiz], { encoding: "utf8" });
   if (r.status === 0) return;
   push({
