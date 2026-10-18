@@ -130,3 +130,236 @@ Continuação de `2026-10-18-mergex-revisao-por-task-e-merge-automatico.md` (par
 - [ ] **Step 4: Run** o teste, `test-ownership-task.sh`, `test-m4b-arvore-inteira.sh`, `validate-mergex-contract.sh` — Expected: verdes. O validador continua vendo exatamente quatro situações.
 - [ ] **Step 5: Commit** `feat(mergex): portao da sprint atual e remocao declarada em arquivos.remove`. Abra a PR 9 (≈ 340 linhas, 8 arquivos).
 
+## Bloco M1 (PR 10) — condições do merge automático que o Git prova
+
+> Depende da expxdev#53 mergeada e da cópia do núcleo regerada (Task A1).
+
+### Task M1: `scripts/merge-automatico.sh --conferir` (ligado, 3, 4-diff, 5, 7)
+
+**Files:**
+- Create: `.claude/skills/mergex/scripts/merge-automatico.sh`
+- Create: `scripts/ci/test-merge-automatico.sh`; Modify: `.github/workflows/ci.yml`
+
+**Interfaces:**
+- **Comando:** `merge-automatico.sh --conferir --entrega <ENTREGA.md> --base <sha> --head <sha> [--raiz <dir>]`.
+- **Saída:** uma linha `condicao<TAB>ok|falha|nao_verificavel<TAB>motivo` por condição, depois `regras=merge-automatico-v1` e `resultado=apto|espera`.
+- **Códigos:** 0 apto; 1 espera; 2 ambiente (= espera); 64 uso. `merge-automatico.sh --versao` imprime `merge-automatico-v1` (a "versão das regras" da trilha).
+
+| Condição | Como |
+|---|---|
+| `ligado` | `EXPX_MERGE_AUTOMATICO=sim` em `leitor-do-projeto.sh --rev <base>` |
+| `portao` | `validade-do-portao.sh --verificar --rev <head>` `ok=true`: o ATENCAO.md e as evidências do HEAD são os que o portão avaliou |
+| 3 `sincronizado` | `<base>` ancestral de `<head>`; `git merge-tree --write-tree <base> <head>` sem conflito |
+| 4 `teste_no_diff` | nenhum arquivo de teste com status `D`; nenhum teste renomeado para fora do padrão; nenhuma linha adicionada com marcador de teste desligado que não exista, igual, numa linha removida do mesmo arquivo. O padrão de arquivo de teste e a lista de marcadores (`.skip(`, `xit(`, `xdescribe(`, `.only(`, `.todo(`, `@pytest.mark.skip`, `@pytest.mark.xfail`, `pytest.skip(`, `t.Skip(`, `@Disabled`, `@Ignore`, `[Ignore]`, `[Skip]`) ficam num bloco único do script e na DM-252 |
+| 5 `remocao_declarada` | todo `D` de `<base>...<head>` (renomeação: a origem) está em `ownership-da-task.sh --remocoes … --sprint <sprint_atual>`; remoção só em `altera` → `falha` |
+| 7 `caminho_protegido` | nenhum caminho alterado casa `EXPX_CAMINHOS_PROTEGIDOS` da base, nem `^\.expx/(fatiamento|hooks)\.json$` |
+
+- **DM-251** (o que é do Git e o que é da plataforma) e **DM-252** (padrões de teste e marcadores; movimento não conta).
+
+- [ ] **Step 1: Write the failing tests:**
+  - `nao na base: espera, mesmo sim na cabeca` (Review Focus 2);
+  - `.expx/fatiamento.json alterado: caminho_protegido`;
+  - `migration padrao: caminho_protegido`;
+  - `portao vencido no head: espera`;
+  - um caso por marcador, com `teste_no_diff falha`;
+  - `marcador movido: ok`;
+  - `teste apagado: falha`;
+  - `teste renomeado para docs/: falha`;
+  - `remocao so em altera: remocao_declarada falha`;
+  - `renomeacao declarada: ok`;
+  - `base nao ancestral: espera`;
+  - `conflito: espera`;
+  - `tudo ok: apto`.
+- [ ] **Step 2: Run** — Expected: FAIL.
+- [ ] **Step 3: Implement** (sem `eval` de dado do PR).
+- [ ] **Step 4: Run** — Expected: `N ok, 0 falha(s)`.
+- [ ] **Step 5: Commit** `feat(mergex): condicoes do merge automatico que o Git prova`. Abra a PR 10 (≈ 390 linhas, 3 arquivos).
+
+## Bloco M2 (PR 11) — condições de evidência: achados, atenção, suíte e contagem
+
+### Task M2: condições 1 (parte registrada), 4 (contagem), 6 e OLHO OBRIGATÓRIO no `merge-automatico.sh`
+
+**Files:**
+- Modify: `.claude/skills/mergex/scripts/merge-automatico.sh`
+- Modify: `scripts/ci/test-merge-automatico.sh`
+
+**Interfaces:**
+
+| Condição | Como |
+|---|---|
+| 1 `suite_da_sprint` | a mesma leitura da V2 por sprint (Task S2) no `<head>`: suíte inteira da sprint registrada e verde |
+| 4 `contagem_de_testes` | registro de contagem do fechamento da sprint no `<head>` (campos da sprintx: dependência S2) contra o registro mais recente do mesmo trabalho na árvore de `<base>`. `coletados` não cai; `ignorados` não sobe. Sem registro no head ou na base (primeira sprint, sprintx anterior): `nao_verificavel` → espera |
+| 6 `achado_rejeitado` | nenhuma evidência `revisao/*.json` alterada em `<base>...<head>` com achado `rejeitado` (o trecho de coleta da Task D2) |
+| `atencao` | as linhas de OLHO OBRIGATÓRIO de `docs/entregas/<slug>/ATENCAO.md` no `<head>`, com o critério tirado da coluna "Por quê": linha sem `O<n>` legível → espera; qualquer `O<n>` diferente de O2 → espera; só O2 → vale a dispensa, abaixo |
+
+- **A dispensa de O2 (DM-253).**
+  - **Onde fica:** no frontmatter de `docs/sprintx/features/<slug>/00-PLANEJAMENTO.md`, gravada pela sprintx ao aprovar o plano da sprint (dependência S3 da sprintx):
+
+    ```yaml
+    merge_automatico_dispensas:
+      - sprint: "02"
+        criterio: O2
+        por: <nome de quem aprovou>
+        em: <AAAA-MM-DD>
+        motivo: <texto>
+    ```
+
+  - **Quando o E9 a aceita:** só se todas valem, lidas no `<head>`:
+    - existe exatamente um item com `sprint` igual à `sprint_atual` da entrega e `criterio: O2`;
+    - `por`, `em` e `motivo` estão preenchidos, sem marcador de template;
+    - toda task da sprint tem `criterio_aceite` preenchido e os dois testes declarados (a V3 já cobra os testes).
+  - **Quando recusa:** item de outra sprint, item sem sprint, `sprint: todas` ou qualquer outra forma global nunca vale.
+  - **Na trilha:** a dispensa usada vai citada na trilha (Task M3).
+
+- [ ] **Step 1: Write the failing tests:**
+  - `rejeitado em evidencia do PR: espera`;
+  - `atencao O3: espera`; `atencao O2 sem dispensa: espera`;
+  - `O2 com dispensa da sprint: ok`;
+  - `dispensa de outra sprint: espera`; `dispensa global: espera`; `dispensa sem motivo: espera`;
+  - `task sem criterio_aceite com dispensa: espera` (Review Focus 4);
+  - `linha de atencao sem criterio legivel: espera`;
+  - `sem registro de contagem: nao_verificavel e espera`;
+  - `coletados cai: falha`; `ignorados sobe: falha`;
+  - `suite da sprint ausente: falha`.
+- [ ] **Step 2: Run** — Expected: FAIL.
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4: Run** — Expected: verdes.
+- [ ] **Step 5: Commit** `feat(mergex): merge automatico confere achados, atencao, suite e contagem de testes`. Abra a PR 11 (≈ 360 linhas, 2 arquivos).
+
+## Bloco M3 (PR 12) — a espera, a trilha e o aviso
+
+### Task M3: `scripts/espera-do-merge.sh`, a máquina de estados da espera
+
+**Files:**
+- Create: `.claude/skills/mergex/scripts/espera-do-merge.sh`
+- Create: `.claude/skills/mergex/references/15-espera-do-merge.md`
+- Create: `scripts/ci/test-espera-do-merge.sh`; Modify: `.github/workflows/ci.yml`
+
+**Interfaces:**
+- **Estado:**
+  - Arquivo: `$(git rev-parse --git-path mergex-e9-espera)`, uma linha por PR, com `pr`, `head`, `inicio`, `ultima`, `tentativas`, `estado`, `comentario_id` e `merge_tentado`.
+  - Estados: `aguardando` → `apto` → `mergeado`; `aguardando` → `espera_humana`; `aguardando` → `aguardando_merge`, por tempo.
+- **Comandos:**
+  - `--proxima --pr <n> --head <sha>` imprime `proxima=conferir|cedo|parar` e o motivo:
+    - `cedo`: menos de 120 s desde a última tentativa;
+    - `parar`: o estado é terminal, ou passaram 30 min desde o `inicio`; aí grava `aguardando_merge`;
+    - HEAD novo mantém o `inicio` e zera o resultado: tudo é recalculado.
+  - `--registrar --pr <n> --head <sha> --resultado apto|pendente|espera --motivo <texto>`:
+    - `pendente` (CI ou revisão rodando) mantém `aguardando`;
+    - `espera` (qualquer condição definitiva) vai a `espera_humana`.
+  - `--marcar-merge --pr <n> --head <sha>` sai 1 se já houve tentativa para esse par: a idempotência do merge.
+  - `--comentario-id …` grava e lê o id do comentário da trilha.
+- **Trilha (DM-254):**
+  - **Comentário único no PR, com o marcador `<!-- mergex:merge-automatico pr=<n> -->`:** achado pela leitura paginada de todos os comentários (DM-222) e editado no lugar, nunca recriado.
+  - **Conteúdo do comentário:**
+    - SHA da base e do HEAD;
+    - checks com conclusão e URL;
+    - `regras=merge-automatico-v1`;
+    - resultado de cada condição;
+    - dispensa usada;
+    - horário UTC;
+    - executor (`mergex E9 automático`, com a conta usada).
+  - **Rastro:** evento `veredito_emitido` com `fase: e9`, sem evento novo (DS-180).
+  - **`ENTREGA.md`:** a seção de prosa `## Merges automáticos`, só local, levada ao histórico pelo `pre-e2` da sprint seguinte quando ela existe.
+- **Aviso:** na saída da sessão, a cada transição terminal.
+- **`aguardando_merge`:** a mergex grava `prs[].estado: aguardando_merge`, avisa e devolve `resultado=aguardando_merge` ao chamador. O bloqueio em `00-BLOQUEIOS.md` é da sprintx (dependência S4).
+- **DM-254** (trilha) e **DM-255** (máquina de estados).
+
+- [ ] **Step 1: Write the failing tests:**
+  - `duas chamadas em 60 s: a segunda e cedo`;
+  - `30 min sem apto: aguardando_merge e parar`;
+  - `head novo: tudo recalculado, inicio mantido`;
+  - `marcar-merge duas vezes no mesmo head: a segunda recusa`;
+  - `comentario existente de passagem anterior e editado, nao duplicado` (com `gh` falso que conta as chamadas);
+  - `espera definitiva para na hora`;
+  - `estado ilegivel: parar com motivo, nunca apto` (Review Focus 5).
+- [ ] **Step 2: Run** — Expected: FAIL.
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4: Run** — Expected: verdes.
+- [ ] **Step 5: Commit** `feat(mergex): espera do merge automatico com estado idempotente e trilha unica no PR`. Abra a PR 12 (≈ 390 linhas, 4 arquivos).
+
+## Bloco M4 (PR 13) — o E9 automático
+
+### Task M4: modo automático do E9, regras da skill e o Codex
+
+**Files:**
+- Create: `.claude/skills/mergex/references/14-merge-automatico.md`:
+  - **Disparo:** pela sprintx, depois do E8, só para o PR da sprint atual do trabalho atual.
+  - **Kill switch:** `EXPX_MERGE_AUTOMATICO` lido da base a cada tentativa.
+  - **Ciclo:** a cada `proxima=conferir`, recalcula as condições 1 e 2 da plataforma (gate R1–R6, CI verde no HEAD, nenhuma thread sem resposta, nenhum pedido de mudança) e roda `merge-automatico.sh --conferir`.
+  - **Merge:** com `apto`, faz a revalidação do item 5 do passo 7, `--marcar-merge` e o merge preso ao SHA.
+  - **Fechamento:** grava `prs[].estado: merged`, `merge_sha` e `merge: automatico`, e atualiza a trilha.
+- Modify: `.claude/skills/mergex/references/09-revisao.md`:
+  - pré-requisitos, l.11-25: o modo automático e o link;
+  - passo 7, item 7, l.961: `prs`;
+  - recusas duras, l.979-996: as recusas 3 e 4 têm uma exceção só, o modo automático com `apto`. Na recusa 4, OLHO OBRIGATÓRIO segue a condição `atencao` (Task M2).
+- Modify: `.claude/skills/mergex/SKILL.md` (regras 16 e 17, l.225-226), `AGENTS.md` (l.19) e `.claude/commands/mergex-revisar.md` (l.30): a exceção, só com `merge_automatico` ligado na base.
+- Modify: `decisoes/revisao-por-task-e-entrega-por-sprint.md` (DM-256)
+- Create: `scripts/ci/test-e9-merge-automatico.sh`; Modify: `.github/workflows/ci.yml`
+
+**Interfaces:**
+- **O Codex na mergex (DM-256).** Só parecer técnico. Quando a espera termina em `espera_humana` ou `aguardando_merge` e o `codex` existe, o E9 pode anexar ao aviso a saída de `codex exec --sandbox read-only "<pergunta técnica sobre o motivo>"`, marcada como parecer. O parecer:
+  - nunca muda condição, resultado do portão ou gate;
+  - nunca vale como confirmação humana;
+  - nunca fecha decisão.
+
+  Sem o `codex`, segue sem parecer.
+- **Sem o modo ligado:** o E9 manual não muda.
+
+- [ ] **Step 1: Write the failing tests** (contrato e trechos com `gh` falso):
+  - `modo nao: E9 pergunta como hoje`;
+  - `sim e apto: merge com --match-head-commit, prs.merge automatico, trilha editada`;
+  - `HEAD muda entre conferir e merge: nao mergeia e recalcula`;
+  - `gate BLOQUEADO: espera_humana com o motivo`;
+  - `CI pendente: aguardando`;
+  - `recusas 3 e 4 citam a excecao unica`;
+  - `regra 16 nomeia a excecao`;
+  - `parecer do codex nunca muda o resultado` (o texto proíbe; o trecho do aviso só anexa);
+  - o texto antigo, sem a exceção, reprova.
+- [ ] **Step 2: Run** — Expected: FAIL.
+- [ ] **Step 3: Write.**
+- [ ] **Step 4: Run** o teste, os dois validadores e `bash .claude/hooks/teste.sh` — Expected: verdes.
+- [ ] **Step 5: Commit** `feat(mergex): E9 faz o merge automatico quando o projeto liga e todas as condicoes valem`. Abra a PR 13 (≈ 360 linhas, 9 arquivos).
+
+## Tabela de PRs
+
+| PR | Bloco | Assunto | Linhas | Arquivos | Depende de |
+|---|---|---|---|---|---|
+| 1 | A1 | cópia do núcleo nos testes; espelho do verificador (F2c, sha256) | ≈220 | 6 | — |
+| 2 | A2 | `leitor-do-projeto.sh`; E7 com o leitor do SHA publicado | ≈380 | 7 | PR 1 |
+| 3 | B1 | `portao-v12.sh` | ≈390 | 3 | PR 2 |
+| 4 | B2 | causa v12 e "doze verificações" | ≈300 | 18 | PR 3 |
+| 5 | C | evidência no commit da task; `revisao:`; E3 | ≈360 | 11 | PR 4 |
+| 6 | D1 | E4 lista os rejeitados; E9 confirma um a um | ≈330 | 7 | PR 5 |
+| 7 | D2 | feature empilhada redirecionada; `revisor_bot` | ≈320 | 6 | PR 2; expxdev D2 |
+| 8 | S1 | E0 fixa o modo e a sprint; `prs`; E7; E8 | ≈360 | 9 | PR 2 |
+| 9 | S2 | portão da sprint atual; `arquivos.remove` | ≈340 | 8 | PR 8; sprintx S1 |
+| 10 | M1 | merge automático: condições do Git | ≈390 | 3 | PR 9; expxdev#53 |
+| 11 | M2 | achados, atenção e dispensa de O2, suíte, contagem | ≈360 | 2 | PR 10, PR 6; sprintx S2/S3 |
+| 12 | M3 | espera idempotente, trilha e aviso | ≈390 | 4 | PR 11 |
+| 13 | M4 | E9 automático; regras 16/17; Codex | ≈360 | 9 | PR 12 |
+
+## Dependências externas
+
+**expxdev**
+- **#53** (`feat/leitor-merge-automatico`): `merge_automatico {ativo, caminhos_protegidos}` → `EXPX_MERGE_AUTOMATICO=sim|nao` e `EXPX_CAMINHOS_PROTEGIDOS` (ERE unidas por `|`, padrão mais projeto). Os nomes foram conferidos na branch, em e61d79b. Bloqueia M1.
+- **D2 (PR pequena nova):** chave `revisor_bot` no leitor.
+  - Formato no `.expx/fatiamento.json`: `"revisor_bot": ["login-exato", "outro[bot]"]`, uma lista de logins exatos, cada um casando `^[A-Za-z0-9][A-Za-z0-9-]*(\[bot\])?$`; lista vazia ou ausente = nenhum.
+  - Saída do leitor: `EXPX_REVISOR_BOT=login1,login2` (vírgula, porque login não tem vírgula).
+  - Validação estrita como as demais chaves. Bloqueia a parte do bot da Task D3.
+- **Release com #51, #53 e D2**, para a Task A1 regerar a cópia do núcleo.
+
+**sprintx**
+- **S1:** campo `arquivos.remove` nas tasks (lista; renomeação = origem em `remove` e destino em `cria`). Bloqueia a condição 5 e a regra do E1 com remoção.
+- **S2:** registro de contagem no fechamento da sprint (comando, coletados, aprovados, ignorados, CI de referência), em campos de frontmatter que a mergex leia sem prosa. Os nomes dos campos saem do plano da sprintx e entram na Task M2. Sem eles, a contagem fica `nao_verificavel` e o merge espera.
+- **S3:** gravar `merge_automatico_dispensas` no `00-PLANEJAMENTO.md` (formato da Task M2) ao aprovar o plano da sprint, com quem, quando e motivo, e só para aquela sprint.
+- **S4:**
+  - F6 passa `--sprint <id fixo>` ao E0;
+  - `entrega:` no frontmatter do `00-PLANEJAMENTO.md`;
+  - atualizar a branch a partir da main depois do merge;
+  - disparar o E9 depois do E8;
+  - registrar o bloqueio `aguardando_merge` quando a mergex o devolve.
+
+## Pergunta que resta
+
+1. **A dispensa de O2 é escrita pela sprintx, com a conta do agente.** O E9 confere a forma e o escopo (só aquela sprint, campos completos, critérios de aceite com teste), mas não consegue provar que foi o desenvolvedor quem a deu: mesma limitação de proveniência da DM-223. O plano aceita o registro como está e o expõe na trilha do PR. Se for preciso prova de autoria (por exemplo, a dispensa confirmada de forma interativa no E9 da própria sprint), é uma condição a mais na Task M2.
