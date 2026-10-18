@@ -147,18 +147,23 @@ function achados(issues, ev) {
 function veredito(task, sha) {
   if (op.modo === "desligada") return "ok";
   const nivel = op.modo === "obrigatoria" ? "FALHA" : "AVISO";
-  const ev = le(caminhoEv(task));
-  if (ev === undefined) return `${nivel} evidencia-ausente`;
-  if (ev.expx_revisao !== 1 || ev.task !== task || ev.trabalho !== op.trabalho || typeof ev.arquivos !== "object"
-    || !["ok", "achados", "indisponivel"].includes(ev.resultado)) return "FALHA evidencia-invalida";
   if (git("rev-parse", "--verify", "-q", `${sha}^{commit}`).status !== 0) return `FALHA commit-inexistente:${sha}`;
-  for (const [f, b] of Object.entries(ev.arquivos ?? {})) {
-    const r = git("rev-parse", "--verify", "-q", `${sha}:${f}`);
+  // a evidência que vale é a do commit da task (o E1 a commita junto), nunca a do disco
+  const doCommit = git("show", `${sha}:./docs/entregas/${op.trabalho}/revisao/${task}.json`);
+  if (doCommit.status !== 0) return `${nivel} evidencia-ausente`;
+  let ev;
+  try { ev = JSON.parse(doCommit.stdout.replace(/^\uFEFF/, "")); } catch { return "FALHA evidencia-invalida"; }
+  const ehMapa = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+  if (!ehMapa(ev) || ev.expx_revisao !== 1 || ev.task !== task || ev.trabalho !== op.trabalho || !ehMapa(ev.arquivos)
+    || Object.keys(ev.arquivos).length === 0 || !Array.isArray(ev.achados)
+    || !["ok", "achados", "indisponivel"].includes(ev.resultado)) return "FALHA evidencia-invalida";
+  for (const [f, b] of Object.entries(ev.arquivos)) {
+    const r = git("rev-parse", "--verify", "-q", `${sha}:./${f}`);
     if ((r.status === 0 ? r.stdout.trim() : null) !== b) return `FALHA evidencia-nao-bate:${f}`;
   }
   if (ev.resultado === "indisponivel") return `${nivel} indisponivel:${ev.motivo}`;
-  const abertos = (ev.achados ?? []).filter((a) => a.estado === "aberto").length;
-  return abertos > 0 ? `FALHA achados-abertos:${abertos}` : "ok";
+  const abertos = ev.achados.filter((a) => a?.estado === "aberto").length;
+  return abertos > 0 || ev.resultado === "achados" ? `FALHA achados-abertos:${abertos}` : "ok";
 }
 
 function conferir() {

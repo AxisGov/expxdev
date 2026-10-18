@@ -88,16 +88,19 @@ Imprime uma linha de resumo.
 
 A regra da V12. Uma linha por task, `T-NN ok`, `T-NN AVISO <motivo>` ou
 `T-NN FALHA <motivo>`; sai **0** (tudo ok), **1** (alguma FALHA) ou **3** (só AVISO).
+A evidência lida é a que está **no commit da task** (`<sha>`), nunca a do disco:
+editar o arquivo depois do commit não muda o veredito. As linhas abaixo valem na
+ordem em que aparecem.
 
 | Situação | `obrigatoria` | `se_disponivel` |
 |---|---|---|
 | `desligada` | ok | ok |
-| evidência ausente | FALHA `evidencia-ausente` | AVISO `evidencia-ausente` |
-| evidência de outra task, versão ou formato | FALHA `evidencia-invalida` | FALHA |
-| blob ≠ `git rev-parse <sha>:<arquivo>` (ou `null` e o arquivo existe no commit) | FALHA `evidencia-nao-bate:<arquivo>` | FALHA |
 | `<sha>` não é commit | FALHA `commit-inexistente:<sha>` | FALHA |
+| evidência ausente do commit | FALHA `evidencia-ausente` | AVISO `evidencia-ausente` |
+| JSON ilegível; outra task ou trabalho; `expx_revisao` ≠ 1; `arquivos` que não é mapa ou vazio; `achados` que não é lista; `resultado` desconhecido | FALHA `evidencia-invalida` | FALHA |
+| blob ≠ `git rev-parse <sha>:<arquivo>` (ou `null` e o arquivo existe no commit) | FALHA `evidencia-nao-bate:<arquivo>` | FALHA |
 | `indisponivel` | FALHA `indisponivel:<motivo>` | AVISO `indisponivel:<motivo>` |
-| achado `aberto` | FALHA `achados-abertos:<n>` | FALHA |
+| achado `aberto`, ou `resultado: achados` | FALHA `achados-abertos:<n>` | FALHA |
 
 ## `rejeitar`
 

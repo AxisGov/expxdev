@@ -191,8 +191,14 @@ const roda = (raiz: string, ...a: string[]) => {
   return { rc: r.status, out: r.stdout.trim(), err: r.stderr };
 };
 const conferir = (raiz: string, modo: string, ...pares: string[]) => roda(raiz, "conferir", "--modo", modo, ...pares.flatMap((p) => ["--task", p]));
-const evidencia = (raiz: string): unknown => JSON.parse(readFileSync(join(raiz, "docs/entregas/w/revisao/T-01.json"), "utf8"));
-const commita = (raiz: string): string => { git(raiz, "add", "-A", "src"); git(raiz, "commit", "-q", "-m", "task"); return git(raiz, "rev-parse", "HEAD"); };
+const EV = "docs/entregas/w/revisao/T-01.json";
+const evidencia = (raiz: string): unknown => JSON.parse(readFileSync(join(raiz, EV), "utf8"));
+/** O commit da task leva a evidência junto (E1); `soEvidencia` deixa o código fora. */
+const commita = (raiz: string, soEvidencia = false): string => {
+  git(raiz, "add", "-A", ...(soEvidencia ? ["docs"] : ["src", "docs"]));
+  git(raiz, "commit", "-q", "-m", "task");
+  return git(raiz, "rev-parse", "HEAD");
+};
 
 describe("expx-revisao.mjs conferir e rejeitar", () => {
   it("funcional: evidência ok que bate com o commit passa; desligada aceita tudo", () => {
@@ -204,11 +210,34 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     expect(conferir(c.raiz, "desligada", `T-09=${sha}`)).toMatchObject({ rc: 0, out: "T-09 ok" });
   });
 
-  it("funcional: evidência ausente é FALHA em obrigatoria e AVISO em se_disponivel", () => {
+  it("funcional: evidência ausente é FALHA em obrigatoria e AVISO em se_disponivel; commit inexistente é sempre FALHA", () => {
     const c = cenario();
     const sha = git(c.raiz, "rev-parse", "HEAD");
     expect(conferir(c.raiz, "obrigatoria", `T-09=${sha}`)).toMatchObject({ rc: 1, out: "T-09 FALHA evidencia-ausente" });
     expect(conferir(c.raiz, "se_disponivel", `T-09=${sha}`)).toMatchObject({ rc: 3, out: "T-09 AVISO evidencia-ausente" });
+    expect(conferir(c.raiz, "se_disponivel", `T-09=${"0".repeat(40)}`)).toMatchObject({ rc: 1, out: `T-09 FALHA commit-inexistente:${"0".repeat(40)}` });
+  });
+
+  it("funcional: a evidência vale como está no commit, não como está no disco", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
+    const sha = commita(c.raiz);
+    expect(roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp").rc).toBe(0);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
+  });
+
+  it.each([
+    ["arquivos nulo", { arquivos: null }],
+    ["arquivos vazio", { arquivos: {} }],
+    ["achados ausente", { achados: undefined }],
+    ["resultado achados sem achado aberto", { resultado: "achados" }],
+  ])("funcional: evidência malformada (%s) é FALHA, nunca ok", (_nome, troca) => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    escreve(c.raiz, EV, JSON.stringify({ ...(evidencia(c.raiz) as object), ...troca }));
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: expect.stringMatching(/^T-01 FALHA /) });
   });
 
   it("funcional: indisponivel é FALHA em obrigatoria e AVISO em se_disponivel", () => {
@@ -224,17 +253,16 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     const c = cenario({ issues: [achado("src/a.js", 3)] });
     altera3(c.raiz);
     const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
-    const sha = commita(c.raiz);
-    expect(conferir(c.raiz, "se_disponivel", `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
     expect(roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", "f".repeat(64), "--motivo", "fp").rc).toBe(1);
     expect(roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "falso positivo").rc).toBe(0);
     expect(evidencia(c.raiz)).toMatchObject({ resultado: "ok", achados: [{ estado: "rejeitado" }], rejeicoes: [{ identidade: id, motivo: "falso positivo" }] });
-    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
   });
 
   it("funcional: rejeitar não muda o resultado de indisponivel", () => {
     const c = cenario();
-    escreve(c.raiz, "docs/entregas/w/revisao/T-01.json", JSON.stringify({ expx_revisao: 1, trabalho: "w", task: "T-01", resultado: "indisponivel", motivo: "erro",
+    escreve(c.raiz, EV, JSON.stringify({ expx_revisao: 1, trabalho: "w", task: "T-01", resultado: "indisponivel", motivo: "erro",
       arquivos: {}, achados: [{ identidade: "a".repeat(64), estado: "aberto" }], rejeicoes: [] }));
     expect(roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", "a".repeat(64), "--motivo", "fp").rc).toBe(0);
     expect(evidencia(c.raiz)).toMatchObject({ resultado: "indisponivel", achados: [{ estado: "rejeitado" }] });
@@ -252,8 +280,7 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     const c = cenario();
     rmSync(join(c.raiz, "src/a.js"));
     revisar(c, "src/a.js");
-    const antes = git(c.raiz, "rev-parse", "HEAD");
-    expect(conferir(c.raiz, "obrigatoria", `T-01=${antes}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-nao-bate:src/a.js" });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-nao-bate:src/a.js" });
     expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
   });
 });
