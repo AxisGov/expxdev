@@ -14,7 +14,7 @@
 # partir de .expx/fatiamento.json):
 #   FATIA_MAX_LINHAS_PR, FATIA_MAX_ARQUIVOS (F2), FATIA_MAX_LINHAS_COMMIT (F3),
 #   FATIA_MAX_KB_ARQUIVO, FATIA_MAX_LINHAS_ARQUIVO (até 5000), FATIA_AVISO_*, FATIA_TOLERANCIA_* (F4)
-#   FATIA_IGNORAR          fora de F2/F3/F4; o padrão inclui os artefatos de método
+#   FATIA_IGNORAR          fora de F2/F3/F4 (não vazia, substitui o padrão, que inclui os artefatos de método)
 #   FATIA_IGNORAR_PROJETO  regex do projeto que SOMA ao FATIA_IGNORAR, nunca o substitui
 #   FATIA_CAPACIDADE_ARQUIVOS  F2c: arquivos que o revisor lê numa PR (100; acima: saída 2)
 #   FATIA_CAPACIDADE_EXCLUIDO  fora de F2c (o painel não os mostra; padrão: o de FATIA_IGNORAR); vazio = nenhum
