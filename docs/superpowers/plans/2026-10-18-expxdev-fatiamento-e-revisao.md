@@ -20,6 +20,7 @@
 - `ignorar` soma aos padrões, nunca os substitui. `capacidade.excluido_no_painel` tem padrão `^docs/(sprintx|entregas|eventos)/`.
 - CLI do CodeAnt: versão mínima **0.5.14**; o código de saída e `--fail-on` NÃO são usados (spike 6.0: saem 0 com achados); o portão lê o JSON.
 - Todo achado em linha alterada pela task bloqueia; achado em linha não alterada é `anterior` e não bloqueia.
+- Quem consome o leitor no shell exporta as variáveis: `set -a; eval "$(node <leitor>)"; set +a` — um `eval` sozinho cria variáveis do shell que o verificador, processo filho, não recebe (e mediria com os padrões). O contrato v2 (Task 5) e os planos da mergex e da sprintx usam essa forma.
 - O agente nunca configura credencial da CLI (nem `login`, nem `set-codeant-api-key`, nem `CODEANT_API_TOKEN`).
 - Fatiamento desta mudança: commits ≤ 300 linhas, PR ≤ 400 linhas e 20 arquivos (`bash scripts/verificar-fatiamento.sh origin/main HEAD`). Três PRs, uma por bloco abaixo.
 
@@ -125,7 +126,7 @@
 - Modify: `docs/contrato/CONTRATO-expx-fatiamento.md`
 - Modify: `docs/contrato/CONVENCOES.md` (índice, se citar seções do contrato)
 
-- [ ] **Step 1:** Reescreva as seções: "Capacidade × legibilidade" (F2c e F4 são capacidade; F2/F3 legibilidade calibrável); "Configuração por projeto" (aponta para a §5.2 do contrato de instalação, não repete o formato); "Afrouxar exige revisão por task obrigatória"; "Entrega por sprint" (um PR por sprint conta F2 por sprint); F6 corrigida (os artefatos de método estão no padrão do verificador). Preencha o Histórico com as mudanças desde a criação (git log do arquivo) e a v2.
+- [ ] **Step 1:** Reescreva as seções: "Capacidade × legibilidade" (F2c e F4 são capacidade; F2/F3 legibilidade calibrável); "Configuração por projeto" (aponta para a §5.2 do contrato de instalação, não repete o formato); "Afrouxar exige revisão por task obrigatória"; "Entrega por sprint" (um PR por sprint conta F2 por sprint); "Como consumir o leitor" (`set -a; eval "$(node …/expx-fatiamento.mjs)"; set +a`, e por que o `set -a`); F6 corrigida (os artefatos de método estão no padrão do verificador). Preencha o Histórico com as mudanças desde a criação (git log do arquivo) e a v2.
 - [ ] **Step 2: Run** `npm run build && npx vitest run` e `bash scripts/verificar-fatiamento.sh origin/main HEAD` — Expected: verdes.
 - [ ] **Step 3: Commit** `docs(expxdev): contrato expx-fatiamento v2`. Abra a PR 2.
 
@@ -154,8 +155,9 @@
   - `arquivo apagado pela task não é revisado e fica null em arquivos` (Review Focus 4).
   - `rejeição anterior com a mesma identidade vale nesta task` — evidência de outra task do mesmo trabalho com `rejeicoes:[{identidade}]` → o achado entra como `rejeitado` e rc 0.
   - `revisar de novo preserva as rejeições da própria task`.
+  - `arquivo alterado durante a chamada da CLI → indisponivel com motivo arquivo-mudou-durante-revisao` (a CLI falsa reescreve o arquivo antes de responder).
 - [ ] **Step 2: Run** `npx vitest run src/nucleo/expx-revisao.test.ts` — Expected: FAIL.
-- [ ] **Step 3: Implement**: linhas alteradas por `git diff -U0 HEAD -- <arq>` (hunks `+a,b`); não rastreado = todas; blob por `git hash-object <arq>`; versão por `codeant --version` comparada por semver; JSON extraído do primeiro `{` que faz `JSON.parse` do resto. Nunca lê nem imprime `~/.codeant/config.json`.
+- [ ] **Step 3: Implement**: linhas alteradas por `git diff -U0 HEAD -- <arq>` (hunks `+a,b`); não rastreado = todas; blob por `git hash-object <arq>` ANTES e DEPOIS da chamada da CLI — se mudou durante a revisão, `indisponivel` com motivo `arquivo-mudou-durante-revisao` (a evidência nunca fica amarrada a bytes não revisados); versão por `codeant --version` comparada por semver; JSON extraído do primeiro `{` que faz `JSON.parse` do resto. Nunca lê nem imprime `~/.codeant/config.json`.
 - [ ] **Step 4: Run** — Expected: PASS.
 - [ ] **Step 5: Commit** `feat(expxdev): revisao por task pela CLI do CodeAnt no nucleo`.
 
