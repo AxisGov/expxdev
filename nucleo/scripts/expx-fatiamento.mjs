@@ -65,14 +65,18 @@ function limites(cfg, nome, padrao) {
 function foraDoEre(p) {
   let quant = false;
   let ramo = "inicio"; // inicio: começo ou depois de `(`; alt: depois de `|`; cheio: ramo com conteúdo
+  let ancora = false; // o último token foi `^`
   for (let i = 0; i < p.length; i++) {
     const c = p[i];
     if (c === "|" || c === ")") {
       if (ramo === "alt" || (c === "|" && ramo === "inicio")) return "alternativa vazia (a|, |a, (|a), a||b)";
-      ramo = c === "|" ? "alt" : "cheio"; quant = false; continue;
+      ramo = c === "|" ? "alt" : "cheio"; quant = ancora = false; continue;
     }
-    if (c === "(") { ramo = "inicio"; quant = false; continue; }
+    if (c === "(") { ramo = "inicio"; quant = ancora = false; continue; }
+    // `{` sem operando (no começo, depois de `(`, `|` ou `^`) é recusado, mesmo sendo literal no JavaScript
+    if (c === "{" && (ramo !== "cheio" || ancora)) return CHAVE;
     ramo = "cheio";
+    ancora = c === "^";
     if (c === "\\") { i++; quant = false; continue; }
     if (c === "[") {
       let j = i + 1;
@@ -85,19 +89,27 @@ function foraDoEre(p) {
       }
       i = j; quant = false; continue;
     }
-    const intervalo = c === "{" ? /^\{\d+(,\d*)?\}/.exec(p.slice(i)) : null;
-    if (c === "*" || c === "+" || c === "?" || intervalo) {
+    if (c === "*" || c === "+" || c === "?" || c === "{") {
       if (quant) return REPETIDO;
       quant = true;
-      if (intervalo) i += intervalo[0].length - 1;
+      if (c === "{") {
+        // no ERE, `{` abre intervalo: o que não fecha `{n}`, `{n,}` ou `{n,m}` (n <= m <= 255) é recusado
+        const m = /^\{(\d+)(,(\d*))?\}/.exec(p.slice(i));
+        if (!m) return CHAVE;
+        const n = Number(m[1]), aberto = m[2] !== undefined && m[3] === "";
+        const max = aberto || m[2] === undefined ? n : Number(m[3]);
+        // `{0}` e `{0,0}`: o Git Bash e o macOS recusam ("empty (sub)expression")
+        if (n > 255 || max > 255 || max < n || (!aberto && max === 0)) return CHAVE;
+        i += m[0].length - 1;
+      }
       continue;
     }
-    if (c === "{" && quant) return REPETIDO;
     quant = false;
   }
   return ramo === "alt" ? "alternativa vazia (a|, |a, (|a), a||b)" : null;
 }
 const REPETIDO = "quantificador repetido (a+?, a*+, x{2}?)";
+const CHAVE = "chave que nao forma intervalo ({, a{, a{1, a{,3}, a{0}, a{256})";
 
 function regexes(v, nome) {
   if (v === undefined) return undefined;
