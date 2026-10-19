@@ -12,7 +12,9 @@ const TETOS = { legibilidade: { pr_arquivos: CAP_ARQUIVOS }, arquivo: { linhas: 
 const EXCLUIDO_PADRAO = ["^docs/(sprintx|entregas|eventos)/"];
 const MODOS = ["obrigatoria", "se_disponivel", "desligada"];
 const ENTREGAS = ["por_trabalho", "por_sprint"];
-const CHAVES = ["expx_fatiamento", "justificativa", "legibilidade", "arquivo", "ignorar", "capacidade", "revisao_por_task", "entrega", "merge_automatico"];
+const CHAVES = ["expx_fatiamento", "justificativa", "legibilidade", "arquivo", "ignorar", "capacidade", "revisao_por_task", "entrega", "merge_automatico", "revisor_bot"];
+// Login do bot revisor de PR: o do GitHub (alfanumérico e hífen), com `[bot]` só no fim.
+const LOGIN = /^[A-Za-z0-9][A-Za-z0-9-]*(\[bot\])?$/;
 // Caminhos que nunca entram em merge automático (E9 da mergex). O projeto soma; nunca substitui.
 // Cada item e o porquê estão no contrato expx-instalacao §5.2.
 const PROTEGIDOS_PADRAO = [
@@ -148,6 +150,19 @@ function regexes(v, nome) {
   return v;
 }
 
+/** Logins exatos, sem duplicata: a duplicata é erro, não se deduplica em silêncio. */
+function logins(v, nome) {
+  if (v === undefined) return [];
+  if (!Array.isArray(v)) return erro(nome, "deve ser uma lista de logins"), [];
+  const primeiro = new Map(); // login → índice da primeira vez: tempo linear mesmo em lista longa
+  v.forEach((l, i) => {
+    if (typeof l !== "string" || !LOGIN.test(l)) erro(`${nome}[${i}]`, "deve ser login (letras, digitos e hifen, [bot] so no fim)");
+    else if (primeiro.has(l)) erro(`${nome}[${i}]`, `deve aparecer uma vez (repete o item ${primeiro.get(l)})`);
+    else primeiro.set(l, i);
+  });
+  return v;
+}
+
 function resolver(cfg, origem) {
   if (!ehObjeto(cfg)) return erro(".expx/fatiamento.json", "deve ser um objeto JSON"), undefined;
   if (origem === "projeto") {
@@ -169,6 +184,8 @@ function resolver(cfg, origem) {
   if (m.ativo !== undefined && typeof m.ativo !== "boolean") erro("merge_automatico.ativo", "deve ser true ou false");
   const protegidos = regexes(m.caminhos_protegidos, "merge_automatico.caminhos_protegidos") ?? [];
   const merge = { ativo: m.ativo === true, caminhos_protegidos: [...new Set([...PROTEGIDOS_PADRAO, ...protegidos])] };
+  // independente de merge_automatico: o E9 da mergex reconhece a revisão do bot no PR redirecionado
+  const revisor = logins(cfg.revisor_bot, "revisor_bot");
   const just = cfg.justificativa;
   if (just !== undefined && typeof just !== "string") erro("justificativa", "deve ser texto");
   const difere = (v, p) => Object.keys(p).some((k) => v[k] !== p[k]);
@@ -180,7 +197,7 @@ function resolver(cfg, origem) {
     erro("revisao_por_task.modo", `afrouxar ${afrouxados.join(", ")} acima do padrao exige "obrigatoria"`);
   }
   const capacidade = { pr_arquivos: CAP_ARQUIVOS, excluido_no_painel: excluido };
-  return { origem, legibilidade, arquivo, ignorar, capacidade, revisao_por_task: { modo }, entrega, merge_automatico: merge, justificativa: just ?? null };
+  return { origem, legibilidade, arquivo, ignorar, capacidade, revisao_por_task: { modo }, entrega, merge_automatico: merge, revisor_bot: revisor, justificativa: just ?? null };
 }
 
 const caminho = join(op.raiz, ".expx", "fatiamento.json");
@@ -214,6 +231,7 @@ const env = {
   EXPX_ENTREGA: e.entrega,
   EXPX_MERGE_AUTOMATICO: e.merge_automatico.ativo ? "sim" : "nao",
   EXPX_CAMINHOS_PROTEGIDOS: e.merge_automatico.caminhos_protegidos.join("|"),
+  EXPX_REVISOR_BOT: e.revisor_bot.join(","), // vírgula: login não tem vírgula
   EXPX_FATIAMENTO_ORIGEM: e.origem,
 };
 const texto = Object.entries(env).map(([k, v]) => `${k}=${shell(v)}\n`).join("");

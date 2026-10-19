@@ -177,11 +177,12 @@ O projeto calibra o fatiamento (contrato `expx-fatiamento`) de forma versionada:
   "capacidade": { "excluido_no_painel": ["^docs/(sprintx|entregas|eventos)/"] },
   "revisao_por_task": { "modo": "obrigatoria" },
   "entrega": "por_sprint",
-  "merge_automatico": { "ativo": true, "caminhos_protegidos": ["^src/pagamentos/"] }
+  "merge_automatico": { "ativo": true, "caminhos_protegidos": ["^src/pagamentos/"] },
+  "revisor_bot": ["codeant-ai[bot]"]
 }
 ```
 
-- padrões: `legibilidade` 400 / 20 / 300; `arquivo` 150 KB / 4000 linhas; `ignorar` vazio; `excluido_no_painel` como acima; `modo: se_disponivel`; `entrega: por_trabalho`; `merge_automatico.ativo: false` com a lista padrão de caminhos protegidos;
+- padrões: `legibilidade` 400 / 20 / 300; `arquivo` 150 KB / 4000 linhas; `ignorar` vazio; `excluido_no_painel` como acima; `modo: se_disponivel`; `entrega: por_trabalho`; `merge_automatico.ativo: false` com a lista padrão de caminhos protegidos; `revisor_bot` vazio (nenhum);
 - **capacidade do revisor**, não calibrável: `legibilidade.pr_arquivos` ≤ 100 e `arquivo.linhas` ≤ 5000;
 - limite diferente do padrão exige `justificativa` não vazia; `legibilidade` acima do padrão exige `revisao_por_task.modo: "obrigatoria"`;
 - `ignorar` sai em `FATIA_IGNORAR_PROJETO`, que **soma** às exclusões padrão (`FATIA_IGNORAR`), nunca as substitui: quem soma é o verificador do contrato `expx-fatiamento` v2, com a variável exportada como ali se diz ("Como consumir o leitor"); no E7 da mergex, quando ela espelhar o verificador. Regex que não compila, ou fora do ERE que o bash aplica (`(?…)`, `\d`, `\w`, retrovisor, quantificador repetido como `a+?` ou `x{2}?`, alternativa vazia como `a|` ou `(|a)`, chave que não forma intervalo como `{`, `a{1` ou `a{,3}`, contagem acima de 255 e `{0}`), é inválida. Na dúvida entre o glibc e o regex do Git Bash e do macOS, vale o mais estrito: o glibc aceita alternativa vazia e `{0}`, os outros recusam, e a exclusão recusada não exclui nada;
@@ -192,7 +193,8 @@ O projeto calibra o fatiamento (contrato `expx-fatiamento`) de forma versionada:
   - SQL: `\.sql$` — de propósito amplo: fora de `migrations/` o `.sql` costuma ser esquema, função, política ou seed (`schema.sql`, `seed.sql`), e o leitor não sabe distinguir uma consulta inofensiva disso. O custo é o projeto com muito SQL de consulta (dbt, sqlc) não ter merge automático nesses arquivos, o que é a falha segura;
   - CI e infraestrutura: `^\.github/`, `^(infra|deploy|terraform|k8s|docker)/` (na raiz), `(^|/)Dockerfile$`;
   - segredos: `(^|/)\.env` — cobre `.env`, `.env.*` (o mesmo conjunto que o hook `segredo` da sprintx varre) e também `.envrc`; `(^|/)secrets?/`;
-- validação estrita: chave desconhecida em qualquer nível, `expx_fatiamento` ≠ 1, inteiro fora de 1 a 2^31−1, `modo` fora de `obrigatoria`/`se_disponivel`/`desligada`, `entrega` fora de `por_trabalho`/`por_sprint` e `merge_automatico.ativo` que não seja booleano invalidam o arquivo; BOM e CRLF são aceitos;
+- `revisor_bot` (E9 da mergex): lista dos logins exatos do bot que revisa os PRs do projeto. O E9 a usa para exigir, num PR redirecionado (a base trocada depois do merge da predecessora), uma revisão de um desses logins no HEAD atual; a comparação é exata: nem prefixo nem diferença de maiúsculas casam. É do projeto, porque a skill não nomeia o produto revisor (DM-197 da mergex). Cada login casa `^[A-Za-z0-9][A-Za-z0-9-]*(\[bot\])?$` (`[bot]` só no fim); login repetido é **inválido**, não deduplicado, para o erro de cópia aparecer em vez de sumir. Lista vazia ou ausente = nenhum bot, e o E9 não exige essa revisão. Independente de `merge_automatico`. Sai em `EXPX_REVISOR_BOT` (logins unidos por vírgula, que login não tem; vazio quando nenhum) e em `revisor_bot` no `--formato json`;
+- validação estrita: chave desconhecida em qualquer nível, `expx_fatiamento` ≠ 1, inteiro fora de 1 a 2^31−1, `modo` fora de `obrigatoria`/`se_disponivel`/`desligada`, `entrega` fora de `por_trabalho`/`por_sprint`, `merge_automatico.ativo` que não seja booleano e `revisor_bot` que não seja lista de logins sem repetição invalidam o arquivo; BOM e CRLF são aceitos;
 - ausente → padrões, e tudo como antes; presente e inválido → **erro**, nunca queda calada nos padrões; o arquivo é do projeto: `init`, `add`, `remove` e `update` nunca o escrevem;
 - **leitor único**: `.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs` (README do núcleo). Hoje só o `doctor` o usa (`fatiamento-invalido`, `fatiamento-sem-leitor`; valida com a cópia do próprio CLI, nunca executa a do checkout); a sprintx (F3 e auditor) e a mergex (E7) passam a chamá-lo nos planos delas. Arquivo presente e leitor ausente é erro, com a instrução de atualizar o expx.
 
