@@ -133,6 +133,15 @@ describe("expx-revisao.mjs revisar", () => {
     expect(r.chamadas.some((a) => a[0] === "review")).toBe(false);
   });
 
+  it("funcional: espaço na ponta do caminho é parte do nome: nunca aparado (revisaria outro arquivo ou o daria por ausente)", () => {
+    const c = cenario({ issues: [achado(" a.js", 1)] });
+    escreve(c.raiz, " a.js", "x\n");
+    const r = revisar(c, " a.js");
+    expect(r).toMatchObject({ rc: 1, ev: { resultado: "achados", achados: [{ arquivo: " a.js", estado: "aberto" }] } });
+    expect(Object.keys(r.ev.arquivos)).toEqual([" a.js"]);
+    expect(r.chamadas[1]).toEqual(["review", "--uncommitted", "--headless", "--include", " a.js"]);
+  });
+
   it("funcional: JSON precedido de avisos no stdout é lido", () => {
     const c = cenario({ avisos: "npm warn config {obsoleto}\nnpm notice nova versao\n", issues: [achado("src/a.js", 3)] });
     altera3(c.raiz);

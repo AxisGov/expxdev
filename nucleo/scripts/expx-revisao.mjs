@@ -112,7 +112,8 @@ function alteradas(f) {
 }
 
 function revisar() {
-  const arquivos = op.arquivos.split(",").map((f) => caminho(f.trim())).filter(Boolean);
+  // sem aparar: espaço na ponta é parte do nome, e aparado o caminho seria outro arquivo (ou nenhum)
+  const arquivos = op.arquivos.split(",").map(caminho).filter(Boolean);
   if (arquivos.length === 0) uso("--arquivos sem nenhum caminho");
   const anterior = le(caminhoEv(op.task));
   const ev = { expx_revisao: 1, trabalho: op.trabalho, task: op.task, cli: { versao: null }, executada_em: new Date().toISOString(),
