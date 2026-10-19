@@ -290,7 +290,7 @@ Continuação de `2026-10-18-mergex-revisao-por-task-e-merge-automatico.md` (par
   - **Kill switch:** `EXPX_MERGE_AUTOMATICO` lido da base a cada tentativa.
   - **Ciclo:** a cada `proxima=conferir`, recalcula as condições 1 e 2 da plataforma (gate R1–R6, CI verde no HEAD, nenhuma thread sem resposta, nenhum pedido de mudança) e roda `merge-automatico.sh --conferir`.
   - **Merge:** com `apto`, faz a revalidação do item 5 do passo 7, `--marcar-merge` e o merge preso ao SHA.
-  - **Fechamento:** grava `prs[].estado: merged`, `merge_sha` e `merge: automatico`, e atualiza a trilha.
+  - **Fechamento:** grava no item de `prs` da sprint atual `estado: merged`, `merge_sha` e `merge: automatico`; grava também `pr_estado: merged` de topo, que é o da sprint atual (Task S1), e, como o item 7 do passo 7, em `.expx/estado.json` quando o PR é do trabalho atual; e atualiza a trilha.
 - Modify: `.claude/skills/mergex/references/09-revisao.md`:
   - pré-requisitos, l.11-25: o modo automático e o link;
   - passo 7, item 7, l.961: `prs`;
@@ -311,6 +311,7 @@ Continuação de `2026-10-18-mergex-revisao-por-task-e-merge-automatico.md` (par
 - [ ] **Step 1: Write the failing tests** (contrato e trechos com `gh` falso):
   - `modo nao: E9 pergunta como hoje`;
   - `sim e apto: merge com --match-head-commit, prs.merge automatico, trilha editada`;
+  - `fechamento automatico: pr_estado de topo e prs da sprint ficam merged`;
   - `HEAD muda entre conferir e merge: nao mergeia e recalcula`;
   - `gate BLOQUEADO: espera_humana com o motivo`;
   - `CI pendente: aguardando`;
