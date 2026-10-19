@@ -2,9 +2,9 @@
 
 Data: 2026-10-19. Emenda o desenho `2026-10-18-revisao-por-task-pr-por-sprint-design.md` (aprovado). Repositórios: AxisGov/expxdev, AxisGov/mergex, AxisGov/sprintx; vale também para os demais repositórios do método (buildx) e para os projetos.
 Estado de partida: expxdev f95d7cd, mergex 1310f4c, sprintx e1f88c9.
-Estado: **proposta para aprovação**. Nada se implementa antes dela; o contrato `expx-fatiamento` v3, o código e o plano vêm depois.
+Estado: **decisões fechadas, aguardando a aprovação do texto**. Nada se implementa antes dela; o contrato `expx-fatiamento` v3, o código e o plano vêm depois.
 
-Onde esta emenda e o desenho divergem, vale a emenda. As decisões aqui são do usuário (2026-10-19, depois de parecer do Codex), salvo as marcadas *(proposta)*, que o usuário confirma ao aprovar.
+Onde esta emenda e o desenho divergem, vale a emenda. Todas as decisões aqui são do usuário (2026-10-19, depois de dois pareceres do Codex); onde o autor do texto e o Codex divergiram, o usuário ficou com o Codex.
 
 ## 1. Por que
 
@@ -18,9 +18,9 @@ A emenda troca o "fatiamento calibrável" por **limites do CodeAnt, fixos**, pre
 
 | Fato | Fonte |
 |---|---|
-| A CLI revisa no máximo **40 arquivos** por revisão (`MAX_REVIEW_FILES = 40`) | `src/utils/reviewApiHelper.js` do pacote npm `codeant-cli@0.5.14` ([repositório](https://github.com/CodeAnt-AI/codeant-cli/blob/main/src/utils/reviewApiHelper.js)); o [PR #52](https://github.com/CodeAnt-AI/codeant-cli/pull/52) subiu de 15 para 40 (mergeado em 2026-10-15); o spike 6.0 do desenho viu `max_files` 15 na 0.5.1 e 40 na 0.5.14 |
-| Arquivo acima de **5.000 linhas** (`MAX_FILE_LINES`) ou de **200 KB = 204.800 bytes** (`MAX_FILE_SIZE_BYTES`) é **pulado**, com aviso | mesmo arquivo |
-| Não contam para os 40: arquivos deletados, binários e gerados, lock, mídia, documentos e o que casa `--exclude`. O corte de 40 vem **depois** desses filtros | mesmo arquivo |
+| A CLI revisa no máximo **40 arquivos** por revisão (`MAX_REVIEW_FILES = 40`) | `src/utils/reviewApiHelper.js` (:6-8) do pacote npm [`codeant-cli@0.5.14`](https://registry.npmjs.org/codeant-cli/-/codeant-cli-0.5.14.tgz), publicado em 2026-10-15, integridade `sha512-LNg2uf76Qq4b11vZuxtL0ULTs6UPcGHlRxvFoiADXywLxqtYoBnHszyaNQmY1v9niZW/zzPwqMgNTn3ltuNnzw==`, `gitHead` 475f979. A `main` do [repositório](https://github.com/CodeAnt-AI/codeant-cli) pode mostrar outra versão no `package.json`: a fonte é o pacote. O [PR #52](https://github.com/CodeAnt-AI/codeant-cli/pull/52) subiu de 15 para 40; o spike 6.0 do desenho viu `max_files` 15 na 0.5.1 e 40 na 0.5.14 |
+| Arquivo acima de **5.000 linhas** (`MAX_FILE_LINES`) ou de **200 KB = 204.800 bytes** (`MAX_FILE_SIZE_BYTES = 200 * 1024`) é **pulado**, com o motivo `too large (<n> lines, max 5000)` ou `too large (<n> KB, max 200 KB)` | mesmo arquivo, :124-131 e :207-209 |
+| Não contam para os 40: arquivos deletados, binários e gerados, lock, mídia, documentos e o que casa `--exclude`. O corte de 40 vem **depois** desses filtros | mesmo arquivo; no pacote, os metadados saem como `_meta` (:148) e o modo `--headless` os devolve como `meta` (`src/reviewHeadless.js:116`) |
 | A documentação pública ainda diz 10 arquivos: está desatualizada | [docs.codeant.ai/cli/review](https://docs.codeant.ai/cli/review) |
 | `--last-n-commits` aceita no máximo 5 commits; `--base-commit <sha>` revisa tudo desde um commit | [docs.codeant.ai/cli/review](https://docs.codeant.ai/cli/review) |
 | O app do GitHub não revisa PR com **mais de 100 arquivos**: responde "Skipping CodeAnt AI review — this PR changes more than 100 files"; dá para forçar com `@codeant-ai : review`, mas o sinal é pior | observado na AxisGov/mergex#15 (177 arquivos) |
@@ -34,7 +34,7 @@ Isto corrige o item da CLI na seção 3 do desenho ("10 arquivos únicos e 5.000
 Fixas. Nenhum projeto as calibra, nem para afrouxar nem para apertar. Valem iguais nos repositórios do método (expxdev, sprintx, mergex, buildx) e nos projetos.
 
 - **L1 — task:** no máximo **40 arquivos revisáveis**. Revisável é o arquivo da task que a CLI revisaria: presente, fora das exclusões da CLI (deletado, binário, gerado, lock, mídia, documento) e fora de `excluir_da_revisao` (5). A conta é feita antes do corte da CLI.
-- **L2 — arquivo:** cada arquivo revisável da task tem no máximo **5.000 linhas** e **204.800 bytes**, inteiro, **no estado depois da task** (não o diff, nem o estado anterior).
+- **L2 — arquivo:** cada arquivo revisável da task tem no máximo **5.000 linhas** e **204.800 bytes**, inteiro, **no estado depois da task** (não o diff, nem o estado anterior). **Não há exceção a L2 para arquivo nenhum.**
 - **L3 — PR:** no máximo **100 arquivos alterados**, contando **todos**, como o `changed_files` do GitHub: código, artefatos de método (`docs/sprintx/`, `docs/entregas/`, `docs/eventos/`), gerados, lock e o que o painel exclui (2).
 - **Sem limite de linhas** por PR, por commit ou por task.
 
@@ -46,7 +46,7 @@ Fixas. Nenhum projeto as calibra, nem para afrouxar nem para apertar. Valem igua
 
 A saída de L1 ou L2 é tornar a mudança revisável. Mais de 40 arquivos: dividir a task. Arquivo acima de L2: uma task anterior o divide. Isso não é circular: L2 mede o estado **depois** da task, e a task que divide deixa o original e as partes abaixo do limite, todos revisáveis. Só não cabe numa task a divisão que precisa de mais de 40 arquivos; essa se faz em várias tasks, cada uma deixando o que tocou abaixo do limite.
 
-**PR acima de 100 arquivos bloqueia e se divide.** O E7 não abre o PR e ninguém força a revisão com `@codeant-ai : review`. Com `entrega: por_sprint`, a sprint que passa de 100 arquivos se divide no plano da sprint (F3); com `por_trabalho`, o trabalho se divide em trabalhos. Os artefatos de método entram na conta (12).
+**PR acima de 100 arquivos bloqueia e se divide.** O E7 não abre o PR e ninguém força a revisão com `@codeant-ai : review`. Com `entrega: por_sprint`, a sprint que passa de 100 arquivos se divide no plano da sprint (F3); com `por_trabalho`, o trabalho se divide em trabalhos. A única PR que passa de 100 é a de planejamento, que só tem artefatos de método e nunca é revisada pelo app (7).
 
 ## 4. O que sai
 
@@ -60,36 +60,47 @@ A saída de L1 ou L2 é tornar a mudança revisável. Mais de 40 arquivos: divid
 - A revisão **em lotes** (4.2 e 6.0 do desenho): task com mais de 40 arquivos revisáveis se divide, não se revisa em pedaços.
 - No desenho: o O3 ("limites calibráveis por projeto"), o anti-objetivo "limite relaxado sem revisão por task", a 4.1 ("Capacidade", "Legibilidade", "Afrouxamento", "Duas medidas no E7") e a seção 5 (calibragem do conselho). Ficam da 4.1: o arquivo do projeto, o leitor único no núcleo, o caminho fixo dele e o erro quando o arquivo existe e o leitor não.
 
-**Transição das variáveis:** por uma versão (a release que traz a emenda), toda peça que lia `FATIA_*` **falha** se qualquer uma estiver definida no ambiente, com a mensagem "`FATIA_<nome>` não é mais lida (limites do CodeAnt, fixos: emenda de 2026-10-19); remova-a do ambiente". Nunca a ignora em silêncio. Na release seguinte a conferência sai.
+**Nomes `FATIA_*` reservados para sempre:** toda peça que lia `FATIA_*` (leitor, verificador, `fatiamento-da-pr.sh`, `leitor-do-projeto.sh`, revisão por task, doctor) **falha** se qualquer variável com esse prefixo estiver definida no ambiente, com a mensagem "`FATIA_<nome>` não é mais lida (limites do CodeAnt, fixos: emenda de 2026-10-19); remova-a do ambiente". Não é transição: a conferência fica, para que quem pular uma versão nunca tenha a variável ignorada em silêncio.
 
 ## 5. `.expx/fatiamento.json` depois da emenda
 
 ```json
 {
-  "expx_fatiamento": 1,
+  "expx_fatiamento": 2,
   "revisao_por_task": { "modo": "obrigatoria" },
   "entrega": "por_sprint",
   "merge_automatico": { "ativo": true, "caminhos_protegidos": ["^src/pagamentos/"] },
   "revisor_bot": ["codeant-ai[bot]"],
-  "excluir_da_revisao": ["^gerado/"]
+  "excluir_da_revisao": [
+    { "padrao": "^fixtures/candidatos/", "classe": "copia", "origem": "scripts/atualizar-candidatos.sh", "motivo": "cópia das skills candidatas, revisada no repositório de origem" }
+  ]
 }
 ```
 
 - Ficam como estão: `revisao_por_task.modo`, `entrega`, `merge_automatico` (com `caminhos_protegidos`) e `revisor_bot`.
-- `excluir_da_revisao` *(proposta: substitui `ignorar`)*: lista de ERE, validada como `ignorar` hoje, que **soma** ao padrão do núcleo (os artefatos de método, `^docs/(sprintx|entregas|eventos)/`). Arquivo que casa não vai para a CLI na revisão por task e fica fora de L1 e L2; não muda L3. O método aplica o padrão antes de montar o `--include`, então a sintaxe glob do `--exclude` da CLI não entra. Troca de nome porque o sentido muda: o que antes só saía da conta de legibilidade passa a sair da **revisão**, e cada padrão precisa ser reconfirmado com esse sentido (9). Como `.expx/fatiamento.json` é caminho sempre protegido no merge automático, ampliar a lista nunca entra sem o desenvolvedor.
-- Chave removida (`legibilidade`, `arquivo`, `justificativa`, `capacidade`, `ignorar`) é **inválida** com mensagem própria: "`<chave>`: removida pela emenda de 2026-10-19 (limites do CodeAnt, fixos); apague-a" (para `ignorar`: "renomeada para `excluir_da_revisao`; confirme que cada padrão deve ficar fora da revisão"). Não é a "chave desconhecida" genérica, e nunca é ignorada.
-- `expx_fatiamento` continua `1` *(proposta)*: um projeto sem as chaves removidas não precisa mudar nada; quem as tem recebe o erro acima.
+- `excluir_da_revisao` substitui `ignorar`. Serve só para **classes de artefato**, nunca para código-fonte. O que o arquivo lista **soma** ao padrão do núcleo (os artefatos de método, `^docs/(sprintx|entregas|eventos)/`), que não se declara. Arquivo que casa não vai para a CLI na revisão por task e fica fora de L1 e L2; não muda L3. O método aplica o padrão antes de montar o `--include`, então a sintaxe glob do `--exclude` da CLI não entra. Validação de cada item, toda obrigatória:
+  1. **Forma:** objeto com exatamente `padrao`, `classe`, `origem` e `motivo`.
+  2. **`padrao` é um diretório literal:** `^`, um ou mais segmentos e `/` no fim, sem metacaractere de regex (só `\.` escapado). Não há padrão por extensão, por nome de arquivo nem com alternativa: cada exclusão é uma pasta inteira, à vista.
+  3. **`classe`** é `gerado` (produzido por script: snapshot, fixture regenerada) ou `copia` (cópia versionada de outro repositório, revisada lá).
+  4. **`origem`** não vazia: o comando que gera a pasta (`gerado`) ou o repositório de onde ela vem (`copia`). **`motivo`** não vazio.
+  5. **Nunca código-fonte:** o primeiro segmento não pode ser uma raiz de código (`src`, `lib`, `app`, `apps`, `packages`, `pkg`, `cmd`, `internal`, `server`, `client`, `web`, `api`, `test`, `tests`, `spec`, `scripts`, `.github`, `.claude`, `.opencode`, `.expx`), salvo com mais de um segmento e um deles chamado `fixtures`, `snapshots`, `__snapshots__`, `generated` ou `gerado` (`^scripts/ci/fixtures/candidatos/` passa; `^src/` e `^scripts/` não).
+  6. **O que a task escreve é revisado:** arquivo declarado em `cria` ou `altera` de uma task que casa um item da lista torna a revisão `incompleta` (`incompleta:excluido-declarado`). Regenerar um artefato gerado é commit próprio, fora das tasks, como na F6 do contrato.
+
+  Como `.expx/fatiamento.json` é caminho sempre protegido no merge automático, ampliar a lista nunca entra sem o desenvolvedor.
+- `capacidade.excluido_no_painel` sai (7).
+- Chave removida (`legibilidade`, `arquivo`, `justificativa`, `capacidade`, `ignorar`) é **inválida** com mensagem própria: "`<chave>`: removida pela emenda de 2026-10-19 (limites do CodeAnt, fixos); apague-a" (para `ignorar`: "substituída por `excluir_da_revisao`, só para classes de artefato; ver o contrato"). Não é a "chave desconhecida" genérica, e nunca é ignorada.
+- **`expx_fatiamento: 2`.** O formato muda (chaves removidas, chave nova, sentido novo da exclusão), então a versão sobe: o leitor antigo recusa o formato novo de forma determinística ("versão desconhecida"), e o leitor novo recusa a versão 1 com a mensagem "versão 1: migre para 2 (emenda de 2026-10-19)", seguida da lista das chaves removidas que o arquivo ainda tem.
 
 ## 6. Os números presos à versão da CLI
 
-- **Dois perfis versionados** no núcleo, separados porque têm donos diferentes: o da CLI, `codeant-cli@0.5.14 = 40 / 5000 / 204800` (com a integridade do pacote npm homologado), e o do app, `100 arquivos, todos contados` (2). O perfil é a **fonte canônica**; as cópias (constantes do verificador, espelho na mergex, texto da sprintx e dos contratos) são conferidas contra ele por teste.
-- **Versão da CLI:** só versão homologada é aceita *(proposta: lista exata, hoje só 0.5.14, em vez de "≥ 0.5.14")*. Outra versão: `indisponivel:versao`, com a orientação de instalar a homologada (`npm i -g codeant-cli@0.5.14`) ou homologar a nova; o agente não instala nada.
-- **Asserção, nunca adaptação:** a revisão confere no JSON da CLI o `max_files` (tem de ser 40) e a lista de pulados, nos caminhos exatos que os testes de conformidade fixarem (o spike 6.0 viu `meta.max_files` e `meta.skipped`; o código da CLI pode expô-los como `_meta`). Campo ausente, tipo errado, `max_files` diferente ou motivo de pulo fora da lista do perfil: revisão incompleta (`incompleta:perfil`). Nunca muda limite em silêncio.
+- **Dois perfis versionados** no núcleo, separados porque têm donos diferentes: o da CLI, `codeant-cli@0.5.14 = 40 / 5000 / 204800`, e o do app, `100 arquivos, todos contados` (2). O perfil é a **fonte canônica**; as cópias (constantes do verificador, espelho na mergex, texto da sprintx e dos contratos) são conferidas contra ele por teste.
+- **Versão da CLI:** só versão da **lista exata de homologadas** é aceita, hoje só 0.5.14; nunca "≥". Cada versão homologada registra o pacote npm, a integridade (`dist.integrity`) e o `gitHead`. Isso substitui a orientação `npm i -g codeant-cli@latest` do contrato `expx-revisao`. Outra versão: `indisponivel:versao`, com a orientação de instalar a homologada (`npm i -g codeant-cli@0.5.14`) ou homologar a nova; o agente não instala nada.
+- **Asserção, nunca adaptação:** a revisão confere no JSON da CLI o `max_files` (tem de ser 40) e a lista de pulados. O caminho exato no JSON é o que os testes de conformidade do passo 0 (11) fixarem: o pacote monta `_meta`, e o `--headless` o devolve como `meta` (2), que é o que o spike 6.0 viu. Campo ausente, tipo errado, `max_files` diferente ou motivo de pulo fora da lista do perfil: revisão incompleta (`incompleta:perfil`). Nunca muda limite em silêncio.
 - **Mesmo estado medido e revisado:** a evidência guarda, de cada arquivo, o caminho, o blob, os bytes e as linhas; o blob é conferido antes e depois da chamada (como já faz o `revisar`), e o conjunto que a CLI devolve é reconciliado com o da task (3).
-- **Testes de conformidade** nas bordas: 40 e 41 arquivos, 5.000 e 5.001 linhas, 204.800 e 204.801 bytes; e também lock, binário, documento, arquivo deletado e exclusão explícita. Precisam da CLI e do login, então quem os roda é o desenvolvedor, ao homologar uma versão; os JSONs que a CLI devolveu ficam versionados no expxdev, e a suíte testa a revisão contra eles com uma CLI falsa. Eles fixam também os textos de motivo dos pulados, o predicado de revisável e como a CLI conta linhas (com ou sem a quebra final).
+- **Testes de conformidade** nas bordas (passo 0 da seção 11): 40 e 41 arquivos, 5.000 e 5.001 linhas, 204.800 e 204.801 bytes; e também lock, binário, documento, arquivo deletado e exclusão explícita. Precisam da CLI e do login, então quem os roda é o desenvolvedor, ao homologar uma versão; os JSONs que a CLI devolveu ficam versionados no expxdev, e a suíte testa a revisão contra eles com uma CLI falsa. Eles fixam o caminho dos metadados, os textos de motivo dos pulados, o predicado de revisável e como a CLI conta linhas (com ou sem a quebra final).
 - **Comando:** na F6 continua `--uncommitted --include <arquivos da task>` (a task é revisada antes do commit). Revisão de mudança já commitada usa `--base-commit <SHA inicial da task>`, nunca `--last-n-commits` (máximo 5).
 
-## 7. O teste das exclusões do painel (feito)
+## 7. As exclusões do painel e o PR de planejamento
 
 O desenho supôs que o app aplica as exclusões do painel antes de contar os 100 arquivos. O teste em [katosmv/login#7](https://github.com/katosmv/login/pull/7) mostrou que não: com 101 arquivos `.js`, 5 deles numa pasta excluída no painel, o app pulou a revisão por passar de 100.
 
@@ -97,7 +108,17 @@ Consequências:
 - L3 conta todos os arquivos alterados do PR (`changed_files`), sem desconto.
 - `capacidade.excluido_no_painel` e o desconto saem do leitor, do verificador (`FATIA_CAPACIDADE_EXCLUIDO`), do `leitor-do-projeto.sh` e do E7.
 - O painel continua útil para o que ele faz: tirar arquivos da **revisão** do app (gerados, artefatos de método). Só não muda a conta dos 100.
-- Os artefatos de método consomem a cota de 100 do PR da sprint (12).
+- Os artefatos de método consomem a cota de 100. O planejamento de uma feature real passa de 250 arquivos (contrato v2, F6), então ele sai dos PRs de sprint.
+
+### O PR de planejamento
+
+*Decisão do usuário, 2026-10-19.* Vale em `por_sprint` e em `por_trabalho`.
+
+- **O que leva:** só os artefatos de método do planejamento (sprintx F1–F5): tudo sob `^docs/(sprintx|entregas|eventos)/`. Qualquer arquivo fora disso, código ou não, faz o PR ser **recusado**: ele não abre, e o motivo é dito.
+- **Quando abre:** no fim da F5, com o plano aprovado, antes da execução da primeira sprint. A sprintx aciona a mergex para ele como a primeira entrega do trabalho.
+- **Merge do usuário, sempre:** nunca tem merge automático, mesmo com `merge_automatico.ativo`. A F6 só executa a primeira sprint depois do merge dele, com a branch atualizada a partir da main (como entre sprints, 4.3 do desenho).
+- **L3 não vale para ele.** Se passar de 100 arquivos, o app pula a revisão, e isso é aceito: esses caminhos já ficam fora da revisão por desenho (excluídos no painel, conferidos pelos portões das skills).
+- **Os PRs de sprint** levam só o código e os poucos artefatos que a sprint atualiza (progresso em `docs/sprintx/`, eventos, `ENTREGA.md`), e contam **tudo** nos 100.
 
 ## 8. O que muda em cada peça
 
