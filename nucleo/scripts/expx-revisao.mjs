@@ -42,6 +42,8 @@ const le = (f) => { try { return JSON.parse(readFileSync(f, "utf8").replace(/^\u
 const git = (...a) => spawnSync("git", a, { cwd: op.raiz, encoding: "utf8" });
 const blob = (f) => { const r = git("hash-object", "--", f); return r.status === 0 ? r.stdout.trim() : undefined; };
 
+// `\` é separador só no Windows; fora dele é parte do nome, e trocá-lo daria por ausente um arquivo que existe
+const caminho = (f) => (process.platform === "win32" ? f.replace(/\\/g, "/") : f).replace(/^\.\//, "");
 const pausa = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 const velha = (d) => { try { return Date.now() - statSync(d).mtimeMs > 120000; } catch { return false; /* sumiu */ } };
 /** Remove a trava velha conferindo de novo sob `<trava>.quebra` (`mkdir` exclusivo): sem isso, quem a viu
@@ -107,7 +109,7 @@ function alteradas(f) {
 }
 
 function revisar() {
-  const arquivos = op.arquivos.split(",").map((f) => f.trim().replace(/\\/g, "/").replace(/^\.\//, "")).filter(Boolean);
+  const arquivos = op.arquivos.split(",").map((f) => caminho(f.trim())).filter(Boolean);
   if (arquivos.length === 0) uso("--arquivos sem nenhum caminho");
   const anterior = le(caminhoEv(op.task));
   const ev = { expx_revisao: 1, trabalho: op.trabalho, task: op.task, cli: { versao: null }, executada_em: new Date().toISOString(),
@@ -189,7 +191,7 @@ function achados(issues, ev) {
   const rejeitadas = new Set([...ev.rejeicoes.map((r) => r.identidade), ...rejeitadasDoTrabalho()]);
   const cache = {};
   for (const i of issues) {
-    const arquivo = String(i.relevant_file ?? "").replace(/\\/g, "/").replace(/^\.\//, "");
+    const arquivo = caminho(String(i.relevant_file ?? ""));
     const linha = Number(i.start_line);
     const c = (cache[arquivo] ??= { alt: arquivo in ev.arquivos ? alteradas(arquivo) : new Set(),
       linhas: existsSync(join(op.raiz, arquivo)) ? readFileSync(join(op.raiz, arquivo), "utf8").split(/\r?\n/) : [] });

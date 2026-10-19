@@ -208,6 +208,19 @@ describe("expx-revisao.mjs revisar", () => {
     expect(r.ev.arquivos["src/a.js"]).toBe(git(c.raiz, "rev-parse", "HEAD:src/a.js"));
   });
 
+  // no Windows `\` é separador e não cabe em nome de arquivo: o caso só existe fora dele
+  it.skipIf(process.platform === "win32")("funcional: fora do Windows, `\\` é parte do nome: o arquivo é achado e o diff é o dele", () => {
+    const f = "src/a\\b.js";
+    const c = cenario({ issues: [achado(f, 3)] });
+    escreve(c.raiz, f, "l1\nl2\nl3\nl4\nl5\n");
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "com barra invertida");
+    escreve(c.raiz, f, "l1\nl2\nnovo3\nl4\nl5\n");
+    const r = revisar(c, f);
+    expect(r).toMatchObject({ rc: 1, ev: { resultado: "achados", achados: [{ arquivo: f, linha: 3, estado: "aberto" }] } });
+    expect(r.ev.arquivos[f]).toMatch(/^[0-9a-f]{40}$/);
+  });
+
   it("funcional: arquivo alterado durante a chamada da CLI → indisponivel", () => {
     const c = cenario({ reescreve: "src/a.js" }); // a falsa reescreve o arquivo antes de responder
     altera3(c.raiz);

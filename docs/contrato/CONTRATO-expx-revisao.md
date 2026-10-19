@@ -71,6 +71,8 @@ Imprime uma linha de resumo.
 - Achado cuja identidade está em `rejeicoes` de qualquer evidência do trabalho é
   `rejeitado` (relidas também sob a trava, antes de gravar). Revisar de novo preserva
   as rejeições da própria task.
+- No Windows, `\` em `--arquivos` e no `relevant_file` da CLI vira `/`; fora dele é
+  parte do nome do arquivo e fica como está.
 - Mais arquivos que o `meta.max_files` informado: revisa em lotes; a task passa só
   se todos passam.
 - Arquivo apagado não vai para a CLI (não há linha onde ancorar achado): fica
@@ -135,3 +137,4 @@ desenvolvedor no PR para cada um.
 | 2026-10-18 | `conferir` exige, em `ok`/`achados`, `cli.versao` ≥ 0.5.14, `executada_em` ISO 8601 e `lotes` que cobrem os arquivos presentes (`evidencia-invalida:<campo>`). |
 | 2026-10-18 | Trava velha removida sob `.quebra`: quem a viu velha não remove a trava nova de outro processo. |
 | 2026-10-18 | `revisar` relê sob a trava as rejeições de todas as evidências do trabalho, não só as da própria task. |
+| 2026-10-18 | `\` só vira `/` no Windows: fora dele é parte do nome, e o arquivo deixava de ser achado. |
