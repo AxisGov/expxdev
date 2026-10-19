@@ -100,4 +100,6 @@ codeant review --headless "${modo[@]}" "${exclude[@]}" > "$saida/$caso.json" 2> 
 echo $? > "$saida/$caso.saida"
 set -e
 cat "$saida/$caso.json"
-echo "exit $(cat "$saida/$caso.saida")" >&2
+rc="$(cat "$saida/$caso.saida")"
+echo "exit $rc" >&2
+exit "$rc"
