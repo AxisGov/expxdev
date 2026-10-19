@@ -181,4 +181,53 @@ describe("expx-fatiamento.mjs", () => {
       expect(r.stdout.split("\n").filter(Boolean)).toEqual(["sim", ...protegidos.map((c) => `P ${c}`), ...livres.map((c) => `L ${c} (rc 1)`)]);
     });
   });
+  describe("revisor_bot", () => {
+    it("funcional: ausente ou vazia, nenhum (env vazio, json [])", () => {
+      for (const raiz of [projeto(), projeto({ expx_fatiamento: 1 }), projeto({ expx_fatiamento: 1, revisor_bot: [] })]) {
+        expect(roda(raiz).out.split("\n")).toContain("EXPX_REVISOR_BOT=");
+        expect(JSON.parse(roda(raiz, "--formato", "json").out).revisor_bot).toEqual([]);
+      }
+    });
+
+    it("funcional: lista válida sai unida por vírgula, sem exigir merge_automatico", () => {
+      const raiz = projeto({ expx_fatiamento: 1, revisor_bot: ["codeant-ai[bot]", "outro-bot"] });
+      expect(roda(raiz).out.split("\n")).toContain("EXPX_REVISOR_BOT='codeant-ai[bot],outro-bot'");
+      expect(JSON.parse(roda(raiz, "--formato", "json").out).revisor_bot).toEqual(["codeant-ai[bot]", "outro-bot"]);
+    });
+
+    it.each([
+      ["login com espaço", ["ok", "codeant ai"], "revisor_bot[1]"],
+      ["[bot] no meio", ["codeant[bot]-ai"], "revisor_bot[0]"],
+      ["login vazio", ["ok", "x", ""], "revisor_bot[2]"],
+      ["começa com hífen", ["-bot"], "revisor_bot[0]"],
+      ["item que não é texto", [7], "revisor_bot[0]"],
+      ["duplicata", ["outro-bot", "outro-bot"], "revisor_bot[1]"],
+      ["não lista", "codeant-ai[bot]", "revisor_bot"],
+      ["objeto", { login: "a" }, "revisor_bot"],
+    ])("funcional: %s é inválido", (_nome, revisor_bot, chave) => {
+      const r = roda(projeto({ expx_fatiamento: 1, revisor_bot }));
+      expect(r).toMatchObject({ rc: 1, out: "" });
+      // a chave é conhecida: o erro é do formato, nunca "chave desconhecida"
+      expect(r.err).toContain(`expx-fatiamento: ${chave}: deve `);
+    });
+
+    it("funcional: lista longa é validada em tempo linear", () => {
+      // antes, cada login procurava a duplicata do começo da lista: 100 mil levavam ~12 s
+      const t = Date.now();
+      const r = roda(projeto({ expx_fatiamento: 1, revisor_bot: Array.from({ length: 100_000 }, (_, i) => `bot-${i}`) }), "--validar");
+      expect(r.rc).toBe(0);
+      expect(Date.now() - t).toBeLessThan(5000);
+    });
+
+    it("funcional: o env é seguro para eval e separa os logins por vírgula", () => {
+      const raiz = projeto({ expx_fatiamento: 1, revisor_bot: ["codeant-ai[bot]", "outro-bot"] });
+      const script = 'eval "$("$NODE" "$SCRIPT" --raiz "$RAIZ")" || exit 9; IFS=, read -ra l <<< "$EXPX_REVISOR_BOT"; printf "%s\\n" "${l[@]}"';
+      const r = spawnSync(bashDosHooks(), ["-c", script], {
+        encoding: "utf8",
+        env: { ...process.env, NODE: barra(process.execPath), SCRIPT: barra(SCRIPT), RAIZ: barra(raiz) },
+      });
+      expect(r.stderr).toBe("");
+      expect(r.stdout).toBe("codeant-ai[bot]\noutro-bot\n");
+    });
+  });
 });
