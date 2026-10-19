@@ -27,7 +27,8 @@ for (let i = 0; i < args.length; i += 2) {
   op[args[i].slice(2)] = args[i + 1];
   if (args[i] === "--task") op.tasks.push(args[i + 1]);
 }
-for (const k of ["trabalho", ...OBRIGATORIOS[cmd]]) if (!op[k]?.trim()) uso(`--${k} obrigatorio`);
+// `--arquivos` não é aparado: espaço é parte do nome
+for (const k of ["trabalho", ...OBRIGATORIOS[cmd]]) if (!(k === "arquivos" ? op[k] : op[k]?.trim())) uso(`--${k} obrigatorio`);
 if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(op.trabalho)) uso(`trabalho invalido: ${op.trabalho}`);
 // id `T-NN.MM` da sprintx/runx (sprint.task) ou o legado `T-<dígitos>` (como antes); vira nome de arquivo, então nada além disso
 const TASK = cmd === "conferir" ? /^T-(\d+|\d{2}\.\d{2})=[^\s:]+$/ : /^T-(\d+|\d{2}\.\d{2})$/;

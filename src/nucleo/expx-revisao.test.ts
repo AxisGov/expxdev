@@ -142,6 +142,17 @@ describe("expx-revisao.mjs revisar", () => {
     expect(r.chamadas[1]).toEqual(["review", "--uncommitted", "--headless", "--include", " a.js"]);
   });
 
+  it("funcional: --arquivos só com espaços é um caminho, não uso errado: ausente → indisponivel", () => {
+    expect(revisar(cenario(), " ")).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "arquivo-inexistente: " } });
+  });
+
+  // no Windows um nome só de espaços não existe: o caso de o arquivo existir só cabe fora dele
+  it.skipIf(process.platform === "win32")("funcional: fora do Windows, arquivo cujo nome é só espaços é revisado", () => {
+    const c = cenario({ issues: [achado(" ", 1)] });
+    escreve(c.raiz, " ", "x\n");
+    expect(revisar(c, " ")).toMatchObject({ rc: 1, ev: { resultado: "achados", achados: [{ arquivo: " ", estado: "aberto" }] } });
+  });
+
   it("funcional: JSON precedido de avisos no stdout é lido", () => {
     const c = cenario({ avisos: "npm warn config {obsoleto}\nnpm notice nova versao\n", issues: [achado("src/a.js", 3)] });
     altera3(c.raiz);
