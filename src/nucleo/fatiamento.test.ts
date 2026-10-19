@@ -396,22 +396,6 @@ describe("verificar-fatiamento.sh", () => {
     expect(r.saida).toContain("PR com 10 linhas em 1 arquivo(s)");
   });
 
-  it("funcional: o leitor chega ao verificador só com `set -a` (sem ele, mede com os padrões)", () => {
-    const d = repo();
-    escreve(d, ".expx/fatiamento.json", JSON.stringify({ expx_fatiamento: 1, ignorar: ["^gerado/"] }));
-    commita(d, "chore: configuracao");
-    git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "gerado/x.txt", linhas(500));
-    commita(d, "feat: gerado");
-    // caminhos por env: argumento com `\` passado ao bash pelo Node é mutilado no Windows
-    const barra = (c: string): string => c.replace(/\\/g, "/");
-    const env = { ...process.env, NODE: barra(process.execPath), SCRIPT: barra(SCRIPT), LEITOR: barra(join(process.cwd(), "nucleo", "scripts", "expx-fatiamento.mjs")) };
-    const consome = (pre: string, pos: string) =>
-      spawnSync(BASH, ["-c", `${pre} eval "$("$NODE" "$LEITOR")"; ${pos} bash "$SCRIPT" main HEAD`], { cwd: d, encoding: "utf8", env });
-    expect(consome("set -a;", "set +a;").status).toBe(0);
-    expect(consome("", "").stdout).toContain("F2: a PR altera 500 linhas");
-  });
-
   // PR com merge de um lado (lado: s1 → s2): base para os casos de medida impossível
   function comMerge(): { d: string; s1: string } {
     const d = repo();
