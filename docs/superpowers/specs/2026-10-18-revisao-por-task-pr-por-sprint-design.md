@@ -3,7 +3,7 @@
 Data: 2026-10-17. Repositórios: AxisGov/expxdev (contrato e núcleo), AxisGov/sprintx, AxisGov/mergex.
 Estado de partida: expxdev d623daa, sprintx 1f1f957, mergex 3c15ed2 (mais o que a rodada 3 de achados da #204 trouxer).
 
-> **Emenda de 2026-10-19 — limites do CodeAnt, fixos:** [`2026-10-19-limites-do-codeant-emenda.md`](2026-10-19-limites-do-codeant-emenda.md). Os limites deixam de ser calibráveis: valem os do CodeAnt (task ≤ 40 arquivos revisáveis, cada um ≤ 5.000 linhas e ≤ 200 KB; PR ≤ 100 arquivos, todos contados: o painel não desconta), sem legibilidade e sem `FATIA_*`. Ela substitui o O3, o segundo anti-objetivo, o item da CLI na seção 3, a maior parte da 4.1, os lotes da 4.2 e da 6.0 e a seção 5. Onde este texto e a emenda divergem, vale a emenda.
+> **Emenda de 2026-10-19 — limites do CodeAnt, fixos:** [`2026-10-19-limites-do-codeant-emenda.md`](2026-10-19-limites-do-codeant-emenda.md). Os limites deixam de ser calibráveis: valem os do CodeAnt (task ≤ 40 arquivos revisáveis, cada um ≤ 5.000 linhas e ≤ 200 KB; PR ≤ 100 arquivos, todos contados: o painel não desconta; o planejamento vai num PR próprio, só de artefatos de método), sem legibilidade e sem `FATIA_*`. Ela substitui o O3, o segundo anti-objetivo, o item da CLI na seção 3, a maior parte da 4.1, os lotes da 4.2 e da 6.0 e a seção 5. Onde este texto e a emenda divergem, vale a emenda.
 
 ## 1. Por que
 

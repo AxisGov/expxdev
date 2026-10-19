@@ -56,7 +56,7 @@ A saída de L1 ou L2 é tornar a mudança revisável. Mais de 40 arquivos: divid
 - A natureza "legibilidade" e a tabela "Capacidade × legibilidade" do contrato.
 - Em `.expx/fatiamento.json`: `legibilidade`, `arquivo`, `justificativa`, `capacidade` (com `excluido_no_painel`) e a regra "afrouxar exige revisão por task obrigatória".
 - **Todas** as variáveis de ambiente `FATIA_*`: `FATIA_MAX_LINHAS_PR`, `FATIA_MAX_ARQUIVOS`, `FATIA_MAX_LINHAS_COMMIT`, `FATIA_MAX_KB_ARQUIVO`, `FATIA_AVISO_KB`, `FATIA_TOLERANCIA_B`, `FATIA_MAX_LINHAS_ARQUIVO`, `FATIA_AVISO_LINHAS`, `FATIA_TOLERANCIA_LINHAS`, `FATIA_IGNORAR`, `FATIA_IGNORAR_PROJETO`, `FATIA_CAPACIDADE_ARQUIVOS`, `FATIA_CAPACIDADE_EXCLUIDO`, `FATIA_EXCECAO`. Nenhum limite nem exclusão vem do ambiente.
-- Com `FATIA_EXCECAO`, a exceção de **movimento mecânico** (F6): ela só rebaixava F2 e F3, que saem. As exceções de artefato gerado e de artefato de método ficam como exclusões **da revisão por task** (5); na conta de L3 não há exceção.
+- Com `FATIA_EXCECAO`, a exceção de **movimento mecânico** (F6): ela só rebaixava F2 e F3, que saem. As exceções de artefato gerado e de artefato de método ficam como exclusões **da revisão por task** (5); na conta de L3 dos PRs de sprint não há exceção (o planejamento vai num PR próprio, 7).
 - A revisão **em lotes** (4.2 e 6.0 do desenho): task com mais de 40 arquivos revisáveis se divide, não se revisa em pedaços.
 - No desenho: o O3 ("limites calibráveis por projeto"), o anti-objetivo "limite relaxado sem revisão por task", a 4.1 ("Capacidade", "Legibilidade", "Afrouxamento", "Duas medidas no E7") e a seção 5 (calibragem do conselho). Ficam da 4.1: o arquivo do projeto, o leitor único no núcleo, o caminho fixo dele e o erro quando o arquivo existe e o leitor não.
 
@@ -124,21 +124,21 @@ Consequências:
 
 ### expxdev
 
-- **Leitor** (`nucleo/scripts/expx-fatiamento.mjs`): saem `LEGIBILIDADE`, `ARQUIVO`, `TETOS` e `CAP_ARQUIVOS` (:8-11), `limites()` (:56-68), `capacidade` e `EXCLUIDO_PADRAO` (:12, :175-176, :199), a `justificativa` e o afrouxamento (:189-198); as chaves `justificativa`, `legibilidade`, `arquivo`, `capacidade` e `ignorar` saem de `CHAVES` (:15) e passam a dar o erro de chave removida. Sai da saída env tudo o que é `FATIA_*` (:222-229). Entram os perfis (6), `excluir_da_revisao` e a falha de transição das `FATIA_*` (4). Ficam `EXPX_*` e o resto da validação.
+- **Leitor** (`nucleo/scripts/expx-fatiamento.mjs`): saem `LEGIBILIDADE`, `ARQUIVO`, `TETOS` e `CAP_ARQUIVOS` (:8-11), `limites()` (:56-68), `capacidade` e `EXCLUIDO_PADRAO` (:12, :175-176, :199), a `justificativa` e o afrouxamento (:189-198); as chaves `justificativa`, `legibilidade`, `arquivo`, `capacidade` e `ignorar` saem de `CHAVES` (:15) e passam a dar o erro de chave removida. Sai da saída env tudo o que é `FATIA_*` (:222-229). A versão aceita passa a ser 2, e a 1 dá a mensagem de migração (5). Entram os perfis (6), `excluir_da_revisao` com a validação da seção 5 e a falha permanente das `FATIA_*` (4). Ficam `EXPX_*` e o resto da validação.
 - **Revisão por task** (`nucleo/scripts/expx-revisao.mjs`):
-  - `VERSAO_MINIMA` (:15) e as comparações (:132-139, :215-217) viram a lista de versões homologadas.
-  - Antes de chamar a CLI, aplica o predicado de revisável e mede L1 e L2 (com `excluir_da_revisao` lido do leitor irmão, nunca do ambiente). Acima: `incompleta`, sem chamar a CLI.
+  - `VERSAO_MINIMA` (:15) e as comparações (:132-139, :215-217) viram a lista exata de versões homologadas (6).
+  - Antes de chamar a CLI, aplica o predicado de revisável e mede L1 e L2 (com `excluir_da_revisao` lido do leitor irmão, nunca do ambiente). Acima, ou arquivo declarado pela task que casa `excluir_da_revisao`: `incompleta`, sem chamar a CLI.
   - Saem os lotes (:146-151): uma chamada só; `max_files` ≠ 40 é `incompleta:perfil`.
   - O pulo por padrão (`porPadrao`, :153-161, que hoje aceita qualquer motivo com "pattern") vira a lista de motivos do perfil, e a conta de revisados (:159-161) vira a reconciliação de conjuntos (3). A regra de que arquivo da task pulado fora de padrão é incompleto já existe (:158); a emenda a torna um portão próprio, com motivo, e a leva ao `conferir`.
-  - `incompleta` passa a ser um **resultado**, separado de `indisponivel` *(proposta)*: falta de CLI depende do modo; mudança que a CLI não cobre, não. O `conferir` dá FALHA para `incompleta` em `obrigatoria` e em `se_disponivel`, e reprova evidência `ok` com `max_files` ≠ perfil ou com pulo fora da lista (:215-227, :230-252). A precedência entre os resultados e os códigos de saída ficam no contrato `expx-revisao` v2.
+  - `incompleta` passa a ser um **resultado**, separado de `indisponivel` (decidido, 2026-10-19): falta de CLI depende do modo; mudança que a CLI não cobre, não. O `conferir` dá FALHA para `incompleta` em `obrigatoria` e em `se_disponivel`, e reprova evidência `ok` com `max_files` ≠ perfil ou com pulo fora da lista (:215-227, :230-252). A precedência entre os resultados e os códigos de saída ficam no contrato `expx-revisao` v2.
 - **Verificador** (`scripts/verificar-fatiamento.sh`): saem F2 (:117-123), F3 (:139-174), a tolerância e os avisos de F4 (:176-226), a exclusão de F2c (:127) e todas as variáveis (:13-21, :31-57). Ficam duas medidas, com os números dos perfis como constantes conferidas por teste: **L3** (todos os arquivos alterados, a medida de :125-130 sem exclusão) e **L2** (arquivo alterado ou criado que passa no predicado de revisável, com no máximo 5.000 linhas e 204.800 bytes no head). As exclusões da revisão chegam por argumento, que quem chama tira do leitor do commit medido, nunca do ambiente. L1 não se mede na PR, porque a PR não conhece a task. O `ci.yml` (:81) passa a exclusão do próprio repositório (`fixtures/candidatos/`).
-- **doctor** (`src/doctor/verificadores.ts:505-525`): continua validando pelo leitor do pacote; a mensagem de chave removida chega pelo stderr. Ganha um **erro** para `FATIA_*` no ambiente, coerente com a transição (4).
+- **doctor** (`src/doctor/verificadores.ts:505-525`): continua validando pelo leitor do pacote; a mensagem de chave removida chega pelo stderr. Ganha um **erro** para `FATIA_*` no ambiente (4) e o erro de migração de `expx_fatiamento: 1` (5).
 
 ### Contratos
 
-- **`CONTRATO-expx-fatiamento.md` v3:** a tabela de fatos com as fontes da seção 2; L1, L2 e L3 no lugar de F2, F2c, F3 e F4; o predicado de revisável e os dois portões; F1, F5 (item 1 passa a dizer "dentro de L3") e F6 ficam, sem o movimento mecânico; "Capacidade × legibilidade" sai; "Configuração por projeto", "Entrega por sprint" (:184-189, que ainda fala de PRs empilhadas, superadas na 4.3 do desenho), "Como consumir o leitor" e "Como verificar" (:208-222) são reescritas sem `FATIA_*`; o texto do painel (F2c, :77-85, e F6, :139-158) passa a dizer que a exclusão tira da revisão do app, não da conta dos 100; histórico.
-- **`CONTRATO-expx-instalacao.md` §5.2** (:166-199): o exemplo e as regras da seção 5 desta emenda.
-- **`CONTRATO-expx-revisao.md` v2:** versão homologada no lugar da mínima (:15-17); sem lotes (:77-78); o resultado `incompleta`, os motivos dele e a reconciliação (:89-97); os dois portões; a tabela do `conferir` (:109-118); os perfis e os testes de conformidade.
+- **`CONTRATO-expx-fatiamento.md` v3:** a tabela de fatos com as fontes da seção 2; o PR de planejamento (7); L1, L2 e L3 no lugar de F2, F2c, F3 e F4; o predicado de revisável e os dois portões; F1, F5 (item 1 passa a dizer "dentro de L3") e F6 ficam, sem o movimento mecânico; "Capacidade × legibilidade" sai; "Configuração por projeto", "Entrega por sprint" (:184-189, que ainda fala de PRs empilhadas, superadas na 4.3 do desenho), "Como consumir o leitor" e "Como verificar" (:208-222) são reescritas sem `FATIA_*`; o texto do painel (F2c, :77-85, e F6, :139-158) passa a dizer que a exclusão tira da revisão do app, não da conta dos 100; histórico.
+- **`CONTRATO-expx-instalacao.md` §5.2** (:166-199): o exemplo, a versão 2, a validação de `excluir_da_revisao` e as regras da seção 5 desta emenda.
+- **`CONTRATO-expx-revisao.md` v2:** a lista exata de versões homologadas no lugar da mínima e do `@latest` (:15-17); sem lotes (:77-78); o resultado `incompleta`, os motivos dele e a reconciliação (:89-97); os dois portões; a tabela do `conferir` (:109-118); os perfis e os testes de conformidade.
 - `nucleo/README.md` (:56) e `CONVENCOES.md` (:160) acompanham.
 
 ### mergex
@@ -148,22 +148,28 @@ Consequências:
 - **`leitor-do-projeto.sh`:** a saída padrão (:60-68) perde `FATIA_CAPACIDADE_EXCLUIDO`; a lista de chaves exigidas do leitor (:102-105) perde as `FATIA_*` e ganha as novas. Fica a saída 3 quando o commit versiona um leitor diferente do instalado (:76-77).
 - **Cópia do núcleo** (`scripts/ci/fixtures/candidatos/expx-nucleo/`, hoje de expxdev 8653468): regerada a partir do commit do expxdev que trouxer a emenda.
 - **Testes:** `test-fatiamento-e7.sh` e `test-leitor-do-projeto.sh` trocam os casos de `FATIA_*` pelos de L2 e L3.
+- **PR de planejamento (7):**
+  - **E0:** aceita a entrega de planejamento (`--planejamento`, no lugar de `--sprint`) e a registra em `prs` como o primeiro item, `{sprint: planejamento, …}`; o PR da primeira sprint só abre com ele `merged`.
+  - **E2:** as verificações de task ficam `n/a` (nenhuma task foi executada); entra a conferência de que todo arquivo do diff casa `^docs/(sprintx|entregas|eventos)/`.
+  - **E7:** confere de novo os caminhos antes de abrir; arquivo fora dos artefatos de método faz o E7 recusar (não abre, com a lista dos arquivos). L3 não se mede nele; L2 não se aplica, porque nada nele é revisável.
+  - **E9:** nunca faz merge automático dele, com qualquer configuração; o merge é do desenvolvedor. A revisão pulada pelo app (> 100) não conta como pendência.
 - Já decidido, e só registrado: no merge automático (M1/M2) e na D3, o leitor do núcleo é executado da árvore da main; no E7, roda o instalado e sai 3 se o commit versiona um leitor diferente.
 
 ### sprintx
 
-- **F3** (`references/03-plano.md:73`): a regra de tamanho deixa de ser 300 linhas por commit e 400/20 por PR. Passa a ser: cada task com no máximo 40 arquivos revisáveis declarados (L1); nenhuma task deixa arquivo revisável acima de 5.000 linhas ou 204.800 bytes, e uma task anterior divide o que já passa (L2); a sprint (`por_sprint`) ou o trabalho (`por_trabalho`) com no máximo 100 arquivos, **somando os artefatos de método** que o PR leva (L3). A sprint que passa de 100 se divide no plano da sprint.
+- **F3** (`references/03-plano.md:73`): a regra de tamanho deixa de ser 300 linhas por commit e 400/20 por PR. Passa a ser: cada task com no máximo 40 arquivos revisáveis declarados (L1); nenhuma task deixa arquivo revisável acima de 5.000 linhas ou 204.800 bytes, e uma task anterior divide o que já passa (L2); a sprint (`por_sprint`) ou o trabalho (`por_trabalho`) com no máximo 100 arquivos, **somando os poucos artefatos de método** que o PR da sprint leva (L3); o planejamento vai no PR próprio (7) e não entra nessa conta. A sprint que passa de 100 se divide no plano da sprint.
 - **Auditor** (`.claude/agents/auditor-plano.md:44` e `:91-94`, e a cópia em `.opencode/agent/`): o item 10 cita L1, L2 e L3, com os números do leitor; a linha MÉDIA do movimento mecânico sai.
-- **F6** (`references/06-execucao.md:123`): o passo de revisão por task, ainda a construir, nasce com os dois portões. A task com revisão `incompleta` vira bloqueio *(proposta: classe `revisao_incompleta`)*, com a rota pelo motivo: L1, dividir a task; L2, task anterior que divide o arquivo; `perfil`, instalar a versão homologada ou homologar a nova; pulo desconhecido ou faltante, diagnóstico. Nunca contestação.
+- **F5 e F6, PR de planejamento (7):** no fim da F5, com o plano aprovado, a sprintx aciona a mergex (E0–E8) com `--planejamento`, só com os artefatos do planejamento, e registra o bloqueio `aguardando_merge` até o desenvolvedor mergear. A F6 só executa a primeira sprint depois desse merge, com a branch atualizada a partir da main. Nada de código entra antes disso.
+- **F6** (`references/06-execucao.md:123`): o passo de revisão por task, ainda a construir, nasce com os dois portões. A task com revisão `incompleta` vira bloqueio da classe `revisao_incompleta` (decidido, 2026-10-19), com a rota pelo motivo: L1, dividir a task; L2, task anterior que divide o arquivo; `excluido-declarado`, tirar o arquivo da lista ou da task; `perfil`, instalar a versão homologada ou homologar a nova; pulo desconhecido ou faltante, diagnóstico. Nunca contestação.
 
 ## 9. Transição dos projetos que já têm `.expx/fatiamento.json`
 
 O que o repositório mostra: o desenho (seção 5) e o contrato de instalação (§5.2) trazem a calibragem do conselho como exemplo (`legibilidade` 2500/80/300, `justificativa`), e a ordem de entrega do desenho deixa a adoção pelo conselho para o fim (7, passo 6). Se o conselho ou o login já versionam o arquivo não está aqui (os projetos não foram lidos); o inventário é o passo 0 da seção 11. A transição cobre os dois casos:
 
-- **Sem o arquivo:** nada a mudar no projeto. Depois da atualização, o E7 mede L2 e L3 no lugar de F2, F2c, F3 e F4.
-- **Com `legibilidade`, `arquivo`, `justificativa` ou `capacidade`:** depois de atualizar o expx, o leitor recusa o arquivo com a mensagem de chave removida, o `doctor` dá `fatiamento-invalido` e o E7 sai 2 sem abrir o PR. Nunca vale como padrão. A correção é apagar as chaves, numa PR do projeto; `.expx/fatiamento.json` é caminho sempre protegido no merge automático, então essa PR espera o desenvolvedor.
-- **Com `ignorar`:** o mesmo erro, com a instrução de renomear para `excluir_da_revisao` só os padrões que devem mesmo ficar fora da revisão por task.
-- **Com `FATIA_*` no ambiente** (no shell ou no CI do projeto): falha clara por uma versão (4).
+- **Sem o arquivo:** nada a mudar no projeto. Depois da atualização, o E7 mede L2 e L3 no lugar de F2, F2c, F3 e F4, e o trabalho seguinte começa pelo PR de planejamento (7).
+- **Com o arquivo:** `expx_fatiamento: 1` é recusado com a mensagem de migração, que lista as chaves removidas que ele ainda tem (`legibilidade`, `arquivo`, `justificativa`, `capacidade`, `ignorar`). O `doctor` dá `fatiamento-invalido` e o E7 sai 2 sem abrir o PR. Nunca vale como padrão. A correção é passar a 2 e apagar as chaves, numa PR do projeto; `.expx/fatiamento.json` é caminho sempre protegido no merge automático, então essa PR espera o desenvolvedor.
+- **Com `ignorar`:** cada padrão que deve mesmo ficar fora da revisão por task vira um item de `excluir_da_revisao` (pasta literal, classe, origem e motivo); padrão sobre código-fonte não tem equivalente e sai.
+- **Com `FATIA_*` no ambiente** (no shell ou no CI do projeto): falha clara, sempre (4).
 - **Ordem:** o projeto só atualiza quando a versão liberada trouxer o núcleo novo **e** a mergex e a sprintx que o leem. Núcleo novo com mergex antiga não passa calado: o `leitor-do-projeto.sh` antigo exige as `FATIA_*` (:102-105) e sai 3 ("atualize o expx"). Voltar atrás é voltar à versão liberada anterior, inteira; nenhuma combinação mista é suportada.
 
 ## 10. O que fica obsoleto nos planos da mergex
@@ -183,22 +189,29 @@ Parte 1 (`docs/superpowers/plans/2026-10-18-mergex-revisao-por-task-e-merge-auto
 Parte 2 (`docs/superpowers/plans/2026-10-18-mergex-revisao-por-task-e-merge-automatico-parte-2.md`):
 - Tabela de PRs (:332): o assunto da PR 1 ("F2c, sha256") e a coluna de linhas deixam de ser limite.
 - A dependência "Release com #51, #53 e D2" (:354) passa a incluir a release da emenda.
+- Task S1 (:45-91): `prs` ganha o item de planejamento, primeiro da lista, e o E0 a entrega `--planejamento` (8).
 
-O resto (B2 em diante, S1, S2, M1 a M4) não depende dos limites.
+O resto (B2 em diante, S2, M1 a M4) não depende dos limites; o M4 (E9 automático) só precisa recusar o PR de planejamento.
 
 ## 11. Ordem de implementação
 
 PRs pequenas, cada uma com até 100 arquivos. "Release" é a do CLI que a CI publica a cada commit da main (`cli-<sha7>`); "versão liberada" é a que o desenvolvedor aponta aos projetos (`scripts/liberar-versao.sh`).
 
-0. **Antes de tudo, pelo desenvolvedor:** os testes de conformidade com a CLI 0.5.14 e login (6), com os JSONs guardados; e o inventário de `.expx/fatiamento.json` e de `FATIA_*` nos projetos e no CI deles (9).
+0. **Antes de tudo:**
+   - pelo desenvolvedor: os testes de conformidade com a CLI 0.5.14 e login (6), com os JSONs guardados, que fixam também o caminho do `max_files` (`meta` ou `_meta`); e o inventário de `.expx/fatiamento.json` e de `FATIA_*` nos projetos e no CI deles (9);
+   - **divisão dos dois arquivos acima de L2**, cada um numa PR de movimento mecânico, sem mudar casos, em partes com menos de 5.000 linhas e de 200 KB: `.claude/hooks/testes/bancada.sh` da sprintx (621.567 bytes, 9.829 linhas) e `scripts/ci/test-r1-reconciliacao-base.sh` da mergex (245.639 bytes). Isto **revoga** a decisão antiga de não dividir a `bancada.sh` da sprintx. Nenhuma outra mudança toca esses arquivos antes da divisão. A cópia da bancada no expxdev (`fixtures/candidatos/`) acompanha no repin.
 1. **expxdev**, uma PR por peça: (a) leitor, doctor e contrato de instalação §5.2; (b) verificador, `ci.yml` e contrato `expx-fatiamento` v3; (c) revisão por task, fixtures de conformidade e contrato `expx-revisao` v2. A main não fica vermelha entre elas: a mergex e a sprintx usam a cópia fixada, e o verificador do expxdev não lê o leitor.
 2. **Release** do expxdev (`cli-<sha7>`), sem liberar aos projetos.
-3. **mergex:** `fatiamento-da-pr.sh`, E7 e `leitor-do-projeto.sh`, com a cópia do núcleo regerada; depois, o ajuste dos planos (10) e a volta ao B1.
-4. **sprintx:** F3 e auditor (as duas cópias), com DS nova.
+3. **mergex:** `fatiamento-da-pr.sh`, E7 e `leitor-do-projeto.sh`, com a cópia do núcleo regerada; o PR de planejamento (E0, E2, E7, E9); depois, o ajuste dos planos (10) e a volta ao B1.
+4. **sprintx:** F3 e auditor (as duas cópias); o PR de planejamento no fim da F5 e a espera do merge antes da primeira sprint; DS nova.
 5. **expxdev:** repin das candidatas e os testes de consistência da 4.5 (agora sobre os perfis e `excluir_da_revisao`); **versão liberada**; os projetos atualizam (9).
 
-## 12. O que ainda pede decisão
+## 12. O que ainda está aberto
 
-- **Artefatos de método nos 100.** Como o painel não desconta (7), `docs/sprintx/`, `docs/entregas/` e `docs/eventos/` consomem a cota do PR da sprint. O planejamento de uma feature real passa de 250 arquivos (contrato v2, F6), e com `entrega: por_sprint` ele entra no PR da primeira sprint, que estouraria L3 só com ele. É preciso decidir onde esses artefatos ficam (por exemplo, PR própria do planejamento antes da primeira sprint, ou menos arquivos por trabalho).
-- **Arquivos dos repositórios do método acima de L2** (medidos em origin/main de 2026-10-19): `.claude/hooks/testes/bancada.sh` da sprintx (621.567 bytes, 9.829 linhas) e `scripts/ci/test-r1-reconciliacao-base.sh` da mergex (245.639 bytes). Qualquer mudança neles bloqueia até a divisão. A cópia da bancada no expxdev fica em `fixtures/candidatos/`, excluída; o `package-lock.json` do template da buildx (338.779 bytes) é lock, que a CLI já exclui.
+Decidido em 2026-10-19 e já no texto: o PR de planejamento (7), a divisão dos dois arquivos grandes (11, passo 0) e o pacote do Codex (versão 2 do arquivo, `FATIA_*` reservados para sempre, `excluir_da_revisao` só para classes de artefato, `incompleta` e `revisao_incompleta`, versão exata homologada, L1 e L2 antes da CLI).
+
+Fica para o passo 0 ou para o plano:
+- **O caminho do `max_files` e os motivos de pulo** no JSON do `--headless`: fixados pelos testes de conformidade (6).
+- **O inventário** de `.expx/fatiamento.json` e de `FATIA_*` no login e no conselho (9).
 - **L1 nos repositórios do método.** Neles não há revisão por task pela CLI: valem L2 e L3 na PR, e L1 fica como regra de planejamento sem portão automático.
+- **A lista de raízes de código** da validação de `excluir_da_revisao` (5): o contrato de instalação a fixa, e cresce só por PR no expxdev.
