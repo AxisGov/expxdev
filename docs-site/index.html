@@ -127,7 +127,7 @@
     <div class="cartao"><div class="cartao__num">7</div><div class="cartao__rot">skills no catálogo</div></div>
     <div class="cartao"><div class="cartao__num">7</div><div class="cartao__rot">subcomandos do CLI</div></div>
     <div class="cartao"><div class="cartao__num">795</div><div class="cartao__rot">testes, sem rede</div></div>
-    <div class="cartao"><div class="cartao__num">29</div><div class="cartao__rot">verificações do doctor</div></div>
+    <div class="cartao"><div class="cartao__num">30</div><div class="cartao__rot">verificações do doctor</div></div>
   </div>
 
   <p style="margin-top:8px">
@@ -1637,7 +1637,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
 <section class="secao" id="doctor">
   <p class="eyebrow">Referência do CLI</p>
   <h1>O que o doctor verifica</h1>
-  <p class="lede">Vinte e nove verificações, cada uma com severidade e correção sugerida. Achado de severidade
+  <p class="lede">Trinta verificações, cada uma com severidade e correção sugerida. Achado de severidade
   <code>aviso</code> não derruba a saída; <code>erro</code> sim.</p>
 
   <div class="codigo" data-copiar>
@@ -1671,6 +1671,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
       <tr><td><code>modo-executavel-sem-bit</code></td><td><span class="selo selo--erro">erro</span></td><td>executável gerenciado sem o bit de execução no disco</td></tr>
       <tr><td><code>fatiamento-invalido</code></td><td><span class="selo selo--erro">erro</span></td><td><code>.expx/fatiamento.json</code> recusado pelo leitor do núcleo, com a mensagem dele</td></tr>
       <tr><td><code>fatiamento-sem-leitor</code></td><td><span class="selo selo--erro">erro</span></td><td><code>.expx/fatiamento.json</code> existe e o núcleo instalado não tem o leitor</td></tr>
+      <tr><td><code>fatia-no-ambiente</code></td><td><span class="selo selo--erro">erro</span></td><td>variável <code>FATIA_*</code> no ambiente: reservadas pela emenda de 2026-10-19, nenhum limite vem dele</td></tr>
       <tr><td><code>modificacao-local</code></td><td><span class="selo selo--aviso">aviso</span></td><td>o disco divergiu do lock</td></tr>
       <tr><td><code>skill-nao-travada</code></td><td><span class="selo selo--aviso">aviso</span></td><td>a skill segue uma branch, não uma versão publicada</td></tr>
       <tr><td><code>modo-alterado</code></td><td><span class="selo selo--aviso">aviso</span></td><td>o modo de um hook foi mudado à mão em <code>.expx/hooks.json</code> — decisão legítima</td></tr>

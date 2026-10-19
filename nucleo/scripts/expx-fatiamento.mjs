@@ -4,11 +4,12 @@
 // <motivo>` por erro no stderr, nada no stdout — nunca os padrões. Uso errado: 2.
 import { lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { ehRaizDeCodigo, fatiaNoAmbiente, mensagemFatia, prefixoDe } from "./expx-limites.mjs";
 
 const MODOS = ["obrigatoria", "se_disponivel", "desligada"];
 const ENTREGAS = ["por_trabalho", "por_sprint"];
 const VERSAO = 2;
-const CHAVES = ["expx_fatiamento", "revisao_por_task", "entrega", "merge_automatico", "revisor_bot"];
+const CHAVES = ["expx_fatiamento", "revisao_por_task", "entrega", "merge_automatico", "revisor_bot", "excluir_da_revisao"];
 // Os limites são os do CodeAnt, fixos (emenda de 2026-10-19): a chave removida tem mensagem
 // própria, nunca a "chave desconhecida" genérica, e nunca é ignorada.
 const REMOVIDA = "removida pela emenda de 2026-10-19 (limites do CodeAnt, fixos); apague-a";
@@ -57,8 +58,9 @@ function bloco(cfg, nome, conhecidas) {
 }
 
 /**
- * O que o `new RegExp` aceita e o ERE do Git Bash e do macOS recusa: o `[[ =~ ]]` sai com 2 e a
- * exclusão não exclui nada. Na dúvida entre o glibc e o Git Bash/macOS, vale o mais estrito. Não
+ * O que o `new RegExp` aceita e o ERE do Git Bash e do macOS recusa: o `[[ =~ ]]` do merge
+ * automático (E9 da mergex) sai com 2 e o caminho protegido não protege nada. Só vale para
+ * `caminhos_protegidos`: `excluir_da_revisao` é pasta literal (`expx-limites.mjs`). Na dúvida entre o glibc e o Git Bash/macOS, vale o mais estrito. Não
  * olha o escapado nem o que está em classe (no ERE, `\` dentro de `[...]` é literal). Devolve o
  * motivo, ou `null`.
  */
@@ -131,9 +133,9 @@ function regexes(v, nome) {
   if (!Array.isArray(v)) return erro(nome, "deve ser uma lista de expressoes regulares"), [];
   v.forEach((p, i) => {
     if (typeof p !== "string" || p === "") return erro(`${nome}[${i}]`, "deve ser texto nao vazio");
-    // quem aplica é o bash (`[[ =~ ]]`, ERE): o que só existe no JavaScript, ou que o Git Bash recusa, fica com `foraDoEre`
+    // quem aplica é o bash do merge automático (`[[ =~ ]]`, ERE): o que só existe no JavaScript, ou que o Git Bash recusa, fica com `foraDoEre`
     const motivo = foraDoEre(p);
-    if (motivo) return erro(`${nome}[${i}]`, `${motivo}, que o ERE do verificador recusa`);
+    if (motivo) return erro(`${nome}[${i}]`, `${motivo}, que o ERE do bash recusa`);
     try { new RegExp(p); } catch (e) { erro(`${nome}[${i}]`, `expressao regular invalida (${e.message})`); }
   });
   return v;
@@ -148,6 +150,37 @@ function logins(v, nome) {
     if (typeof l !== "string" || !LOGIN.test(l)) erro(`${nome}[${i}]`, "deve ser login (letras, digitos e hifen, [bot] so no fim)");
     else if (primeiro.has(l)) erro(`${nome}[${i}]`, `deve aparecer uma vez (repete o item ${primeiro.get(l)})`);
     else primeiro.set(l, i);
+  });
+  return v;
+}
+
+const CAMPOS = ["padrao", "classe", "origem", "motivo"];
+const CLASSES = ["gerado", "copia"];
+
+/**
+ * Exclusões da revisão (emenda de 2026-10-19, §5): só classes de artefato, cada uma uma pasta
+ * literal, nunca raiz de código. Somam às do núcleo, que não se declaram.
+ */
+function exclusoes(v, nome) {
+  if (v === undefined) return [];
+  if (!Array.isArray(v)) return erro(nome, "deve ser uma lista de objetos {padrao, classe, origem, motivo}"), [];
+  const primeiro = new Map(); // padrão → índice da primeira vez
+  v.forEach((item, i) => {
+    const k = `${nome}[${i}]`;
+    if (!ehObjeto(item)) return erro(k, "deve ser um objeto {padrao, classe, origem, motivo}");
+    for (const c of Object.keys(item)) if (!CAMPOS.includes(c)) erro(`${k}.${c}`, "chave desconhecida");
+    for (const c of CAMPOS) if (!Object.hasOwn(item, c)) erro(`${k}.${c}`, "obrigatória");
+    const p = item.padrao;
+    if (p !== undefined) {
+      if (typeof p !== "string" || prefixoDe(p) === null) erro(`${k}.padrao`, "deve ser pasta literal: ^, segmentos terminados em /, sem metacaractere de regex (o ponto só escapado)");
+      else if (ehRaizDeCodigo(p)) erro(`${k}.padrao`, "é raiz de código-fonte; só pasta de fixtures, snapshots, __snapshots__, generated ou gerado dentro dela");
+      else if (primeiro.has(p)) erro(`${k}.padrao`, `deve aparecer uma vez (repete o item ${primeiro.get(p)})`);
+      else primeiro.set(p, i);
+    }
+    if (item.classe !== undefined && !CLASSES.includes(item.classe)) erro(`${k}.classe`, `deve ser ${CLASSES.join(", ")}`);
+    for (const c of ["origem", "motivo"]) {
+      if (item[c] !== undefined && (typeof item[c] !== "string" || item[c].trim() === "")) erro(`${k}.${c}`, "deve ser texto não vazio");
+    }
   });
   return v;
 }
@@ -175,19 +208,24 @@ function resolver(cfg, origem) {
   const merge = { ativo: m.ativo === true, caminhos_protegidos: [...new Set([...PROTEGIDOS_PADRAO, ...protegidos])] };
   // independente de merge_automatico: o E9 da mergex reconhece a revisão do bot no PR redirecionado
   const revisor = logins(cfg.revisor_bot, "revisor_bot");
-  return { origem, revisao_por_task: { modo }, entrega, merge_automatico: merge, revisor_bot: revisor };
+  const excluir = exclusoes(cfg.excluir_da_revisao, "excluir_da_revisao");
+  return { origem, revisao_por_task: { modo }, entrega, merge_automatico: merge, revisor_bot: revisor, excluir_da_revisao: excluir };
 }
 
+// `FATIA_*` são reservados para sempre: falham antes do arquivo, com ou sem ele, também no --validar
+for (const nome of fatiaNoAmbiente(process.env)) erros.push(`expx-fatiamento: ${mensagemFatia(nome)}`);
 const caminho = join(op.raiz, ".expx", "fatiamento.json");
 // presente = qualquer entrada (link quebrado, diretório): ilegível é inválido, nunca os padrões
 const presente = (() => { try { return lstatSync(caminho), true; } catch (e) { return e.code !== "ENOENT"; } })();
 let lido = {};
+let legivel = true;
 try {
   if (presente) lido = JSON.parse(readFileSync(caminho, "utf8").replace(/^\uFEFF/, ""));
 } catch (e) {
+  legivel = false;
   erro(".expx/fatiamento.json", `ilegivel ou JSON invalido (${e.message})`);
 }
-const e = erros.length > 0 ? undefined : resolver(lido, presente ? "projeto" : "padrao");
+const e = !legivel ? undefined : resolver(lido, presente ? "projeto" : "padrao");
 if (erros.length > 0 || e === undefined) {
   process.stderr.write(`${erros.join("\n")}\n`);
   process.exit(1);
@@ -203,6 +241,7 @@ const env = {
   EXPX_MERGE_AUTOMATICO: e.merge_automatico.ativo ? "sim" : "nao",
   EXPX_CAMINHOS_PROTEGIDOS: e.merge_automatico.caminhos_protegidos.join("|"),
   EXPX_REVISOR_BOT: e.revisor_bot.join(","), // vírgula: login não tem vírgula
+  EXPX_EXCLUIR_DA_REVISAO: e.excluir_da_revisao.map((x) => x.padrao).join("|"), // só as do projeto; | não é de pasta literal
   EXPX_FATIAMENTO_ORIGEM: e.origem,
 };
 const texto = Object.entries(env).map(([k, v]) => `${k}=${shell(v)}\n`).join("");

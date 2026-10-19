@@ -63,11 +63,13 @@ function lerJson(caminho: string): unknown | undefined {
   }
 }
 
-export function diagnosticar(raiz: string): Diagnostico {
+export function diagnosticar(raiz: string, env: NodeJS.ProcessEnv = process.env): Diagnostico {
   const achados: Achado[] = [];
   const push = (a: Achado): void => {
     achados.push(a);
   };
+  // antes de tudo: vale com ou sem .expx/ e com ou sem .expx/fatiamento.json
+  const fatias = verificarFatiaNoAmbiente(env, push);
 
   // O .gitignore é verificado ANTES de exigir o .expx/: um .gitignore que
   // ignora .expx/ é justamente a causa provável de ele não estar ali para quem
@@ -218,7 +220,7 @@ export function diagnosticar(raiz: string): Diagnostico {
   }
   verificarHooks(raiz, push);
   verificarRastro(raiz, push);
-  verificarFatiamento(raiz, push);
+  verificarFatiamento(raiz, env, fatias, push);
 
   return { saudavel: achados.filter((a) => a.severidade === "erro").length === 0, achados };
 }
@@ -497,24 +499,42 @@ function verificarModoNoHead(
  * doctor que as pessoas param de rodar. As quatro skills que escrevem o rastro
  * têm implementações independentes — é justamente onde a divergência aparece.
  */
+/** Cópia de `mensagemFatia` do `nucleo/scripts/expx-limites.mjs` (o doctor é síncrono), conferida por teste. */
+export function mensagemFatia(nome: string): string {
+  return `\`${nome}\` não é mais lida (limites do CodeAnt, fixos: emenda de 2026-10-19); remova-a do ambiente`;
+}
+
+/** `FATIA_*` são reservados para sempre: um erro por variável definida (vazia conta). Devolve os nomes. */
+function verificarFatiaNoAmbiente(env: NodeJS.ProcessEnv, push: (a: Achado) => void): string[] {
+  const nomes = Object.keys(env).filter((k) => k.startsWith("FATIA_") && env[k] !== undefined).sort();
+  for (const nome of nomes) {
+    push({ id: "fatia-no-ambiente", severidade: "erro", problema: mensagemFatia(nome),
+      correcao: "remova a variável do shell, do perfil e do CI do projeto" });
+  }
+  return nomes;
+}
+
 /**
  * `.expx/fatiamento.json` presente exige o leitor instalado (o que as skills chamam),
  * mas quem valida é a cópia do próprio CLI: a do checkout é gravável por quem mexe no
  * projeto, e o doctor não executa código do checkout. Link quebrado ou diretório é presente.
  */
-function verificarFatiamento(raiz: string, push: (a: Achado) => void): void {
+function verificarFatiamento(raiz: string, env: NodeJS.ProcessEnv, fatias: string[], push: (a: Achado) => void): void {
   try { lstatSync(join(raiz, ".expx", "fatiamento.json")); } catch (e) { if ((e as NodeJS.ErrnoException).code === "ENOENT") return; }
-  const script = join(raiz, ".expx", "marketplace", "plugins", "expx", "nucleo", "scripts", "expx-fatiamento.mjs");
+  const instalados = join(raiz, ".expx", "marketplace", "plugins", "expx", "nucleo", "scripts");
   const leitor = join(raizDoNucleo(), "scripts", "expx-fatiamento.mjs");
-  // o instalado (o que as skills chamam) e o do pacote têm de ser arquivo regular
-  const falta = [script, leitor].find((c) => { try { return !statSync(c).isFile(); } catch { return true; } });
+  // o instalado (o que as skills chamam) e o do pacote têm de ser arquivo regular, com o módulo que o leitor importa
+  const exigidos = ["expx-fatiamento.mjs", "expx-limites.mjs"].flatMap((n) => [join(instalados, n), join(raizDoNucleo(), "scripts", n)]);
+  const falta = exigidos.find((c) => { try { return !statSync(c).isFile(); } catch { return true; } });
   if (falta !== undefined) {
     push({ id: "fatiamento-sem-leitor", severidade: "erro",
       problema: `.expx/fatiamento.json existe, mas o leitor nao e um arquivo regular: ${falta}`,
       correcao: "rode `expx update` (ou `expx init`); se o caminho e do pacote do expx, reinstale o expxdev" });
     return;
   }
-  const r = spawnSync(process.execPath, [leitor, "--validar", "--raiz", raiz], { encoding: "utf8" });
+  // sem as `FATIA_*`: o problema já saiu como fatia-no-ambiente, uma vez só
+  const semFatia = Object.fromEntries(Object.entries(env).filter(([k]) => !fatias.includes(k)));
+  const r = spawnSync(process.execPath, [leitor, "--validar", "--raiz", raiz], { encoding: "utf8", env: semFatia });
   if (r.status === 0) return;
   push({
     id: "fatiamento-invalido",
