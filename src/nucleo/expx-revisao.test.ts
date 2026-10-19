@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { ambienteCom, noPath, RAIZ_DO_REPO } from "../teste/candidatos.js";
 
 // `nucleo/scripts/expx-revisao.mjs`. A CLI do CodeAnt nunca é chamada de verdade: uma `codeant` falsa vem
@@ -330,6 +331,39 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     const rej = filho(["rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp"]);
     await espera(1500); // sem a trava, o rejeitar grava aqui, com o revisar parado, e o revisar o apaga
     writeFileSync(join(dir, "continuar"), "");
+    expect([await rev, await rej]).toEqual([1, 0]);
+    expect(evidencia(c.raiz)).toMatchObject({ resultado: "ok", rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] });
+  });
+
+  it("funcional: trava velha: quem a julgou abandonada não remove a trava nova de outro processo", async () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
+    const trava = join(c.raiz, `${EV}.trava`);
+    mkdirSync(trava);
+    utimesSync(trava, new Date(0), new Date(0)); // de processo que morreu
+    const [pb, pa] = [temp("expx-pausa-"), temp("expx-pausa-")];
+    // o rejeitar para logo depois do primeiro stat que acha a trava velha, antes de removê-la
+    writeFileSync(join(pb, "pre.mjs"), `import fs from "node:fs"; import { syncBuiltinESMExports } from "node:module";
+const dir = ${JSON.stringify(pb)}, stat = fs.statSync; let uma = false;
+fs.statSync = (...a) => { const r = stat(...a);
+  if (!uma && String(a[0]).endsWith(".trava") && Date.now() - r.mtimeMs > 120000) { uma = true; fs.writeFileSync(dir + "/pronto", "");
+    for (const ate = Date.now() + 20000; Date.now() < ate && !fs.existsSync(dir + "/continuar");) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50); }
+  return r; };
+syncBuiltinESMExports();
+`);
+    const filho = (a: string[], env?: NodeJS.ProcessEnv) => new Promise<number | null>((ok) =>
+      spawn(process.execPath, [...a, "--trabalho", "w", "--raiz", c.raiz], { env, stdio: "ignore" }).on("close", ok));
+    const espera = async (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+    const pronto = async (d: string) => { for (const ate = Date.now() + 20000; !existsSync(join(d, "pronto")) && Date.now() < ate;) await espera(50); };
+    const rej = filho(["--import", pathToFileURL(join(pb, "pre.mjs")).href, SCRIPT, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp"]);
+    await pronto(pb);
+    // o revisar remove a trava velha, toma a sua e para entre a releitura e a gravação
+    const rev = filho([SCRIPT, "revisar", "--task", "T-01", "--arquivos", "src/a.js"], ambienteCom(`${c.falsa}${delimiter}${PATH}`, { EXPX_REVISAO_TESTE_PAUSA: pa }));
+    await pronto(pa);
+    writeFileSync(join(pb, "continuar"), "");
+    await espera(1500); // sem a correção, o rejeitar remove aqui a trava do revisar, grava, e o revisar o apaga
+    writeFileSync(join(pa, "continuar"), "");
     expect([await rev, await rej]).toEqual([1, 0]);
     expect(evidencia(c.raiz)).toMatchObject({ resultado: "ok", rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] });
   });

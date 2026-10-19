@@ -43,6 +43,19 @@ const git = (...a) => spawnSync("git", a, { cwd: op.raiz, encoding: "utf8" });
 const blob = (f) => { const r = git("hash-object", "--", f); return r.status === 0 ? r.stdout.trim() : undefined; };
 
 const pausa = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+const velha = (d) => { try { return Date.now() - statSync(d).mtimeMs > 120000; } catch { return false; /* sumiu */ } };
+/** Remove a trava velha conferindo de novo sob `<trava>.quebra` (`mkdir` exclusivo): sem isso, quem a viu
+ *  velha antes de outro removê-la e criar a sua removeria a trava nova. A `.quebra` só fica velha se um
+ *  processo morreu entre esse stat e o rm, e então é removida. */
+function quebra(trava) {
+  const q = `${trava}.quebra`;
+  try { mkdirSync(q); } catch (e) {
+    if (e.code !== "EEXIST") throw e;
+    if (velha(q)) rmSync(q, { recursive: true, force: true });
+    return;
+  }
+  try { if (velha(trava)) rmSync(trava, { recursive: true, force: true }); } catch { /* sumiu */ } finally { rmSync(q, { recursive: true, force: true }); }
+}
 /** Trava por evidência (`mkdir` é exclusivo): quem relê e regrava a evidência o faz dentro dela. */
 function comTrava(task, fn) {
   mkdirSync(pasta, { recursive: true });
@@ -51,7 +64,7 @@ function comTrava(task, fn) {
     try { mkdirSync(trava); break; } catch (e) {
       if (e.code !== "EEXIST") throw e;
       // trava de processo que morreu: mais velha que 2 min é abandonada
-      try { if (Date.now() - statSync(trava).mtimeMs > 120000) rmSync(trava, { recursive: true, force: true }); } catch { /* sumiu */ }
+      if (velha(trava)) quebra(trava);
       if (Date.now() > ate) { process.stderr.write(`expx-revisao: evidencia travada por outro processo: ${trava}\n`); process.exit(75); }
     }
   }
