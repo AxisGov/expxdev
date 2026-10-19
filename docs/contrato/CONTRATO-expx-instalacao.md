@@ -163,40 +163,115 @@ que precisa de outro custo sobrepõe de forma consciente e versionada:
 - **OpenCode**: fora do escopo. Os agentes de `.opencode/agent/` não são
   instalados pelo `init` e o override não os alcança.
 
-## 5.2 `.expx/fatiamento.json` — limites de fatiamento do projeto
+## 5.2 `.expx/fatiamento.json` — decisões de fatiamento do projeto
 
-O projeto calibra o fatiamento (contrato `expx-fatiamento`) de forma versionada:
+O arquivo registra somente as decisões que continuam configuráveis pelo
+projeto. Os limites do CodeAnt são fixos e não aparecem aqui. O formato atual é
+a versão 2:
 
 ```json
 {
-  "expx_fatiamento": 1,
-  "justificativa": "sprint de ~8 tasks",
-  "legibilidade": { "pr_linhas": 2500, "pr_arquivos": 80, "commit_linhas": 300 },
-  "arquivo": { "kb": 150, "linhas": 4000 },
-  "ignorar": ["^gerado/"],
-  "capacidade": { "excluido_no_painel": ["^docs/(sprintx|entregas|eventos)/"] },
+  "expx_fatiamento": 2,
   "revisao_por_task": { "modo": "obrigatoria" },
   "entrega": "por_sprint",
   "merge_automatico": { "ativo": true, "caminhos_protegidos": ["^src/pagamentos/"] },
-  "revisor_bot": ["codeant-ai[bot]"]
+  "revisor_bot": ["codeant-ai[bot]"],
+  "excluir_da_revisao": [
+    {
+      "padrao": "^fixtures/candidatos/",
+      "classe": "copia",
+      "origem": "scripts/atualizar-candidatos.sh",
+      "motivo": "cópia das skills candidatas, revisada no repositório de origem"
+    }
+  ]
 }
 ```
 
-- padrões: `legibilidade` 400 / 20 / 300; `arquivo` 150 KB / 4000 linhas; `ignorar` vazio; `excluido_no_painel` como acima; `modo: se_disponivel`; `entrega: por_trabalho`; `merge_automatico.ativo: false` com a lista padrão de caminhos protegidos; `revisor_bot` vazio (nenhum);
-- **capacidade do revisor**, não calibrável: `legibilidade.pr_arquivos` ≤ 100 e `arquivo.linhas` ≤ 5000;
-- limite diferente do padrão exige `justificativa` não vazia; `legibilidade` acima do padrão exige `revisao_por_task.modo: "obrigatoria"`;
-- `ignorar` sai em `FATIA_IGNORAR_PROJETO`, que **soma** às exclusões padrão (`FATIA_IGNORAR`), nunca as substitui: quem soma é o verificador do contrato `expx-fatiamento` v2, com a variável exportada como ali se diz ("Como consumir o leitor"); no E7 da mergex, quando ela espelhar o verificador. Regex que não compila, ou fora do ERE que o bash aplica (`(?…)`, `\d`, `\w`, retrovisor, quantificador repetido como `a+?` ou `x{2}?`, alternativa vazia como `a|` ou `(|a)`, chave que não forma intervalo como `{`, `a{1` ou `a{,3}`, contagem acima de 255 e `{0}`), é inválida. Na dúvida entre o glibc e o regex do Git Bash e do macOS, vale o mais estrito: o glibc aceita alternativa vazia e `{0}`, os outros recusam, e a exclusão recusada não exclui nada;
-- `merge_automatico` (E9 da mergex; desenho de 2026-10-18, §4.6): `ativo` liga o merge sem perguntar e sai em `EXPX_MERGE_AUTOMATICO` (`sim`/`nao`). Ligar **não** exige `revisao_por_task.modo: "obrigatoria"`: as duas chaves são independentes, e quem decide cada merge são as condições do E9 (CI e suíte verdes, gate R1–R6 satisfeito, sem perda de teste, sem remoção fora do plano, nenhum achado rejeitado, nenhum arquivo em caminho protegido), conferidas no HEAD exato; qualquer uma falha → o merge espera o desenvolvedor. `caminhos_protegidos` é uma lista de regex de caminho com a mesma validação ERE de `ignorar` e **soma** à lista padrão, nunca a substitui; a lista efetiva sai em `EXPX_CAMINHOS_PROTEGIDOS` (unida por `|`) e em `merge_automatico.caminhos_protegidos` no `--formato json`. A lista padrão, que pende para o lado seguro (o falso positivo só faz o merge esperar o desenvolvedor):
+- `revisao_por_task.modo`: `se_disponivel` quando ausente; aceita também
+  `obrigatoria` e `desligada`;
+- `entrega`: `por_trabalho` quando ausente; aceita também `por_sprint`;
+- `merge_automatico.ativo`: `false` quando ausente. A decisão é independente do
+  modo da revisão por task. `caminhos_protegidos` soma à lista padrão, nunca a
+  substitui, e usa ERE compatível com o Git Bash e o macOS. A lista padrão é:
   - autenticação: `(^|/)auth/`, `(^|/)autenticacao/`, `(^|/)login/` — diretório inteiro, em qualquer nível;
   - permissões e RLS: `(^|/)(permiss|rls|polic(y|ies))` — começo de diretório ou arquivo (`permissions.ts`, `permissoes/`, `rls.sql`, `policy.ts`, `policies/`); `policies?` não serviria: casa `policie`/`policies`, não `policy`;
   - migrations: `(^|/)(migrations?|migracoes?|migrate)/` — `migrate/` cobre o `db/migrate/` do Rails, cujas migrations não são `.sql`;
   - SQL: `\.sql$` — de propósito amplo: fora de `migrations/` o `.sql` costuma ser esquema, função, política ou seed (`schema.sql`, `seed.sql`), e o leitor não sabe distinguir uma consulta inofensiva disso. O custo é o projeto com muito SQL de consulta (dbt, sqlc) não ter merge automático nesses arquivos, o que é a falha segura;
   - CI e infraestrutura: `^\.github/`, `^(infra|deploy|terraform|k8s|docker)/` (na raiz), `(^|/)Dockerfile$`;
   - segredos: `(^|/)\.env` — cobre `.env`, `.env.*` (o mesmo conjunto que o hook `segredo` da sprintx varre) e também `.envrc`; `(^|/)secrets?/`;
-- `revisor_bot` (E9 da mergex): lista dos logins exatos do bot que revisa os PRs do projeto. O E9 a usa para exigir, num PR redirecionado (a base trocada depois do merge da predecessora), uma revisão de um desses logins no HEAD atual; a comparação é exata: nem prefixo nem diferença de maiúsculas casam. É do projeto, porque a skill não nomeia o produto revisor (DM-197 da mergex). Cada login casa `^[A-Za-z0-9][A-Za-z0-9-]*(\[bot\])?$` (`[bot]` só no fim); login repetido é **inválido**, não deduplicado, para o erro de cópia aparecer em vez de sumir. Lista vazia ou ausente = nenhum bot, e o E9 não exige essa revisão. Independente de `merge_automatico`. Sai em `EXPX_REVISOR_BOT` (logins unidos por vírgula, que login não tem; vazio quando nenhum) e em `revisor_bot` no `--formato json`;
-- validação estrita: chave desconhecida em qualquer nível, `expx_fatiamento` ≠ 1, inteiro fora de 1 a 2^31−1, `modo` fora de `obrigatoria`/`se_disponivel`/`desligada`, `entrega` fora de `por_trabalho`/`por_sprint`, `merge_automatico.ativo` que não seja booleano e `revisor_bot` que não seja lista de logins sem repetição invalidam o arquivo; BOM e CRLF são aceitos;
-- ausente → padrões, e tudo como antes; presente e inválido → **erro**, nunca queda calada nos padrões; o arquivo é do projeto: `init`, `add`, `remove` e `update` nunca o escrevem;
-- **leitor único**: `.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs` (README do núcleo). Hoje só o `doctor` o usa (`fatiamento-invalido`, `fatiamento-sem-leitor`; valida com a cópia do próprio CLI, nunca executa a do checkout); a sprintx (F3 e auditor) e a mergex (E7) passam a chamá-lo nos planos delas. Arquivo presente e leitor ausente é erro, com a instrução de atualizar o expx.
+- `revisor_bot`: lista vazia quando ausente. Cada login casa
+  `^[A-Za-z0-9][A-Za-z0-9-]*(\[bot\])?$`, sem repetição; a comparação feita
+  pela mergex é exata e independente de `merge_automatico`;
+- `excluir_da_revisao`: lista vazia quando ausente. Ela substitui `ignorar` e
+  serve somente para classes de artefato, nunca para código-fonte.
+
+Cada item de `excluir_da_revisao` obedece a estas seis regras:
+
+1. É um objeto com exatamente `padrao`, `classe`, `origem` e `motivo`; padrão
+   repetido é inválido.
+2. `padrao` descreve uma pasta literal: começa com `^`, tem um ou mais
+   segmentos e termina em `/`. Controles e metacaracteres de regex são
+   proibidos; ponto só aparece como `\.`, e os segmentos `.` e `..` são
+   inválidos. Não há glob, extensão, nome de arquivo nem alternativa.
+3. `classe` é `gerado` (produzido por script) ou `copia` (cópia versionada de
+   outro repositório e revisada na origem).
+4. `origem` e `motivo` são textos não vazios. A origem identifica o comando
+   gerador ou o repositório de onde veio a cópia.
+5. O primeiro segmento não pode ser uma raiz de código: `src`, `lib`, `app`,
+   `apps`, `packages`, `pkg`, `cmd`, `internal`, `server`, `client`, `web`,
+   `api`, `test`, `tests`, `spec`, `scripts`, `.github`, `.claude`, `.opencode`
+   ou `.expx`. A exceção exige um segmento posterior `fixtures`, `snapshots`,
+   `__snapshots__`, `generated` ou `gerado`: `^scripts/ci/fixtures/candidatos/`
+   passa; `^src/` e `^scripts/` não. Essas listas só crescem por PR no expxdev.
+6. Quando o bloco C integrar as exclusões à revisão, arquivo declarado em
+   `cria` ou `altera` de uma task e coberto por um item tornará a revisão
+   `incompleta:excluido-declarado`; gerar o artefato será um commit próprio,
+   fora das tasks.
+
+As exclusões do projeto somam às do núcleo: `^docs/sprintx/`,
+`^docs/entregas/` e `^docs/eventos/`. O projeto não as declara. Os blocos A1 a
+A3 entregam a leitura, a validação e o diagnóstico dessa configuração. O bloco
+B entregará as medidas e o verificador; o bloco C aplicará as exclusões e os
+portões na revisão. Nessa integração, o método testará o prefixo literal antes
+de montar `--include`; a sintaxe glob do `--exclude` da CLI não participará. Um
+arquivo coberto ficará fora da revisão por task, de L1 e de L2, mas continuará
+contado em L3. Como `.expx/fatiamento.json` é caminho sempre protegido, ampliar
+a lista espera o desenvolvedor.
+
+`legibilidade`, `arquivo`, `justificativa` e `capacidade` foram removidas. Na
+versão 2, cada uma falha com
+`<chave>: removida pela emenda de 2026-10-19 (limites do CodeAnt, fixos); apague-a`.
+`ignorar` falha com
+`` ignorar: substituída por `excluir_da_revisao`, só para classes de artefato; ver o contrato ``.
+Nenhuma delas cai no erro genérico de chave desconhecida. A versão 1 falha
+com `versão 1: migre para 2 (emenda de 2026-10-19)` e uma linha para cada
+chave removida ainda presente.
+
+Todo nome `FATIA_*` fica reservado para sempre. Se qualquer um estiver definido
+no ambiente, mesmo vazio, o leitor sai 1 e o doctor emite o erro
+`fatia-no-ambiente`, com
+`` `FATIA_<nome>` não é mais lida (limites do CodeAnt, fixos: emenda de 2026-10-19); remova-a do ambiente ``.
+Nenhum limite, caminho ou exclusão vem do ambiente.
+
+O leitor único é
+`.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs`:
+
+- `node <L>` imprime somente `EXPX_REVISAO_POR_TASK`, `EXPX_ENTREGA`,
+  `EXPX_MERGE_AUTOMATICO`, `EXPX_CAMINHOS_PROTEGIDOS`, `EXPX_REVISOR_BOT`,
+  `EXPX_EXCLUIR_DA_REVISAO` e `EXPX_FATIAMENTO_ORIGEM`, em formato seguro para
+  `eval`;
+- `node <L> --formato json` imprime as mesmas decisões como `origem`,
+  `revisao_por_task`, `entrega`, `merge_automatico`, `revisor_bot` e
+  `excluir_da_revisao`;
+- `node <L> --validar` apenas valida. Arquivo ausente usa os padrões; presente
+  e inválido sai 1 sem stdout, nunca cai silenciosamente nos padrões. BOM e
+  CRLF são aceitos. O arquivo pertence ao projeto: `init`, `add`, `remove` e
+  `update` não o escrevem.
+
+O `doctor` valida com o leitor do próprio pacote, nunca com a cópia gravável do
+checkout. Leitor ou módulo de limites ausente produz `fatiamento-sem-leitor`.
+Nos planos seguintes, a mergex E7 e a sprintx F3/F6 passarão a consumir o
+leitor.
 
 ## 6. O que o `init` não apaga
 

@@ -60,9 +60,9 @@ function bloco(cfg, nome, conhecidas) {
 /**
  * O que o `new RegExp` aceita e o ERE do Git Bash e do macOS recusa: o `[[ =~ ]]` do merge
  * automático (E9 da mergex) sai com 2 e o caminho protegido não protege nada. Só vale para
- * `caminhos_protegidos`: `excluir_da_revisao` é pasta literal (`expx-limites.mjs`). Na dúvida entre o glibc e o Git Bash/macOS, vale o mais estrito. Não
- * olha o escapado nem o que está em classe (no ERE, `\` dentro de `[...]` é literal). Devolve o
- * motivo, ou `null`.
+ * `caminhos_protegidos`: `excluir_da_revisao` é pasta literal (`expx-limites.mjs`). Na dúvida entre
+ * o glibc e o Git Bash/macOS, vale o mais estrito. Não olha o escapado nem o que está em classe
+ * (no ERE, `\` dentro de `[...]` é literal). Devolve o motivo, ou `null`.
  */
 function foraDoEre(p) {
   let quant = false;

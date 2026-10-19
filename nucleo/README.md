@@ -10,6 +10,7 @@ foram selecionadas.
 |---|---|
 | `hooks/expx-rastro.sh` | O rastro de eventos, os modos de hook e o `trabalho_id` |
 | `scripts/expx-fatiamento.mjs` | O leitor único de `.expx/fatiamento.json` (seção `scripts/` abaixo) |
+| `scripts/expx-limites.mjs` | As exclusões do núcleo, a gramática de `excluir_da_revisao` e a regra dos nomes `FATIA_*` reservados |
 | `scripts/expx-revisao.mjs` | A revisão por task pela CLI do CodeAnt: `revisar`, `conferir`, `rejeitar` (seção `scripts/` abaixo) |
 | `commands/onboarding.md` | `/expx:onboarding` — orquestra o mapeamento inicial (stackx, designx, legadox, memox, prodx) das camadas instaladas. Não é núcleo de hook: `montarPlugin` o copia à parte, direto para `commands/` na raiz do plugin — não para dentro de `nucleo/` — porque é assim que o Claude Code descobre um comando. |
 
@@ -52,11 +53,17 @@ Variáveis que o rastro lê, todas opcionais:
 ## `scripts/`
 
 Ferramentas Node (ESM, só `node:`), copiadas daqui como o resto do núcleo e
-chamadas por caminho. Hoje só o `doctor` usa o leitor; sprintx (F3/auditor) e
-mergex (E7) passam a chamá-lo nos planos delas. `expx-fatiamento.mjs` (formato no contrato de instalação, §5.2):
-`node <L>` imprime `FATIA_*`/`EXPX_*` para `eval`, `--formato json` os limites
-efetivos, `--validar` só valida; arquivo inválido sai 1. `<L>` é
-`.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs`.
+chamadas por caminho. `expx-limites.mjs` concentra as regras fixas importadas
+pelo leitor; o bloco C fará a revisão importá-las. O módulo não lê o ambiente
+por conta própria.
+
+`expx-fatiamento.mjs` (formato no contrato de instalação, §5.2): `node <L>`
+imprime somente `EXPX_*` para `eval`; `--formato json` imprime as decisões
+efetivas; `--validar` só valida. Arquivo inválido ou qualquer `FATIA_*` no
+ambiente sai 1. `<L>` é
+`.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs`. O `doctor`
+o usa hoje; nos planos seguintes, sprintx (F3/F6) e mergex (E7) passarão a
+chamá-lo.
 
 `expx-revisao.mjs` (contrato em `docs/contrato/CONTRATO-expx-revisao.md`):
 `revisar` roda a CLI do CodeAnt nos arquivos de uma task e grava a evidência em

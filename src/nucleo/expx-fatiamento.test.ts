@@ -341,5 +341,11 @@ describe("expx-fatiamento.mjs", () => {
       const r = comEnv({ FATIA_X: "1" }, projeto({ expx_fatiamento: 2, limites: {} }));
       expect(r).toEqual({ rc: 1, out: "", err: MSG("FATIA_X") + "expx-fatiamento: limites: chave desconhecida\n" });
     });
+
+    it("funcional: com FATIA_* e JSON malformado, os dois problemas aparecem", () => {
+      const r = comEnv({ FATIA_X: "1" }, projeto('{"expx_fatiamento": 2,'));
+      expect(r).toMatchObject({ rc: 1, out: "" });
+      expect(r.err).toMatch(/^expx-fatiamento: `FATIA_X`[^\n]+\nexpx-fatiamento: \.expx\/fatiamento\.json: ilegivel ou JSON invalido \(.+\)\n$/);
+    });
   });
 });
