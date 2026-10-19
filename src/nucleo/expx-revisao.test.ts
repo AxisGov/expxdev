@@ -399,6 +399,17 @@ syncBuiltinESMExports();
     expect(evidencia(c.raiz)).toMatchObject({ resultado: "ok", rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] });
   });
 
+  it("funcional: .quebra velha nunca é removida sozinha: sai 75 nomeando-a, e a trava fica", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
+    const trava = join(c.raiz, `${EV}.trava`);
+    for (const d of [trava, `${trava}.quebra`]) { mkdirSync(d); utimesSync(d, new Date(0), new Date(0)); } // morreu ao quebrar
+    const r = roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp");
+    expect(r).toMatchObject({ rc: 75, err: expect.stringContaining(`${trava}.quebra`) });
+    expect([existsSync(trava), existsSync(`${trava}.quebra`)]).toEqual([true, true]);
+  }, 60000);
+
   it("funcional: rejeitar não muda o resultado de indisponivel", () => {
     const c = cenario();
     escreve(c.raiz, EV, JSON.stringify({ expx_revisao: 1, trabalho: "w", task: "T-01", resultado: "indisponivel", motivo: "erro",

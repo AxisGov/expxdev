@@ -47,13 +47,12 @@ const caminho = (f) => (process.platform === "win32" ? f.replace(/\\/g, "/") : f
 const pausa = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 const velha = (d) => { try { return Date.now() - statSync(d).mtimeMs > 120000; } catch { return false; /* sumiu */ } };
 /** Remove a trava velha conferindo de novo sob `<trava>.quebra` (`mkdir` exclusivo): sem isso, quem a viu
- *  velha antes de outro removê-la e criar a sua removeria a trava nova. A `.quebra` só fica velha se um
- *  processo morreu entre esse stat e o rm, e então é removida. */
+ *  velha antes de outro removê-la e criar a sua removeria a trava nova. A `.quebra` nunca é removida por
+ *  idade (isso traria a mesma corrida de volta): se um processo morreu com ela, a saída 75 a nomeia. */
 function quebra(trava) {
   const q = `${trava}.quebra`;
   try { mkdirSync(q); } catch (e) {
     if (e.code !== "EEXIST") throw e;
-    if (velha(q)) rmSync(q, { recursive: true, force: true });
     return;
   }
   try { if (velha(trava)) rmSync(trava, { recursive: true, force: true }); } catch { /* sumiu */ } finally { rmSync(q, { recursive: true, force: true }); }
@@ -67,7 +66,11 @@ function comTrava(task, fn) {
       if (e.code !== "EEXIST") throw e;
       // trava de processo que morreu: mais velha que 2 min é abandonada
       if (velha(trava)) quebra(trava);
-      if (Date.now() > ate) { process.stderr.write(`expx-revisao: evidencia travada por outro processo: ${trava}\n`); process.exit(75); }
+      if (Date.now() > ate) {
+        const q = velha(`${trava}.quebra`) ? ` (remova a mao, se nenhum processo esta rodando: ${trava}.quebra)` : "";
+        process.stderr.write(`expx-revisao: evidencia travada por outro processo: ${trava}${q}\n`);
+        process.exit(75);
+      }
     }
   }
   try { return fn(); } finally { rmSync(trava, { recursive: true, force: true }); }

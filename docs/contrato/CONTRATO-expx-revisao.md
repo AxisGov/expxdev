@@ -82,7 +82,8 @@ Imprime uma linha de resumo.
   nunca fica amarrada a bytes que a CLI não viu.
 - `revisar` e `rejeitar` releem e gravam a evidência (temporário + `rename`) sob a trava
   `<T-NN.MM>.json.trava` (`mkdir` exclusivo; abandonada após 2 min, removida só por quem a confere de novo sob
-  `<T-NN.MM>.json.trava.quebra`; ocupada por 30 s: sai **75**).
+  `<T-NN.MM>.json.trava.quebra`, que nunca é removida por idade; ocupada por 30 s: sai **75**, nomeando
+  a `.quebra` velha, se houver, para remoção à mão).
 
 | Motivo de `indisponivel` | Quando |
 |---|---|
@@ -135,6 +136,6 @@ desenvolvedor no PR para cada um.
 |---|---|
 | 2026-10-18 | Contrato criado: evidência v1, identidade com as linhas vizinhas, `revisar`, `conferir` e `rejeitar`. |
 | 2026-10-18 | `conferir` exige, em `ok`/`achados`, `cli.versao` ≥ 0.5.14, `executada_em` ISO 8601 e `lotes` que cobrem os arquivos presentes (`evidencia-invalida:<campo>`). |
-| 2026-10-18 | Trava velha removida sob `.quebra`: quem a viu velha não remove a trava nova de outro processo. |
+| 2026-10-18 | Trava velha removida sob `.quebra`: quem a viu velha não remove a trava nova de outro processo; a `.quebra` velha só sai à mão. |
 | 2026-10-18 | `revisar` relê sob a trava as rejeições de todas as evidências do trabalho, não só as da própria task. |
 | 2026-10-18 | `\` só vira `/` no Windows: fora dele é parte do nome, e o arquivo deixava de ser achado. |
