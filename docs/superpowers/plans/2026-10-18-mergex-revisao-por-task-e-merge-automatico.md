@@ -230,8 +230,8 @@
 | sem `.expx/fatiamento.json` (`EXPX_FATIAMENTO_ORIGEM=padrao`) | `n/a`, sem node | `n/a`, sem node | `n/a`, sem node |
 | modo `desligada`; `versionado: false`; nenhuma task concluída | — | — | `n/a`, sem node |
 | task concluída sem item em `commits` | fora da V12 (é da V11) | idem | — |
-| configuração inválida ou leitor ausente (`leitor-do-projeto` 1 ou 3) | `SEM_PROVA` | `SEM_PROVA` | `SEM_PROVA` |
-| node ausente ou núcleo sem `expx-revisao.mjs` | `SEM_PROVA` | `AVISO revisao-nao-conferida:<motivo>` | — |
+| configuração inválida, leitor ausente ou node ausente (`leitor-do-projeto` 1 ou 3): o modo não pode ser lido | `SEM_PROVA` | `SEM_PROVA` | `SEM_PROVA` |
+| node presente (o modo foi lido), mas o núcleo instalado sem `expx-revisao.mjs` | `SEM_PROVA` | `AVISO revisao-nao-conferida:<motivo>` | — |
 | `conferir` 0 / 3 / 1 | OK / AVISO / FALHA | OK / AVISO / FALHA | — |
 | `conferir` 64, outro código, ou saída sem exatamente uma linha `T-… ok|AVISO …|FALHA …` por task pedida | `SEM_PROVA` | `SEM_PROVA` | — |
 
@@ -241,7 +241,9 @@
   - `se_disponivel sem evidencia: V12=AVISO, codigo 0`;
   - `sem .expx/fatiamento.json: n/a sem chamar node` (decisão do coordenador, 2026-10-18);
   - `id com ponto (T-01.03) e conferido de verdade` (cópia 05847fd);
-  - `desligada: n/a sem chamar node` (PATH sem node);
+  - `desligada: n/a sem chamar o conferir` (o leitor roda, com node, e devolve `desligada`);
+  - `node ausente com .expx/fatiamento.json: SEM_PROVA em qualquer modo` (o modo não pode ser lido);
+  - `se_disponivel com o núcleo sem expx-revisao.mjs: AVISO revisao-nao-conferida, codigo 0`;
   - `achado aberto: FALHA achados-abertos:1`;
   - `evidencia editada no disco depois do commit nao muda o veredito`;
   - `task com dois itens em commits: confere o commit do ultimo`;
@@ -361,8 +363,8 @@
 **Interfaces:**
 - Fonte: as evidências alteradas no PR, `git diff --name-only <branch_base>...HEAD -- 'docs/entregas/<trabalho_id>/revisao/*.json'`, lidas em `HEAD` com `jq`. Lista: cada achado `rejeitado` (`arquivo:linha — label — motivo da rejeição`, o motivo de `rejeicoes` pela `identidade`), cada `removidos_sem_revisao`, e cada task `indisponivel:<motivo>`. A seção 6 continua na posição 6; a ordem das onze seções não muda.
 - DM-244.
-- [ ] **Step 1: Write the failing tests** (bloco extraído do `04-descricao-pr.md` e rodado numa fixture): `lista o achado rejeitado com o motivo`; `lista removidos_sem_revisao`; `sem rejeicao nem removido: a secao e omitida`; `evidencia de outro trabalho nao entra`; contrato: `TEMPLATE-PR tem ### Revisão por task dentro de O que foi testado`.
-- [ ] **Step 2: Run** — Expected: FAIL. **Step 3: Write**. **Step 4: Run** — Expected: `5 ok, 0 falha(s)`.
+- [ ] **Step 1: Write the failing tests** (bloco extraído do `04-descricao-pr.md` e rodado numa fixture): `lista o achado rejeitado com o motivo`; `lista removidos_sem_revisao`; `sem rejeicao, removido nem indisponivel: a secao e omitida`; `task indisponivel sem rejeicao: a secao aparece e lista a task com o motivo`; `evidencia de outro trabalho nao entra`; contrato: `TEMPLATE-PR tem ### Revisão por task dentro de O que foi testado`.
+- [ ] **Step 2: Run** — Expected: FAIL. **Step 3: Write**. **Step 4: Run** — Expected: `6 ok, 0 falha(s)`.
 - [ ] **Step 5: Commit** `feat(mergex): descricao do PR lista os achados rejeitados da revisao por task`.
 
 ### Task D2: o E9 exige confirmação por achado rejeitado
