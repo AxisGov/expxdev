@@ -211,6 +211,14 @@ describe("expx-fatiamento.mjs", () => {
       expect(r.err).toContain(`expx-fatiamento: ${chave}: deve `);
     });
 
+    it("funcional: lista longa é validada em tempo linear", () => {
+      // antes, cada login procurava a duplicata do começo da lista: 100 mil levavam ~12 s
+      const t = Date.now();
+      const r = roda(projeto({ expx_fatiamento: 1, revisor_bot: Array.from({ length: 100_000 }, (_, i) => `bot-${i}`) }), "--validar");
+      expect(r.rc).toBe(0);
+      expect(Date.now() - t).toBeLessThan(5000);
+    });
+
     it("funcional: o env é seguro para eval e separa os logins por vírgula", () => {
       const raiz = projeto({ expx_fatiamento: 1, revisor_bot: ["codeant-ai[bot]", "outro-bot"] });
       const script = 'eval "$("$NODE" "$SCRIPT" --raiz "$RAIZ")" || exit 9; IFS=, read -ra l <<< "$EXPX_REVISOR_BOT"; printf "%s\\n" "${l[@]}"';

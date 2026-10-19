@@ -154,9 +154,11 @@ function regexes(v, nome) {
 function logins(v, nome) {
   if (v === undefined) return [];
   if (!Array.isArray(v)) return erro(nome, "deve ser uma lista de logins"), [];
+  const primeiro = new Map(); // login → índice da primeira vez: tempo linear mesmo em lista longa
   v.forEach((l, i) => {
     if (typeof l !== "string" || !LOGIN.test(l)) erro(`${nome}[${i}]`, "deve ser login (letras, digitos e hifen, [bot] so no fim)");
-    else if (v.indexOf(l) !== i) erro(`${nome}[${i}]`, `deve aparecer uma vez (repete o item ${v.indexOf(l)})`);
+    else if (primeiro.has(l)) erro(`${nome}[${i}]`, `deve aparecer uma vez (repete o item ${primeiro.get(l)})`);
+    else primeiro.set(l, i);
   });
   return v;
 }
