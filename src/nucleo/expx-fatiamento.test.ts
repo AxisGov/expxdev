@@ -151,7 +151,7 @@ describe("expx-fatiamento.mjs", () => {
   it("funcional: --formato json traz só as chaves da versão 2, com os padrões; --validar não imprime nada", () => {
     const raiz = projeto({ expx_fatiamento: 2 });
     expect(JSON.parse(roda(raiz, "--formato", "json").out)).toEqual({ origem: "projeto", revisao_por_task: { modo: "se_disponivel" }, entrega: "por_trabalho",
-      merge_automatico: { ativo: false, caminhos_protegidos: PADRAO }, revisor_bot: [] });
+      merge_automatico: { ativo: false, caminhos_protegidos: PADRAO }, revisor_bot: [], excluir_da_revisao: [] });
     expect(roda(raiz, "--validar")).toMatchObject({ rc: 0, out: "" });
     expect(roda(raiz, "--formato", "yaml").rc).toBe(2);
   });
@@ -258,6 +258,95 @@ describe("expx-fatiamento.mjs", () => {
       });
       expect(r.stderr).toBe("");
       expect(r.stdout).toBe("codeant-ai[bot]\noutro-bot\n");
+    });
+  });
+  describe("excluir_da_revisao", () => {
+    // o exemplo da §5 da emenda
+    const ITEM = { padrao: "^fixtures/candidatos/", classe: "copia", origem: "scripts/atualizar-candidatos.sh",
+      motivo: "cópia das skills candidatas, revisada no repositório de origem" };
+    const lista = (l: unknown) => ({ expx_fatiamento: 2, excluir_da_revisao: l });
+    const EXCL = "excluir_da_revisao";
+
+    it("funcional: o exemplo da emenda é válido (env e json)", () => {
+      const raiz = projeto({ expx_fatiamento: 2, revisao_por_task: { modo: "obrigatoria" }, entrega: "por_sprint",
+        merge_automatico: { ativo: true, caminhos_protegidos: ["^src/pagamentos/"] }, revisor_bot: ["codeant-ai[bot]"], excluir_da_revisao: [ITEM] });
+      const r = roda(raiz);
+      expect(r).toMatchObject({ rc: 0, err: "" });
+      expect(r.out.split("\n")).toContain("EXPX_EXCLUIR_DA_REVISAO=^fixtures/candidatos/");
+      expect(JSON.parse(roda(raiz, "--formato", "json").out).excluir_da_revisao).toEqual([ITEM]);
+    });
+
+    it("funcional: sem lista, EXPX_EXCLUIR_DA_REVISAO vazio e json [] (o núcleo não se declara)", () => {
+      for (const raiz of [projeto(), projeto({ expx_fatiamento: 2 }), projeto(lista([]))]) {
+        expect(roda(raiz).out.split("\n")).toContain("EXPX_EXCLUIR_DA_REVISAO=");
+        expect(JSON.parse(roda(raiz, "--formato", "json").out).excluir_da_revisao).toEqual([]);
+      }
+    });
+
+    it("funcional: raiz de código liberada por pasta gerada e ponto escapado são válidos; o env é seguro para eval", () => {
+      const raiz = projeto(lista([{ ...ITEM, padrao: "^scripts/ci/fixtures/candidatos/" }, { ...ITEM, padrao: "^a\\.b c/", classe: "gerado" }]));
+      const script = 'eval "$("$NODE" "$SCRIPT" --raiz "$RAIZ")" || exit 9; printf %s "$EXPX_EXCLUIR_DA_REVISAO"';
+      const r = spawnSync(bashDosHooks(), ["-c", script], {
+        encoding: "utf8",
+        env: { ...process.env, NODE: barra(process.execPath), SCRIPT: barra(SCRIPT), RAIZ: barra(raiz) },
+      });
+      expect(r.stderr).toBe("");
+      expect(r.stdout).toBe("^scripts/ci/fixtures/candidatos/|^a\\.b c/");
+    });
+
+    it.each([
+      ["não lista", ITEM, EXCL],
+      ["item que não é objeto", ["^fixtures/"], `${EXCL}[0]`],
+      ["chave a mais", [{ ...ITEM, extra: 1 }], `${EXCL}[0].extra`],
+      ["chave a menos", [{ padrao: ITEM.padrao, classe: "copia", origem: "x" }], `${EXCL}[0].motivo`],
+      ["padrão com glob", [ITEM, { ...ITEM, padrao: "^a/*/" }], `${EXCL}[1].padrao`],
+      ["padrão sem / no fim", [{ ...ITEM, padrao: "^gerado" }], `${EXCL}[0].padrao`],
+      ["padrão com alternativa", [{ ...ITEM, padrao: "^(a|b)/" }], `${EXCL}[0].padrao`],
+      ["padrão que não é texto", [{ ...ITEM, padrao: 7 }], `${EXCL}[0].padrao`],
+      ["raiz de código ^src/", [{ ...ITEM, padrao: "^src/" }], `${EXCL}[0].padrao`],
+      ["raiz de código ^scripts/", [{ ...ITEM, padrao: "^scripts/" }], `${EXCL}[0].padrao`],
+      ["raiz de código ^\\.github/", [{ ...ITEM, padrao: "^\\.github/" }], `${EXCL}[0].padrao`],
+      ["padrão repetido", [ITEM, { ...ITEM, classe: "gerado" }], `${EXCL}[1].padrao`],
+      ["classe fora de gerado|copia", [{ ...ITEM, classe: "codigo" }], `${EXCL}[0].classe`],
+      ["origem só com espaço", [{ ...ITEM, origem: " " }], `${EXCL}[0].origem`],
+      ["motivo vazio", [{ ...ITEM, motivo: "" }], `${EXCL}[0].motivo`],
+      ["motivo que não é texto", [{ ...ITEM, motivo: ["x"] }], `${EXCL}[0].motivo`],
+    ])("funcional: %s é inválido (rc 1, cita a chave)", (_nome, l, chave) => {
+      const r = roda(projeto(lista(l)));
+      expect(r).toMatchObject({ rc: 1, out: "" });
+      expect(r.err).toContain(`expx-fatiamento: ${chave}: `);
+      // a chave é conhecida: nunca a "chave desconhecida" genérica
+      expect(r.err).not.toContain(`${EXCL}: chave desconhecida`);
+    });
+
+    it("funcional: o padrão repetido cita o primeiro", () => {
+      const r = roda(projeto(lista([ITEM, { ...ITEM, classe: "gerado" }])));
+      expect(r.err).toBe(`expx-fatiamento: ${EXCL}[1].padrao: deve aparecer uma vez (repete o item 0)\n`);
+    });
+  });
+
+  describe("FATIA_* reservados", () => {
+    const MSG = (n: string) => `expx-fatiamento: \`${n}\` não é mais lida (limites do CodeAnt, fixos: emenda de 2026-10-19); remova-a do ambiente\n`;
+    const comEnv = (env: Record<string, string>, raiz: string, ...args: string[]) => {
+      const r = spawnSync(process.execPath, [SCRIPT, "--raiz", raiz, ...args], { encoding: "utf8", env: { ...process.env, ...env } });
+      return { rc: r.status, out: r.stdout, err: r.stderr };
+    };
+
+    it("funcional: FATIA_MAX_LINHAS_PR=400 no ambiente falha com a mensagem exata, também sem arquivo e com --validar", () => {
+      for (const raiz of [projeto({ expx_fatiamento: 2 }), projeto()]) {
+        for (const args of [[], ["--validar"], ["--formato", "json"]]) {
+          expect(comEnv({ FATIA_MAX_LINHAS_PR: "400" }, raiz, ...args)).toEqual({ rc: 1, out: "", err: MSG("FATIA_MAX_LINHAS_PR") });
+        }
+      }
+    });
+
+    it("funcional: FATIA_ vazia também falha, uma linha por variável, ordenadas", () => {
+      expect(comEnv({ FATIA_Z: "", FATIA_A: "" }, projeto())).toEqual({ rc: 1, out: "", err: MSG("FATIA_A") + MSG("FATIA_Z") });
+    });
+
+    it("funcional: com FATIA_* e arquivo inválido, os dois problemas aparecem", () => {
+      const r = comEnv({ FATIA_X: "1" }, projeto({ expx_fatiamento: 2, limites: {} }));
+      expect(r).toEqual({ rc: 1, out: "", err: MSG("FATIA_X") + "expx-fatiamento: limites: chave desconhecida\n" });
     });
   });
 });
