@@ -242,7 +242,7 @@ Continuação de `2026-10-18-mergex-revisao-por-task-e-merge-automatico.md` (par
 - **Comandos:**
   - `--proxima --pr <n> --head <sha>` imprime `proxima=conferir|cedo|parar` e o motivo:
     - `cedo`: menos de 120 s desde a última tentativa;
-    - `parar`: o estado é terminal, ou passaram 30 min desde o `inicio`; aí grava `aguardando_merge`;
+    - `parar`: o estado já é terminal (`mergeado`, `espera_humana`, `aguardando_merge`) — devolve o estado como está, sem regravar —, ou o estado é `aguardando` e passaram 30 min desde o `inicio` — só aí grava `aguardando_merge`;
     - HEAD novo mantém o `inicio` e zera o resultado: tudo é recalculado.
   - `--registrar --pr <n> --head <sha> --resultado apto|pendente|espera --motivo <texto>`:
     - `pendente` (CI ou revisão rodando) mantém `aguardando`;
@@ -268,6 +268,7 @@ Continuação de `2026-10-18-mergex-revisao-por-task-e-merge-automatico.md` (par
 - [ ] **Step 1: Write the failing tests:**
   - `duas chamadas em 60 s: a segunda e cedo`;
   - `30 min sem apto: aguardando_merge e parar`;
+  - `estado terminal (mergeado, espera_humana) passados 30 min: parar sem regravar o estado`;
   - `head novo: tudo recalculado, inicio mantido`;
   - `marcar-merge duas vezes no mesmo head: a segunda recusa`;
   - `comentario existente de passagem anterior e editado, nao duplicado` (com `gh` falso que conta as chamadas);
