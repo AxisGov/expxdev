@@ -122,20 +122,20 @@ describe("diagnóstico de .expx/fatiamento.json", () => {
   it("funcional: sem .expx/fatiamento.json, ou com ele válido, não há achado de fatiamento", async () => {
     p = await projetoSadio();
     expect(ids(p.raiz)).toEqual([]);
-    escreve(p.raiz, { expx_fatiamento: 1, ignorar: ["^gerado/"] });
+    escreve(p.raiz, { expx_fatiamento: 2, entrega: "por_sprint" });
     expect(ids(p.raiz)).toEqual([]);
   });
 
   it("funcional: arquivo inválido é erro fatiamento-invalido com a mensagem do script", async () => {
     p = await projetoSadio();
-    escreve(p.raiz, { expx_fatiamento: 1, limites: {} });
+    escreve(p.raiz, { expx_fatiamento: 2, limites: {} });
     expect(achado(p.raiz, "fatiamento-invalido")).toMatchObject({ severidade: "erro", problema: "expx-fatiamento: limites: chave desconhecida" });
   });
 
   const viraDiretorio = (c: string): void => (rmSync(c), mkdirSync(c));
   it.each([["ausente", rmSync], ["diretório", viraDiretorio]])("funcional: leitor instalado %s é erro fatiamento-sem-leitor", async (_n, troca) => {
     p = await projetoSadio();
-    escreve(p.raiz, { expx_fatiamento: 1 });
+    escreve(p.raiz, { expx_fatiamento: 2 });
     troca(join(p.raiz, ".expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs"));
     expect(achado(p.raiz, "fatiamento-sem-leitor")).toMatchObject({ severidade: "erro", correcao: expect.stringContaining("expx update") });
   });
@@ -148,7 +148,7 @@ describe("diagnóstico de .expx/fatiamento.json", () => {
 
   it("funcional: o doctor nunca executa a cópia do leitor que está no checkout", async () => {
     p = await projetoSadio();
-    escreve(p.raiz, { expx_fatiamento: 1, limites: {} });
+    escreve(p.raiz, { expx_fatiamento: 2, limites: {} });
     const marca = join(p.raiz, "executou");
     writeFileSync(join(p.raiz, ".expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs"), `import { writeFileSync } from "node:fs"; writeFileSync(${JSON.stringify(marca)}, "");`);
     expect(achado(p.raiz, "fatiamento-invalido")?.problema).toContain("limites: chave desconhecida");

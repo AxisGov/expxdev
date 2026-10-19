@@ -290,7 +290,7 @@ describe(".expx/fatiamento.json é do projeto", () => {
     p = projetoTemporario("fixtures/cli/projeto-limpo");
     await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: repo } });
     // BOM e CRLF de propósito: o expx não pode "normalizar" o arquivo do projeto
-    const bytes = Buffer.from('\uFEFF{"expx_fatiamento": 1,\r\n "justificativa": "x"}\r\n', "utf8");
+    const bytes = Buffer.from('\uFEFF{"expx_fatiamento": 2,\r\n "entrega": "por_sprint"}\r\n', "utf8");
     writeFileSync(join(p.raiz, ".expx/fatiamento.json"), bytes);
     await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: repo } });
     expect(readFileSync(join(p.raiz, ".expx/fatiamento.json")).equals(bytes)).toBe(true);
