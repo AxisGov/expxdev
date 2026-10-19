@@ -69,7 +69,8 @@ Imprime uma linha de resumo.
   `git diff` que falha, como sem `HEAD`) tem todas as linhas alteradas. Achado em linha alterada é `aberto` e bloqueia; nas
   demais é `anterior`, não bloqueia e vai para PR própria (F1).
 - Achado cuja identidade está em `rejeicoes` de qualquer evidência do trabalho é
-  `rejeitado`. Revisar de novo preserva as rejeições da própria task.
+  `rejeitado` (relidas também sob a trava, antes de gravar). Revisar de novo preserva
+  as rejeições da própria task.
 - Mais arquivos que o `meta.max_files` informado: revisa em lotes; a task passa só
   se todos passam.
 - Arquivo apagado não vai para a CLI (não há linha onde ancorar achado): fica
@@ -133,3 +134,4 @@ desenvolvedor no PR para cada um.
 | 2026-10-18 | Contrato criado: evidência v1, identidade com as linhas vizinhas, `revisar`, `conferir` e `rejeitar`. |
 | 2026-10-18 | `conferir` exige, em `ok`/`achados`, `cli.versao` ≥ 0.5.14, `executada_em` ISO 8601 e `lotes` que cobrem os arquivos presentes (`evidencia-invalida:<campo>`). |
 | 2026-10-18 | Trava velha removida sob `.quebra`: quem a viu velha não remove a trava nova de outro processo. |
+| 2026-10-18 | `revisar` relê sob a trava as rejeições de todas as evidências do trabalho, não só as da própria task. |

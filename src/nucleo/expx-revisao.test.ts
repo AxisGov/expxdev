@@ -172,6 +172,24 @@ describe("expx-revisao.mjs revisar", () => {
     expect(revisar(c, "src/a.js")).toMatchObject({ rc: 0, ev: { resultado: "ok", rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] } });
   });
 
+  it("funcional: rejeição de outra task gravada enquanto o revisar espera a trava não se perde", async () => {
+    const id = identidade("security", "src/a.js", ["l2", "novo3", "l4"]);
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    const trava = join(c.raiz, `${EV}.trava`);
+    mkdirSync(trava, { recursive: true }); // outro processo segura a evidência da T-01
+    const ch = join(c.falsa, "chamadas.jsonl");
+    const rev = new Promise<number | null>((ok) => spawn(process.execPath, [SCRIPT, "revisar", "--trabalho", "w", "--task", "T-01", "--arquivos", "src/a.js", "--raiz", c.raiz],
+      { env: ambienteCom(`${c.falsa}${delimiter}${PATH}`), stdio: "ignore" }).on("close", ok));
+    const espera = async (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+    for (const ate = Date.now() + 20000; !(existsSync(ch) && readFileSync(ch, "utf8").includes("review")) && Date.now() < ate;) await espera(50);
+    await espera(1500); // o revisar já classificou os achados e espera a trava
+    rejeita(c.raiz, "T-00", [id]);
+    rmSync(trava, { recursive: true });
+    expect(await rev).toBe(0);
+    expect(evidencia(c.raiz)).toMatchObject({ resultado: "ok", achados: [{ estado: "rejeitado" }] });
+  });
+
   it("funcional: linhas de texto idêntico com vizinhas diferentes têm identidades diferentes", () => {
     const c = cenario({ issues: [achado("src/b.js", 2), achado("src/b.js", 5)] });
     escreve(c.raiz, "src/b.js", "a\nx\nb\nc\nx\nd\n");

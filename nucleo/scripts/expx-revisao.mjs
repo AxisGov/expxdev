@@ -158,14 +158,16 @@ function revisar() {
     else if (presentes.some((f) => blob(f) !== ev.arquivos[f])) indisponivel("arquivo-mudou-durante-revisao");
     else achados(lotes.flatMap((l) => l.issues), ev);
   }
-  // rejeição gravada (rejeitar) enquanto a CLI rodava não se perde: releitura e gravação sob a trava
+  // rejeição gravada (rejeitar) enquanto a CLI rodava não se perde: releitura e gravação sob a trava;
+  // as de outras tasks do trabalho também são relidas aqui, não só antes da espera pela trava
   const abertos = comTrava(op.task, () => {
     const agora = le(caminhoEv(op.task))?.rejeicoes;
+    const doTrabalho = rejeitadasDoTrabalho();
     pausaDeTeste();
     for (const r of Array.isArray(agora) ? agora : []) {
       if (!ev.rejeicoes.some((x) => x?.identidade === r?.identidade)) ev.rejeicoes.push(r);
-      for (const a of ev.achados) if (a.identidade === r?.identidade) a.estado = "rejeitado";
     }
+    for (const a of ev.achados) if (doTrabalho.has(a.identidade) || ev.rejeicoes.some((r) => r?.identidade === a.identidade)) a.estado = "rejeitado";
     if (ev.resultado === "achados" && !ev.achados.some((a) => a.estado === "aberto")) ev.resultado = "ok";
     grava(op.task, ev);
     return ev.achados.filter((a) => a.estado === "aberto").length;
@@ -174,12 +176,17 @@ function revisar() {
   process.exit(ev.resultado === "indisponivel" ? 2 : abertos > 0 ? 1 : 0);
 }
 
-/** Classifica os achados: rejeitado (por esta ou outra task do trabalho), aberto (linha alterada) ou anterior. */
-function achados(issues, ev) {
-  const rejeitadas = new Set(ev.rejeicoes.map((r) => r.identidade));
+/** As identidades rejeitadas em qualquer evidência do trabalho. */
+function rejeitadasDoTrabalho() {
+  const rejeitadas = new Set();
   for (const n of existsSync(pasta) ? readdirSync(pasta) : []) {
     for (const r of n.endsWith(".json") ? le(join(pasta, n))?.rejeicoes ?? [] : []) rejeitadas.add(r?.identidade);
   }
+  return rejeitadas;
+}
+/** Classifica os achados: rejeitado (por esta ou outra task do trabalho), aberto (linha alterada) ou anterior. */
+function achados(issues, ev) {
+  const rejeitadas = new Set([...ev.rejeicoes.map((r) => r.identidade), ...rejeitadasDoTrabalho()]);
   const cache = {};
   for (const i of issues) {
     const arquivo = String(i.relevant_file ?? "").replace(/\\/g, "/").replace(/^\.\//, "");
