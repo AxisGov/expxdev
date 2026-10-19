@@ -21,16 +21,17 @@ Continuação de `2026-10-18-mergex-revisao-por-task-e-merge-automatico.md` (par
 - **Quando vale:** o PR teve a base trocada (a predecessora foi mergeada).
 - **Condições, todas sobre o `headRefOid` atual:**
   - a ponta da base atual (`baseRefOid`) é ancestral do `headRefOid`, ou seja, o PR está sincronizado;
-  - o R1 está verde com checks desse `headRefOid`; como o HEAD é novo, todo check dele é posterior ao redirecionamento;
+  - o R1 está verde com checks desse `headRefOid` concluídos depois do redirecionamento (o horário do evento de troca de base do serviço). O HEAD pode não mudar, quando a base nova já era ancestral (predecessora mergeada por fast-forward), e um verde de antes, como o `fora-de-main` do gate do conselho, não rodou a suíte contra a base atual;
   - o R1–R6 foi recalculado inteiro;
-  - com `EXPX_REVISOR_BOT` não vazio, lido da árvore da base, há uma revisão de um desses logins, comparados exatamente, cujo commit é o `headRefOid`.
-- **Motivos de inelegibilidade:** `não sincronizado com a base nova` e `revisão do revisor_bot ausente no HEAD atual`. O motivo `CI anterior ao redirecionamento` vale quando o único verde é de um HEAD anterior.
+  - com `EXPX_REVISOR_BOT` não vazio, lido da árvore da base, há uma revisão de um desses logins, comparados exatamente, cujo commit é o `headRefOid` e submetida depois do redirecionamento.
+- **Motivos de inelegibilidade:** `não sincronizado com a base nova` e `revisão do revisor_bot ausente no HEAD atual`. O motivo `CI anterior ao redirecionamento` vale quando o único verde é de um HEAD anterior ou anterior ao redirecionamento; a orientação é disparar o CI de novo pelo serviço, contra a base atual.
 - **Orientação ao desenvolvedor.** Sincronizar pela reconciliação de base (`references/11-reconciliacao-base.md`: merge registrado, E2, push), que mantém o portão provado. Nunca com commit vazio. O botão de atualizar a branch do serviço faz o mesmo merge sem registro, e o portão aparece vencido para o `pre-push` e para o CI (DM-245).
 - **DM-245.**
 
 - [ ] **Step 1: Write the failing tests:**
   - `base nova nao ancestral do head: inelegivel nao sincronizado`;
   - `sincronizado e check verde so de head anterior: inelegivel CI anterior ao redirecionamento`;
+  - `head inalterado pelo redirecionamento e check verde so de antes dele: inelegivel CI anterior ao redirecionamento`;
   - `sincronizado, CI verde no head, sem revisor_bot: elegivel`;
   - `revisor_bot declarado e revisao so de head anterior: inelegivel`;
   - `login parecido (prefixo) nao conta`;
