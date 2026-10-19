@@ -524,11 +524,14 @@ function verificarFatiamento(raiz: string, env: NodeJS.ProcessEnv, fatias: strin
   const instalados = join(raiz, ".expx", "marketplace", "plugins", "expx", "nucleo", "scripts");
   const leitor = join(raizDoNucleo(), "scripts", "expx-fatiamento.mjs");
   // o instalado (o que as skills chamam) e o do pacote têm de ser arquivo regular, com o módulo que o leitor importa
-  const exigidos = ["expx-fatiamento.mjs", "expx-limites.mjs"].flatMap((n) => [join(instalados, n), join(raizDoNucleo(), "scripts", n)]);
-  const falta = exigidos.find((c) => { try { return !statSync(c).isFile(); } catch { return true; } });
+  const exigidos = ["expx-fatiamento.mjs", "expx-limites.mjs"].flatMap((nome) => [
+    { nome, caminho: join(instalados, nome) },
+    { nome, caminho: join(raizDoNucleo(), "scripts", nome) },
+  ]);
+  const falta = exigidos.find(({ caminho }) => { try { return !statSync(caminho).isFile(); } catch { return true; } });
   if (falta !== undefined) {
     push({ id: "fatiamento-sem-leitor", severidade: "erro",
-      problema: `.expx/fatiamento.json existe, mas o leitor nao e um arquivo regular: ${falta}`,
+      problema: `.expx/fatiamento.json existe, mas o arquivo exigido ${falta.nome} nao e um arquivo regular: ${falta.caminho}`,
       correcao: "rode `expx update` (ou `expx init`); se o caminho e do pacote do expx, reinstale o expxdev" });
     return;
   }

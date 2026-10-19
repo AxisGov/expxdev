@@ -1,5 +1,6 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { existsSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from "node:fs";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { copyFileSync, existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
@@ -9,11 +10,18 @@ import { diagnosticar, mensagemFatia } from "./verificadores.js";
 import { RAIZ_DO_REPO } from "../teste/candidatos.js";
 import { suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
 
+const nucleoDoPacote = vi.hoisted(() => ({ raiz: undefined as string | undefined }));
+vi.mock("../plugin/montagem.js", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../plugin/montagem.js")>();
+  return { ...real, raizDoNucleo: () => nucleoDoPacote.raiz ?? real.raizDoNucleo() };
+});
+
 // hermético: `FATIA_*` do shell de quem roda (reservadas, emenda de 2026-10-19) não vazam para os casos
 for (const k of Object.keys(process.env)) if (k.startsWith("FATIA_")) delete process.env[k];
 let p: ProjetoTemporario | undefined;
 const repos: string[] = [];
 afterEach(() => {
+  nucleoDoPacote.raiz = undefined;
   p?.descartar();
   p = undefined;
   for (const r of repos.splice(0)) rmSync(r, { recursive: true, force: true });
@@ -182,6 +190,21 @@ describe("diagnóstico de .expx/fatiamento.json", () => {
     escreve(p.raiz, { expx_fatiamento: 2 });
     rmSync(join(p.raiz, ".expx/marketplace/plugins/expx/nucleo/scripts/expx-limites.mjs"));
     expect(achado(p.raiz, "fatiamento-sem-leitor")?.problema).toContain("expx-limites.mjs");
+  });
+
+  it("funcional: expx-limites.mjs ausente no pacote é fatiamento-sem-leitor e nomeia o arquivo", async () => {
+    p = await projetoSadio();
+    escreve(p.raiz, { expx_fatiamento: 2 });
+    const pacote = mkdtempSync(join(tmpdir(), "expx-nucleo-pacote-"));
+    repos.push(pacote);
+    mkdirSync(join(pacote, "scripts"));
+    copyFileSync(join(RAIZ_DO_REPO, "nucleo/scripts/expx-fatiamento.mjs"), join(pacote, "scripts/expx-fatiamento.mjs"));
+    nucleoDoPacote.raiz = pacote;
+
+    expect(achado(p.raiz, "fatiamento-sem-leitor")).toMatchObject({
+      severidade: "erro",
+      problema: expect.stringContaining("o arquivo exigido expx-limites.mjs nao e um arquivo regular"),
+    });
   });
 
   it("funcional: a mensagem do doctor é a do módulo do núcleo", async () => {
