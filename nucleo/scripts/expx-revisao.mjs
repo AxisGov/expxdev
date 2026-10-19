@@ -42,7 +42,21 @@ const le = (f) => { try { return JSON.parse(readFileSync(f, "utf8").replace(/^\u
 const git = (...a) => spawnSync("git", a, { cwd: op.raiz, encoding: "utf8" });
 const blob = (f) => { const r = git("hash-object", "--", f); return r.status === 0 ? r.stdout.trim() : undefined; };
 
+// `\` é separador só no Windows; fora dele é parte do nome, e trocá-lo daria por ausente um arquivo que existe
+const caminho = (f) => (process.platform === "win32" ? f.replace(/\\/g, "/") : f).replace(/^\.\//, "");
 const pausa = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+const velha = (d) => { try { return Date.now() - statSync(d).mtimeMs > 120000; } catch { return false; /* sumiu */ } };
+/** Remove a trava velha conferindo de novo sob `<trava>.quebra` (`mkdir` exclusivo): sem isso, quem a viu
+ *  velha antes de outro removê-la e criar a sua removeria a trava nova. A `.quebra` nunca é removida por
+ *  idade (isso traria a mesma corrida de volta): se um processo morreu com ela, a saída 75 a nomeia. */
+function quebra(trava) {
+  const q = `${trava}.quebra`;
+  try { mkdirSync(q); } catch (e) {
+    if (e.code !== "EEXIST") throw e;
+    return;
+  }
+  try { if (velha(trava)) rmSync(trava, { recursive: true, force: true }); } catch { /* sumiu */ } finally { rmSync(q, { recursive: true, force: true }); }
+}
 /** Trava por evidência (`mkdir` é exclusivo): quem relê e regrava a evidência o faz dentro dela. */
 function comTrava(task, fn) {
   mkdirSync(pasta, { recursive: true });
@@ -51,8 +65,12 @@ function comTrava(task, fn) {
     try { mkdirSync(trava); break; } catch (e) {
       if (e.code !== "EEXIST") throw e;
       // trava de processo que morreu: mais velha que 2 min é abandonada
-      try { if (Date.now() - statSync(trava).mtimeMs > 120000) rmSync(trava, { recursive: true, force: true }); } catch { /* sumiu */ }
-      if (Date.now() > ate) { process.stderr.write(`expx-revisao: evidencia travada por outro processo: ${trava}\n`); process.exit(75); }
+      if (velha(trava)) quebra(trava);
+      if (Date.now() > ate) {
+        const q = velha(`${trava}.quebra`) ? ` (remova a mao, se nenhum processo esta rodando: ${trava}.quebra)` : "";
+        process.stderr.write(`expx-revisao: evidencia travada por outro processo: ${trava}${q}\n`);
+        process.exit(75);
+      }
     }
   }
   try { return fn(); } finally { rmSync(trava, { recursive: true, force: true }); }
@@ -94,7 +112,7 @@ function alteradas(f) {
 }
 
 function revisar() {
-  const arquivos = op.arquivos.split(",").map((f) => f.trim().replace(/\\/g, "/").replace(/^\.\//, "")).filter(Boolean);
+  const arquivos = op.arquivos.split(",").map((f) => caminho(f.trim())).filter(Boolean);
   if (arquivos.length === 0) uso("--arquivos sem nenhum caminho");
   const anterior = le(caminhoEv(op.task));
   const ev = { expx_revisao: 1, trabalho: op.trabalho, task: op.task, cli: { versao: null }, executada_em: new Date().toISOString(),
@@ -145,14 +163,16 @@ function revisar() {
     else if (presentes.some((f) => blob(f) !== ev.arquivos[f])) indisponivel("arquivo-mudou-durante-revisao");
     else achados(lotes.flatMap((l) => l.issues), ev);
   }
-  // rejeição gravada (rejeitar) enquanto a CLI rodava não se perde: releitura e gravação sob a trava
+  // rejeição gravada (rejeitar) enquanto a CLI rodava não se perde: releitura e gravação sob a trava;
+  // as de outras tasks do trabalho também são relidas aqui, não só antes da espera pela trava
   const abertos = comTrava(op.task, () => {
     const agora = le(caminhoEv(op.task))?.rejeicoes;
+    const doTrabalho = rejeitadasDoTrabalho();
     pausaDeTeste();
     for (const r of Array.isArray(agora) ? agora : []) {
       if (!ev.rejeicoes.some((x) => x?.identidade === r?.identidade)) ev.rejeicoes.push(r);
-      for (const a of ev.achados) if (a.identidade === r?.identidade) a.estado = "rejeitado";
     }
+    for (const a of ev.achados) if (doTrabalho.has(a.identidade) || ev.rejeicoes.some((r) => r?.identidade === a.identidade)) a.estado = "rejeitado";
     if (ev.resultado === "achados" && !ev.achados.some((a) => a.estado === "aberto")) ev.resultado = "ok";
     grava(op.task, ev);
     return ev.achados.filter((a) => a.estado === "aberto").length;
@@ -161,15 +181,20 @@ function revisar() {
   process.exit(ev.resultado === "indisponivel" ? 2 : abertos > 0 ? 1 : 0);
 }
 
-/** Classifica os achados: rejeitado (por esta ou outra task do trabalho), aberto (linha alterada) ou anterior. */
-function achados(issues, ev) {
-  const rejeitadas = new Set(ev.rejeicoes.map((r) => r.identidade));
+/** As identidades rejeitadas em qualquer evidência do trabalho. */
+function rejeitadasDoTrabalho() {
+  const rejeitadas = new Set();
   for (const n of existsSync(pasta) ? readdirSync(pasta) : []) {
     for (const r of n.endsWith(".json") ? le(join(pasta, n))?.rejeicoes ?? [] : []) rejeitadas.add(r?.identidade);
   }
+  return rejeitadas;
+}
+/** Classifica os achados: rejeitado (por esta ou outra task do trabalho), aberto (linha alterada) ou anterior. */
+function achados(issues, ev) {
+  const rejeitadas = new Set([...ev.rejeicoes.map((r) => r.identidade), ...rejeitadasDoTrabalho()]);
   const cache = {};
   for (const i of issues) {
-    const arquivo = String(i.relevant_file ?? "").replace(/\\/g, "/").replace(/^\.\//, "");
+    const arquivo = caminho(String(i.relevant_file ?? ""));
     const linha = Number(i.start_line);
     const c = (cache[arquivo] ??= { alt: arquivo in ev.arquivos ? alteradas(arquivo) : new Set(),
       linhas: existsSync(join(op.raiz, arquivo)) ? readFileSync(join(op.raiz, arquivo), "utf8").split(/\r?\n/) : [] });

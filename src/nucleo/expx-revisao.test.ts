@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { ambienteCom, noPath, RAIZ_DO_REPO } from "../teste/candidatos.js";
 
 // `nucleo/scripts/expx-revisao.mjs`. A CLI do CodeAnt nunca é chamada de verdade: uma `codeant` falsa vem
@@ -171,6 +172,24 @@ describe("expx-revisao.mjs revisar", () => {
     expect(revisar(c, "src/a.js")).toMatchObject({ rc: 0, ev: { resultado: "ok", rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] } });
   });
 
+  it("funcional: rejeição de outra task gravada enquanto o revisar espera a trava não se perde", async () => {
+    const id = identidade("security", "src/a.js", ["l2", "novo3", "l4"]);
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    const trava = join(c.raiz, `${EV}.trava`);
+    mkdirSync(trava, { recursive: true }); // outro processo segura a evidência da T-01
+    const ch = join(c.falsa, "chamadas.jsonl");
+    const rev = new Promise<number | null>((ok) => spawn(process.execPath, [SCRIPT, "revisar", "--trabalho", "w", "--task", "T-01", "--arquivos", "src/a.js", "--raiz", c.raiz],
+      { env: ambienteCom(`${c.falsa}${delimiter}${PATH}`), stdio: "ignore" }).on("close", ok));
+    const espera = async (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+    for (const ate = Date.now() + 20000; !(existsSync(ch) && readFileSync(ch, "utf8").includes("review")) && Date.now() < ate;) await espera(50);
+    await espera(1500); // o revisar já classificou os achados e espera a trava
+    rejeita(c.raiz, "T-00", [id]);
+    rmSync(trava, { recursive: true });
+    expect(await rev).toBe(0);
+    expect(evidencia(c.raiz)).toMatchObject({ resultado: "ok", achados: [{ estado: "rejeitado" }] });
+  });
+
   it("funcional: linhas de texto idêntico com vizinhas diferentes têm identidades diferentes", () => {
     const c = cenario({ issues: [achado("src/b.js", 2), achado("src/b.js", 5)] });
     escreve(c.raiz, "src/b.js", "a\nx\nb\nc\nx\nd\n");
@@ -187,6 +206,19 @@ describe("expx-revisao.mjs revisar", () => {
     git(c.raiz, "add", "src/a.js");
     git(c.raiz, "commit", "-q", "-m", "task");
     expect(r.ev.arquivos["src/a.js"]).toBe(git(c.raiz, "rev-parse", "HEAD:src/a.js"));
+  });
+
+  // no Windows `\` é separador e não cabe em nome de arquivo: o caso só existe fora dele
+  it.skipIf(process.platform === "win32")("funcional: fora do Windows, `\\` é parte do nome: o arquivo é achado e o diff é o dele", () => {
+    const f = "src/a\\b.js";
+    const c = cenario({ issues: [achado(f, 3)] });
+    escreve(c.raiz, f, "l1\nl2\nl3\nl4\nl5\n");
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "com barra invertida");
+    escreve(c.raiz, f, "l1\nl2\nnovo3\nl4\nl5\n");
+    const r = revisar(c, f);
+    expect(r).toMatchObject({ rc: 1, ev: { resultado: "achados", achados: [{ arquivo: f, linha: 3, estado: "aberto" }] } });
+    expect(r.ev.arquivos[f]).toMatch(/^[0-9a-f]{40}$/);
   });
 
   it("funcional: arquivo alterado durante a chamada da CLI → indisponivel", () => {
@@ -333,6 +365,50 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     expect([await rev, await rej]).toEqual([1, 0]);
     expect(evidencia(c.raiz)).toMatchObject({ resultado: "ok", rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] });
   });
+
+  it("funcional: trava velha: quem a julgou abandonada não remove a trava nova de outro processo", async () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
+    const trava = join(c.raiz, `${EV}.trava`);
+    mkdirSync(trava);
+    utimesSync(trava, new Date(0), new Date(0)); // de processo que morreu
+    const [pb, pa] = [temp("expx-pausa-"), temp("expx-pausa-")];
+    // o rejeitar para logo depois do primeiro stat que acha a trava velha, antes de removê-la
+    writeFileSync(join(pb, "pre.mjs"), `import fs from "node:fs"; import { syncBuiltinESMExports } from "node:module";
+const dir = ${JSON.stringify(pb)}, stat = fs.statSync; let uma = false;
+fs.statSync = (...a) => { const r = stat(...a);
+  if (!uma && String(a[0]).endsWith(".trava") && Date.now() - r.mtimeMs > 120000) { uma = true; fs.writeFileSync(dir + "/pronto", "");
+    for (const ate = Date.now() + 20000; Date.now() < ate && !fs.existsSync(dir + "/continuar");) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50); }
+  return r; };
+syncBuiltinESMExports();
+`);
+    const filho = (a: string[], env?: NodeJS.ProcessEnv) => new Promise<number | null>((ok) =>
+      spawn(process.execPath, [...a, "--trabalho", "w", "--raiz", c.raiz], { env, stdio: "ignore" }).on("close", ok));
+    const espera = async (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+    const pronto = async (d: string) => { for (const ate = Date.now() + 20000; !existsSync(join(d, "pronto")) && Date.now() < ate;) await espera(50); };
+    const rej = filho(["--import", pathToFileURL(join(pb, "pre.mjs")).href, SCRIPT, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp"]);
+    await pronto(pb);
+    // o revisar remove a trava velha, toma a sua e para entre a releitura e a gravação
+    const rev = filho([SCRIPT, "revisar", "--task", "T-01", "--arquivos", "src/a.js"], ambienteCom(`${c.falsa}${delimiter}${PATH}`, { EXPX_REVISAO_TESTE_PAUSA: pa }));
+    await pronto(pa);
+    writeFileSync(join(pb, "continuar"), "");
+    await espera(1500); // sem a correção, o rejeitar remove aqui a trava do revisar, grava, e o revisar o apaga
+    writeFileSync(join(pa, "continuar"), "");
+    expect([await rev, await rej]).toEqual([1, 0]);
+    expect(evidencia(c.raiz)).toMatchObject({ resultado: "ok", rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] });
+  });
+
+  it("funcional: .quebra velha nunca é removida sozinha: sai 75 nomeando-a, e a trava fica", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
+    const trava = join(c.raiz, `${EV}.trava`);
+    for (const d of [trava, `${trava}.quebra`]) { mkdirSync(d); utimesSync(d, new Date(0), new Date(0)); } // morreu ao quebrar
+    const r = roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp");
+    expect(r).toMatchObject({ rc: 75, err: expect.stringContaining(`${trava}.quebra`) });
+    expect([existsSync(trava), existsSync(`${trava}.quebra`)]).toEqual([true, true]);
+  }, 60000);
 
   it("funcional: rejeitar não muda o resultado de indisponivel", () => {
     const c = cenario();
