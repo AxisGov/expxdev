@@ -3,6 +3,8 @@
 Data: 2026-10-17. Repositórios: AxisGov/expxdev (contrato e núcleo), AxisGov/sprintx, AxisGov/mergex.
 Estado de partida: expxdev d623daa, sprintx 1f1f957, mergex 3c15ed2 (mais o que a rodada 3 de achados da #204 trouxer).
 
+> **Emenda de 2026-10-19 — limites do CodeAnt, fixos:** [`2026-10-19-limites-do-codeant-emenda.md`](2026-10-19-limites-do-codeant-emenda.md). Os limites deixam de ser calibráveis: valem os do CodeAnt (task ≤ 40 arquivos revisáveis, cada um ≤ 5.000 linhas e ≤ 200 KB; PR ≤ 100 arquivos, todos contados: o painel não desconta; o planejamento vai num PR próprio, só de artefatos de método), sem legibilidade e sem `FATIA_*`. Ela substitui o O3, o segundo anti-objetivo, o item da CLI na seção 3, a maior parte da 4.1, os lotes da 4.2 e da 6.0 e a seção 5. Onde este texto e a emenda divergem, vale a emenda.
+
 ## 1. Por que
 
 O contrato `expx-fatiamento` nasceu para os repositórios do método, depois das PRs P0.2 (+19 mil e +43 mil linhas), e o seu único limite medido do revisor é o de 100 arquivos por PR no CodeAnt. Os 20 arquivos e 400 linhas por PR são legibilidade "nossa" (contrato :59-60). Aplicados a um projeto consumidor, eles travam o ciclo: a Onda 0b do conselho (4 sprints, 32 tasks, ~104 arquivos de código) teria de virar 14 a 40 trabalhos, cada um com F1–F5, PR e merge humano, e as ondas 1 a 8 batem no mesmo muro.
@@ -44,6 +46,8 @@ Anti-objetivos (falharia mesmo "funcionando")
 ## 4. O desenho
 
 ### 4.1 Configuração do projeto: `.expx/fatiamento.json`
+
+*Superada em parte pela emenda de 2026-10-19 (ver o topo): saem capacidade × legibilidade, `justificativa`, o afrouxamento, `capacidade.excluido_no_painel` e as duas medidas no E7; ficam o arquivo do projeto e o leitor único.*
 
 Arquivo versionado, **do projeto** (o CLI nunca o escreve, como o `agentes.json`). Ausente = padrões do contrato, e tudo como hoje.
 
@@ -141,6 +145,8 @@ Opt-in (`entrega: por_sprint` na configuração; o plano pode sobrescrever por t
 **Decisões no caminho.** O agente só para quando precisa de uma decisão. Antes de levá-la ao desenvolvedor, discute com o Codex (`codex exec`, só leitura). Os dois podem **fechar sozinhos** só decisões técnicas reversíveis e de baixo impacto, dentro do que o plano já define: escolher entre implementações equivalentes, diagnosticar uma falha com base nos testes, corrigir sem mudar contrato. **Nunca fecham**, mesmo concordando (vira recomendação ao desenvolvedor): rejeitar achado, aceitar risco, regra de negócio ou critério de aceite, dados e migrations, permissões e segurança, contrato público, exceção ao portão. Se os dois discordam, ou o Codex não está disponível, vai ao desenvolvedor. A decisão e os pareceres ficam registrados no bloqueio.
 
 ## 5. Calibragem inicial do conselho (exemplo; o valor final é seu)
+
+*Superada pela emenda de 2026-10-19: não há o que calibrar.*
 
 - `pr_arquivos: 80` (abaixo dos 100 do revisor, com folga para os artefatos que o painel não exclui).
 - `pr_linhas: 2500`: uma sprint típica da Onda 0b tem ~8 tasks; com F3 em 300 linhas por commit, 8 × 300 = 2.400. O PR de sprint fica dentro do que o CodeAnt revisa por arquivos (≤80) e cada linha já passou pela CLI na task.
