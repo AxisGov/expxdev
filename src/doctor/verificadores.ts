@@ -499,11 +499,6 @@ function verificarModoNoHead(
  * doctor que as pessoas param de rodar. As quatro skills que escrevem o rastro
  * têm implementações independentes — é justamente onde a divergência aparece.
  */
-/**
- * `.expx/fatiamento.json` presente exige o leitor instalado (o que as skills chamam),
- * mas quem valida é a cópia do próprio CLI: a do checkout é gravável por quem mexe no
- * projeto, e o doctor não executa código do checkout. Link quebrado ou diretório é presente.
- */
 /** Cópia de `mensagemFatia` do `nucleo/scripts/expx-limites.mjs` (o doctor é síncrono), conferida por teste. */
 export function mensagemFatia(nome: string): string {
   return `\`${nome}\` não é mais lida (limites do CodeAnt, fixos: emenda de 2026-10-19); remova-a do ambiente`;
@@ -519,6 +514,11 @@ function verificarFatiaNoAmbiente(env: NodeJS.ProcessEnv, push: (a: Achado) => v
   return nomes;
 }
 
+/**
+ * `.expx/fatiamento.json` presente exige o leitor instalado (o que as skills chamam),
+ * mas quem valida é a cópia do próprio CLI: a do checkout é gravável por quem mexe no
+ * projeto, e o doctor não executa código do checkout. Link quebrado ou diretório é presente.
+ */
 function verificarFatiamento(raiz: string, env: NodeJS.ProcessEnv, fatias: string[], push: (a: Achado) => void): void {
   try { lstatSync(join(raiz, ".expx", "fatiamento.json")); } catch (e) { if ((e as NodeJS.ErrnoException).code === "ENOENT") return; }
   const instalados = join(raiz, ".expx", "marketplace", "plugins", "expx", "nucleo", "scripts");
