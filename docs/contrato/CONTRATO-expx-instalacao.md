@@ -223,16 +223,20 @@ Cada item de `excluir_da_revisao` obedece a estas seis regras:
    ou `.expx`. A exceção exige um segmento posterior `fixtures`, `snapshots`,
    `__snapshots__`, `generated` ou `gerado`: `^scripts/ci/fixtures/candidatos/`
    passa; `^src/` e `^scripts/` não. Essas listas só crescem por PR no expxdev.
-6. Arquivo declarado em `cria` ou `altera` de uma task e coberto por um item
-   torna a revisão `incompleta:excluido-declarado`; gerar o artefato é um
-   commit próprio, fora das tasks.
+6. Quando o bloco C integrar as exclusões à revisão, arquivo declarado em
+   `cria` ou `altera` de uma task e coberto por um item tornará a revisão
+   `incompleta:excluido-declarado`; gerar o artefato será um commit próprio,
+   fora das tasks.
 
 As exclusões do projeto somam às do núcleo: `^docs/sprintx/`,
-`^docs/entregas/` e `^docs/eventos/`. O projeto não as declara. O método testa
-o prefixo literal antes de montar `--include`; a sintaxe glob do `--exclude`
-da CLI não participa. Um arquivo coberto fica fora da revisão por task, de L1
-e de L2, mas continua contado em L3. Como `.expx/fatiamento.json` é caminho
-sempre protegido, ampliar a lista espera o desenvolvedor.
+`^docs/entregas/` e `^docs/eventos/`. O projeto não as declara. Os blocos A1 a
+A3 entregam a leitura, a validação e o diagnóstico dessa configuração. O bloco
+B entregará as medidas e o verificador; o bloco C aplicará as exclusões e os
+portões na revisão. Nessa integração, o método testará o prefixo literal antes
+de montar `--include`; a sintaxe glob do `--exclude` da CLI não participará. Um
+arquivo coberto ficará fora da revisão por task, de L1 e de L2, mas continuará
+contado em L3. Como `.expx/fatiamento.json` é caminho sempre protegido, ampliar
+a lista espera o desenvolvedor.
 
 `legibilidade`, `arquivo`, `justificativa` e `capacidade` foram removidas. Na
 versão 2, cada uma falha com
@@ -266,7 +270,8 @@ O leitor único é
 
 O `doctor` valida com o leitor do próprio pacote, nunca com a cópia gravável do
 checkout. Leitor ou módulo de limites ausente produz `fatiamento-sem-leitor`.
-A mergex E7 e a sprintx F3/F6 passam a consumir o leitor nos planos delas.
+Nos planos seguintes, a mergex E7 e a sprintx F3/F6 passarão a consumir o
+leitor.
 
 ## 6. O que o `init` não apaga
 

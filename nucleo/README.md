@@ -54,14 +54,16 @@ Variáveis que o rastro lê, todas opcionais:
 
 Ferramentas Node (ESM, só `node:`), copiadas daqui como o resto do núcleo e
 chamadas por caminho. `expx-limites.mjs` concentra as regras fixas importadas
-pelo leitor e pela revisão; não lê o ambiente por conta própria.
+pelo leitor; o bloco C fará a revisão importá-las. O módulo não lê o ambiente
+por conta própria.
 
 `expx-fatiamento.mjs` (formato no contrato de instalação, §5.2): `node <L>`
 imprime somente `EXPX_*` para `eval`; `--formato json` imprime as decisões
 efetivas; `--validar` só valida. Arquivo inválido ou qualquer `FATIA_*` no
 ambiente sai 1. `<L>` é
 `.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs`. O `doctor`
-o usa hoje; sprintx (F3/F6) e mergex (E7) passam a chamá-lo nos planos delas.
+o usa hoje; nos planos seguintes, sprintx (F3/F6) e mergex (E7) passarão a
+chamá-lo.
 
 `expx-revisao.mjs` (contrato em `docs/contrato/CONTRATO-expx-revisao.md`):
 `revisar` roda a CLI do CodeAnt nos arquivos de uma task e grava a evidência em
