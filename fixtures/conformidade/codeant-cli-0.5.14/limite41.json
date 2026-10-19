@@ -1,0 +1,58 @@
+{
+  "issues": [],
+  "meta": {
+    "reviewed_files": [
+      "f01.js",
+      "f02.js",
+      "f03.js",
+      "f04.js",
+      "f05.js",
+      "f06.js",
+      "f07.js",
+      "f08.js",
+      "f09.js",
+      "f10.js",
+      "f11.js",
+      "f12.js",
+      "f13.js",
+      "f14.js",
+      "f15.js",
+      "f16.js",
+      "f17.js",
+      "f18.js",
+      "f19.js",
+      "f20.js",
+      "f21.js",
+      "f22.js",
+      "f23.js",
+      "f24.js",
+      "f25.js",
+      "f26.js",
+      "f27.js",
+      "f28.js",
+      "f29.js",
+      "f30.js",
+      "f31.js",
+      "f32.js",
+      "f33.js",
+      "f34.js",
+      "f35.js",
+      "f36.js",
+      "f37.js",
+      "f38.js",
+      "f39.js",
+      "f40.js"
+    ],
+    "total_changed": 41,
+    "skipped": [
+      {
+        "file": "f41.js",
+        "reason": "exceeded 40-file limit"
+      }
+    ],
+    "capped": true,
+    "max_files": 40
+  },
+  "error": null,
+  "noFiles": false
+}

@@ -1,0 +1,47 @@
+{
+  "issues": [],
+  "meta": {
+    "reviewed_files": [
+      "notas.md"
+    ],
+    "total_changed": 9,
+    "skipped": [
+      {
+        "file": "apagado.js",
+        "reason": "deleted"
+      },
+      {
+        "file": "gerado/saida.js",
+        "reason": "excluded by pattern"
+      },
+      {
+        "file": "logo.png",
+        "reason": "binary/generated"
+      },
+      {
+        "file": "manual.pdf",
+        "reason": "binary/generated"
+      },
+      {
+        "file": "package-lock.json",
+        "reason": "binary/generated"
+      },
+      {
+        "file": "bytes-204801.js",
+        "reason": "too large (200 KB, max 200 KB)"
+      },
+      {
+        "file": "linhas-5000-quebra-final.js",
+        "reason": "too large (5001 lines, max 5000)"
+      },
+      {
+        "file": "linhas-5001.js",
+        "reason": "too large (5001 lines, max 5000)"
+      }
+    ],
+    "capped": false,
+    "max_files": 40
+  },
+  "error": null,
+  "noFiles": false
+}

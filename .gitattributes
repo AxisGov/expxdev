@@ -4,3 +4,6 @@
 # o hook .mjs e os .md com CRLF (AxisGov/login#2 e #3).
 *.sh text eol=lf
 nucleo/** text eol=lf
+# JSONs devolvidos pela CLI do CodeAnt, versionados byte a byte (a suíte os
+# serve por uma CLI falsa): LF em qualquer checkout.
+fixtures/conformidade/** text eol=lf
