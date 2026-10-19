@@ -538,7 +538,7 @@ skill encolhe entre versões.
 npx expxdev doctor
 ```
 
-Vinte e nove verificações, cada uma com severidade e correção sugerida. Achado de severidade
+Trinta verificações, cada uma com severidade e correção sugerida. Achado de severidade
 `aviso` não derruba a saída; `erro` sim.
 
 | Verificação | Severidade |
@@ -566,6 +566,7 @@ Vinte e nove verificações, cada uma com severidade e correção sugerida. Acha
 | executável gerenciado **sem o bit de execução no disco** | erro |
 | `.expx/fatiamento.json`, se existe, é válido para o leitor do núcleo | erro |
 | `.expx/fatiamento.json` existe e o núcleo instalado tem o leitor | erro |
+| nenhuma `FATIA_*` no ambiente (reservadas pela emenda de 2026-10-19) | erro |
 | disco não divergiu do lock (modificação local) | aviso |
 | skill travada em versão publicada | aviso |
 | modo de um hook alterado localmente em `.expx/hooks.json` | aviso |

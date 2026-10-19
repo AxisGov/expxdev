@@ -4,7 +4,9 @@ import { join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
 import { executarInit } from "../cli/init.js";
-import { diagnosticar } from "./verificadores.js";
+import { pathToFileURL } from "node:url";
+import { diagnosticar, mensagemFatia } from "./verificadores.js";
+import { RAIZ_DO_REPO } from "../teste/candidatos.js";
 import { suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
 
 let p: ProjetoTemporario | undefined;
@@ -153,5 +155,35 @@ describe("diagnóstico de .expx/fatiamento.json", () => {
     writeFileSync(join(p.raiz, ".expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs"), `import { writeFileSync } from "node:fs"; writeFileSync(${JSON.stringify(marca)}, "");`);
     expect(achado(p.raiz, "fatiamento-invalido")?.problema).toContain("limites: chave desconhecida");
     expect(existsSync(marca)).toBe(false);
+  });
+  const FATIA = { ...process.env, FATIA_X: "1" };
+  it("funcional: FATIA_X no ambiente: erro fatia-no-ambiente, sem arquivo", async () => {
+    p = await projetoSadio();
+    expect(diagnosticar(p.raiz, FATIA).achados.filter((a) => a.id === "fatia-no-ambiente")).toEqual([{ id: "fatia-no-ambiente", severidade: "erro",
+      problema: mensagemFatia("FATIA_X"), correcao: "remova a variável do shell, do perfil e do CI do projeto" }]);
+  });
+
+  it("funcional: FATIA_X e arquivo válido: só fatia-no-ambiente, nenhum fatiamento-invalido", async () => {
+    p = await projetoSadio();
+    escreve(p.raiz, { expx_fatiamento: 2 });
+    expect(diagnosticar(p.raiz, FATIA).achados.map((a) => a.id).filter((id) => id.startsWith("fati"))).toEqual(["fatia-no-ambiente"]);
+  });
+
+  it("funcional: versão 1 é fatiamento-invalido com a migração", async () => {
+    p = await projetoSadio();
+    escreve(p.raiz, { expx_fatiamento: 1, legibilidade: {} });
+    expect(achado(p.raiz, "fatiamento-invalido")?.problema).toContain("expx_fatiamento: versão 1: migre para 2 (emenda de 2026-10-19)");
+  });
+
+  it("funcional: expx-limites.mjs ausente na instalação é fatiamento-sem-leitor", async () => {
+    p = await projetoSadio();
+    escreve(p.raiz, { expx_fatiamento: 2 });
+    rmSync(join(p.raiz, ".expx/marketplace/plugins/expx/nucleo/scripts/expx-limites.mjs"));
+    expect(achado(p.raiz, "fatiamento-sem-leitor")?.problema).toContain("expx-limites.mjs");
+  });
+
+  it("funcional: a mensagem do doctor é a do módulo do núcleo", async () => {
+    const m = (await import(pathToFileURL(join(RAIZ_DO_REPO, "nucleo", "scripts", "expx-limites.mjs")).href)) as { mensagemFatia(n: string): string };
+    expect(mensagemFatia("FATIA_MAX_LINHAS_PR")).toBe(m.mensagemFatia("FATIA_MAX_LINHAS_PR"));
   });
 });
