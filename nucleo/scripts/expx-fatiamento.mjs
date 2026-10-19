@@ -58,8 +58,9 @@ function bloco(cfg, nome, conhecidas) {
 }
 
 /**
- * O que o `new RegExp` aceita e o ERE do Git Bash e do macOS recusa: o `[[ =~ ]]` sai com 2 e a
- * exclusão não exclui nada. Na dúvida entre o glibc e o Git Bash/macOS, vale o mais estrito. Não
+ * O que o `new RegExp` aceita e o ERE do Git Bash e do macOS recusa: o `[[ =~ ]]` do merge
+ * automático (E9 da mergex) sai com 2 e o caminho protegido não protege nada. Só vale para
+ * `caminhos_protegidos`: `excluir_da_revisao` é pasta literal (`expx-limites.mjs`). Na dúvida entre o glibc e o Git Bash/macOS, vale o mais estrito. Não
  * olha o escapado nem o que está em classe (no ERE, `\` dentro de `[...]` é literal). Devolve o
  * motivo, ou `null`.
  */
@@ -132,9 +133,9 @@ function regexes(v, nome) {
   if (!Array.isArray(v)) return erro(nome, "deve ser uma lista de expressoes regulares"), [];
   v.forEach((p, i) => {
     if (typeof p !== "string" || p === "") return erro(`${nome}[${i}]`, "deve ser texto nao vazio");
-    // quem aplica é o bash (`[[ =~ ]]`, ERE): o que só existe no JavaScript, ou que o Git Bash recusa, fica com `foraDoEre`
+    // quem aplica é o bash do merge automático (`[[ =~ ]]`, ERE): o que só existe no JavaScript, ou que o Git Bash recusa, fica com `foraDoEre`
     const motivo = foraDoEre(p);
-    if (motivo) return erro(`${nome}[${i}]`, `${motivo}, que o ERE do verificador recusa`);
+    if (motivo) return erro(`${nome}[${i}]`, `${motivo}, que o ERE do bash recusa`);
     try { new RegExp(p); } catch (e) { erro(`${nome}[${i}]`, `expressao regular invalida (${e.message})`); }
   });
   return v;

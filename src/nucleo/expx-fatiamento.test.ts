@@ -56,9 +56,10 @@ describe("expx-fatiamento.mjs", () => {
   it("funcional: versão 1 dá a mensagem de migração e lista as chaves removidas", () => {
     const r = roda(projeto(CONSELHO_V1));
     expect(r).toMatchObject({ rc: 1, out: "" });
-    expect(r.err).toContain("expx-fatiamento: expx_fatiamento: versão 1: migre para 2 (emenda de 2026-10-19)\n");
-    expect(r.err).toContain(`expx-fatiamento: legibilidade: ${REMOVIDA}\n`);
-    expect(r.err).toContain(`expx-fatiamento: justificativa: ${REMOVIDA}\n`);
+    // a migração primeiro, depois uma linha por chave removida, na ordem do arquivo; nenhuma "chave desconhecida"
+    expect(r.err).toBe(["expx-fatiamento: expx_fatiamento: versão 1: migre para 2 (emenda de 2026-10-19)",
+      `expx-fatiamento: justificativa: ${REMOVIDA}`, `expx-fatiamento: legibilidade: ${REMOVIDA}`, ""].join("\n"));
+    expect(r.err).not.toContain("chave desconhecida");
   });
 
   it.each([
@@ -93,8 +94,8 @@ describe("expx-fatiamento.mjs", () => {
 
   it.each([
     ["regex inválida", ere(["(sem-fechar"]), `${CP}[0]`],
-    ["regex só do JavaScript (o verificador usa ERE)", ere(["^a/", "(?=src/)", "\\d"]), `${CP}[1]`],
-    // o Git Bash e o macOS recusam ("repetition-operator operand invalid") e a exclusão não exclui nada
+    ["regex só do JavaScript (o merge automático usa ERE)", ere(["^a/", "(?=src/)", "\\d"]), `${CP}[1]`],
+    // o Git Bash e o macOS recusam ("repetition-operator operand invalid") e o caminho protegido não protege nada
     ["quantificador repetido a+?", ere(["^a/", "a+?"]), `${CP}[1]`],
     ["quantificador repetido a*+", ere(["^b/", "^c/", "a*+"]), `${CP}[2]`],
     ["quantificador repetido x{2}?", ere(["x{2}?"]), `${CP}[0]`],
@@ -156,17 +157,6 @@ describe("expx-fatiamento.mjs", () => {
     expect(roda(raiz, "--formato", "yaml").rc).toBe(2);
   });
 
-  it("funcional: o env é seguro para eval no bash", () => {
-    const raiz = projeto({ expx_fatiamento: 2, merge_automatico: { caminhos_protegidos: ["^a b/", "^x'y/"] } });
-    // caminhos por env: argumento com `\` passado ao bash pelo Node é mutilado no Windows
-    const r = spawnSync(bashDosHooks(), ["-c", 'eval "$("$NODE" "$SCRIPT" --raiz "$RAIZ")"; printf %s "$EXPX_CAMINHOS_PROTEGIDOS"'], {
-      encoding: "utf8",
-      env: { ...process.env, NODE: barra(process.execPath), SCRIPT: barra(SCRIPT), RAIZ: barra(raiz) },
-    });
-    expect(r.stderr).toBe("");
-    expect(r.stdout).toBe([...PADRAO, "^a b/", "^x'y/"].join("|"));
-  });
-
   describe("merge_automatico", () => {
     it("funcional: ausente, desligado e com a lista padrão (env e json)", () => {
       const raiz = projeto({ expx_fatiamento: 2 });
@@ -200,7 +190,7 @@ describe("expx-fatiamento.mjs", () => {
       const protegidos = ["src/auth/x.ts", "a/autenticacao/b", "login/p.tsx", "src/permissoes.ts", "lib/rls.ts", "supabase/policies/a", "src/policy.ts", "db/migrate/1.rb",
         "supabase/migrations/1.sql", "consultas/a.sql", ".github/workflows/ci.yml", "infra/main.tf", "api/Dockerfile", ".env.local", "config/secrets/k", "a b/c", "x'y/z"];
       const livres = ["src/app.ts", "docs/authors.md", "src/mylogin/a.ts", "src/infra/a.ts", "Dockerfile.md", "a/b.sqlite"];
-      const script = 'eval "$("$NODE" "$SCRIPT" --raiz "$RAIZ")" || exit 9; printf "%s\\n" "$EXPX_MERGE_AUTOMATICO"; '
+      const script = 'eval "$("$NODE" "$SCRIPT" --raiz "$RAIZ")" || exit 9; printf "%s\\n" "$EXPX_MERGE_AUTOMATICO" "$EXPX_CAMINHOS_PROTEGIDOS"; '
         + 'while IFS= read -r c; do if [[ $c =~ $EXPX_CAMINHOS_PROTEGIDOS ]]; then echo "P $c"; else echo "L $c (rc $?)"; fi; done <<< "$CAMINHOS"';
       // caminhos por env: no Windows o Node junta argumentos com aspas simples e o bash os remonta errado
       const r = spawnSync(bashDosHooks(), ["-c", script], {
@@ -208,7 +198,8 @@ describe("expx-fatiamento.mjs", () => {
         env: { ...process.env, NODE: barra(process.execPath), SCRIPT: barra(SCRIPT), RAIZ: barra(raiz), CAMINHOS: [...protegidos, ...livres].join("\n") },
       });
       expect(r.stderr).toBe("");
-      expect(r.stdout.split("\n").filter(Boolean)).toEqual(["sim", ...protegidos.map((c) => `P ${c}`), ...livres.map((c) => `L ${c} (rc 1)`)]);
+      // o valor chega inteiro ao bash (espaço e aspa simples), e cada padrão casa
+      expect(r.stdout.split("\n").filter(Boolean)).toEqual(["sim", [...PADRAO, "^a b/", "^x'y/"].join("|"), ...protegidos.map((c) => `P ${c}`), ...livres.map((c) => `L ${c} (rc 1)`)]);
     });
   });
   describe("revisor_bot", () => {
