@@ -176,15 +176,23 @@ O projeto calibra o fatiamento (contrato `expx-fatiamento`) de forma versionada:
   "ignorar": ["^gerado/"],
   "capacidade": { "excluido_no_painel": ["^docs/(sprintx|entregas|eventos)/"] },
   "revisao_por_task": { "modo": "obrigatoria" },
-  "entrega": "por_sprint"
+  "entrega": "por_sprint",
+  "merge_automatico": { "ativo": true, "caminhos_protegidos": ["^src/pagamentos/"] }
 }
 ```
 
-- padrões: `legibilidade` 400 / 20 / 300; `arquivo` 150 KB / 4000 linhas; `ignorar` vazio; `excluido_no_painel` como acima; `modo: se_disponivel`; `entrega: por_trabalho`;
+- padrões: `legibilidade` 400 / 20 / 300; `arquivo` 150 KB / 4000 linhas; `ignorar` vazio; `excluido_no_painel` como acima; `modo: se_disponivel`; `entrega: por_trabalho`; `merge_automatico.ativo: false` com a lista padrão de caminhos protegidos;
 - **capacidade do revisor**, não calibrável: `legibilidade.pr_arquivos` ≤ 100 e `arquivo.linhas` ≤ 5000;
 - limite diferente do padrão exige `justificativa` não vazia; `legibilidade` acima do padrão exige `revisao_por_task.modo: "obrigatoria"`;
 - `ignorar` sai em `FATIA_IGNORAR_PROJETO`, que **soma** às exclusões padrão (`FATIA_IGNORAR`), nunca as substitui: quem soma é o verificador do contrato `expx-fatiamento` v2, com a variável exportada como ali se diz ("Como consumir o leitor"); no E7 da mergex, quando ela espelhar o verificador. Regex que não compila, ou fora do ERE que o bash aplica (`(?…)`, `\d`, `\w`, retrovisor, quantificador repetido como `a+?` ou `x{2}?`, alternativa vazia como `a|` ou `(|a)`, chave que não forma intervalo como `{`, `a{1` ou `a{,3}`, contagem acima de 255 e `{0}`), é inválida. Na dúvida entre o glibc e o regex do Git Bash e do macOS, vale o mais estrito: o glibc aceita alternativa vazia e `{0}`, os outros recusam, e a exclusão recusada não exclui nada;
-- validação estrita: chave desconhecida em qualquer nível, `expx_fatiamento` ≠ 1, inteiro fora de 1 a 2^31−1, `modo` fora de `obrigatoria`/`se_disponivel`/`desligada` e `entrega` fora de `por_trabalho`/`por_sprint` invalidam o arquivo; BOM e CRLF são aceitos;
+- `merge_automatico` (E9 da mergex; desenho de 2026-10-18, §4.6): `ativo` liga o merge sem perguntar e sai em `EXPX_MERGE_AUTOMATICO` (`sim`/`nao`). Ligar **não** exige `revisao_por_task.modo: "obrigatoria"`: as duas chaves são independentes, e quem decide cada merge são as condições do E9 (CI e suíte verdes, gate R1–R6 satisfeito, sem perda de teste, sem remoção fora do plano, nenhum achado rejeitado, nenhum arquivo em caminho protegido), conferidas no HEAD exato; qualquer uma falha → o merge espera o desenvolvedor. `caminhos_protegidos` é uma lista de regex de caminho com a mesma validação ERE de `ignorar` e **soma** à lista padrão, nunca a substitui; a lista efetiva sai em `EXPX_CAMINHOS_PROTEGIDOS` (unida por `|`) e em `merge_automatico.caminhos_protegidos` no `--formato json`. A lista padrão, que pende para o lado seguro (o falso positivo só faz o merge esperar o desenvolvedor):
+  - autenticação: `(^|/)auth/`, `(^|/)autenticacao/`, `(^|/)login/` — diretório inteiro, em qualquer nível;
+  - permissões e RLS: `(^|/)(permiss|rls|polic(y|ies))` — começo de diretório ou arquivo (`permissions.ts`, `permissoes/`, `rls.sql`, `policy.ts`, `policies/`); `policies?` não serviria: casa `policie`/`policies`, não `policy`;
+  - migrations: `(^|/)(migrations?|migracoes?|migrate)/` — `migrate/` cobre o `db/migrate/` do Rails, cujas migrations não são `.sql`;
+  - SQL: `\.sql$` — de propósito amplo: fora de `migrations/` o `.sql` costuma ser esquema, função, política ou seed (`schema.sql`, `seed.sql`), e o leitor não sabe distinguir uma consulta inofensiva disso. O custo é o projeto com muito SQL de consulta (dbt, sqlc) não ter merge automático nesses arquivos, o que é a falha segura;
+  - CI e infraestrutura: `^\.github/`, `^(infra|deploy|terraform|k8s|docker)/` (na raiz), `(^|/)Dockerfile$`;
+  - segredos: `(^|/)\.env` — cobre `.env`, `.env.*` (o mesmo conjunto que o hook `segredo` da sprintx varre) e também `.envrc`; `(^|/)secrets?/`;
+- validação estrita: chave desconhecida em qualquer nível, `expx_fatiamento` ≠ 1, inteiro fora de 1 a 2^31−1, `modo` fora de `obrigatoria`/`se_disponivel`/`desligada`, `entrega` fora de `por_trabalho`/`por_sprint` e `merge_automatico.ativo` que não seja booleano invalidam o arquivo; BOM e CRLF são aceitos;
 - ausente → padrões, e tudo como antes; presente e inválido → **erro**, nunca queda calada nos padrões; o arquivo é do projeto: `init`, `add`, `remove` e `update` nunca o escrevem;
 - **leitor único**: `.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs` (README do núcleo). Hoje só o `doctor` o usa (`fatiamento-invalido`, `fatiamento-sem-leitor`; valida com a cópia do próprio CLI, nunca executa a do checkout); a sprintx (F3 e auditor) e a mergex (E7) passam a chamá-lo nos planos delas. Arquivo presente e leitor ausente é erro, com a instrução de atualizar o expx.
 
