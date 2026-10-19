@@ -228,7 +228,7 @@
 | Situação | `obrigatoria` | `se_disponivel` | `desligada` |
 |---|---|---|---|
 | sem `.expx/fatiamento.json` (`EXPX_FATIAMENTO_ORIGEM=padrao`) | `n/a`, sem node | `n/a`, sem node | `n/a`, sem node |
-| modo `desligada`; `versionado: false`; nenhuma task concluída | — | — | `n/a`, sem node |
+| modo `desligada`; `versionado: false`; nenhuma task concluída | — | — | `n/a`, sem chamar o `conferir` |
 | task concluída sem item em `commits` | fora da V12 (é da V11) | idem | — |
 | configuração inválida, leitor ausente ou node ausente (`leitor-do-projeto` 1 ou 3): o modo não pode ser lido | `SEM_PROVA` | `SEM_PROVA` | `SEM_PROVA` |
 | node presente (o modo foi lido), mas o núcleo instalado sem `expx-revisao.mjs` | `SEM_PROVA` | `AVISO revisao-nao-conferida:<motivo>` | — |
@@ -248,7 +248,6 @@
   - `evidencia editada no disco depois do commit nao muda o veredito`;
   - `task com dois itens em commits: confere o commit do ultimo`;
   - `conferir que sai 64 vira SEM_PROVA em qualquer modo` (`node` falso que sai 64);
-  - `node ausente: SEM_PROVA em obrigatoria, AVISO em se_disponivel`;
   - `conferir que sai 0 com uma linha a menos: SEM_PROVA`;
   - `task concluida sem item em commits nao e alvo da V12`.
 - [ ] **Step 2: Run** `bash scripts/ci/test-portao-v12.sh` — Expected: FAIL (script ausente).
