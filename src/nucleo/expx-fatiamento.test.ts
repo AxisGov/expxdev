@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { bashDosHooks, RAIZ_DO_REPO } from "../teste/candidatos.js";
 import { suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
 
+// hermético: `FATIA_*` do shell de quem roda (reservadas, emenda de 2026-10-19) não vazam para os casos
+for (const k of Object.keys(process.env)) if (k.startsWith("FATIA_")) delete process.env[k];
 const SCRIPT = join(RAIZ_DO_REPO, "nucleo", "scripts", "expx-fatiamento.mjs");
 const criados: string[] = [];
 afterEach(() => {
