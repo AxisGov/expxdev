@@ -72,7 +72,8 @@ Imprime uma linha de resumo.
   `rejeitado` (relidas também sob a trava, antes de gravar). Revisar de novo preserva
   as rejeições da própria task.
 - No Windows, `\` em `--arquivos` e no `relevant_file` da CLI vira `/`; fora dele é
-  parte do nome do arquivo e fica como está.
+  parte do nome do arquivo e fica como está. Espaço na ponta de um caminho também
+  é parte do nome: nunca é aparado.
 - Mais arquivos que o `meta.max_files` informado: revisa em lotes; a task passa só
   se todos passam.
 - Arquivo apagado não vai para a CLI (não há linha onde ancorar achado): fica
@@ -139,3 +140,4 @@ desenvolvedor no PR para cada um.
 | 2026-10-18 | Trava velha removida sob `.quebra`: quem a viu velha não remove a trava nova de outro processo; a `.quebra` velha só sai à mão. |
 | 2026-10-18 | `revisar` relê sob a trava as rejeições de todas as evidências do trabalho, não só as da própria task. |
 | 2026-10-18 | `\` só vira `/` no Windows: fora dele é parte do nome, e o arquivo deixava de ser achado. |
+| 2026-10-19 | Caminhos de `--arquivos` não são aparados: espaço na ponta é parte do nome, e aparar revisava outro arquivo ou o dava por ausente. |
