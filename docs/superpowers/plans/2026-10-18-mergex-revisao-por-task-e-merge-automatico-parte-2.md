@@ -151,7 +151,7 @@ Continuação de `2026-10-18-mergex-revisao-por-task-e-merge-automatico.md` (par
 | `portao` | `validade-do-portao.sh --verificar --rev <head>` `ok=true`: o ATENCAO.md e as evidências do HEAD são os que o portão avaliou |
 | 3 `sincronizado` | `<base>` ancestral de `<head>`; `git merge-tree --write-tree <base> <head>` sem conflito |
 | 4 `teste_no_diff` | nenhum arquivo de teste com status `D`; nenhum teste renomeado para fora do padrão; nenhuma linha adicionada com marcador de teste desligado que não exista, igual, numa linha removida do mesmo arquivo. O padrão de arquivo de teste e a lista de marcadores (`.skip(`, `xit(`, `xdescribe(`, `.only(`, `.todo(`, `@pytest.mark.skip`, `@pytest.mark.xfail`, `pytest.skip(`, `t.Skip(`, `@Disabled`, `@Ignore`, `[Ignore]`, `[Skip]`) ficam num bloco único do script e na DM-252 |
-| 5 `remocao_declarada` | todo `D` de `<base>...<head>` (renomeação: a origem) está em `ownership-da-task.sh --remocoes … --sprint <sprint_atual>`; remoção só em `altera` → `falha` |
+| 5 `remocao_declarada` | todo `D` de `<base>...<head>` (renomeação: a origem) está em `ownership-da-task.sh --remocoes … --sprint <sprint_atual>`, com os `tasks.md` lidos da árvore de `<head>` (extraídos por `git archive <head>` para uma pasta temporária, removida em `trap`, passada como `<raiz>`), nunca do disco; remoção só em `altera` → `falha` |
 | 7 `caminho_protegido` | nenhum caminho alterado casa `EXPX_CAMINHOS_PROTEGIDOS` da base, nem `^\.expx/(fatiamento|hooks)\.json$` |
 
 - **DM-251** (o que é do Git e o que é da plataforma) e **DM-252** (padrões de teste e marcadores; movimento não conta).
@@ -166,6 +166,7 @@ Continuação de `2026-10-18-mergex-revisao-por-task-e-merge-automatico.md` (par
   - `teste apagado: falha`;
   - `teste renomeado para docs/: falha`;
   - `remocao so em altera: remocao_declarada falha`;
+  - `remocao declarada so no tasks.md do disco, nao commitado: remocao_declarada falha`;
   - `renomeacao declarada: ok`;
   - `base nao ancestral: espera`;
   - `conflito: espera`;
