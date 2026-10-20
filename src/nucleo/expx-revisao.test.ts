@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ambienteCom, noPath, RAIZ_DO_REPO } from "../teste/candidatos.js";
+import { arquivosDoCaso, respostaDoCaso, type CasoConformidade } from "../teste/conformidade.js";
 import { chamadasDa, instalarCodeantFalsa, nucleoDeTeste, type CfgFalsa, type Falsa } from "../teste/codeant-falsa.js";
 
 // `nucleo/scripts/expx-revisao.mjs`. A CLI do CodeAnt nunca é chamada de verdade: uma `codeant` falsa vem
@@ -36,10 +37,11 @@ function cenario(cfg: CfgFalsa = {}, autocrlf = "false"): Cenario {
   return { raiz, falsa, script: nucleoDeTeste(temp("expx-nucleo-"), falsa) };
 }
 const PATH = process.env["PATH"] ?? process.env["Path"] ?? "";
-type Ev = { resultado: string; motivo?: string; arquivos: Record<string, string | null>; lotes: { include: string[] }[];
+type Arquivo = { blob: string; bytes: number; linhas: number; revisao: string };
+type Ev = { resultado: string; motivo?: string; arquivos: Record<string, Arquivo | null>; chamada: unknown; [k: string]: unknown;
   achados: { identidade: string; arquivo: string; linha: number; estado: string }[]; rejeicoes: { identidade: string }[]; removidos_sem_revisao: string[] };
-function revisar(c: Cenario, arquivos: string, task = "T-01", path = `${c.falsa.path}${delimiter}${PATH}`, extra: Record<string, string> = {}, script = c.script) {
-  const r = spawnSync(process.execPath, [script, "revisar", "--trabalho", "w", "--task", task, "--arquivos", arquivos, "--raiz", c.raiz],
+function revisar(c: Cenario, arquivos: string, task = "T-01", path = `${c.falsa.path}${delimiter}${PATH}`, extra: Record<string, string> = {}, script = c.script, mais: string[] = []) {
+  const r = spawnSync(process.execPath, [script, "revisar", "--trabalho", "w", "--task", task, "--arquivos", arquivos, "--raiz", c.raiz, ...mais],
     { encoding: "utf8", env: ambienteCom(path, extra) });
   const ev = join(c.raiz, "docs", "entregas", "w", "revisao", `${task}.json`);
   return { rc: r.status, out: r.stdout, err: r.stderr, ev: (existsSync(ev) ? JSON.parse(readFileSync(ev, "utf8")) : undefined) as Ev,
@@ -60,7 +62,7 @@ describe("expx-revisao.mjs revisar: a CLI conferida", () => {
     altera3(c.raiz);
     const r = revisar(c, "src/a.js");
     expect(r).toMatchObject({ rc: 0, ev: { resultado: "ok", cli: { versao: "0.5.14", integridade: "conferida" } } });
-    expect(r.chamadas).toEqual([["review", "--uncommitted", "--headless", "--include", "src/a.js"]]);
+    expect(r.chamadas).toEqual([["review", "--headless", "--uncommitted", "--include", "src/a.js"]]);
   });
 
   it("funcional: a falsa com o perfil real → indisponivel:integridade, nenhuma chamada de review", () => {
@@ -111,7 +113,7 @@ describe("expx-revisao.mjs revisar", () => {
     const r = revisar(c, "src/a.js");
     expect(r.rc).toBe(1);
     expect(r.ev).toMatchObject({ resultado: "achados", achados: [{ arquivo: "src/a.js", linha: 3, estado: "aberto", identidade: identidade("security", "src/a.js", ["l2", "novo3", "l4"]) }] });
-    expect(r.ev.arquivos["src/a.js"]).toMatch(/^[0-9a-f]{40}$/);
+    expect(r.ev.arquivos["src/a.js"]?.blob).toMatch(/^[0-9a-f]{40}$/);
   });
 
   it("funcional: achado em linha não alterada é anterior e não bloqueia", () => {
@@ -130,25 +132,13 @@ describe("expx-revisao.mjs revisar", () => {
     const c = cenario();
     altera3(c.raiz);
     escreve(c.raiz, "src/b.js", "b\n");
-    expect(revisar(c, "src/a.js,src/b.js").chamadas).toEqual([["review", "--uncommitted", "--headless", "--include", "src/a.js,src/b.js"]]);
-  });
-
-  it("funcional: lotes pelo meta.max_files; passa só se todos os lotes passam", () => {
-    const c = cenario({ resposta: resp({ max_files: 2, reviewed_files: ["src/a.js", "src/b.js", "src/c.js"] }, { issues: [achado("src/c.js", 1)] }) });
-    for (const f of ["a", "b", "c"]) escreve(c.raiz, `src/${f}.js`, `${f}\n`);
-    const r = revisar(c, "src/a.js,src/b.js,src/c.js");
-    expect(r.rc).toBe(1);
-    expect(r.ev.lotes.map((l) => l.include)).toEqual([["src/a.js", "src/b.js"], ["src/c.js"]]);
+    expect(revisar(c, "src/a.js,src/b.js").chamadas).toEqual([["review", "--headless", "--uncommitted", "--include", "src/a.js,src/b.js"]]);
   });
 
   it.each([
     ["CLI ausente", {}, "cli-ausente"],
     ["versão abaixo de 0.5.14", { versao: "0.5.9" }, "versao"],
     ["error não nulo", { error: "falhou" }, "erro"],
-    ["capped", { resposta: resp({ capped: true }) }, "incompleta"],
-    ["noFiles", { resposta: resp({ reviewed_files: [] }, { noFiles: true }) }, "incompleta"],
-    ["meta.reviewed_files abaixo dos arquivos pedidos", { resposta: resp({ reviewed_files: [] }) }, "incompleta"],
-    ["arquivo da task em skipped sem ser por padrão", { resposta: resp({ reviewed_files: [], skipped: [{ file: "src/a.js", reason: "too large" }] }) }, "incompleta"],
   ])("funcional: %s → indisponivel (rc 2) com motivo", (nome, cfg, motivo) => {
     const c = cenario(cfg);
     altera3(c.raiz);
@@ -179,7 +169,7 @@ describe("expx-revisao.mjs revisar", () => {
     const r = revisar(c, " a.js");
     expect(r).toMatchObject({ rc: 1, ev: { resultado: "achados", achados: [{ arquivo: " a.js", estado: "aberto" }] } });
     expect(Object.keys(r.ev.arquivos)).toEqual([" a.js"]);
-    expect(r.chamadas[0]).toEqual(["review", "--uncommitted", "--headless", "--include", " a.js"]);
+    expect(r.chamadas[0]).toEqual(["review", "--headless", "--uncommitted", "--include", " a.js"]);
   });
 
   it("funcional: --arquivos só com espaços é um caminho, não uso errado: ausente → indisponivel", () => {
@@ -265,7 +255,7 @@ describe("expx-revisao.mjs revisar", () => {
     const r = revisar(c, "src/a.js");
     git(c.raiz, "add", "src/a.js");
     git(c.raiz, "commit", "-q", "-m", "task");
-    expect(r.ev.arquivos["src/a.js"]).toBe(git(c.raiz, "rev-parse", "HEAD:src/a.js"));
+    expect(r.ev.arquivos["src/a.js"]?.blob).toBe(git(c.raiz, "rev-parse", "HEAD:src/a.js"));
   });
 
   // no Windows `\` é separador e não cabe em nome de arquivo: o caso só existe fora dele
@@ -278,13 +268,261 @@ describe("expx-revisao.mjs revisar", () => {
     escreve(c.raiz, f, "l1\nl2\nnovo3\nl4\nl5\n");
     const r = revisar(c, f);
     expect(r).toMatchObject({ rc: 1, ev: { resultado: "achados", achados: [{ arquivo: f, linha: 3, estado: "aberto" }] } });
-    expect(r.ev.arquivos[f]).toMatch(/^[0-9a-f]{40}$/);
+    expect(r.ev.arquivos[f]?.blob).toMatch(/^[0-9a-f]{40}$/);
   });
 
   it("funcional: arquivo alterado durante a chamada da CLI → indisponivel", () => {
     const c = cenario({ reescreve: "src/a.js" }); // a falsa reescreve o arquivo antes de responder
     altera3(c.raiz);
     expect(revisar(c, "src/a.js")).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "arquivo-mudou-durante-revisao" } });
+  });
+});
+
+const grava = (d: string, rel: string, b: Buffer): void => { mkdirSync(dirname(join(d, rel)), { recursive: true }); writeFileSync(join(d, rel), b); };
+/** Põe na raiz os arquivos do caso (só `nomes`, se dados); o apagado é commitado antes e removido. Devolve os nomes. */
+function poeCaso(raiz: string, arquivos: Map<string, Buffer | null>, nomes?: string[]): string[] {
+  const sel = [...arquivos].filter(([f]) => !nomes || nomes.includes(f));
+  const apagados = sel.filter(([, b]) => b === null).map(([f]) => f);
+  if (apagados.length > 0) {
+    for (const f of apagados) grava(raiz, f, Buffer.from("x\n"));
+    git(raiz, "add", "-A");
+    git(raiz, "commit", "-q", "-m", "apagaveis");
+    for (const f of apagados) rmSync(join(raiz, f));
+  }
+  for (const [f, b] of sel) if (b) grava(raiz, f, b);
+  return sel.map(([f]) => f);
+}
+type Resposta = { issues: unknown[]; meta: { reviewed_files: string[]; skipped: { file: string; reason: string }[]; total_changed: number }; error: unknown; noFiles: boolean };
+/** O JSON da #60; com `fica`, só as entradas dos arquivos que ficam, e `total_changed` refeito. */
+function doFixture(caso: CasoConformidade, fica?: (f: string) => boolean): Resposta {
+  const j = JSON.parse(respostaDoCaso(caso).toString("utf8")) as Resposta;
+  if (fica) {
+    j.meta.reviewed_files = j.meta.reviewed_files.filter(fica);
+    j.meta.skipped = j.meta.skipped.filter((s) => fica(s.file));
+    j.meta.total_changed = j.meta.reviewed_files.length + j.meta.skipped.length;
+  }
+  return j;
+}
+const semCodeant = (): string => dirname(noPath("git") ?? "");
+const naoChamou = (r: { chamadas: string[][] }) => expect(r.chamadas.filter((a) => a[0] === "review")).toEqual([]);
+
+describe("expx-revisao.mjs revisar v2: portões antes da CLI", () => {
+  it("funcional: limite40.json: 40 revisáveis, com 5.000 linhas sem quebra final e 204.800 bytes → ok; uma chamada com os 40", () => {
+    const c = cenario({ fixture: "limite40" });
+    const nomes = poeCaso(c.raiz, arquivosDoCaso("limite40"));
+    const r = revisar(c, nomes.join(","));
+    expect(r).toMatchObject({ rc: 0, out: "T-01 ok\n", ev: { expx_revisao: 2, resultado: "ok", modo: "uncommitted", base_commit: null,
+      cli: { versao: "0.5.14", integridade: "conferida" } } });
+    expect(r.chamadas).toEqual([["review", "--headless", "--uncommitted", "--include", nomes.join(",")]]);
+    expect(r.ev.arquivos["linhas-5000.js"]).toMatchObject({ linhas: 5000, revisao: "enviado", blob: expect.stringMatching(/^[0-9a-f]{40}$/) });
+    expect(r.ev.arquivos["bytes-204800.js"]).toMatchObject({ bytes: 204800, linhas: 101, revisao: "enviado" });
+    expect(r.ev.chamada).toMatchObject({ include: nomes, error: null, falhas_de_lote: [], meta: { max_files: 40, total_changed: 40 } });
+  });
+
+  it("funcional: 41 revisáveis → incompleta:L1:41 (rc 3), sem chamar a CLI; sem codeant no PATH, também rc 3, nunca 2", () => {
+    const c = cenario();
+    const nomes = poeCaso(c.raiz, arquivosDoCaso("limite41"));
+    const r = revisar(c, nomes.join(","));
+    expect(r).toMatchObject({ rc: 3, out: "T-01 incompleta:L1:41\n", ev: { resultado: "incompleta", motivo: "L1:41", cli: null, chamada: null } });
+    naoChamou(r);
+    expect(revisar(c, nomes.join(","), "T-01", semCodeant())).toMatchObject({ rc: 3, ev: { motivo: "L1:41" } });
+  });
+
+  it("funcional: 5.000 linhas com quebra final → incompleta:L2:<f>, sem chamar a CLI", () => {
+    const c = cenario();
+    poeCaso(c.raiz, arquivosDoCaso("pulos"), ["linhas-5000-quebra-final.js"]);
+    const r = revisar(c, "src/a.js,linhas-5000-quebra-final.js");
+    expect(r).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "L2:linhas-5000-quebra-final.js" } });
+    expect(r.ev.arquivos["linhas-5000-quebra-final.js"]).toMatchObject({ linhas: 5001, revisao: "enviado" });
+    naoChamou(r);
+  });
+
+  it("funcional: 204.801 bytes → incompleta:L2:<f>", () => {
+    const c = cenario();
+    poeCaso(c.raiz, arquivosDoCaso("pulos"), ["bytes-204801.js"]);
+    expect(revisar(c, "bytes-204801.js")).toMatchObject({ rc: 3, ev: { motivo: "L2:bytes-204801.js" } });
+  });
+
+  it("funcional: CRLF no checkout acima de 204.800 bytes com o blob abaixo → incompleta:L2 (vale o maior)", () => {
+    const c = cenario({}, "true");
+    const linha = `${"x".repeat(98)}\r\n`;
+    grava(c.raiz, "src/grande.js", Buffer.from(linha.repeat(2060)));
+    const r = revisar(c, "src/grande.js");
+    expect(r).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "L2:src/grande.js" } });
+    expect(r.ev.arquivos["src/grande.js"]).toMatchObject({ bytes: 2060 * 100, linhas: 2061 });
+    expect(Number(git(c.raiz, "cat-file", "-s", r.ev.arquivos["src/grande.js"]?.blob ?? ""))).toBe(2060 * 99);
+  });
+
+  it("funcional: notas.md, manual.pdf, logo.png, package-lock.json e apagado.js → --include só notas.md; a resposta da CLI para eles → ok", () => {
+    const tarefa = ["notas.md", "manual.pdf", "logo.png", "package-lock.json", "apagado.js"];
+    const c = cenario({ resposta: doFixture("pulos", (f) => tarefa.includes(f)) });
+    poeCaso(c.raiz, arquivosDoCaso("pulos"), tarefa);
+    const r = revisar(c, tarefa.join(","));
+    expect(r).toMatchObject({ rc: 0, ev: { resultado: "ok", removidos_sem_revisao: ["apagado.js"], arquivos: { "apagado.js": null,
+      "notas.md": { revisao: "enviado" }, "manual.pdf": { revisao: "nao-revisavel" }, "logo.png": { revisao: "nao-revisavel" },
+      "package-lock.json": { revisao: "nao-revisavel" } } } });
+    expect(r.chamadas).toEqual([["review", "--headless", "--uncommitted", "--include", "notas.md"]]);
+  });
+
+  it("funcional: sem arquivo revisável → ok sem localizar nem chamar a CLI (cli e chamada nulos)", () => {
+    const c = cenario();
+    poeCaso(c.raiz, arquivosDoCaso("pulos"), ["manual.pdf"]);
+    const r = revisar(c, "manual.pdf", "T-01", semCodeant());
+    expect(r).toMatchObject({ rc: 0, ev: { resultado: "ok", cli: null, chamada: null } });
+    naoChamou(r);
+  });
+
+  it("funcional: arquivo da task em excluir_da_revisao do projeto → incompleta:excluido-declarado:<f>", () => {
+    const c = cenario();
+    escreve(c.raiz, ".expx/fatiamento.json", JSON.stringify({ expx_fatiamento: 2, excluir_da_revisao: [
+      { padrao: "^gerado/", classe: "gerado", origem: "scripts/gera.sh", motivo: "saída do gerador" }] }));
+    escreve(c.raiz, "gerado/saida.js", "x\n");
+    const r = revisar(c, "src/a.js,gerado/saida.js");
+    expect(r).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "excluido-declarado:gerado/saida.js" } });
+    naoChamou(r);
+  });
+
+  it("funcional: arquivo da task em ^docs/entregas/ fica fora do --include, revisao excluido, e não bloqueia", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    escreve(c.raiz, "docs/entregas/w/ENTREGA.md", "# entrega\n");
+    const r = revisar(c, "src/a.js,docs/entregas/w/ENTREGA.md");
+    expect(r).toMatchObject({ rc: 0, ev: { resultado: "ok", arquivos: { "docs/entregas/w/ENTREGA.md": { revisao: "excluido" } } } });
+    expect(r.chamadas).toEqual([["review", "--headless", "--uncommitted", "--include", "src/a.js"]]);
+  });
+
+  it("funcional: arquivo apagado em pasta excluída pelo projeto não bloqueia", () => {
+    const c = cenario();
+    escreve(c.raiz, ".expx/fatiamento.json", JSON.stringify({ expx_fatiamento: 2, excluir_da_revisao: [
+      { padrao: "^gerado/", classe: "gerado", origem: "scripts/gera.sh", motivo: "saída do gerador" }] }));
+    poeCaso(c.raiz, new Map([["gerado/velho.js", null]]));
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js,gerado/velho.js")).toMatchObject({ rc: 0, ev: { resultado: "ok", removidos_sem_revisao: ["gerado/velho.js"] } });
+  });
+
+  it("funcional: .expx/fatiamento.json inválido → indisponivel:fatiamento-invalido, sem chamar a CLI", () => {
+    const c = cenario();
+    escreve(c.raiz, ".expx/fatiamento.json", JSON.stringify({ expx_fatiamento: 1 }));
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js");
+    expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "fatiamento-invalido" } });
+    naoChamou(r);
+  });
+
+  it("funcional: FATIA_X no ambiente → rc 64 com a mensagem, sem evidência, nos três subcomandos", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js", "T-01", undefined, { FATIA_X: "" });
+    expect(r).toMatchObject({ rc: 64, ev: undefined });
+    expect(r.err).toContain("`FATIA_X` não é mais lida (limites do CodeAnt, fixos: emenda de 2026-10-19); remova-a do ambiente");
+    naoChamou(r);
+    const env = ambienteCom(PATH, { FATIA_X: "1" });
+    for (const a of [["conferir", "--modo", "obrigatoria", "--task", `T-01=${git(c.raiz, "rev-parse", "HEAD")}`],
+      ["rejeitar", "--task", "T-01", "--identidade", "a".repeat(64), "--motivo", "fp"]]) {
+      const s = spawnSync(process.execPath, [c.script, ...a, "--trabalho", "w", "--raiz", c.raiz], { encoding: "utf8", env });
+      expect([s.status, s.stderr.includes("`FATIA_X` não é mais lida")]).toEqual([64, true]);
+    }
+  });
+});
+
+describe("expx-revisao.mjs revisar v2: depois da CLI", () => {
+  it("funcional: limite41.json servido a uma task com f01–f40 → incompleta:sobra:f41.js", () => {
+    const c = cenario({ fixture: "limite41" });
+    const nomes = poeCaso(c.raiz, arquivosDoCaso("limite41")).slice(0, 40);
+    expect(revisar(c, nomes.join(","))).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "sobra:f41.js" } });
+  });
+
+  it("funcional: pulos.json inteiro servido à task de notas.md → incompleta:sobra:bytes-204801.js", () => {
+    const c = cenario({ fixture: "pulos" });
+    poeCaso(c.raiz, arquivosDoCaso("pulos"), ["notas.md"]);
+    expect(revisar(c, "notas.md")).toMatchObject({ rc: 3, ev: { motivo: "sobra:bytes-204801.js" } });
+  });
+
+  it("funcional: pulos-uncommitted.json (noFiles), sem as entradas de tamanho, servido à task de notas.md → incompleta:faltante:notas.md", () => {
+    const c = cenario({ resposta: doFixture("pulos-uncommitted", (f) => !/^(bytes|linhas)-/.test(f)) });
+    poeCaso(c.raiz, arquivosDoCaso("pulos"), ["notas.md"]);
+    expect(revisar(c, "notas.md")).toMatchObject({ rc: 3, ev: { motivo: "faltante:notas.md" } });
+  });
+
+  it.each([
+    ["JSON limpo", {}],
+    ["error não nulo", { error: "falhou" }],
+  ])("funcional: stderr com \"[error] Failed to review\" e %s → incompleta:lote-falhou (rc 3)", (_nome, topo) => {
+    const c = cenario({ stderr: "aviso qualquer\n[error] Failed to review src/a.js: 500\n", resposta: resp({}, topo) });
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js");
+    expect(r).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "lote-falhou",
+      chamada: { falhas_de_lote: ["[error] Failed to review src/a.js: 500"] } } });
+  });
+
+  it.each([
+    ["max_files 15", { resposta: resp({ max_files: 15 }) }],
+    ["reason fora do perfil", { resposta: resp({ skipped: [{ file: "x.js", reason: "too big" }], total_changed: 2 }) }],
+    ["total_changed errado", { resposta: resp({ total_changed: 3 }) }],
+    ["meta ausente", { resposta: { issues: [], error: null, noFiles: false } }],
+    ["noFiles que não é booleano", { resposta: resp({}, { noFiles: "x" }) }],
+    ["reviewed_files que não é lista", { resposta: resp({ reviewed_files: 1 }) }],
+    ["skipped sem reason", { resposta: resp({ skipped: [{ file: "x.js" }], total_changed: 2 }) }],
+    ["saída 1 com error nulo", { resposta: resp(), saida: 1 }],
+  ])("funcional: %s → incompleta:perfil", (_nome, cfg) => {
+    const c = cenario(cfg as CfgFalsa);
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "perfil" } });
+  });
+
+  it("funcional: arquivo da task em skipped com \"too large (200 KB, max 200 KB)\" → incompleta:pulado:<f>", () => {
+    const c = cenario({ resposta: resp({ reviewed_files: [], skipped: [{ file: "src/a.js", reason: "too large (200 KB, max 200 KB)" }] }) });
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 3, ev: { motivo: "pulado:src/a.js" } });
+  });
+
+  it("funcional: arquivo repetido na resposta → incompleta:repetido:<f>", () => {
+    const c = cenario({ resposta: resp({ reviewed_files: ["src/a.js", "src/a.js"], total_changed: 2 }) });
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 3, ev: { motivo: "repetido:src/a.js" } });
+  });
+
+  it("funcional: src/[id].ts na task e resposta sem ele (o --include o tomou por glob) → incompleta:faltante:src/[id].ts", () => {
+    const c = cenario({ resposta: resp({ reviewed_files: [], total_changed: 0 }, { noFiles: true }) });
+    escreve(c.raiz, "src/[id].ts", "export const id = 1;\n");
+    expect(revisar(c, "src/[id].ts")).toMatchObject({ rc: 3, ev: { motivo: "faltante:src/[id].ts" } });
+  });
+});
+
+describe("expx-revisao.mjs revisar v2: --base-commit", () => {
+  it("funcional: chama --base-commit <sha>; linhas alteradas pelo diff desde <sha>", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3), achado("src/a.js", 1)] });
+    const base = git(c.raiz, "rev-parse", "HEAD");
+    altera3(c.raiz);
+    git(c.raiz, "commit", "-q", "-am", "task");
+    escreve(c.raiz, "src/b.js", "b\n");
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "outra");
+    const r = revisar(c, "src/a.js", "T-01", undefined, {}, c.script, ["--base-commit", base]);
+    expect(r.chamadas).toEqual([["review", "--headless", "--base-commit", base, "--include", "src/a.js"]]);
+    expect(r).toMatchObject({ rc: 1, ev: { modo: "base-commit", base_commit: base, resultado: "achados",
+      achados: [{ linha: 3, estado: "aberto" }, { linha: 1, estado: "anterior" }] } });
+    expect(r.ev.arquivos["src/a.js"]?.blob).toBe(git(c.raiz, "rev-parse", "HEAD:src/a.js"));
+  });
+
+  it("funcional: arquivo da task alterado e não commitado → indisponivel:arquivo-nao-commitado:<f>", () => {
+    const c = cenario();
+    const base = git(c.raiz, "rev-parse", "HEAD");
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js", "T-01", undefined, {}, c.script, ["--base-commit", base]);
+    expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "arquivo-nao-commitado:src/a.js" } });
+    naoChamou(r);
+  });
+
+  it("funcional: arquivo apagado desde <sha> → removido, não arquivo-inexistente", () => {
+    const c = cenario();
+    const base = git(c.raiz, "rev-parse", "HEAD");
+    rmSync(join(c.raiz, "src/a.js"));
+    escreve(c.raiz, "src/b.js", "b\n");
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "task");
+    const r = revisar(c, "src/a.js,src/b.js", "T-01", undefined, {}, c.script, ["--base-commit", base]);
+    expect(r).toMatchObject({ rc: 0, ev: { resultado: "ok", removidos_sem_revisao: ["src/a.js"], arquivos: { "src/a.js": null } } });
   });
 });
 
@@ -355,11 +593,8 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     ["executada_em que não é ISO 8601", { executada_em: "ontem" }, "executada_em"],
     ["executada_em em data impossível", { executada_em: "2026-02-30T10:00:00Z" }, "executada_em"],
     ["executada_em em hora impossível", { executada_em: "2026-02-10T24:30:00Z" }, "executada_em"],
-    ["lotes vazio com arquivo presente", { lotes: [] }, "lotes"],
-    ["sem lotes", { lotes: undefined }, "lotes"],
-    ["lote sem meta", { lotes: [{ include: ["src/a.js"], error: null }] }, "lotes"],
-    ["lote com erro",{ lotes: [{ include: ["src/a.js"], meta: {}, error: "x" }] }, "lotes"],
-    ["lotes que não incluem o arquivo presente", { lotes: [{ include: ["src/b.js"], meta: {}, error: null }] }, "lotes"],
+    ["chamada nula com arquivo enviado", { chamada: null }, "chamada"],
+    ["sem chamada", { chamada: undefined }, "chamada"],
   ])("funcional: ok sem sinal de que a CLI rodou (%s) é FALHA evidencia-invalida nomeando o campo", (_nome, troca, campo) => {
     const c = cenario();
     altera3(c.raiz);
@@ -379,11 +614,11 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:cli.versao" });
   });
 
-  it("funcional: indisponivel não exige cli.versao, executada_em nem lotes", () => {
+  it("funcional: indisponivel não exige cli.versao, executada_em nem chamada", () => {
     const c = cenario();
     altera3(c.raiz);
     revisar(c, "src/a.js", "T-01", dirname(noPath("git") ?? ""));
-    expect(evidencia(c.raiz)).toMatchObject({ resultado: "indisponivel", motivo: "cli-ausente", cli: { versao: null }, lotes: [] });
+    expect(evidencia(c.raiz)).toMatchObject({ resultado: "indisponivel", motivo: "cli-ausente", cli: null, chamada: null });
     escreve(c.raiz, EV, JSON.stringify({ ...(evidencia(c.raiz) as object), executada_em: undefined }));
     expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 3, out: "T-01 AVISO indisponivel:cli-ausente" });
   });
