@@ -11,7 +11,8 @@
 // `continuar` entre a releitura e a gravação.
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, statSync,
+  writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -65,16 +66,28 @@ function blobGit(ref) {
   const r = spawnSync("git", ["cat-file", "blob", ref], { cwd: op.raiz, maxBuffer: LEITURA_MAXIMA, env: GIT_ENV });
   return r.error || r.status !== 0 ? undefined : r.stdout;
 }
-/** A medida da CLI do blob `ref` (`{linhas, bytes}`); acima de LEITURA_MAXIMA, `{linhas: null, bytes: <tamanho>}` sem lê-lo. */
+/** A medida da CLI do blob `ref` (`{linhas, bytes}`); acima de LEITURA_MAXIMA, `{linhas: null, bytes: <tamanho>}` sem lê-lo;
+ *  undefined se o git não o lê (nunca uma medida de 0 bytes). */
 function medirBlob(ref) {
-  const tamanho = Number(git("cat-file", "-s", ref).stdout.trim());
+  const r = git("cat-file", "-s", ref);
+  const tamanho = r.status === 0 ? Number(r.stdout.trim()) : NaN;
+  if (!Number.isSafeInteger(tamanho)) return undefined;
   if (tamanho > LEITURA_MAXIMA) return { linhas: null, bytes: tamanho };
-  return medir(blobGit(ref) ?? Buffer.alloc(0));
+  const conteudo = blobGit(ref);
+  return conteudo ? medir(conteudo) : undefined;
 }
-/** A medida da CLI do arquivo do checkout, pela mesma regra de `medirBlob`. */
+/** A medida da CLI do arquivo do checkout, pela mesma regra de `medirBlob`: lê no máximo LEITURA_MAXIMA + 1 bytes, mesmo
+ *  que o arquivo cresça durante a leitura. */
 function medirArquivo(f) {
-  const tamanho = statSync(join(op.raiz, f)).size;
-  return tamanho > LEITURA_MAXIMA ? { linhas: null, bytes: tamanho } : medir(readFileSync(join(op.raiz, f)));
+  const fd = openSync(join(op.raiz, f), "r");
+  try {
+    const buf = Buffer.alloc(LEITURA_MAXIMA + 1);
+    let n = 0;
+    for (let k; n < buf.length && (k = readSync(fd, buf, n, buf.length - n, null)) > 0;) n += k;
+    return n > LEITURA_MAXIMA ? { linhas: null, bytes: Math.max(n, fstatSync(fd).size) } : medir(buf.subarray(0, n));
+  } finally {
+    closeSync(fd);
+  }
 }
 
 // `\` é separador só no Windows; fora dele é parte do nome, e trocá-lo daria por ausente um arquivo que existe
@@ -209,6 +222,7 @@ function medida(f) {
   const blob = (op["base-commit"] && idDe("rev-parse", "--verify", "-q", `HEAD:./${f}`)) || idDe("hash-object", "-w", "--", f);
   if (!blob || !disco) return undefined;
   const a = medirBlob(blob);
+  if (!a) return undefined;
   const b = medirArquivo(f);
   const linhas = a.linhas === null || b.linhas === null ? null : Math.max(a.linhas, b.linhas);
   return { blob, bytes: Math.max(a.bytes, b.bytes), linhas, disco };
@@ -406,7 +420,7 @@ function semSinalDaCli(ev, sha) {
   for (const f of enviados) {
     const a = ev.arquivos[f];
     const m = medirBlob(`${sha}:./${f}`);
-    if (!Number.isSafeInteger(a.bytes) || !Number.isSafeInteger(a.linhas) || a.bytes > perfil.max_bytes || a.linhas > perfil.max_linhas
+    if (!m || !Number.isSafeInteger(a.bytes) || !Number.isSafeInteger(a.linhas) || a.bytes > perfil.max_bytes || a.linhas > perfil.max_linhas
       || a.bytes < m.bytes || a.linhas < m.linhas) return "L2";
   }
   // a mesma reconciliação do `revisar`, com o `--include` igual aos enviados

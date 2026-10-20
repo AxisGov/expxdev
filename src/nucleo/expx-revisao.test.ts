@@ -889,6 +889,13 @@ describe("expx-revisao.mjs conferir v2", () => {
     }, (raiz) => { escreve(raiz, "src/a.js", grande); grandeBlob = git(raiz, "hash-object", "src/a.js"); }), "L2");
   });
 
+  it("funcional: blob do enviado ilegível para o git (objeto apagado) → FALHA evidencia-invalida:L2, nunca medida de 0 bytes", () => {
+    const f = forjada(() => undefined);
+    const blob = git(f.raiz, "rev-parse", `${f.sha}:src/a.js`);
+    rmSync(join(f.raiz, ".git", "objects", blob.slice(0, 2), blob.slice(2)), { force: true });
+    reprova(f, "L2");
+  });
+
   it("funcional: ok com enviado acima da leitura máxima forjado pequeno → FALHA evidencia-invalida:L2", () => {
     reprova(forjada((ev) => {
       ev["arquivos"]["src/a.js"] = { ...ev["arquivos"]["src/a.js"], blob: grandeBlob, linhas: 2, bytes: 4 };
