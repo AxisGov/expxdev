@@ -125,6 +125,8 @@ evidência travada, **75**. Imprime `<task> <resultado>[:<motivo>]`.
   as rejeições da própria task.
 - No Windows, `\` em `--arquivos` e no `relevant_file` da CLI vira `/`; fora dele é
   parte do nome. Espaço na ponta de um caminho é parte do nome: nunca é aparado.
+- Todo caminho dado ao git é literal (`GIT_LITERAL_PATHSPECS=1`): glob (`src/[id].ts`) ou pathspec mágico
+  (`:(top)x`) no nome nunca traz os hunks de outro arquivo nem esconde os do próprio.
 - Arquivo apagado não vai para a CLI: fica `null` em `arquivos` e entra em
   `removidos_sem_revisao`, que o E4 da mergex lista na descrição do PR.
 - `revisar` e `rejeitar` releem e gravam a evidência (temporário + `rename`) sob a trava
@@ -246,3 +248,4 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-10-18 | `\` só vira `/` no Windows: fora dele é parte do nome, e o arquivo deixava de ser achado. |
 | 2026-10-19 | Caminhos de `--arquivos` não são aparados: espaço na ponta é parte do nome, e aparar revisava outro arquivo ou o dava por ausente. |
 | 2026-10-20 | **v2** (emenda de 2026-10-19, limites do CodeAnt, fixos): lista exata de versões homologadas, localização e integridade do pacote, execução pelo arquivo conferido; sem lotes; `--base-commit`; exclusões, L1 e L2 antes da CLI; reconciliação com `meta`, `skipped` e stderr; resultado `incompleta` (saída 3); evidência v2; `conferir` reprova `incompleta` em qualquer modo e evidência fora do perfil; `FATIA_*` no ambiente é uso errado. |
+| 2026-10-20 | Revisão da PR 5: `conferir` refaz a classificação `revisao` de cada arquivo (`evidencia-invalida:revisao`), exige `chamada.error` nulo e `include` igual aos enviados, e aplica a reconciliação do `revisar` (`cobertura`); o git recebe caminhos literais. |

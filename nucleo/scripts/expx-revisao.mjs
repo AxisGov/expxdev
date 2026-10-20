@@ -50,7 +50,11 @@ if (op["base-commit"] !== undefined && cmd !== "revisar") uso("--base-commit so 
 const pasta = join(op.raiz, "docs", "entregas", op.trabalho, "revisao");
 const caminhoEv = (task) => join(pasta, `${task}.json`);
 const le = (f) => { try { return JSON.parse(readFileSync(f, "utf8").replace(/^\uFEFF/, "")); } catch { return undefined; } };
-const git = (...a) => spawnSync("git", a, { cwd: op.raiz, encoding: "utf8" });
+// todo caminho dado ao git é literal: glob (`src/[id].ts`) ou pathspec mágico (`:(top)x`) no nome trariam os
+// hunks de outro arquivo, ou nenhum, e o achado em linha alterada viraria `anterior`
+const GIT_ENV = { ...process.env, GIT_LITERAL_PATHSPECS: "1" };
+const git = (...a) => spawnSync("git", a, { cwd: op.raiz, encoding: "utf8", env: GIT_ENV });
+const blobGit = (ref) => spawnSync("git", ["cat-file", "blob", ref], { cwd: op.raiz, maxBuffer: 1 << 30, env: GIT_ENV }).stdout;
 
 // `\` é separador só no Windows; fora dele é parte do nome, e trocá-lo daria por ausente um arquivo que existe
 const caminho = (f) => (process.platform === "win32" ? f.replace(/\\/g, "/") : f).replace(/^\.\//, "");
@@ -161,7 +165,7 @@ function medida(f) {
   const disco = idDe("hash-object", "--", f);
   const blob = (op["base-commit"] && idDe("rev-parse", "--verify", "-q", `HEAD:./${f}`)) || idDe("hash-object", "-w", "--", f);
   if (!blob || !disco) return undefined;
-  const conteudo = spawnSync("git", ["cat-file", "blob", blob], { cwd: op.raiz, maxBuffer: 1 << 30 }).stdout;
+  const conteudo = blobGit(blob);
   const a = medir(conteudo);
   const b = medir(readFileSync(join(op.raiz, f)));
   return { blob, bytes: Math.max(a.bytes, b.bytes), linhas: Math.max(a.linhas, b.linhas), disco };
@@ -349,7 +353,7 @@ function semSinalDaCli(ev, sha) {
   if (enviados.length > perfil.max_files) return "L1";
   for (const f of enviados) {
     const a = ev.arquivos[f];
-    const m = medir(spawnSync("git", ["cat-file", "blob", `${sha}:./${f}`], { cwd: op.raiz, maxBuffer: 1 << 30 }).stdout ?? Buffer.alloc(0));
+    const m = medir(blobGit(`${sha}:./${f}`) ?? Buffer.alloc(0));
     if (!Number.isSafeInteger(a.bytes) || !Number.isSafeInteger(a.linhas) || a.bytes > perfil.max_bytes || a.linhas > perfil.max_linhas
       || a.bytes < m.bytes || a.linhas < m.linhas) return "L2";
   }

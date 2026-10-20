@@ -517,6 +517,33 @@ describe("expx-revisao.mjs revisar v2: --base-commit", () => {
     naoChamou(r);
   });
 
+  // o caminho é literal para o git: glob e pathspec mágico no nome não trocam os hunks do arquivo
+  it.each([false, true])("funcional: src/[id].ts ao lado de src/i.ts: as linhas alteradas são só as dele (--base-commit: %s)", (comBase) => {
+    const c = cenario({ issues: [achado("src/[id].ts", 1), achado("src/[id].ts", 3)] });
+    for (const f of ["src/[id].ts", "src/i.ts"]) escreve(c.raiz, f, "l1\nl2\nl3\nl4\nl5\n");
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "arquivos");
+    const base = git(c.raiz, "rev-parse", "HEAD");
+    escreve(c.raiz, "src/i.ts", "novo1\nl2\nl3\nl4\nl5\n");
+    escreve(c.raiz, "src/[id].ts", "l1\nl2\nnovo3\nl4\nl5\n");
+    if (comBase) git(c.raiz, "commit", "-q", "-am", "task");
+    const r = revisar(c, "src/[id].ts", "T-01", undefined, {}, c.script, comBase ? ["--base-commit", base] : []);
+    expect(r).toMatchObject({ rc: 1, ev: { achados: [{ linha: 1, estado: "anterior" }, { linha: 3, estado: "aberto" }] } });
+  });
+
+  it.skipIf(process.platform === "win32")("funcional: fora do Windows, nome com pathspec mágico (:(top)x): achado em linha alterada continua aberto", () => {
+    const f = ":(top)x";
+    const c = cenario({ issues: [achado(f, 3)] });
+    escreve(c.raiz, f, "l1\nl2\nl3\n");
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "magico");
+    const base = git(c.raiz, "rev-parse", "HEAD");
+    escreve(c.raiz, f, "l1\nl2\nnovo3\n");
+    git(c.raiz, "commit", "-q", "-am", "task");
+    const r = revisar(c, f, "T-01", undefined, {}, c.script, ["--base-commit", base]);
+    expect(r).toMatchObject({ rc: 1, ev: { resultado: "achados", achados: [{ arquivo: f, linha: 3, estado: "aberto" }] } });
+  });
+
   it("funcional: CRLF no checkout (core.autocrlf=true) commitado: não é arquivo-nao-commitado e o blob é o do commit", () => {
     const c = cenario({}, "true");
     const base = git(c.raiz, "rev-parse", "HEAD");
