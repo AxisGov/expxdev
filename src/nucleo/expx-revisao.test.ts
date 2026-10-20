@@ -467,6 +467,7 @@ describe("expx-revisao.mjs revisar v2: depois da CLI", () => {
     ["reviewed_files que não é lista", { resposta: resp({ reviewed_files: 1 }) }],
     ["skipped sem reason", { resposta: resp({ skipped: [{ file: "x.js" }], total_changed: 2 }) }],
     ["saída 1 com error nulo", { resposta: resp(), saida: 1 }],
+    ["issue que não é objeto", { resposta: resp({}, { issues: [null] }) }],
   ])("funcional: %s → incompleta:perfil", (_nome, cfg) => {
     const c = cenario(cfg as CfgFalsa);
     altera3(c.raiz);
