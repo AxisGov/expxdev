@@ -729,6 +729,81 @@ syncBuiltinESMExports();
   });
 });
 
+describe("expx-revisao.mjs conferir v2", () => {
+  /** Uma evidência ok de `src/a.js` revisada e commitada, e a troca `muda` aplicada a ela num commit só de evidência. */
+  function forjada(muda: (ev: Record<string, any>) => void, antes?: (raiz: string) => void): { raiz: string; sha: string } {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    commita(c.raiz);
+    antes?.(c.raiz);
+    const ev = evidencia(c.raiz) as Record<string, any>;
+    muda(ev);
+    escreve(c.raiz, EV, JSON.stringify(ev));
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "forjada");
+    return { raiz: c.raiz, sha: git(c.raiz, "rev-parse", "HEAD") };
+  }
+  const reprova = (f: { raiz: string; sha: string }, campo: string) =>
+    expect(conferir(f.raiz, "se_disponivel", `T-01=${f.sha}`)).toMatchObject({ rc: 1, out: `T-01 FALHA evidencia-invalida:${campo}` });
+
+  it("funcional: evidência v1 → FALHA evidencia-invalida:versao", () => {
+    reprova(forjada((ev) => { ev["expx_revisao"] = 1; }), "versao");
+  });
+
+  it("funcional: incompleta é FALHA em obrigatoria e em se_disponivel", () => {
+    const c = cenario();
+    poeCaso(c.raiz, arquivosDoCaso("pulos"), ["linhas-5001.js"]);
+    revisar(c, "linhas-5001.js");
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "task");
+    const sha = git(c.raiz, "rev-parse", "HEAD");
+    for (const modo of ["obrigatoria", "se_disponivel"]) {
+      expect(conferir(c.raiz, modo, `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA incompleta:L2:linhas-5001.js" });
+    }
+  });
+
+  it.each([
+    ["cli.integridade diferente de conferida", (ev: Record<string, any>) => { ev["cli"].integridade = null; }, "integridade"],
+    ["max_files 15 forjado", (ev: Record<string, any>) => { ev["chamada"].meta.max_files = 15; }, "perfil"],
+    ["meta ausente", (ev: Record<string, any>) => { ev["chamada"].meta = null; }, "perfil"],
+    ["pulo com motivo fora do perfil", (ev: Record<string, any>) => { ev["chamada"].meta.skipped = [{ file: "x.js", reason: "too big" }]; }, "perfil"],
+    ["falha de lote registrada", (ev: Record<string, any>) => { ev["chamada"].falhas_de_lote = ["[error] Failed to review src/a.js: 500"]; }, "lote-falhou"],
+    ["enviado fora de reviewed_files", (ev: Record<string, any>) => { ev["chamada"].meta.reviewed_files = []; }, "cobertura"],
+    ["enviado pulado", (ev: Record<string, any>) => { ev["chamada"].meta.skipped = [{ file: "src/a.js", reason: "too large (5001 lines, max 5000)" }]; }, "cobertura"],
+    ["enviado com linhas menores que as do blob", (ev: Record<string, any>) => { ev["arquivos"]["src/a.js"].linhas = 1; }, "L2"],
+    ["enviado com bytes menores que os do blob", (ev: Record<string, any>) => { ev["arquivos"]["src/a.js"].bytes = 1; }, "L2"],
+  ])("funcional: ok com %s → FALHA evidencia-invalida:<campo>", (_nome, muda, campo) => {
+    reprova(forjada(muda), campo);
+  });
+
+  it("funcional: ok com enviado de 5.001 linhas forjado → FALHA evidencia-invalida:L2", () => {
+    const grande = Array.from({ length: 5001 }, (_, i) => `l${i}`).join("\n");
+    reprova(forjada((ev) => {
+      ev["arquivos"]["src/a.js"] = { ...ev["arquivos"]["src/a.js"], blob: grandeBlob, linhas: 5001, bytes: Buffer.byteLength(grande) };
+    }, (raiz) => { escreve(raiz, "src/a.js", grande); grandeBlob = git(raiz, "hash-object", "src/a.js"); }), "L2");
+  });
+
+  it("funcional: ok com mais de 40 enviados forjado → FALHA evidencia-invalida:L1", () => {
+    const nomes = Array.from({ length: 41 }, (_, i) => `src/f${i}.js`);
+    reprova(forjada((ev) => {
+      for (const f of nomes) ev["arquivos"][f] = { blob: blobs[f], bytes: 2, linhas: 2, revisao: "enviado" };
+      ev["chamada"].include = ["src/a.js", ...nomes];
+      ev["chamada"].meta = { ...ev["chamada"].meta, reviewed_files: ["src/a.js", ...nomes], total_changed: 42 };
+    }, (raiz) => { for (const f of nomes) { escreve(raiz, f, "x\n"); blobs[f] = git(raiz, "hash-object", f); } }), "L1");
+  });
+
+  it("funcional: rejeitar não tira a evidência de incompleta", () => {
+    const c = cenario();
+    escreve(c.raiz, EV, JSON.stringify({ expx_revisao: 2, trabalho: "w", task: "T-01", resultado: "incompleta", motivo: "L1:41",
+      arquivos: {}, achados: [{ identidade: "a".repeat(64), estado: "aberto" }], rejeicoes: [] }));
+    expect(roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", "a".repeat(64), "--motivo", "fp")).toMatchObject({ rc: 0, out: "T-01 incompleta:L1:41" });
+    expect(evidencia(c.raiz)).toMatchObject({ resultado: "incompleta", motivo: "L1:41", achados: [{ estado: "rejeitado" }] });
+  });
+});
+let grandeBlob = "";
+const blobs: Record<string, string> = {};
+
 describe("expx-revisao.mjs id de task", () => {
   it("funcional: T-NN.MM (o id da sprintx e da runx) é aceito nos três subcomandos e a evidência vai para revisao/T-NN.MM.json", () => {
     const c = cenario({ issues: [achado("src/a.js", 3)] });

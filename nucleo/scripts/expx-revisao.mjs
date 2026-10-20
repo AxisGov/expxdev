@@ -318,17 +318,37 @@ function achados(issues, ev) {
 }
 
 const ehMapa = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
-/** Em `ok`/`achados`, o campo que falta para provar que a CLI rodou (ou undefined): `executada_em` ISO 8601 e,
- *  se algum arquivo foi enviado, versão homologada e a chamada. */
-function semSinalDaCli(ev) {
-  const enviados = Object.values(ev.arquivos).filter((a) => ehMapa(a) && a.revisao === "enviado");
-  if (enviados.length > 0 && (typeof ev.cli?.versao !== "string" || !perfilCli(ev.cli.versao))) return "cli.versao";
+/** `executada_em` não é ISO 8601 (ou é data impossível). */
+function semData(ev) {
   const iso = /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d+)?)?(Z|[+-]([01]\d|2[0-3]):[0-5]\d)$/
     .exec(typeof ev.executada_em === "string" ? ev.executada_em : "");
   // o Date normaliza 30/02 para 02/03: a data tem de voltar igual
   const dia = iso && new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])));
-  if (!iso || dia.getUTCMonth() !== Number(iso[2]) - 1 || dia.getUTCDate() !== Number(iso[3])) return "executada_em";
-  if (enviados.length > 0 && !ehMapa(ev.chamada)) return "chamada";
+  return !iso || dia.getUTCMonth() !== Number(iso[2]) - 1 || dia.getUTCDate() !== Number(iso[3]);
+}
+/** Em `ok`/`achados` com algum arquivo enviado, o campo que não prova a revisão completa pela CLI homologada
+ *  (ou undefined): versão, integridade, a chamada, o perfil, falha de lote, L1, L2 (medido de novo no blob do
+ *  commit) e a cobertura de cada enviado. */
+function semSinalDaCli(ev, sha) {
+  const enviados = Object.keys(ev.arquivos).filter((f) => ev.arquivos[f]?.revisao === "enviado");
+  if (enviados.length === 0) return undefined;
+  const perfil = typeof ev.cli?.versao === "string" ? perfilCli(ev.cli.versao) : undefined;
+  if (!perfil) return "cli.versao";
+  if (ev.cli.integridade !== "conferida") return "integridade";
+  if (!ehMapa(ev.chamada)) return "chamada";
+  const meta = ev.chamada.meta;
+  const pulados = ehMapa(meta) && Array.isArray(meta.skipped) ? meta.skipped : undefined;
+  if (!pulados || meta.max_files !== perfil.max_files || !Array.isArray(meta.reviewed_files)
+    || !pulados.every((s) => ehMapa(s) && typeof s.reason === "string" && motivoAceito(s.reason, perfil))) return "perfil";
+  if (!Array.isArray(ev.chamada.falhas_de_lote) || ev.chamada.falhas_de_lote.length > 0) return "lote-falhou";
+  if (enviados.length > perfil.max_files) return "L1";
+  for (const f of enviados) {
+    const a = ev.arquivos[f];
+    const m = medir(spawnSync("git", ["cat-file", "blob", `${sha}:./${f}`], { cwd: op.raiz, maxBuffer: 1 << 30 }).stdout ?? Buffer.alloc(0));
+    if (!Number.isSafeInteger(a.bytes) || !Number.isSafeInteger(a.linhas) || a.bytes > perfil.max_bytes || a.linhas > perfil.max_linhas
+      || a.bytes < m.bytes || a.linhas < m.linhas) return "L2";
+  }
+  if (!enviados.every((f) => meta.reviewed_files.includes(f) && !pulados.some((s) => s.file === f))) return "cobertura";
 }
 
 /** O veredito de uma task: a evidência tem de existir, bater com o commit e não ter achado aberto. */
@@ -341,18 +361,22 @@ function veredito(task, sha) {
   if (doCommit.status !== 0) return `${nivel} evidencia-ausente`;
   let ev;
   try { ev = JSON.parse(doCommit.stdout.replace(/^\uFEFF/, "")); } catch { return "FALHA evidencia-invalida"; }
-  if (!ehMapa(ev) || ev.expx_revisao !== 2 || ev.task !== task || ev.trabalho !== op.trabalho || !ehMapa(ev.arquivos)
+  if (ehMapa(ev) && ev.expx_revisao !== 2) return "FALHA evidencia-invalida:versao";
+  if (!ehMapa(ev) || ev.task !== task || ev.trabalho !== op.trabalho || !ehMapa(ev.arquivos)
     || Object.keys(ev.arquivos).length === 0 || !Object.values(ev.arquivos).every((a) => a === null || ehMapa(a)) || !Array.isArray(ev.achados)
     || !ev.achados.every((a) => ehMapa(a) && /^[0-9a-f]{64}$/.test(a.identidade) && ["aberto", "anterior", "rejeitado"].includes(a.estado))
     || !["ok", "achados", "indisponivel", "incompleta"].includes(ev.resultado)) return "FALHA evidencia-invalida";
-  const falta = ["indisponivel", "incompleta"].includes(ev.resultado) ? undefined : semSinalDaCli(ev);
-  if (falta) return `FALHA evidencia-invalida:${falta}`;
+  const concluida = ["ok", "achados"].includes(ev.resultado);
+  if (concluida && semData(ev)) return "FALHA evidencia-invalida:executada_em";
   for (const [f, a] of Object.entries(ev.arquivos)) {
     const r = git("rev-parse", "--verify", "-q", `${sha}:./${f}`);
     if ((r.status === 0 ? r.stdout.trim() : null) !== (a === null ? null : a.blob)) return `FALHA evidencia-nao-bate:${f}`;
   }
   if (ev.resultado === "indisponivel") return `${nivel} indisponivel:${ev.motivo}`;
+  // a mudança que a CLI não cobre não depende do modo
   if (ev.resultado === "incompleta") return `FALHA incompleta:${ev.motivo}`;
+  const falta = semSinalDaCli(ev, sha);
+  if (falta) return `FALHA evidencia-invalida:${falta}`;
   const abertos = ev.achados.filter((a) => a?.estado === "aberto").length;
   return abertos > 0 || ev.resultado === "achados" ? `FALHA achados-abertos:${abertos}` : "ok";
 }
@@ -370,9 +394,10 @@ function rejeitar() {
     if (alvo.length === 0) return ev ? "achado nao encontrado" : "evidencia ausente";
     for (const a of alvo) a.estado = "rejeitado";
     ev.rejeicoes = [...(Array.isArray(ev.rejeicoes) ? ev.rejeicoes : []), { identidade: op.identidade, motivo: op.motivo, em: new Date().toISOString() }];
-    if (ev.resultado !== "indisponivel") ev.resultado = ev.achados.some((a) => a.estado === "aberto") ? "achados" : "ok";
+    // rejeitar um achado não muda o que a revisão não pôde fazer (indisponivel) nem o que ela não cobriu (incompleta)
+    if (!["indisponivel", "incompleta"].includes(ev.resultado)) ev.resultado = ev.achados.some((a) => a.estado === "aberto") ? "achados" : "ok";
     grava(op.task, ev);
-    process.stdout.write(`${op.task} ${ev.resultado === "indisponivel" ? `indisponivel:${ev.motivo}` : ev.resultado}\n`);
+    process.stdout.write(`${op.task} ${ev.resultado}${["indisponivel", "incompleta"].includes(ev.resultado) ? `:${ev.motivo}` : ""}\n`);
     return undefined;
   });
   if (erro) {
