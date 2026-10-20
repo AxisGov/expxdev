@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 
 const FONTE = "src/utils/reviewApiHelper.js";
 const USO = "uso: node scripts/homologar-codeant-cli.mjs --versao <v> --integridade <sha512-…> --git-head <sha> [--tarball <arquivo>] [--packument <arquivo>] [--saida <dir>]";
+const TAR = process.platform === "win32" ? join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe") : "tar";
 
 class Falha extends Error {
   constructor(mensagem, codigo = 1) {
@@ -170,7 +171,7 @@ async function executar() {
 
     const extraido = join(temporario, "extraido");
     mkdirSync(extraido);
-    const tar = spawnSync("tar", ["-xzf", tarball, "-C", extraido], { encoding: "utf8" });
+    const tar = spawnSync(TAR, ["-xzf", tarball, "-C", extraido], { encoding: "utf8" });
     if (tar.status !== 0) falha(`não foi possível extrair o tarball: ${String(tar.stderr).trim()}`);
     const pacote = join(extraido, "package");
     const packageJson = JSON.parse(readFileSync(join(pacote, "package.json"), "utf8"));

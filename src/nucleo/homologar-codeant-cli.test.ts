@@ -10,6 +10,7 @@ const temporarios: string[] = [];
 const SCRIPT = join(RAIZ_DO_REPO, "scripts", "homologar-codeant-cli.mjs");
 const VERSAO = "0.5.14";
 const GIT_HEAD = "475f9793969c3c86cb0dae04acc64884af2ee1f1";
+const TAR = process.platform === "win32" ? join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe") : "tar";
 
 const FONTE = `
 import path from 'node:path';
@@ -71,7 +72,7 @@ function montar(fonte = FONTE, packument?: Record<string, unknown>): Cenario {
   }
 
   const tarball = join(raiz, "codeant-cli.tgz");
-  const tar = spawnSync("tar", ["-czf", tarball, "-C", join(raiz, "conteudo"), "package"], { encoding: "utf8" });
+  const tar = spawnSync(TAR, ["-czf", tarball, "-C", join(raiz, "conteudo"), "package"], { encoding: "utf8" });
   expect(tar.status, `${tar.stdout}${tar.stderr}`).toBe(0);
   const integridade = `sha512-${createHash("sha512").update(readFileSync(tarball)).digest("base64")}`;
   const packumentFinal = packument ?? {
