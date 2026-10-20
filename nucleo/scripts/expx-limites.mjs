@@ -2,8 +2,9 @@
 // da revisão e os `FATIA_*` reservados. Só `node:`; nada é lido do ambiente além do que se passa.
 
 /** Artefatos de método: fora da revisão sempre, sem se declarar no `.expx/fatiamento.json`. */
-import { readFileSync, readdirSync } from "node:fs";
-import { posix } from "node:path";
+import { createHash } from "node:crypto";
+import { accessSync, constants, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { dirname, extname, join, posix, resolve } from "node:path";
 
 export const EXCLUIDOS_DO_NUCLEO = Object.freeze(["^docs/sprintx/", "^docs/entregas/", "^docs/eventos/"]);
 /** Primeiro segmento que é código-fonte: `excluir_da_revisao` nunca começa nele (regra 5 da §5). */
@@ -215,6 +216,82 @@ export function medir(conteudo) {
 
 export function motivoAceito(motivo, perfil) {
   return perfil.motivos.exatos.includes(motivo) || perfil.motivos.padroes.some((padrao) => new RegExp(padrao).test(motivo));
+}
+
+const ehArquivo = (f) => { try { return statSync(f).isFile(); } catch { return false; } };
+const executavel = (f) => { try { accessSync(f, constants.X_OK); return true; } catch { return false; } };
+// o alvo do shim do npm (cmd-shim): `"%dp0%\node_modules\codeant-cli\src\index.js"` ou `"$basedir/node_modules/codeant-cli/src/index.js"`
+const ALVO_DO_SHIM = /node_modules[\\/]codeant-cli[\\/]([^"'\s%]+)/;
+const ehShim = (f, plataforma) => (plataforma === "win32" && [".cmd", ".bat"].includes(extname(f).toLowerCase()))
+  || /^#![^\n]*\bsh\b/.test(readFileSync(f, "latin1").slice(0, 200));
+
+/** O `codeant` que o shell rodaria: o primeiro do `PATH` (no Windows, com cada extensão do `PATHEXT`, como o `cmd.exe`). */
+function noPath(env, plataforma) {
+  const win = plataforma === "win32";
+  const valor = (nome) => Object.entries(env).find(([k]) => (win ? k.toUpperCase() === nome : k === nome))?.[1];
+  const exts = win ? (valor("PATHEXT") || ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean) : [""];
+  for (const d of (valor("PATH") ?? "").split(win ? ";" : ":").filter(Boolean)) {
+    for (const e of exts) {
+      const f = join(d, `codeant${e}`);
+      if (ehArquivo(f) && (win || executavel(f))) return f;
+    }
+  }
+}
+
+/**
+ * O pacote `codeant-cli` do `codeant` do `PATH`: segue o link, lê o shim do npm, sobe até o `package.json`
+ * de nome `codeant-cli` e exige que o `bin` dele seja o arquivo resolvido. Nada roda aqui.
+ */
+export function localizarPacote(env, plataforma) {
+  const achado = noPath(env, plataforma);
+  if (!achado) return { ok: false, motivo: "cli-ausente", detalhe: "codeant fora do PATH" };
+  const falha = (detalhe) => ({ ok: false, motivo: "integridade", detalhe });
+  try {
+    let alvo = realpathSync(achado);
+    if (ehShim(alvo, plataforma)) {
+      const m = ALVO_DO_SHIM.exec(readFileSync(alvo, "utf8"));
+      if (!m) return falha(`executavel que nao e o shim do pacote: ${achado}`);
+      alvo = realpathSync(join(dirname(alvo), "node_modules", "codeant-cli", m[1]));
+    }
+    for (let d = dirname(alvo); ; d = dirname(d)) {
+      const pj = join(d, "package.json");
+      if (ehArquivo(pj)) {
+        const pkg = JSON.parse(readFileSync(pj, "utf8"));
+        if (pkg?.name === "codeant-cli") {
+          const bin = typeof pkg.bin === "string" ? pkg.bin : pkg.bin?.codeant;
+          if (typeof bin !== "string") return falha(`package.json sem bin: ${pj}`);
+          const declarado = resolve(d, bin);
+          const mesmo = plataforma === "win32" ? (a, b) => a.toLowerCase() === b.toLowerCase() : (a, b) => a === b;
+          if (!ehArquivo(declarado) || !mesmo(realpathSync(declarado), alvo)) return falha(`bin do pacote nao e o executavel: ${alvo}`);
+          if (typeof pkg.version !== "string") return falha(`package.json sem version: ${pj}`);
+          return { ok: true, bin: alvo, pacote: d, versao: pkg.version };
+        }
+      }
+      if (dirname(d) === d) return falha(`fora do pacote codeant-cli: ${alvo}`);
+    }
+  } catch (e) {
+    return falha(`nao conferivel: ${e.message}`);
+  }
+}
+
+/** `null` se o pacote instalado é o do manifesto do perfil; senão o detalhe. `node_modules` não é conferido (emenda, 6). */
+export function conferirIntegridade(pacote, perfil) {
+  const manifesto = perfil?.manifesto;
+  if (!manifesto || typeof manifesto !== "object" || Object.keys(manifesto).length === 0) return "manifesto-ausente";
+  for (const [c, sha] of Object.entries(manifesto)) {
+    if (c === "package.json") continue;
+    let conteudo;
+    try { conteudo = readFileSync(join(pacote, ...c.split("/"))); } catch { return `arquivo-ausente:${c}`; }
+    if (createHash("sha256").update(conteudo).digest("hex") !== sha) return `arquivo-diferente:${c}`;
+  }
+  try {
+    const pkg = JSON.parse(readFileSync(join(pacote, "package.json"), "utf8"));
+    const esperado = perfil.package_json;
+    if (pkg.name !== esperado.name || pkg.version !== esperado.version || JSON.stringify(pkg.bin) !== JSON.stringify(esperado.bin)) return "package-json";
+  } catch {
+    return "package-json";
+  }
+  return null;
 }
 
 export function mensagemFatia(nome) {

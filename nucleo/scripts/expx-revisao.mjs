@@ -11,8 +11,8 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { conferirIntegridade, localizarPacote, perfilCli } from "./expx-limites.mjs";
 
-const VERSAO_MINIMA = [0, 5, 14];
 const OBRIGATORIOS = { revisar: ["task", "arquivos"], conferir: ["modo", "task"], rejeitar: ["task", "identidade", "motivo"] };
 function uso(msg) {
   process.stderr.write(`expx-revisao: ${msg}\nuso: node expx-revisao.mjs revisar|conferir|rejeitar --trabalho <slug> ... (cabecalho do script)\n`);
@@ -89,12 +89,27 @@ function grava(task, ev) {
   writeFileSync(tmp, `${JSON.stringify(ev, null, 2)}\n`);
   renameSync(tmp, caminhoEv(task));
 }
-/** A CLI. No Windows o `codeant` do npm é um `.cmd`, que só roda pelo cmd.exe. */
-function codeant(a) {
-  if (process.platform !== "win32") return spawnSync("codeant", a, { cwd: op.raiz, encoding: "utf8", maxBuffer: 64 << 20 });
-  const linha = ["codeant", ...a].map((x) => `"${x}"`).join(" ");
-  return spawnSync(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", `"${linha}"`], { cwd: op.raiz, encoding: "utf8",
-    maxBuffer: 64 << 20, windowsVerbatimArguments: true, env: { ...process.env, NoDefaultCurrentDirectoryInExePath: "1" } });
+/** A CLI: o arquivo do pacote conferido, pelo `node`; nunca o `codeant` do PATH depois da conferência. */
+const codeant = (bin, a) => spawnSync(process.execPath, [bin, ...a], { cwd: op.raiz, encoding: "utf8", maxBuffer: 64 << 20 });
+const ORIENTACAO = "instale a homologada (npm i -g codeant-cli@0.5.14)";
+/** O pacote do `codeant` do PATH, homologado e íntegro (`{bin, versao, perfil}`), ou o motivo de `indisponivel`. */
+function cliConferida() {
+  const loc = localizarPacote(process.env, process.platform);
+  if (!loc.ok) {
+    process.stderr.write(`expx-revisao: ${loc.motivo}: ${loc.detalhe}; ${ORIENTACAO}\n`);
+    return { motivo: loc.motivo };
+  }
+  const perfil = perfilCli(loc.versao);
+  if (!perfil) {
+    process.stderr.write(`expx-revisao: versao ${loc.versao} nao homologada; ${ORIENTACAO} ou homologue a nova\n`);
+    return { motivo: "versao", versao: loc.versao };
+  }
+  const diferenca = conferirIntegridade(loc.pacote, perfil);
+  if (diferenca) {
+    process.stderr.write(`expx-revisao: integridade: ${diferenca} em ${loc.pacote}; ${ORIENTACAO}\n`);
+    return { motivo: "integridade", versao: loc.versao };
+  }
+  return { bin: loc.bin, versao: loc.versao, perfil };
 }
 /** O JSON da CLI: do primeiro `{` que dá JSON até o último `}` (o npm pode avisar antes e depois). */
 function json(texto) {
@@ -117,7 +132,7 @@ function revisar() {
   const arquivos = op.arquivos.split(",").map(caminho).filter(Boolean);
   if (arquivos.length === 0) uso("--arquivos sem nenhum caminho");
   const anterior = le(caminhoEv(op.task));
-  const ev = { expx_revisao: 1, trabalho: op.trabalho, task: op.task, cli: { versao: null }, executada_em: new Date().toISOString(),
+  const ev = { expx_revisao: 1, trabalho: op.trabalho, task: op.task, cli: { versao: null, integridade: null }, executada_em: new Date().toISOString(),
     arquivos: {}, lotes: [], resultado: "ok", achados: [], rejeicoes: Array.isArray(anterior?.rejeicoes) ? anterior.rejeicoes : [], removidos_sem_revisao: [] };
   const indisponivel = (motivo) => Object.assign(ev, { resultado: "indisponivel", motivo });
   const head = new Set(git("ls-tree", "-r", "-z", "--name-only", "HEAD").stdout.split("\0"));
@@ -129,17 +144,15 @@ function revisar() {
   const removidos = arquivos.filter((f) => !presentes.includes(f));
   for (const f of removidos) { ev.arquivos[f] = null; ev.removidos_sem_revisao.push(f); }
   for (const f of presentes) ev.arquivos[f] = blob(f) ?? null;
-  const ver = codeant(["--version"]);
-  const v = /(\d+)\.(\d+)\.(\d+)/.exec(ver.stdout ?? "");
-  const cmp = v ? v.slice(1).map(Number).map((n, i) => n - VERSAO_MINIMA[i]).find((d) => d !== 0) ?? 0 : -1;
-  if (v) ev.cli.versao = v.slice(1).join(".");
+  const cli = virgula || removidos.some((f) => !existe(f)) ? undefined : cliConferida();
+  if (cli?.versao) ev.cli.versao = cli.versao;
   if (virgula) indisponivel("caminho-com-virgula");
   else if (removidos.some((f) => !existe(f))) indisponivel(`arquivo-inexistente:${removidos.find((f) => !existe(f))}`);
-  else if (ver.error || [127, 9009].includes(ver.status) || (ver.status !== 0 && !v)) indisponivel("cli-ausente");
-  else if (cmp < 0) indisponivel("versao");
+  else if (cli?.motivo) indisponivel(cli.motivo);
   else if (presentes.length > 0) {
+    ev.cli.integridade = "conferida";
     const roda = (include) => {
-      const r = codeant(["review", "--uncommitted", "--headless", "--include", include.join(",")]);
+      const r = codeant(cli.bin, ["review", "--uncommitted", "--headless", "--include", include.join(",")]);
       const j = json(r.stdout ?? "");
       return { include, meta: j?.meta ?? null, error: j ? j.error ?? null : `json ilegivel (rc ${r.status})`, issues: j?.issues ?? [], noFiles: j?.noFiles === true };
     };
@@ -210,11 +223,10 @@ function achados(issues, ev) {
 }
 
 const ehMapa = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
-/** Em `ok`/`achados`, o campo que falta para provar que a CLI rodou (ou undefined): versão ≥ mínima,
+/** Em `ok`/`achados`, o campo que falta para provar que a CLI rodou (ou undefined): versão homologada,
  *  `executada_em` ISO 8601 e, se há arquivo presente, lotes com `meta` e sem erro que o incluem. */
 function semSinalDaCli(ev) {
-  const v = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(typeof ev.cli?.versao === "string" ? ev.cli.versao : "");
-  if (!v || (v.slice(1).map(Number).map((n, i) => n - VERSAO_MINIMA[i]).find((d) => d !== 0) ?? 0) < 0) return "cli.versao";
+  if (typeof ev.cli?.versao !== "string" || !perfilCli(ev.cli.versao)) return "cli.versao";
   const iso = /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d+)?)?(Z|[+-]([01]\d|2[0-3]):[0-5]\d)$/
     .exec(typeof ev.executada_em === "string" ? ev.executada_em : "");
   // o Date normaliza 30/02 para 02/03: a data tem de voltar igual

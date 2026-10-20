@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ambienteCom, noPath, RAIZ_DO_REPO } from "../teste/candidatos.js";
+import { chamadasDa, instalarCodeantFalsa, nucleoDeTeste, type CfgFalsa, type Falsa } from "../teste/codeant-falsa.js";
 
 // `nucleo/scripts/expx-revisao.mjs`. A CLI do CodeAnt nunca é chamada de verdade: uma `codeant` falsa vem
 // antes no PATH, responde `--version` e um JSON fixo no `review`, e registra os argumentos recebidos.
@@ -21,48 +22,87 @@ function git(d: string, ...args: string[]): string {
 }
 const escreve = (d: string, rel: string, conteudo: string): void => { mkdirSync(dirname(join(d, rel)), { recursive: true }); writeFileSync(join(d, rel), conteudo); };
 
-/** Repositório com `src/a.js` (l1..l5) commitado e a `codeant` falsa configurada por `cfg`. */
-function cenario(cfg: object = {}, autocrlf = "false"): { raiz: string; falsa: string } {
+/** Repositório com `src/a.js` (l1..l5) commitado, a `codeant` falsa (pacote npm) configurada por `cfg` e o
+ *  núcleo de teste, cujo perfil 0.5.14 tem o manifesto da falsa. */
+type Cenario = { raiz: string; falsa: Falsa; script: string };
+function cenario(cfg: CfgFalsa = {}, autocrlf = "false"): Cenario {
   const raiz = temp("expx-revisao-");
   git(raiz, "init", "-q", "-b", "main");
   git(raiz, "config", "core.autocrlf", autocrlf);
   escreve(raiz, "src/a.js", "l1\nl2\nl3\nl4\nl5\n");
   git(raiz, "add", "-A");
   git(raiz, "commit", "-q", "-m", "base");
-  const falsa = temp("expx-codeant-");
-  writeFileSync(join(falsa, "cfg.json"), JSON.stringify({ versao: "0.5.14", issues: [], ...cfg }));
-  writeFileSync(join(falsa, "codeant.mjs"), `import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
-const dir = ${JSON.stringify(falsa)}, a = process.argv.slice(2);
-const cfg = JSON.parse(readFileSync(dir + "/cfg.json", "utf8"));
-appendFileSync(dir + "/chamadas.jsonl", JSON.stringify(a) + "\\n");
-if (a[0] === "--version") { console.log(cfg.versao); process.exit(0); }
-const inc = a[a.indexOf("--include") + 1].split(",");
-if (cfg.durante) writeFileSync(cfg.durante[0], cfg.durante[1]);
-if (cfg.reescreve) writeFileSync(cfg.reescreve, "mudou\\n");
-process.stdout.write((cfg.avisos ?? "") + JSON.stringify({ issues: cfg.issues.filter((i) => inc.includes(i.relevant_file)),
-  meta: { reviewed_files: cfg.reviewed_files ?? inc.length, total_changed: inc.length, skipped: cfg.skipped ?? [], capped: cfg.capped ?? false, max_files: cfg.max_files ?? 40 },
-  error: cfg.error ?? null, noFiles: cfg.noFiles ?? false }));
-`);
-  writeFileSync(join(falsa, "codeant"), `#!/bin/sh\nexec "${process.execPath}" "${falsa}/codeant.mjs" "$@"\n`, { mode: 0o755 });
-  writeFileSync(join(falsa, "codeant.cmd"), `@"${process.execPath}" "${join(falsa, "codeant.mjs")}" %*\r\n`);
-  return { raiz, falsa };
+  const falsa = instalarCodeantFalsa(temp("expx-codeant-"), cfg);
+  return { raiz, falsa, script: nucleoDeTeste(temp("expx-nucleo-"), falsa) };
 }
 const PATH = process.env["PATH"] ?? process.env["Path"] ?? "";
 type Ev = { resultado: string; motivo?: string; arquivos: Record<string, string | null>; lotes: { include: string[] }[];
   achados: { identidade: string; arquivo: string; linha: number; estado: string }[]; rejeicoes: { identidade: string }[]; removidos_sem_revisao: string[] };
-function revisar(c: { raiz: string; falsa: string }, arquivos: string, task = "T-01", path = `${c.falsa}${delimiter}${PATH}`, extra: Record<string, string> = {}) {
-  const r = spawnSync(process.execPath, [SCRIPT, "revisar", "--trabalho", "w", "--task", task, "--arquivos", arquivos, "--raiz", c.raiz],
+function revisar(c: Cenario, arquivos: string, task = "T-01", path = `${c.falsa.path}${delimiter}${PATH}`, extra: Record<string, string> = {}, script = c.script) {
+  const r = spawnSync(process.execPath, [script, "revisar", "--trabalho", "w", "--task", task, "--arquivos", arquivos, "--raiz", c.raiz],
     { encoding: "utf8", env: ambienteCom(path, extra) });
   const ev = join(c.raiz, "docs", "entregas", "w", "revisao", `${task}.json`);
-  const ch = join(c.falsa, "chamadas.jsonl");
   return { rc: r.status, out: r.stdout, err: r.stderr, ev: (existsSync(ev) ? JSON.parse(readFileSync(ev, "utf8")) : undefined) as Ev,
-    chamadas: existsSync(ch) ? readFileSync(ch, "utf8").trim().split("\n").map((l) => JSON.parse(l) as string[]) : [] };
+    chamadas: chamadasDa(c.falsa).map((x) => x.args), registro: chamadasDa(c.falsa) };
 }
+/** Uma resposta da CLI para `src/a.js`, com `meta` e o topo trocados. */
+const resp = (meta: object = {}, topo: object = {}) => ({ issues: [], meta: { reviewed_files: ["src/a.js"], total_changed: 1, skipped: [],
+  capped: false, max_files: 40, ...meta }, error: null, noFiles: false, ...topo });
 const achado = (arquivo: string, linha: number, label = "security") => ({ issue_content: "x", relevant_file: arquivo, start_line: linha, label });
 const identidade = (label: string, arquivo: string, l: string[]) => createHash("sha256").update([label, arquivo, ...l, "0.5.14"].join("\0")).digest("hex");
 const rejeita = (raiz: string, task: string, ids: string[]) =>
   escreve(raiz, `docs/entregas/w/revisao/${task}.json`, JSON.stringify({ expx_revisao: 1, achados: [], rejeicoes: ids.map((identidade) => ({ identidade, motivo: "fp", em: "x" })) }));
 const altera3 = (raiz: string) => escreve(raiz, "src/a.js", "l1\nl2\nnovo3\nl4\nl5\n");
+
+describe("expx-revisao.mjs revisar: a CLI conferida", () => {
+  it("funcional: a falsa com o perfil de teste revisa (ok); a evidência registra a versão e a integridade conferida", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js");
+    expect(r).toMatchObject({ rc: 0, ev: { resultado: "ok", cli: { versao: "0.5.14", integridade: "conferida" } } });
+    expect(r.chamadas).toEqual([["review", "--uncommitted", "--headless", "--include", "src/a.js"]]);
+  });
+
+  it("funcional: a falsa com o perfil real → indisponivel:integridade, nenhuma chamada de review", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js", "T-01", undefined, {}, SCRIPT);
+    expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "integridade" } });
+    expect(r.chamadas).toEqual([]);
+  });
+
+  it("funcional: arquivo do pacote editado depois da instalação → indisponivel:integridade, nenhuma chamada", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    writeFileSync(join(c.falsa.pacote, "README.md"), "trocado\n");
+    const r = revisar(c, "src/a.js");
+    expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "integridade" } });
+    expect(r.chamadas).toEqual([]);
+  });
+
+  it("funcional: versão 0.5.15 sem perfil → indisponivel:versao, nenhuma chamada", () => {
+    const c = cenario({ versao: "0.5.15" });
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js");
+    expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "versao" } });
+    expect(r.chamadas).toEqual([]);
+  });
+
+  it("funcional: PATH sem codeant → indisponivel:cli-ausente", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js", "T-01", dirname(noPath("git") ?? ""))).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "cli-ausente" } });
+  });
+
+  it("funcional: a CLI roda pelo node no arquivo conferido, não pelo shim nem pelo link", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js");
+    expect(r.registro).toHaveLength(1);
+    expect(r.registro[0]?.shim).toBe(false);
+    expect(r.registro[0]?.arquivo.toLowerCase()).toBe(realpathSync(c.falsa.bin).toLowerCase());
+  });
+});
 
 describe("expx-revisao.mjs revisar", () => {
   it("funcional: achado em linha alterada bloqueia", () => {
@@ -90,11 +130,11 @@ describe("expx-revisao.mjs revisar", () => {
     const c = cenario();
     altera3(c.raiz);
     escreve(c.raiz, "src/b.js", "b\n");
-    expect(revisar(c, "src/a.js,src/b.js").chamadas).toEqual([["--version"], ["review", "--uncommitted", "--headless", "--include", "src/a.js,src/b.js"]]);
+    expect(revisar(c, "src/a.js,src/b.js").chamadas).toEqual([["review", "--uncommitted", "--headless", "--include", "src/a.js,src/b.js"]]);
   });
 
   it("funcional: lotes pelo meta.max_files; passa só se todos os lotes passam", () => {
-    const c = cenario({ max_files: 2, issues: [achado("src/c.js", 1)] });
+    const c = cenario({ resposta: resp({ max_files: 2, reviewed_files: ["src/a.js", "src/b.js", "src/c.js"] }, { issues: [achado("src/c.js", 1)] }) });
     for (const f of ["a", "b", "c"]) escreve(c.raiz, `src/${f}.js`, `${f}\n`);
     const r = revisar(c, "src/a.js,src/b.js,src/c.js");
     expect(r.rc).toBe(1);
@@ -105,10 +145,10 @@ describe("expx-revisao.mjs revisar", () => {
     ["CLI ausente", {}, "cli-ausente"],
     ["versão abaixo de 0.5.14", { versao: "0.5.9" }, "versao"],
     ["error não nulo", { error: "falhou" }, "erro"],
-    ["capped", { capped: true }, "incompleta"],
-    ["noFiles", { noFiles: true }, "incompleta"],
-    ["meta.reviewed_files abaixo dos arquivos pedidos", { reviewed_files: 0 }, "incompleta"],
-    ["arquivo da task em skipped sem ser por padrão", { skipped: [{ file: "src/a.js", reason: "too large" }] }, "incompleta"],
+    ["capped", { resposta: resp({ capped: true }) }, "incompleta"],
+    ["noFiles", { resposta: resp({ reviewed_files: [] }, { noFiles: true }) }, "incompleta"],
+    ["meta.reviewed_files abaixo dos arquivos pedidos", { resposta: resp({ reviewed_files: [] }) }, "incompleta"],
+    ["arquivo da task em skipped sem ser por padrão", { resposta: resp({ reviewed_files: [], skipped: [{ file: "src/a.js", reason: "too large" }] }) }, "incompleta"],
   ])("funcional: %s → indisponivel (rc 2) com motivo", (nome, cfg, motivo) => {
     const c = cenario(cfg);
     altera3(c.raiz);
@@ -139,7 +179,7 @@ describe("expx-revisao.mjs revisar", () => {
     const r = revisar(c, " a.js");
     expect(r).toMatchObject({ rc: 1, ev: { resultado: "achados", achados: [{ arquivo: " a.js", estado: "aberto" }] } });
     expect(Object.keys(r.ev.arquivos)).toEqual([" a.js"]);
-    expect(r.chamadas[1]).toEqual(["review", "--uncommitted", "--headless", "--include", " a.js"]);
+    expect(r.chamadas[0]).toEqual(["review", "--uncommitted", "--headless", "--include", " a.js"]);
   });
 
   it("funcional: --arquivos só com espaços é um caminho, não uso errado: ausente → indisponivel", () => {
@@ -165,7 +205,7 @@ describe("expx-revisao.mjs revisar", () => {
     escreve(c.raiz, "src/b.js", "b\n");
     const r = revisar(c, "src/a.js,src/b.js");
     expect(r).toMatchObject({ rc: 0, ev: { resultado: "ok", removidos_sem_revisao: ["src/a.js"], arquivos: { "src/a.js": null } } });
-    expect(r.chamadas[1]).toContain("src/b.js");
+    expect(r.chamadas[0]).toContain("src/b.js");
   });
 
   it("funcional: rejeição anterior com a mesma identidade vale nesta task", () => {
@@ -198,9 +238,9 @@ describe("expx-revisao.mjs revisar", () => {
     altera3(c.raiz);
     const trava = join(c.raiz, `${EV}.trava`);
     mkdirSync(trava, { recursive: true }); // outro processo segura a evidência da T-01
-    const ch = join(c.falsa, "chamadas.jsonl");
-    const rev = new Promise<number | null>((ok) => spawn(process.execPath, [SCRIPT, "revisar", "--trabalho", "w", "--task", "T-01", "--arquivos", "src/a.js", "--raiz", c.raiz],
-      { env: ambienteCom(`${c.falsa}${delimiter}${PATH}`), stdio: "ignore" }).on("close", ok));
+    const ch = join(c.falsa.dir, "chamadas.jsonl");
+    const rev = new Promise<number | null>((ok) => spawn(process.execPath, [c.script, "revisar", "--trabalho", "w", "--task", "T-01", "--arquivos", "src/a.js", "--raiz", c.raiz],
+      { env: ambienteCom(`${c.falsa.path}${delimiter}${PATH}`), stdio: "ignore" }).on("close", ok));
     const espera = async (ms: number) => new Promise((ok) => setTimeout(ok, ms));
     for (const ate = Date.now() + 20000; !(existsSync(ch) && readFileSync(ch, "utf8").includes("review")) && Date.now() < ate;) await espera(50);
     await espera(1500); // o revisar já classificou os achados e espera a trava
@@ -328,16 +368,15 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: `T-01 FALHA evidencia-invalida:${campo}` });
   });
 
-  it("funcional: achados sem cli.versao é evidencia-invalida; versão 0.10.0 compara por número e passa", () => {
+  it("funcional: achados sem cli.versao, ou com versão acima da homologada, é evidencia-invalida", () => {
     const c = cenario({ issues: [achado("src/a.js", 3)] });
     altera3(c.raiz);
     revisar(c, "src/a.js");
-    escreve(c.raiz, EV, JSON.stringify({ ...(evidencia(c.raiz) as object), cli: {} }));
+    const ev = evidencia(c.raiz) as object;
+    escreve(c.raiz, EV, JSON.stringify({ ...ev, cli: {} }));
     expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:cli.versao" });
-    const d = cenario({ versao: "0.10.0" });
-    altera3(d.raiz);
-    revisar(d, "src/a.js");
-    expect(conferir(d.raiz, "obrigatoria", `T-01=${commita(d.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+    escreve(c.raiz, EV, JSON.stringify({ ...ev, cli: { versao: "0.10.0", integridade: "conferida" } }));
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:cli.versao" });
   });
 
   it("funcional: indisponivel não exige cli.versao, executada_em nem lotes", () => {
@@ -375,9 +414,9 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
     const dir = temp("expx-pausa-");
     const filho = (a: string[], env?: NodeJS.ProcessEnv) => new Promise<number | null>((ok) =>
-      spawn(process.execPath, [SCRIPT, ...a, "--trabalho", "w", "--raiz", c.raiz], { env, stdio: "ignore" }).on("close", ok));
+      spawn(process.execPath, [c.script, ...a, "--trabalho", "w", "--raiz", c.raiz], { env, stdio: "ignore" }).on("close", ok));
     const espera = async (ms: number) => new Promise((ok) => setTimeout(ok, ms));
-    const rev = filho(["revisar", "--task", "T-01", "--arquivos", "src/a.js"], ambienteCom(`${c.falsa}${delimiter}${PATH}`, { EXPX_REVISAO_TESTE_PAUSA: dir }));
+    const rev = filho(["revisar", "--task", "T-01", "--arquivos", "src/a.js"], ambienteCom(`${c.falsa.path}${delimiter}${PATH}`, { EXPX_REVISAO_TESTE_PAUSA: dir }));
     for (const ate = Date.now() + 20000; !existsSync(join(dir, "pronto")) && Date.now() < ate;) await espera(50);
     const rej = filho(["rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp"]);
     await espera(1500); // sem a trava, o rejeitar grava aqui, com o revisar parado, e o revisar o apaga
@@ -410,7 +449,7 @@ syncBuiltinESMExports();
     const rej = filho(["--import", pathToFileURL(join(pb, "pre.mjs")).href, SCRIPT, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp"]);
     await pronto(pb);
     // o revisar remove a trava velha, toma a sua e para entre a releitura e a gravação
-    const rev = filho([SCRIPT, "revisar", "--task", "T-01", "--arquivos", "src/a.js"], ambienteCom(`${c.falsa}${delimiter}${PATH}`, { EXPX_REVISAO_TESTE_PAUSA: pa }));
+    const rev = filho([c.script, "revisar", "--task", "T-01", "--arquivos", "src/a.js"], ambienteCom(`${c.falsa.path}${delimiter}${PATH}`, { EXPX_REVISAO_TESTE_PAUSA: pa }));
     await pronto(pa);
     writeFileSync(join(pb, "continuar"), "");
     await espera(1500); // sem a correção, o rejeitar remove aqui a trava do revisar, grava, e o revisar o apaga
