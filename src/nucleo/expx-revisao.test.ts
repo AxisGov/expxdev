@@ -356,6 +356,15 @@ describe("expx-revisao.mjs revisar v2: portões antes da CLI", () => {
     expect(Number(git(c.raiz, "cat-file", "-s", r.ev.arquivos["src/grande.js"]?.blob ?? ""))).toBe(2060 * 99);
   });
 
+  it("funcional: acima da leitura máxima (1 MiB), nem blob nem checkout são lidos → incompleta:L2, bytes do tamanho e linhas null", () => {
+    const c = cenario();
+    escreve(c.raiz, "src/enorme.js", "x\n".repeat(512 * 1024) + "x");
+    const r = revisar(c, "src/enorme.js");
+    expect(r).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "L2:src/enorme.js" } });
+    expect(r.ev.arquivos["src/enorme.js"]).toMatchObject({ bytes: 1024 * 1024 + 1, linhas: null, revisao: "enviado" });
+    naoChamou(r);
+  });
+
   it("funcional: notas.md, manual.pdf, logo.png, package-lock.json e apagado.js → --include só notas.md; a resposta da CLI para eles → ok", () => {
     const tarefa = ["notas.md", "manual.pdf", "logo.png", "package-lock.json", "apagado.js"];
     const c = cenario({ resposta: doFixture("pulos", (f) => tarefa.includes(f)) });
@@ -559,6 +568,47 @@ describe("expx-revisao.mjs revisar v2: --base-commit", () => {
     configurarFalsa(c.falsa, {});
     altera3(c.raiz);
     expect(revisar(c, "src/a.js")).toMatchObject({ rc: 0, ev: { resultado: "ok" } });
+  });
+
+  // com --base-commit, a exclusão que vale é a versionada no HEAD revisado, nunca a da árvore de trabalho
+  const exclusaoGerado = JSON.stringify({ expx_fatiamento: 2, excluir_da_revisao: [
+    { padrao: "^gerado/", classe: "gerado", origem: "scripts/gera.sh", motivo: "saída do gerador" }] });
+  const comGerado = (c: Cenario): string => {
+    const base = git(c.raiz, "rev-parse", "HEAD");
+    escreve(c.raiz, "gerado/saida.js", "x\n");
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "task");
+    return base;
+  };
+
+  it("funcional: excluir_da_revisao só no disco (fora do HEAD) não vale: o arquivo é revisado", () => {
+    const c = cenario();
+    const base = comGerado(c);
+    escreve(c.raiz, ".expx/fatiamento.json", exclusaoGerado);
+    const r = revisar(c, "gerado/saida.js", "T-01", undefined, {}, c.script, ["--base-commit", base]);
+    expect(r).toMatchObject({ rc: 0, ev: { resultado: "ok", arquivos: { "gerado/saida.js": { revisao: "enviado" } } } });
+    expect(r.chamadas).toEqual([["review", "--headless", "--base-commit", base, "--include", "gerado/saida.js"]]);
+  });
+
+  it("funcional: excluir_da_revisao no HEAD vale mesmo apagado do disco → incompleta:excluido-declarado", () => {
+    const c = cenario();
+    escreve(c.raiz, ".expx/fatiamento.json", exclusaoGerado);
+    const base = comGerado(c);
+    rmSync(join(c.raiz, ".expx", "fatiamento.json"));
+    const r = revisar(c, "gerado/saida.js", "T-01", undefined, {}, c.script, ["--base-commit", base]);
+    expect(r).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "excluido-declarado:gerado/saida.js" } });
+    naoChamou(r);
+  });
+
+  it("funcional: .expx/fatiamento.json do HEAD que não é arquivo → indisponivel:fatiamento-invalido, mesmo válido no disco", () => {
+    const c = cenario();
+    escreve(c.raiz, ".expx/fatiamento.json/x", "x\n");
+    const base = comGerado(c);
+    rmSync(join(c.raiz, ".expx"), { recursive: true });
+    escreve(c.raiz, ".expx/fatiamento.json", exclusaoGerado);
+    const r = revisar(c, "gerado/saida.js", "T-01", undefined, {}, c.script, ["--base-commit", base]);
+    expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "fatiamento-invalido" } });
+    naoChamou(r);
   });
 
   it("funcional: arquivo apagado desde <sha> → removido, não arquivo-inexistente", () => {
@@ -837,6 +887,19 @@ describe("expx-revisao.mjs conferir v2", () => {
     reprova(forjada((ev) => {
       ev["arquivos"]["src/a.js"] = { ...ev["arquivos"]["src/a.js"], blob: grandeBlob, linhas: 5001, bytes: Buffer.byteLength(grande) };
     }, (raiz) => { escreve(raiz, "src/a.js", grande); grandeBlob = git(raiz, "hash-object", "src/a.js"); }), "L2");
+  });
+
+  it("funcional: blob do enviado ilegível para o git (objeto apagado) → FALHA evidencia-invalida:L2, nunca medida de 0 bytes", () => {
+    const f = forjada(() => undefined);
+    const blob = git(f.raiz, "rev-parse", `${f.sha}:src/a.js`);
+    rmSync(join(f.raiz, ".git", "objects", blob.slice(0, 2), blob.slice(2)), { force: true });
+    reprova(f, "L2");
+  });
+
+  it("funcional: ok com enviado acima da leitura máxima forjado pequeno → FALHA evidencia-invalida:L2", () => {
+    reprova(forjada((ev) => {
+      ev["arquivos"]["src/a.js"] = { ...ev["arquivos"]["src/a.js"], blob: grandeBlob, linhas: 2, bytes: 4 };
+    }, (raiz) => { escreve(raiz, "src/a.js", "x".repeat(1024 * 1024 + 1)); grandeBlob = git(raiz, "hash-object", "src/a.js"); }), "L2");
   });
 
   it("funcional: ok com mais de 40 enviados forjado → FALHA evidencia-invalida:L1", () => {

@@ -82,7 +82,7 @@ exceto `motivo`:
 | `head` | o SHA completo do `HEAD` quando o `revisar` rodou, ou `null` sem commit; sem `--base-commit`, é dele que as linhas alteradas são medidas |
 | `cli` | `{versao, integridade}`: a versão do `package.json` do pacote e `conferida`; `integridade` `null` quando a CLI foi achada mas não passou; `cli` `null` quando a CLI não foi procurada (nada a revisar, ou um portão antes dela) ou não foi achada |
 | `executada_em` | timestamp ISO (R4) |
-| `arquivos` | `{<caminho>: {blob, bytes, linhas, revisao} \| null}`. `blob`: o sha1 que vai ao commit (sem `--base-commit`, `git hash-object -w`, com os filtros de fim de linha; com, o de `HEAD:<caminho>`). `bytes` e `linhas`: medidos como a CLI (`Buffer.byteLength` e `split('\n').length`) no blob e no checkout, o maior. `revisao`: `enviado`, `nao-revisavel` (fora do predicado da CLI) ou `excluido` (exclusões do núcleo ou do projeto). `null` para arquivo removido |
+| `arquivos` | `{<caminho>: {blob, bytes, linhas, revisao} \| null}`. `blob`: o sha1 que vai ao commit (sem `--base-commit`, `git hash-object -w`, com os filtros de fim de linha; com, o de `HEAD:<caminho>`). `bytes` e `linhas`: medidos como a CLI (`Buffer.byteLength` e `split('\n').length`) no blob e no checkout, o maior; conteúdo acima de 1 MiB não é lido (já reprova L2 pelo tamanho, porque a decodificação da CLI nunca encolhe o conteúdo): `bytes` é o tamanho e `linhas` `null`. `revisao`: `enviado`, `nao-revisavel` (fora do predicado da CLI) ou `excluido` (exclusões do núcleo ou do projeto). `null` para arquivo removido |
 | `chamada` | `{include, meta, error, falhas_de_lote, issues, stdout_sha256}` da única chamada, ou `null` sem chamada. `falhas_de_lote`: as linhas do stderr que começam com `[error] Failed to review `. `issues`: a lista `issues` do JSON da CLI, crua (cada objeto com todas as chaves que a CLI deu, sem reformatar), ou `null` com JSON ilegível. `stdout_sha256`: sha256, em hex, do stdout da CLI byte a byte (com os avisos do npm), para rastreio |
 | `resultado` | `ok`, `achados` (algum `aberto`), `incompleta` ou `indisponivel` |
 | `motivo` | só com `incompleta` e `indisponivel` (abaixo) |
@@ -125,9 +125,12 @@ evidência travada, **75**. Imprime `<task> <resultado>[:<motivo>]`.
 - **Exclusões:** as do núcleo (`^docs/sprintx/`, `^docs/entregas/`, `^docs/eventos/`)
   mais os `padrao` de `excluir_da_revisao` do projeto, lidos pelo leitor irmão
   (`node <pasta do script>/expx-fatiamento.mjs --formato json --raiz <raiz>`), nunca do
-  ambiente. Arquivo da task sob as do núcleo fica `revisao: "excluido"`, fora de L1 e
-  L2. Arquivo presente da task sob as do projeto é `incompleta:excluido-declarado`
-  (o que a task escreve é revisado; regenerar um gerado é commit próprio).
+  ambiente. Com `--base-commit`, o arquivo lido é o `.expx/fatiamento.json` do `HEAD`
+  revisado, nunca o da árvore de trabalho: o leitor roda sobre uma pasta temporária com
+  esse blob; ausente no `HEAD`, valem os padrões (como o ausente no disco); no `HEAD`
+  como algo que não é arquivo comum (pasta, link, submódulo), `fatiamento-invalido`.
+  Arquivo da task sob as do núcleo fica `revisao: "excluido"`, fora de L1 e L2. Arquivo
+  presente da task sob as do projeto é `incompleta:excluido-declarado` (o que a task escreve é revisado; regenerar um gerado é commit próprio).
 - **Revisável** é o predicado da CLI homologada (perfil): fora dos nomes, extensões e
   sufixos excluídos. Markdown é revisável. Os portões antes da CLI usam os números do
   perfil, iguais em todas as homologadas, e não dependem da CLI instalada.
@@ -159,7 +162,7 @@ O primeiro que se aplica decide o resultado:
 |---|---|---|
 | 1 | `indisponivel:caminho-com-virgula` | caminho com vírgula (o `--include` separa por vírgula) |
 | 1 | `indisponivel:arquivo-inexistente:<f>` | ausente no disco, no `HEAD` e, com `--base-commit`, na árvore de `<sha>` (o apagado pela task é removido, não inexistente); ou presente e ilegível para o git |
-| 1 | `indisponivel:fatiamento-invalido` | o leitor de `.expx/fatiamento.json` falha |
+| 1 | `indisponivel:fatiamento-invalido` | o leitor de `.expx/fatiamento.json` falha (com `--base-commit`, o do `HEAD`, ou ele no `HEAD` não é arquivo comum) |
 | 1 | `indisponivel:arquivo-nao-commitado:<f>` | com `--base-commit`, arquivo da task diferente de `HEAD` |
 | 2 | `incompleta:excluido-declarado:<f>` | arquivo presente da task em `excluir_da_revisao` do projeto |
 | 2 | `incompleta:L1:<n>` | mais de 40 revisáveis |
@@ -269,3 +272,5 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-10-20 | **v2** (emenda de 2026-10-19, limites do CodeAnt, fixos): lista exata de versões homologadas, localização e integridade do pacote, execução pelo arquivo conferido; sem lotes; `--base-commit`; exclusões, L1 e L2 antes da CLI; reconciliação com `meta`, `skipped` e stderr; resultado `incompleta` (saída 3); evidência v2; `conferir` reprova `incompleta` em qualquer modo e evidência fora do perfil; `FATIA_*` no ambiente é uso errado. |
 | 2026-10-20 | Revisão da PR 5: `conferir` refaz a classificação `revisao` de cada arquivo (`evidencia-invalida:revisao`), exige `chamada.error` nulo e `include` igual aos enviados, e aplica a reconciliação do `revisar` (`cobertura`); o git recebe caminhos literais. |
 | 2026-10-20 | A evidência guarda as `issues` da CLI cruas, o `stdout_sha256` e o `head` da revisão; o `conferir` deriva os `achados` das `issues` gravadas (`evidencia-invalida:achados`, `head`, `base_commit`), e `rejeitado` exige a rejeição gravada. Continua `expx_revisao: 2`, com os campos novos obrigatórios em `ok`/`achados`: nenhum consumidor grava v2 além do núcleo (a V12 da mergex e a sprintx ainda não existem), e a v2 sem eles reprova (`evidencia-invalida:chamada`) e se revisa de novo. Arquivo novo, no `revisar` sem `--base-commit`, passa a ser o ausente do `HEAD` (antes, o fora do índice), a mesma regra do `conferir`. Limite aceito: quem edita a evidência edita as `issues`; a defesa é o diff da evidência no PR. |
+| 2026-10-20 | Com `--base-commit`, `excluir_da_revisao` vem do `.expx/fatiamento.json` do `HEAD` revisado, não da árvore de trabalho (achado do CodeAnt na AxisGov/mergex#38): uma exclusão só no disco não vale, e a versionada vale mesmo apagada do disco. |
+| 2026-10-20 | Leitura limitada a 1 MiB (antes, até 1 GiB na memória; achado do CodeAnt na AxisGov/mergex#38): blob ou checkout maior não é lido, e a medida é o tamanho em bytes com `linhas` `null`, o que dá `incompleta:L2:<f>` no `revisar` e `evidencia-invalida:L2` no `conferir`. O checkout é lido até 1 MiB + 1 byte, mesmo que cresça durante a leitura. Blob que o git não lê não é medido como 0 bytes: `indisponivel:arquivo-inexistente:<f>` no `revisar` e `evidencia-invalida:L2` no `conferir`. Nenhum motivo novo. |

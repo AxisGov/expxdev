@@ -11,7 +11,9 @@
 // `continuar` entre a releitura e a gravação.
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, statSync,
+  writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { conferirIntegridade, excluido, EXCLUIDOS_DO_NUCLEO, fatiaNoAmbiente, homologadas, localizarPacote, medir, mensagemFatia,
@@ -55,7 +57,38 @@ const le = (f) => { try { return JSON.parse(readFileSync(f, "utf8").replace(/^\u
 // hunks de outro arquivo, ou nenhum, e o achado em linha alterada viraria `anterior`
 const GIT_ENV = { ...process.env, GIT_LITERAL_PATHSPECS: "1" };
 const git = (...a) => spawnSync("git", a, { cwd: op.raiz, encoding: "utf8", env: GIT_ENV });
-const blobGit = (ref) => spawnSync("git", ["cat-file", "blob", ref], { cwd: op.raiz, maxBuffer: 1 << 30, env: GIT_ENV }).stdout;
+// Nada acima de LEITURA_MAXIMA vai inteiro à memória. É muito acima de L2 (204.800 bytes), e a decodificação da CLI
+// nunca encolhe o conteúdo (cada sequência UTF-8 inválida, de até 3 bytes, vira um U+FFFD, de 3): o que passa dele já
+// reprova L2 só pelo tamanho, e a medida fica o tamanho em bytes, com as linhas desconhecidas (`null`).
+const LEITURA_MAXIMA = 1 << 20;
+/** O blob `ref`, ou undefined se o git falha ou ele passa de LEITURA_MAXIMA. */
+function blobGit(ref) {
+  const r = spawnSync("git", ["cat-file", "blob", ref], { cwd: op.raiz, maxBuffer: LEITURA_MAXIMA, env: GIT_ENV });
+  return r.error || r.status !== 0 ? undefined : r.stdout;
+}
+/** A medida da CLI do blob `ref` (`{linhas, bytes}`); acima de LEITURA_MAXIMA, `{linhas: null, bytes: <tamanho>}` sem lê-lo;
+ *  undefined se o git não o lê (nunca uma medida de 0 bytes). */
+function medirBlob(ref) {
+  const r = git("cat-file", "-s", ref);
+  const tamanho = r.status === 0 ? Number(r.stdout.trim()) : NaN;
+  if (!Number.isSafeInteger(tamanho)) return undefined;
+  if (tamanho > LEITURA_MAXIMA) return { linhas: null, bytes: tamanho };
+  const conteudo = blobGit(ref);
+  return conteudo ? medir(conteudo) : undefined;
+}
+/** A medida da CLI do arquivo do checkout, pela mesma regra de `medirBlob`: lê no máximo LEITURA_MAXIMA + 1 bytes, mesmo
+ *  que o arquivo cresça durante a leitura. */
+function medirArquivo(f) {
+  const fd = openSync(join(op.raiz, f), "r");
+  try {
+    const buf = Buffer.alloc(LEITURA_MAXIMA + 1);
+    let n = 0;
+    for (let k; n < buf.length && (k = readSync(fd, buf, n, buf.length - n, null)) > 0;) n += k;
+    return n > LEITURA_MAXIMA ? { linhas: null, bytes: Math.max(n, fstatSync(fd).size) } : medir(buf.subarray(0, n));
+  } finally {
+    closeSync(fd);
+  }
+}
 
 // `\` é separador só no Windows; fora dele é parte do nome, e trocá-lo daria por ausente um arquivo que existe
 const caminho = (f) => (process.platform === "win32" ? f.replace(/\\/g, "/") : f).replace(/^\.\//, "");
@@ -143,18 +176,41 @@ function alteradas(f, de, ate) {
 }
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-/** Os `padrao` de `excluir_da_revisao` do projeto, pelo leitor irmão (nunca do ambiente); `null` se ele falha. */
-function exclusoesDoProjeto() {
-  const r = spawnSync(process.execPath, [join(AQUI, "expx-fatiamento.mjs"), "--formato", "json", "--raiz", op.raiz], { encoding: "utf8" });
-  if (r.status !== 0) {
-    process.stderr.write(r.stderr ?? "");
+/** Com `--base-commit`, uma pasta temporária com o `.expx/fatiamento.json` do `HEAD` revisado, para o leitor: ausente
+ *  no `HEAD`, a pasta fica sem ele (os padrões, como o ausente no disco); entrada que não é arquivo comum (pasta, link,
+ *  submódulo) ou `ls-tree` que falha: `null` (inválido, nunca os padrões). */
+function raizDoFatiamentoNoHead() {
+  const r = git("ls-tree", "-z", "HEAD", "--", ".expx/fatiamento.json");
+  const entrada = r.status === 0 ? r.stdout.split("\0")[0] : undefined;
+  const [modo, tipo, oid] = (entrada ?? "").split("\t")[0].split(" ");
+  if (entrada === undefined || (entrada !== "" && (tipo !== "blob" || !["100644", "100755"].includes(modo)))) {
+    process.stderr.write("expx-revisao: .expx/fatiamento.json do HEAD nao e arquivo comum legivel\n");
     return null;
   }
+  const raiz = mkdtempSync(join(tmpdir(), "expx-fatiamento-"));
+  if (entrada !== "") {
+    mkdirSync(join(raiz, ".expx"));
+    writeFileSync(join(raiz, ".expx", "fatiamento.json"), blobGit(oid) ?? Buffer.alloc(0));
+  }
+  return raiz;
+}
+/** Os `padrao` de `excluir_da_revisao` do projeto, pelo leitor irmão (nunca do ambiente); `null` se ele falha. Com
+ *  `--base-commit`, os do `HEAD` revisado, nunca os da árvore de trabalho. */
+function exclusoesDoProjeto() {
+  const temporaria = op["base-commit"] ? raizDoFatiamentoNoHead() : undefined;
+  if (temporaria === null) return null;
   try {
+    const r = spawnSync(process.execPath, [join(AQUI, "expx-fatiamento.mjs"), "--formato", "json", "--raiz", temporaria ?? op.raiz], { encoding: "utf8" });
+    if (r.status !== 0) {
+      process.stderr.write(r.stderr ?? "");
+      return null;
+    }
     const lista = JSON.parse(r.stdout).excluir_da_revisao;
     return Array.isArray(lista) ? lista.map((x) => x.padrao) : null;
   } catch {
     return null;
+  } finally {
+    if (temporaria) rmSync(temporaria, { recursive: true, force: true });
   }
 }
 const arvore = (ref) => new Set(git("ls-tree", "-r", "-z", "--name-only", ref).stdout.split("\0").filter(Boolean));
@@ -165,10 +221,11 @@ function medida(f) {
   const disco = idDe("hash-object", "--", f);
   const blob = (op["base-commit"] && idDe("rev-parse", "--verify", "-q", `HEAD:./${f}`)) || idDe("hash-object", "-w", "--", f);
   if (!blob || !disco) return undefined;
-  const conteudo = blobGit(blob);
-  const a = medir(conteudo);
-  const b = medir(readFileSync(join(op.raiz, f)));
-  return { blob, bytes: Math.max(a.bytes, b.bytes), linhas: Math.max(a.linhas, b.linhas), disco };
+  const a = medirBlob(blob);
+  if (!a) return undefined;
+  const b = medirArquivo(f);
+  const linhas = a.linhas === null || b.linhas === null ? null : Math.max(a.linhas, b.linhas);
+  return { blob, bytes: Math.max(a.bytes, b.bytes), linhas, disco };
 }
 /** A resposta fora da forma do perfil (emenda, 6): topo, `meta`, `max_files`, a conta e os motivos. */
 function foraDoPerfil(j, perfil, status) {
@@ -362,8 +419,8 @@ function semSinalDaCli(ev, sha) {
   if (enviados.length > perfil.max_files) return "L1";
   for (const f of enviados) {
     const a = ev.arquivos[f];
-    const m = medir(blobGit(`${sha}:./${f}`) ?? Buffer.alloc(0));
-    if (!Number.isSafeInteger(a.bytes) || !Number.isSafeInteger(a.linhas) || a.bytes > perfil.max_bytes || a.linhas > perfil.max_linhas
+    const m = medirBlob(`${sha}:./${f}`);
+    if (!m || !Number.isSafeInteger(a.bytes) || !Number.isSafeInteger(a.linhas) || a.bytes > perfil.max_bytes || a.linhas > perfil.max_linhas
       || a.bytes < m.bytes || a.linhas < m.linhas) return "L2";
   }
   // a mesma reconciliação do `revisar`, com o `--include` igual aos enviados
