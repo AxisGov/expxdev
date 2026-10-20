@@ -56,7 +56,26 @@ const le = (f) => { try { return JSON.parse(readFileSync(f, "utf8").replace(/^\u
 // hunks de outro arquivo, ou nenhum, e o achado em linha alterada viraria `anterior`
 const GIT_ENV = { ...process.env, GIT_LITERAL_PATHSPECS: "1" };
 const git = (...a) => spawnSync("git", a, { cwd: op.raiz, encoding: "utf8", env: GIT_ENV });
-const blobGit = (ref) => spawnSync("git", ["cat-file", "blob", ref], { cwd: op.raiz, maxBuffer: 1 << 30, env: GIT_ENV }).stdout;
+// Nada acima de LEITURA_MAXIMA vai inteiro à memória. É muito acima de L2 (204.800 bytes), e a decodificação da CLI
+// nunca encolhe o conteúdo (cada sequência UTF-8 inválida, de até 3 bytes, vira um U+FFFD, de 3): o que passa dele já
+// reprova L2 só pelo tamanho, e a medida fica o tamanho em bytes, com as linhas desconhecidas (`null`).
+const LEITURA_MAXIMA = 1 << 20;
+/** O blob `ref`, ou undefined se o git falha ou ele passa de LEITURA_MAXIMA. */
+function blobGit(ref) {
+  const r = spawnSync("git", ["cat-file", "blob", ref], { cwd: op.raiz, maxBuffer: LEITURA_MAXIMA, env: GIT_ENV });
+  return r.error || r.status !== 0 ? undefined : r.stdout;
+}
+/** A medida da CLI do blob `ref` (`{linhas, bytes}`); acima de LEITURA_MAXIMA, `{linhas: null, bytes: <tamanho>}` sem lê-lo. */
+function medirBlob(ref) {
+  const tamanho = Number(git("cat-file", "-s", ref).stdout.trim());
+  if (tamanho > LEITURA_MAXIMA) return { linhas: null, bytes: tamanho };
+  return medir(blobGit(ref) ?? Buffer.alloc(0));
+}
+/** A medida da CLI do arquivo do checkout, pela mesma regra de `medirBlob`. */
+function medirArquivo(f) {
+  const tamanho = statSync(join(op.raiz, f)).size;
+  return tamanho > LEITURA_MAXIMA ? { linhas: null, bytes: tamanho } : medir(readFileSync(join(op.raiz, f)));
+}
 
 // `\` é separador só no Windows; fora dele é parte do nome, e trocá-lo daria por ausente um arquivo que existe
 const caminho = (f) => (process.platform === "win32" ? f.replace(/\\/g, "/") : f).replace(/^\.\//, "");
@@ -189,10 +208,10 @@ function medida(f) {
   const disco = idDe("hash-object", "--", f);
   const blob = (op["base-commit"] && idDe("rev-parse", "--verify", "-q", `HEAD:./${f}`)) || idDe("hash-object", "-w", "--", f);
   if (!blob || !disco) return undefined;
-  const conteudo = blobGit(blob);
-  const a = medir(conteudo);
-  const b = medir(readFileSync(join(op.raiz, f)));
-  return { blob, bytes: Math.max(a.bytes, b.bytes), linhas: Math.max(a.linhas, b.linhas), disco };
+  const a = medirBlob(blob);
+  const b = medirArquivo(f);
+  const linhas = a.linhas === null || b.linhas === null ? null : Math.max(a.linhas, b.linhas);
+  return { blob, bytes: Math.max(a.bytes, b.bytes), linhas, disco };
 }
 /** A resposta fora da forma do perfil (emenda, 6): topo, `meta`, `max_files`, a conta e os motivos. */
 function foraDoPerfil(j, perfil, status) {
@@ -386,7 +405,7 @@ function semSinalDaCli(ev, sha) {
   if (enviados.length > perfil.max_files) return "L1";
   for (const f of enviados) {
     const a = ev.arquivos[f];
-    const m = medir(blobGit(`${sha}:./${f}`) ?? Buffer.alloc(0));
+    const m = medirBlob(`${sha}:./${f}`);
     if (!Number.isSafeInteger(a.bytes) || !Number.isSafeInteger(a.linhas) || a.bytes > perfil.max_bytes || a.linhas > perfil.max_linhas
       || a.bytes < m.bytes || a.linhas < m.linhas) return "L2";
   }

@@ -356,6 +356,15 @@ describe("expx-revisao.mjs revisar v2: portões antes da CLI", () => {
     expect(Number(git(c.raiz, "cat-file", "-s", r.ev.arquivos["src/grande.js"]?.blob ?? ""))).toBe(2060 * 99);
   });
 
+  it("funcional: acima da leitura máxima (1 MiB), nem blob nem checkout são lidos → incompleta:L2, bytes do tamanho e linhas null", () => {
+    const c = cenario();
+    escreve(c.raiz, "src/enorme.js", "x\n".repeat(512 * 1024) + "x");
+    const r = revisar(c, "src/enorme.js");
+    expect(r).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "L2:src/enorme.js" } });
+    expect(r.ev.arquivos["src/enorme.js"]).toMatchObject({ bytes: 1024 * 1024 + 1, linhas: null, revisao: "enviado" });
+    naoChamou(r);
+  });
+
   it("funcional: notas.md, manual.pdf, logo.png, package-lock.json e apagado.js → --include só notas.md; a resposta da CLI para eles → ok", () => {
     const tarefa = ["notas.md", "manual.pdf", "logo.png", "package-lock.json", "apagado.js"];
     const c = cenario({ resposta: doFixture("pulos", (f) => tarefa.includes(f)) });
@@ -878,6 +887,12 @@ describe("expx-revisao.mjs conferir v2", () => {
     reprova(forjada((ev) => {
       ev["arquivos"]["src/a.js"] = { ...ev["arquivos"]["src/a.js"], blob: grandeBlob, linhas: 5001, bytes: Buffer.byteLength(grande) };
     }, (raiz) => { escreve(raiz, "src/a.js", grande); grandeBlob = git(raiz, "hash-object", "src/a.js"); }), "L2");
+  });
+
+  it("funcional: ok com enviado acima da leitura máxima forjado pequeno → FALHA evidencia-invalida:L2", () => {
+    reprova(forjada((ev) => {
+      ev["arquivos"]["src/a.js"] = { ...ev["arquivos"]["src/a.js"], blob: grandeBlob, linhas: 2, bytes: 4 };
+    }, (raiz) => { escreve(raiz, "src/a.js", "x".repeat(1024 * 1024 + 1)); grandeBlob = git(raiz, "hash-object", "src/a.js"); }), "L2");
   });
 
   it("funcional: ok com mais de 40 enviados forjado → FALHA evidencia-invalida:L1", () => {
