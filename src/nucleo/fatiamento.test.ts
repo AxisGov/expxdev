@@ -297,6 +297,26 @@ describe("verificar-fatiamento.sh — limites fixos L2 e L3", () => {
     expect(r.saida).not.toContain("nao foi possivel");
   });
 
+  it("nome que comeca com hifen no checkout e medido como caminho, nao como opcao", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "-n.md", "x".repeat(204801));
+    escreve(d, "-pequeno.md", "x\n");
+    commita(d, "nomes com hifen");
+    const r = verifica(d);
+    expect(r.codigo, r.saida).toBe(1);
+    expect(r.saida).toContain("VIOLACAO L2: -n.md tem 1 linhas e 204801 bytes");
+    expect(r.saida).not.toContain("-pequeno.md tem");
+    expect(r.saida).not.toContain("nao foi possivel");
+    const bin = join(d, ".bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "node"), "#!/usr/bin/env bash\nexit 1\n", { mode: 0o755 });
+    const semNode = spawnSync(BASH, ["-c", 'PATH="$(cd "$1" && pwd):$PATH" exec bash "$2" main HEAD', "_", bin, SCRIPT],
+      { cwd: d, encoding: "utf8", env: ambiente() });
+    expect(semNode.status, `${semNode.stdout}${semNode.stderr}`).toBe(1);
+    expect(semNode.stdout).toContain("VIOLACAO L2: -n.md tem 1 linhas e 204801 bytes");
+  });
+
   it("falha do git e uso incorreto saem 2", () => {
     expect(spawnSync(BASH, [SCRIPT], { encoding: "utf8", env: ambiente() }).status).toBe(2);
     const d = repo();

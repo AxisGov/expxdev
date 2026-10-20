@@ -142,7 +142,7 @@ revisavel() {
 medir_arquivo() {
   local arquivo="$1" bytes linhas
   command -v iconv >/dev/null 2>&1 || { echo "iconv ausente: nao foi possivel medir $novo" >&2; return 2; }
-  if iconv -f UTF-8 -t UTF-8 "$arquivo" > "$decodificado" 2>/dev/null; then
+  if iconv -f UTF-8 -t UTF-8 < "$arquivo" > "$decodificado" 2>/dev/null; then
     bytes="$(wc -c < "$decodificado")" || return 2
     linhas="$(wc -l < "$decodificado")" || return 2
     printf '%d %d\n' "$((linhas + 1))" "$bytes"
@@ -177,7 +177,7 @@ while IFS= read -r -d '' estado; do
   read -r linhas bytes <<< "$medida"
 
   if [ -f "$novo" ] && [ ! -L "$novo" ]; then
-    oid_checkout="$(git hash-object "$novo" 2>/dev/null)" || { echo "nao foi possivel identificar $novo no checkout" >&2; exit 2; }
+    oid_checkout="$(git hash-object -- "$novo" 2>/dev/null)" || { echo "nao foi possivel identificar $novo no checkout" >&2; exit 2; }
     if [ "$oid_checkout" = "$oid" ]; then
       medida="$(medir_arquivo "$novo")" || exit 2
       read -r linhas_checkout bytes_checkout <<< "$medida"
