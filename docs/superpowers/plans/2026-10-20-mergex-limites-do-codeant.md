@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Levar à mergex a parte dela da emenda "limites do CodeAnt, fixos" (passo 3 da §11): a cópia do núcleo regerada de `cli-e772f88`, o `fatiamento-da-pr.sh` espelhando o verificador só com L2/L3, o E7 e o `leitor-do-projeto.sh` sem `FATIA_*`, o PR de planejamento (E0, E2, E7, E8, E9) e as emendas aos planos antigos da mergex, com a volta ao B1.
+**Goal:** Levar à mergex a parte dela da emenda "limites do CodeAnt, fixos" (passo 3 da §11): a cópia do núcleo regerada de expxdev 4060f8d (release `cli-4060f8d`), o `fatiamento-da-pr.sh` espelhando o verificador só com L2/L3, o E7 e o `leitor-do-projeto.sh` sem `FATIA_*`, o PR de planejamento (E0, E2, E7, E8, E9) e as emendas aos planos antigos da mergex, com a volta ao B1.
 
 **Architecture:**
 - **O núcleo é uma pasta, não um arquivo.** O leitor v2 importa `expx-limites.mjs`, que lê `perfis/`. A cópia dos testes, o gerador dela, a montagem nos testes e a conferência "o commit versiona outro leitor" passam a tratar `nucleo/scripts/` inteira.
-- **O espelho continua byte a byte.** `fatiamento-da-pr.sh` = cabeçalho da mergex + corpo de `scripts/verificar-fatiamento.sh` do expxdev 660bf9a (o mesmo em e772f88), a partir de `set -uo pipefail`, com `Corpo-sha256`.
+- **O espelho continua byte a byte.** `fatiamento-da-pr.sh` = cabeçalho da mergex + corpo de `scripts/verificar-fatiamento.sh` do expxdev 660bf9a (o mesmo em 4060f8d), a partir de `set -uo pipefail`, com `Corpo-sha256`.
 - **O E7 não exporta limite nenhum.** O leitor dá `EXPX_*`; o E7 transforma `EXPX_EXCLUIR_DA_REVISAO` em argumentos `--excluir-da-revisao` e, na entrega de planejamento, passa `--planejamento`.
 - **Entrega de planejamento num leitor só.** Um script novo, `entrega-de-planejamento.sh`, é o único que lê `sprint_atual` e `prs` para dizer se a entrega é a de planejamento; E2, E7, E8 e E9 o consomem.
 
@@ -17,10 +17,10 @@
 **Continua em:** `2026-10-20-mergex-limites-do-codeant-parte-2.md` (emendas aos planos antigos, a volta ao B1, dependências e pontos para o usuário).
 
 **Estado de partida:**
-- expxdev `origin/main` e772f88, release `cli-e772f88` (0.7.0) publicada e conferida, não liberada aos projetos. Em `nucleo/scripts/`: `expx-fatiamento.mjs` (254 linhas), `expx-limites.mjs` (300), `expx-revisao.mjs` (420), `perfis/codeant-cli-0.5.14.json` (16.948 B) e `perfis/codeant-app.json`. `scripts/verificar-fatiamento.sh` (201 linhas; último commit 660bf9a, com `--planejamento`), corpo com sha256 `586a3cae512ae6e13b218f3b0cd0e0fb9f42470bdf01165090cac726bff89019`.
+- expxdev `origin/main` 4060f8d (merge da AxisGov/expxdev#69 sobre e772f88). A release `cli-e772f88` (0.7.0) foi publicada e conferida; a `cli-4060f8d` é a que a cópia acompanha — quem a libera é o usuário, o plano só confere que ela existe (L1.1). Nenhuma das duas liberada aos projetos. Em `nucleo/scripts/`: `expx-fatiamento.mjs` (254 linhas), `expx-limites.mjs` (300), `expx-revisao.mjs` (420), `perfis/codeant-cli-0.5.14.json` (16.948 B) e `perfis/codeant-app.json`. `scripts/verificar-fatiamento.sh` (201 linhas; último commit 660bf9a, com `--planejamento`), corpo com sha256 `586a3cae512ae6e13b218f3b0cd0e0fb9f42470bdf01165090cac726bff89019`.
 - mergex `origin/main` d2da99d (#32 a #36 mergeados). Peças a mudar: `.claude/skills/mergex/scripts/fatiamento-da-pr.sh` (239 linhas, cabeçalho :1-31, origem 5260920), `.claude/skills/mergex/scripts/leitor-do-projeto.sh` (108), `scripts/ci/atualizar-nucleo-expx.sh` (41, lista fixa de dois arquivos em :23), `scripts/ci/fixtures/candidatos/expx-nucleo/` (de expxdev 8653468, só os dois `.mjs`), `references/07-abertura-pr.md` (Passo 1.5 :62-167; "Quando falha" :313-331), `scripts/ci/test-fatiamento-e7.sh` (505), `scripts/ci/test-leitor-do-projeto.sh` (254), `scripts/ci/test-nucleo-expx.sh` (83), `.github/workflows/ci.yml` (140).
 - Nenhum arquivo da mergex passa de 150 KB nem de 4.000 linhas: L2 não reprova nada hoje.
-- AxisGov/expxdev#69 (`feat/evidencia-guarda-issues`, aberta): a evidência continua `expx_revisao: 2`, mas ganha `head`, `chamada.issues` e `chamada.stdout_sha256`, e o `conferir` passa a reprovar a v2 gravada sem eles e a derivar os achados das `issues`. Não toca o leitor nem o verificador: L0, L1 e P não dependem dela; o B1 depende (parte 2).
+- AxisGov/expxdev#69 (`feat/evidencia-guarda-issues`) **mergeada em 4060f8d**: a evidência continua `expx_revisao: 2`, mas `ok`/`achados` exigem `head`, `chamada.issues` (cruas) e `chamada.stdout_sha256`; o `conferir` deriva os achados das `issues` e reprova `evidencia-invalida:achados|head|base_commit`. Só `expx-revisao.mjs` mudou entre e772f88 e 4060f8d: o leitor, `expx-limites.mjs`, os perfis e o verificador são os mesmos.
 
 ## Decisões incorporadas
 
@@ -63,9 +63,9 @@
 | PR | Entrega | Arquivos (est.) | Medido por | Depende de |
 |---|---|---|---|---|
 | L0 | gerador e testes tratam o núcleo como pasta (cópia ainda a de 8653468) | 4 | espelho antigo (400/20/300) | — |
-| L1 | cópia regerada de e772f88; `leitor-do-projeto.sh` v2; espelho L2/L3; E7 Passo 1.5; DM-257, DM-258 | ~16 | espelho novo (troca) | L0 |
+| L1 | cópia regerada de 4060f8d; `leitor-do-projeto.sh` v2; espelho L2/L3; E7 Passo 1.5; DM-257, DM-258 | ~16 | espelho novo (troca) | L0 |
 | P | PR de planejamento: `entrega-de-planejamento.sh`, schema, E0, E2 (V9), E7, E8, E9; DM-259, DM-260 | ~17 | L2/L3 | L1 |
-| B1… | volta ao plano antigo, com as emendas da parte 2 | — | L2/L3 | P; AxisGov/expxdev#69 e a release dela |
+| B1… | volta ao plano antigo, com as emendas da parte 2 | — | L2/L3 | P (a #69 já vem na cópia da L1) |
 
 ---
 
@@ -99,7 +99,7 @@
 
 Esta é a PR que troca o espelho; ela e as seguintes valem L2/L3 (Global Constraints). As quatro tasks vão juntas porque nenhuma fica verde sozinha: o leitor v2 recusa a configuração v1 dos testes de hoje, o helper de hoje exige `FATIA_*` do leitor, e o espelho novo sai 2 com as `FATIA_*` que o E7 de hoje exporta.
 
-### Task L1.1: a cópia regerada de e772f88
+### Task L1.1: a cópia regerada de 4060f8d
 
 **Files:**
 - Regenerate: `scripts/ci/fixtures/candidatos/expx-nucleo/` (`expx-fatiamento.mjs`, `expx-limites.mjs`, `expx-revisao.mjs`, `perfis/codeant-cli-0.5.14.json`, `perfis/codeant-app.json`, `ORIGEM`)
@@ -110,7 +110,7 @@ Esta é a PR que troca o espelho; ela e as seguintes valem L2/L3 (Global Constra
 
 - [ ] **Step 1: Write the failing tests**: lista exigida com os cinco; caso 2 vira `a copia fica fora de L2 do proprio repositorio` (espelho novo com `--excluir-da-revisao '^scripts/ci/fixtures/candidatos/'` num commit só com a cópia: saída 0 e resumo `PR com 6 arquivo(s)`); caso 3 vira `node roda a copia: padroes com os numeros do perfil` (saída contém `EXPX_FATIAMENTO_ORIGEM=padrao` e `EXPX_L2_BYTES=204800`, nenhuma linha `FATIA_`); novo `com EXPXDEV_RAIZ, a copia e a arvore nucleo/scripts da revisao do ORIGEM` (blob a blob; pulado com `passa` sem a variável).
 - [ ] **Step 2: Run** `bash scripts/ci/test-nucleo-expx.sh` — Expected: FAIL (cópia antiga; o caso 2 ainda falha até a Task L1.4).
-- [ ] **Step 3: Generate**: `bash scripts/ci/atualizar-nucleo-expx.sh F:/Projetos/expxdev e772f88`. Commit só da cópia: `test(mergex): copia do nucleo do expx de e772f88` (corpo: o comando).
+- [ ] **Step 3: Generate**: confira antes `gh release view cli-4060f8d -R AxisGov/expxdev` (Expected: a release existe; se não, pare e relate — o plano não a publica). Então `bash scripts/ci/atualizar-nucleo-expx.sh F:/Projetos/expxdev 4060f8d`. Commit só da cópia: `test(mergex): copia do nucleo do expx de 4060f8d` (corpo: o comando).
 - [ ] **Step 4:** siga para a L1.2; o teste fecha verde na L1.4.
 
 ### Task L1.2: `leitor-do-projeto.sh` v2
@@ -144,11 +144,11 @@ Esta é a PR que troca o espelho; ela e as seguintes valem L2/L3 (Global Constra
 ### Task L1.3: `fatiamento-da-pr.sh` espelha o verificador L2/L3
 
 **Files:**
-- Modify: `.claude/skills/mergex/scripts/fatiamento-da-pr.sh` (cabeçalho :1-31 reescrito; corpo :32-239 trocado pelo corpo de `scripts/verificar-fatiamento.sh` de e772f88, :8-201)
+- Modify: `.claude/skills/mergex/scripts/fatiamento-da-pr.sh` (cabeçalho :1-31 reescrito; corpo :32-239 trocado pelo corpo de `scripts/verificar-fatiamento.sh` de 4060f8d, :8-201, igual ao de e772f88)
 - Modify: `scripts/ci/test-fatiamento-e7.sh` (identidade :19-35 e contrato :37-79 ficam, menos :45-55 (o `FATIA_IGNORAR` montado pelo E7), que sai na L1.4; saem os casos de script de :80-264, menos `falha_ao_medir` e `sem_objeto` de :180-190, reaproveitados)
 
 **Interfaces:**
-- Produces: `fatiamento-da-pr.sh [--planejamento] [--excluir-da-revisao <padrao>]... <base> <head>`; saídas 0/1/2 do verificador. Cabeçalho: o que o script mede (L2 e L3, `--planejamento`), `COPIA, nao dependencia` (o teste de :20 procura), `# Origem: AxisGov/expxdev 660bf9a scripts/verificar-fatiamento.sh` (o commit que mudou o arquivo por último; igual em e772f88) e `# Corpo-sha256: 586a3cae512ae6e13b218f3b0cd0e0fb9f42470bdf01165090cac726bff89019`. Sem lista de variáveis.
+- Produces: `fatiamento-da-pr.sh [--planejamento] [--excluir-da-revisao <padrao>]... <base> <head>`; saídas 0/1/2 do verificador. Cabeçalho: o que o script mede (L2 e L3, `--planejamento`), `COPIA, nao dependencia` (o teste de :20 procura), `# Origem: AxisGov/expxdev 660bf9a scripts/verificar-fatiamento.sh` (o commit que mudou o arquivo por último; igual em 4060f8d) e `# Corpo-sha256: 586a3cae512ae6e13b218f3b0cd0e0fb9f42470bdf01165090cac726bff89019`. Sem lista de variáveis.
 
 - [ ] **Step 1: Write the failing tests** (helpers `g`, `passa`, `quebra` de hoje; repositórios temporários):
   - `L3: 100 arquivos passam; 101 reprovam contando package-lock.json, docs/entregas/ e fixtures/candidatos/` (saída contém `VIOLACAO L3`);
@@ -161,7 +161,7 @@ Esta é a PR que troca o espelho; ela e as seguintes valem L2/L3 (Global Constra
   - `--planejamento: 150 arquivos em docs/sprintx/ passam (L3 nao se aplica)`; `--planejamento: src/a.ts reprova (VIOLACAO planejamento)`; `--planejamento: renomeacao de src/a.ts para docs/sprintx/a.ts reprova pela origem` (Review Focus 4);
   - `objeto ausente no head: sai 2` (o `falha_ao_medir` de :180-190, com o blob de um arquivo revisável).
 - [ ] **Step 2: Run** `bash scripts/ci/test-fatiamento-e7.sh` — Expected: FAIL nos novos e no `Corpo-sha256`.
-- [ ] **Step 3: Implement**: copie o corpo (`git -C F:/Projetos/expxdev show e772f88:scripts/verificar-fatiamento.sh | sed -n '/^set -uo pipefail$/,$p'`), escreva o cabeçalho e confira o sha256. Com `EXPXDEV_RAIZ=F:/Projetos/expxdev`, o caso de :30-35 compara com o arquivo de lá.
+- [ ] **Step 3: Implement**: copie o corpo (`git -C F:/Projetos/expxdev show 4060f8d:scripts/verificar-fatiamento.sh | sed -n '/^set -uo pipefail$/,$p'`), escreva o cabeçalho e confira o sha256. Com `EXPXDEV_RAIZ=F:/Projetos/expxdev`, o caso de :30-35 compara com o arquivo de lá.
 - [ ] **Step 4: Run** `EXPXDEV_RAIZ=F:/Projetos/expxdev bash scripts/ci/test-fatiamento-e7.sh` — Expected: as únicas linhas `FALHA` são as dos casos do bloco do E7 (os que a L1.4 reescreve); nenhuma de identidade nem de script.
 - [ ] **Step 5: Commit** `feat(mergex): fatiamento-da-pr espelha o verificador so com L2 e L3`.
 

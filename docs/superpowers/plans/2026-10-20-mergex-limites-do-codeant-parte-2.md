@@ -29,7 +29,7 @@ Os planos `2026-10-18-mergex-revisao-por-task-e-merge-automatico.md` (parte 1) e
 - **Task C1** (:302-318): a gramática de `revisao:` (:311) fica `ok`, `achados`, `indisponivel:<classe>`, **`incompleta:<classe>`**, **`invalida`** ou `null`. O valor **não** sai da evidência: sai da linha do `conferir --modo obrigatoria --task <T>=<commit da task>` (mapeamento na C2). A classe é o texto do motivo antes do segundo `:`, como vier (`incompleta:L1:41` → `incompleta:L1`); a gramática da classe passa a `[A-Za-z0-9][A-Za-z0-9-]*` (ponto 6). Caso novo: `incompleta:L1:41 grava revisao: incompleta:L1`.
 - **Task C2** (:320-336): "Consumes: o formato da evidência do contrato `expx-revisao` v1" (:330) → consome o `conferir`, depois do commit da task: `ok` → `ok`; `FALHA achados-abertos:<n>` → `achados`; `FALHA incompleta:<motivo>` → `incompleta:<classe>`; `FALHA indisponivel:<motivo>` → `indisponivel:<classe>`; `FALHA evidencia-ausente` → `null`; `FALHA evidencia-invalida…`, `FALHA evidencia-nao-bate…`, `FALHA commit-inexistente…`, saída 64 ou linha fora da forma → `invalida`. O passo de `git show ":<caminho>" | jq` sai. Teste novo: `evidencia incompleta no commit: revisao incompleta:<classe>`.
 - **Task C3:** sem mudança.
-- **Tasks D1 e D2** (:353-381): leem achados rejeitados, `rejeicoes`, `removidos_sem_revisao` e o motivo de `indisponivel` direto da evidência com `jq`. Isso contraria a regra "a mergex só conhece a evidência pelo `conferir`" e depende da forma que a AxisGov/expxdev#69 fixa (achados derivados de `chamada.issues`). Ficam **bloqueadas** até a decisão do ponto 1 (abaixo). Na D1, a lista ganha também as tasks `incompleta:<motivo>`.
+- **Tasks D1 e D2** (:353-381): leem achados rejeitados, `rejeicoes`, `removidos_sem_revisao` e o motivo de `indisponivel` direto da evidência com `jq`. Isso contraria a regra "a mergex só conhece a evidência pelo `conferir`" e depende da forma que a AxisGov/expxdev#69 (mergeada, 4060f8d) fixou (achados derivados de `chamada.issues`). Ficam **bloqueadas** até a decisão do ponto 1 (abaixo). Na D1, a lista ganha também as tasks `incompleta:<motivo>`.
 
 ### Parte 2
 
@@ -41,7 +41,7 @@ Os planos `2026-10-18-mergex-revisao-por-task-e-merge-automatico.md` (parte 1) e
 - **Task M3:** sem mudança.
 - **Task M4** (:284-326): o E9 automático cita a condição `planejamento` da M1; teste novo `PR de planejamento com merge_automatico ligado: o E9 pergunta como hoje`. O pulo da revisão do app (> 100 arquivos) no PR de planejamento não é pendência (DM-260).
 - **Tabela de PRs** (:328-344): PRs 1 e 2 feitas; a coluna "Linhas" deixa de ser limite; o assunto da PR 1 é histórico. A ordem segue com P antes da PR 3 (B1).
-- **Dependências externas** (:346-365): "Release com #51, #53 e D2" (:354) → `cli-e772f88` (feita, é a do bloco L1) e, para B1 e o que vem depois, a release do merge da AxisGov/expxdev#69.
+- **Dependências externas** (:346-365): "Release com #51, #53 e D2" (:354) → `cli-4060f8d` (a do merge da AxisGov/expxdev#69, que a cópia da L1 acompanha).
 
 ## A volta ao B1
 
@@ -49,7 +49,7 @@ Os planos `2026-10-18-mergex-revisao-por-task-e-merge-automatico.md` (parte 1) e
 
 Substitui a Task B1 da parte 1 do plano antigo (:212-256). O resto do bloco (ci.yml, DM-238) fica.
 
-**Pré-requisito, incondicional:** AxisGov/expxdev#69 (`feat/evidencia-guarda-issues`) mergeada e a release dela (`cli-<sha7>`) publicada. Ela mantém `expx_revisao: 2` e a forma das linhas do `conferir`, mas muda o que o `conferir` aceita (exige `head`, `chamada.issues` e `chamada.stdout_sha256`; deriva os achados das `issues`): com a cópia de e772f88, a V12 seria testada contra um `conferir` que os projetos não vão rodar. Primeiro commit do bloco: `bash scripts/ci/atualizar-nucleo-expx.sh F:/Projetos/expxdev <sha do merge da #69>` (commit próprio, com o comando no corpo).
+**Pré-requisito:** a AxisGov/expxdev#69 já está mergeada (4060f8d) e a cópia da L1.1 já vem de 4060f8d, com o `conferir` que exige `head`, `chamada.issues` e `chamada.stdout_sha256` e deriva os achados das `issues`. Se, ao começar o B1, o expxdev tiver mudado `nucleo/scripts/` depois de 4060f8d, regere a cópia da revisão nova (commit próprio, com o comando no corpo) antes do primeiro teste.
 
 **Files:**
 - Create: `.claude/skills/mergex/scripts/portao-v12.sh`
@@ -75,7 +75,7 @@ Substitui a Task B1 da parte 1 do plano antigo (:212-256). O resto do bloco (ci.
 
 - [ ] **Step 1: Write the failing tests** (repositório temporário com o núcleo montado como na L0, tasks com commit e evidência gravada pelo `revisar` antes do commit):
   - os da B1 antiga (:239-252), menos `lotes`: `obrigatoria com evidencia ok: OK`; `obrigatoria sem evidencia: FALHA evidencia-ausente`; `se_disponivel sem evidencia: AVISO, codigo 0`; `sem .expx/fatiamento.json: n/a sem node`; `id com ponto (T-01.03)`; `desligada: n/a sem conferir`; `node ausente: SEM_PROVA`; `se_disponivel sem expx-revisao.mjs: AVISO`; `achado aberto: FALHA achados-abertos:1`; `evidencia editada no disco depois do commit nao muda o veredito`; `task com dois itens em commits: confere o ultimo`; `conferir 64: SEM_PROVA`; `conferir com uma linha a menos: SEM_PROVA`; `task sem item em commits nao e alvo`;
-  - novos: `task com 41 arquivos revisaveis: incompleta:L1:41, V12=FALHA em se_disponivel tambem`; `CLI falsa com "[error] Failed to review" no stderr: FALHA incompleta:lote-falhou`; `FATIA_X no ambiente: SEM_PROVA`; `nucleo sem expx-limites.mjs: SEM_PROVA`; `entrega de planejamento: n/a sem chamar o conferir`; `entrega incoerente: SEM_PROVA`; `evidencia v2 sem chamada.issues (gravada antes da #69): FALHA evidencia-invalida:chamada`; `evidencia de versao antiga (expx_revisao 1) no commit: FALHA evidencia-invalida:versao` (os dois únicos casos que montam evidência à mão, de propósito: tiram uma chave de uma evidência gravada pelo `revisar`, ou trocam a versão, para provar que a forma antiga não passa).
+  - novos: `task com 41 arquivos revisaveis: incompleta:L1:41, V12=FALHA em se_disponivel tambem`; `CLI falsa com "[error] Failed to review" no stderr: FALHA incompleta:lote-falhou`; `FATIA_X no ambiente: SEM_PROVA`; `nucleo sem expx-limites.mjs: SEM_PROVA`; `entrega de planejamento: n/a sem chamar o conferir`; `entrega incoerente: SEM_PROVA`; `evidencia v2 sem chamada.issues (gravada antes da #69): FALHA evidencia-invalida:chamada`; `issues com achado trocado: FALHA evidencia-invalida:achados`; `evidencia de versao antiga (expx_revisao 1) no commit: FALHA evidencia-invalida:versao` (os dois únicos casos que montam evidência à mão, de propósito: tiram uma chave de uma evidência gravada pelo `revisar`, ou trocam a versão, para provar que a forma antiga não passa).
 - [ ] **Step 2: Run** `bash scripts/ci/test-portao-v12.sh` — Expected: FAIL (script ausente).
 - [ ] **Step 3: Implement** o script (o leitor de `commits` do `prova-de-commit.sh`, nunca um segundo parser; `entrega-de-planejamento.sh` antes de tudo).
 - [ ] **Step 4: Run** — Expected: `0 falha(s)`.
@@ -87,8 +87,7 @@ Depois do B1, a ordem executável é: B2 → C (C1, C2, C3) → D2 (Task D3) →
 ## Dependências
 
 **expxdev**
-- `cli-e772f88` (feita): a cópia do bloco L1.
-- AxisGov/expxdev#69 (`feat/evidencia-guarda-issues`, aberta): pré-requisito incondicional do B1 (acima). É também a base da decisão do ponto 1.
+- `cli-4060f8d` (a publicar e liberar pelo usuário; a L1.1 só confere que existe): a cópia do bloco L1, já com a AxisGov/expxdev#69 (mergeada). A #69 é também a base da decisão do ponto 1.
 - Versão liberada aos projetos (emenda §11, passo 5): só depois de L1 e P mergeados e da parte da sprintx (passo 4).
 
 **sprintx** (passo 4 da emenda, plano próprio): no fim da F5, chamar E0–E8 com `--planejamento`; esperar o merge; a F6 da primeira sprint chama o E0 sem `--planejamento` (por trabalho) ou com `--sprint 01` (depois da S1).
@@ -99,5 +98,5 @@ Depois do B1, a ordem executável é: B2 → C (C1, C2, C3) → D2 (Task D3) →
 2. **Merge do PR de planejamento feito fora do E9** (botão do serviço): o plano adota o E9 como único registrador (P3): o E0 recusa sem o registro e manda rodar o E9, que lê o PR de `pr_url` no serviço e grava o merge. A alternativa — o E0 consultar o serviço — traria a plataforma para o E0; fica registrada aqui caso o usuário prefira.
 3. **Quem commita os artefatos do planejamento.** O catálogo de método da mergex (`catalogo-de-metodo.sh`) é fechado por nome; o PR de planejamento leva tudo sob `^docs/(sprintx|entregas|eventos)/`. Se a sprintx não commitar o planejamento antes de chamar o E0, o `pre-e2` não persiste o que estiver fora do catálogo. O plano fixa a pré-condição do lado da mergex (P2: o E0 `--planejamento` recusa com artefato do planejamento sujo); o plano da sprintx (passo 4) tem de commitar o planejamento antes de chamar o E0. A mergex não amplia o catálogo.
 4. **D3 e M1 executam o núcleo da árvore da base**, o que pressupõe que o projeto versiona `.expx/marketplace/plugins/expx/nucleo/scripts/`. Base sem a pasta: saída 3 e o merge espera. Se algum projeto não a versiona, o merge automático fica sempre em espera nele; a ativação do merge automático num projeto (passo 5 da emenda) deve conferir antes que a pasta está versionada na main. Teste na D3: `base com .expx/fatiamento.json e sem a pasta do nucleo: sai 3`.
-5. **A PR que troca o espelho (L1) é medida por ele mesmo**, como a B do expxdev; L0 é a única medida pelos limites antigos. Ela junta quatro tasks (cópia, helper, espelho, E7) porque nenhuma fica verde sozinha. Como o CI não tem o expxdev, a identidade do corpo no CI é só o `Corpo-sha256`; a comparação com o arquivo de e772f88 (`EXPXDEV_RAIZ`) é obrigatória no Step 4 da L1.3 e na verificação final da L1.4, rodada localmente e citada na descrição da PR.
+5. **A PR que troca o espelho (L1) é medida por ele mesmo**, como a B do expxdev; L0 é a única medida pelos limites antigos. Ela junta quatro tasks (cópia, helper, espelho, E7) porque nenhuma fica verde sozinha. Como o CI não tem o expxdev, a identidade do corpo no CI é só o `Corpo-sha256`; a comparação com o arquivo de 4060f8d (`EXPXDEV_RAIZ`, revisão 4060f8d) é obrigatória no Step 4 da L1.3 e na verificação final da L1.4, rodada localmente e citada na descrição da PR.
 6. **A classe de `revisao:` (C1) passa a aceitar maiúsculas** (`incompleta:L1`, `incompleta:L2`), porque os motivos do núcleo são `L1`/`L2`; a alternativa é a mergex normalizar para minúsculas, perdendo a igualdade com o `conferir`.
