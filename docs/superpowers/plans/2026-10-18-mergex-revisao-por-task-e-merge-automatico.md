@@ -383,3 +383,5 @@
 
 
 *Continua em `2026-10-18-mergex-revisao-por-task-e-merge-automatico-parte-2.md` (blocos D2, S1–S2 e M1–M4, PRs 7 a 13, tabela de PRs e dependências externas).*
+
+> **Emendado em 2026-10-20** pela emenda "limites do CodeAnt, fixos": onde este texto diverge da lista "Emendas aos planos antigos" de `2026-10-20-mergex-limites-do-codeant-parte-2.md`, vale a lista. A1–A4 estão concluídos e superados pelos blocos L0 e L1 daquele plano; o B1 foi reescrito lá. A nota fica no fim para não mudar os números de linha citados.
