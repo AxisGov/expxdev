@@ -214,9 +214,10 @@ describe("localização e integridade do pacote da CLI", () => {
     if (r.ok) mesmo(r.bin, f.bin);
   });
 
-  it("funcional: localiza a falsa pelo shim .cmd do npm (Windows), pelo PATHEXT", () => {
+  // roda também fora do Windows (a regra é a do win32): lá o sistema de arquivos distingue caixa, e o npm grava `.cmd`
+  it("funcional: localiza a falsa pelo shim .cmd do npm (Windows), pelo PATHEXT, com o alvo separado por \\", () => {
     const f = instalarCodeantFalsa(temp(), {}, "cmd");
-    const r = p.localizarPacote(env(f.path), "win32");
+    const r = p.localizarPacote(env(f.path, { PATHEXT: ".COM;.EXE;.BAT;.cmd" }), "win32");
     expect(r).toMatchObject({ ok: true, versao: "0.5.14" });
     if (r.ok) { mesmo(r.bin, f.bin); mesmo(r.pacote, f.pacote); }
     // fora do PATHEXT o .cmd não é executável

@@ -251,7 +251,8 @@ export function localizarPacote(env, plataforma) {
     if (ehShim(alvo, plataforma)) {
       const m = ALVO_DO_SHIM.exec(readFileSync(alvo, "utf8"));
       if (!m) return falha(`executavel que nao e o shim do pacote: ${achado}`);
-      alvo = realpathSync(join(dirname(alvo), "node_modules", "codeant-cli", m[1]));
+      // o shim `.cmd` separa por `\`: os segmentos são juntados pelo separador do sistema que roda
+      alvo = realpathSync(join(dirname(alvo), "node_modules", "codeant-cli", ...m[1].split(/[\\/]/)));
     }
     for (let d = dirname(alvo); ; d = dirname(d)) {
       const pj = join(d, "package.json");
