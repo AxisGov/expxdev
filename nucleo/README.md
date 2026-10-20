@@ -53,9 +53,10 @@ Variáveis que o rastro lê, todas opcionais:
 ## `scripts/`
 
 Ferramentas Node (ESM, só `node:`), copiadas daqui como o resto do núcleo e
-chamadas por caminho. `expx-limites.mjs` concentra as regras fixas importadas
-pelo leitor; o bloco C fará a revisão importá-las. O módulo não lê o ambiente
-por conta própria.
+chamadas por caminho. `expx-limites.mjs` concentra as regras fixas (exclusões,
+`FATIA_*` reservados, perfis em `perfis/`, predicado de revisável, medidas da CLI,
+localização e integridade do pacote da CLI), importadas pelo leitor e pela
+revisão. O módulo não lê o ambiente por conta própria.
 
 `expx-fatiamento.mjs` (formato no contrato de instalação, §5.2): `node <L>`
 imprime somente `EXPX_*` para `eval`; `--formato json` imprime as decisões
@@ -66,9 +67,14 @@ o usa hoje; nos planos seguintes, sprintx (F3/F6) e mergex (E7) passarão a
 chamá-lo.
 
 `expx-revisao.mjs` (contrato em `docs/contrato/CONTRATO-expx-revisao.md`):
-`revisar` roda a CLI do CodeAnt nos arquivos de uma task e grava a evidência em
-`docs/entregas/<trabalho>/revisao/<T-NN>.json`; `conferir` é a regra da V12 da
-mergex; `rejeitar` registra a rejeição de um achado pelo desenvolvedor. A sprintx
+`revisar` confere que o `codeant` do `PATH` é o pacote homologado e íntegro
+(`npm i -g codeant-cli@0.5.14`), aplica as exclusões e os limites L1 e L2, roda a
+CLI uma vez (`--uncommitted` ou `--base-commit <sha>`) pelo arquivo conferido,
+reconcilia a resposta com a task e grava a evidência v2 em
+`docs/entregas/<trabalho>/revisao/<T-NN.MM>.json`; sai 0 (`ok`), 1 (achado aberto),
+2 (`indisponivel`) ou 3 (`incompleta`). `conferir` é a regra da V12 da mergex
+(`incompleta` é FALHA em qualquer modo); `rejeitar` registra a rejeição de um
+achado pelo desenvolvedor. Qualquer `FATIA_*` no ambiente sai 64. A sprintx
 (passo de revisão da F6) e a mergex (E2, V12) passam a chamá-lo nos planos delas.
 
 ## Por que existe

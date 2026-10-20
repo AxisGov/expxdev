@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { afterEach, describe, expect, it } from "vitest";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { RAIZ_DO_REPO } from "../teste/candidatos.js";
+import { instalarCodeantFalsa } from "../teste/codeant-falsa.js";
 
 interface Limites {
   EXCLUIDOS_DO_NUCLEO: readonly string[];
@@ -183,5 +184,95 @@ describe("perfis e limites do CodeAnt", () => {
     } finally {
       rmSync(raiz, { recursive: true, force: true });
     }
+  });
+});
+
+describe("localização e integridade do pacote da CLI", () => {
+  interface Pacote {
+    localizarPacote(env: Record<string, string | undefined>, plataforma: string):
+      { ok: true; bin: string; pacote: string; versao: string } | { ok: false; motivo: "cli-ausente" | "integridade"; detalhe: string };
+    conferirIntegridade(pacote: string, perfil: unknown): string | null;
+  }
+  const p = m as unknown as Pacote;
+  const criados: string[] = [];
+  afterEach(() => { for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true }); });
+  const temp = (): string => { const d = mkdtempSync(join(tmpdir(), "expx-pacote-")); criados.push(d); return d; };
+  const env = (path: string, extra: Record<string, string> = {}) => ({ PATH: path, PATHEXT: ".COM;.EXE;.BAT;.CMD", ...extra });
+  const mesmo = (a: string, b: string) => expect(realpathSync(a).toLowerCase()).toBe(realpathSync(b).toLowerCase());
+
+  it.skipIf(process.platform === "win32")("funcional: localiza a falsa pelo link do npm (POSIX)", () => {
+    const f = instalarCodeantFalsa(temp(), {}, "link");
+    const r = p.localizarPacote(env(`${f.path}${delimiter}/usr/bin`), "linux");
+    expect(r).toMatchObject({ ok: true, versao: "0.5.14" });
+    if (r.ok) { mesmo(r.bin, f.bin); mesmo(r.pacote, f.pacote); }
+  });
+
+  it.skipIf(process.platform === "win32")("funcional: localiza a falsa pelo shim sh do npm (POSIX)", () => {
+    const f = instalarCodeantFalsa(temp(), {}, "sh");
+    const r = p.localizarPacote(env(f.path), "linux");
+    expect(r).toMatchObject({ ok: true, versao: "0.5.14" });
+    if (r.ok) mesmo(r.bin, f.bin);
+  });
+
+  // roda também fora do Windows (a regra é a do win32): lá o sistema de arquivos distingue caixa, e o npm grava `.cmd`
+  it("funcional: localiza a falsa pelo shim .cmd do npm (Windows), pelo PATHEXT, com o alvo separado por \\", () => {
+    const f = instalarCodeantFalsa(temp(), {}, "cmd");
+    const r = p.localizarPacote(env(f.path, { PATHEXT: ".COM;.EXE;.BAT;.cmd" }), "win32");
+    expect(r).toMatchObject({ ok: true, versao: "0.5.14" });
+    if (r.ok) { mesmo(r.bin, f.bin); mesmo(r.pacote, f.pacote); }
+    // fora do PATHEXT o .cmd não é executável
+    expect(p.localizarPacote(env(f.path, { PATHEXT: ".EXE" }), "win32")).toMatchObject({ ok: false, motivo: "cli-ausente" });
+  });
+
+  it("funcional: codeant fora de pacote (script solto no PATH) → integridade", () => {
+    const d = temp();
+    writeFileSync(join(d, "codeant.cmd"), "@echo 0.5.14\r\n");
+    writeFileSync(join(d, "codeant"), "#!/bin/sh\necho 0.5.14\n", { mode: 0o755 });
+    expect(p.localizarPacote(env(d), process.platform)).toMatchObject({ ok: false, motivo: "integridade" });
+  });
+
+  it("funcional: package.json de outro pacote → integridade", () => {
+    const f = instalarCodeantFalsa(temp());
+    const pj = join(f.pacote, "package.json");
+    writeFileSync(pj, JSON.stringify({ ...JSON.parse(readFileSync(pj, "utf8")), name: "outro" }));
+    expect(p.localizarPacote(env(f.path), process.platform)).toMatchObject({ ok: false, motivo: "integridade" });
+  });
+
+  it("funcional: package.json de outro nome no meio do caminho é atravessado até o codeant-cli", () => {
+    const f = instalarCodeantFalsa(temp());
+    writeFileSync(join(f.pacote, "src", "package.json"), JSON.stringify({ type: "commonjs" }));
+    expect(p.localizarPacote(env(f.path), process.platform)).toMatchObject({ ok: true });
+  });
+
+  it("funcional: bin que aponta para outro arquivo → integridade", () => {
+    const f = instalarCodeantFalsa(temp());
+    const pj = join(f.pacote, "package.json");
+    writeFileSync(join(f.pacote, "src", "outro.js"), "");
+    writeFileSync(pj, JSON.stringify({ ...JSON.parse(readFileSync(pj, "utf8")), bin: { codeant: "src/outro.js" } }));
+    expect(p.localizarPacote(env(f.path), process.platform)).toMatchObject({ ok: false, motivo: "integridade" });
+  });
+
+  it("funcional: PATH sem codeant → cli-ausente", () => {
+    expect(p.localizarPacote(env(temp()), process.platform)).toMatchObject({ ok: false, motivo: "cli-ausente" });
+    expect(p.localizarPacote({}, process.platform)).toMatchObject({ ok: false, motivo: "cli-ausente" });
+  });
+
+  it("funcional: conferirIntegridade: igual → null; editado, apagado ou package.json de outra versão → o detalhe", () => {
+    const f = instalarCodeantFalsa(temp());
+    const perfil = { ...m.perfilCli("0.5.14"), manifesto: f.manifesto, package_json: f.packageJson };
+    expect(p.conferirIntegridade(f.pacote, perfil)).toBeNull();
+    const pj = join(f.pacote, "package.json");
+    const original = readFileSync(pj, "utf8");
+    writeFileSync(pj, original.replace('"description": "falsa"', '"description": "reescrito pelo npm"'));
+    expect(p.conferirIntegridade(f.pacote, perfil)).toBeNull(); // package.json só por name, version e bin
+    writeFileSync(join(f.pacote, "extra.js"), "x"); // arquivo a mais não é conferido (limite aceito)
+    expect(p.conferirIntegridade(f.pacote, perfil)).toBeNull();
+    writeFileSync(pj, original.replace('"0.5.14"', '"0.5.15"'));
+    expect(p.conferirIntegridade(f.pacote, perfil)).toBe("package-json");
+    writeFileSync(pj, original);
+    writeFileSync(join(f.pacote, "README.md"), "editado\n");
+    expect(p.conferirIntegridade(f.pacote, perfil)).toBe("arquivo-diferente:README.md");
+    rmSync(join(f.pacote, "README.md"));
+    expect(p.conferirIntegridade(f.pacote, perfil)).toBe("arquivo-ausente:README.md");
   });
 });
