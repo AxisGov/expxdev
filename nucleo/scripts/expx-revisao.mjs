@@ -11,7 +11,8 @@
 // `continuar` entre a releitura e a gravação.
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { conferirIntegridade, excluido, EXCLUIDOS_DO_NUCLEO, fatiaNoAmbiente, homologadas, localizarPacote, medir, mensagemFatia,
@@ -143,18 +144,41 @@ function alteradas(f, de, ate) {
 }
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-/** Os `padrao` de `excluir_da_revisao` do projeto, pelo leitor irmão (nunca do ambiente); `null` se ele falha. */
-function exclusoesDoProjeto() {
-  const r = spawnSync(process.execPath, [join(AQUI, "expx-fatiamento.mjs"), "--formato", "json", "--raiz", op.raiz], { encoding: "utf8" });
-  if (r.status !== 0) {
-    process.stderr.write(r.stderr ?? "");
+/** Com `--base-commit`, uma pasta temporária com o `.expx/fatiamento.json` do `HEAD` revisado, para o leitor: ausente
+ *  no `HEAD`, a pasta fica sem ele (os padrões, como o ausente no disco); entrada que não é arquivo comum (pasta, link,
+ *  submódulo) ou `ls-tree` que falha: `null` (inválido, nunca os padrões). */
+function raizDoFatiamentoNoHead() {
+  const r = git("ls-tree", "-z", "HEAD", "--", ".expx/fatiamento.json");
+  const entrada = r.status === 0 ? r.stdout.split("\0")[0] : undefined;
+  const [modo, tipo, oid] = (entrada ?? "").split("\t")[0].split(" ");
+  if (entrada === undefined || (entrada !== "" && (tipo !== "blob" || !["100644", "100755"].includes(modo)))) {
+    process.stderr.write("expx-revisao: .expx/fatiamento.json do HEAD nao e arquivo comum legivel\n");
     return null;
   }
+  const raiz = mkdtempSync(join(tmpdir(), "expx-fatiamento-"));
+  if (entrada !== "") {
+    mkdirSync(join(raiz, ".expx"));
+    writeFileSync(join(raiz, ".expx", "fatiamento.json"), blobGit(oid) ?? Buffer.alloc(0));
+  }
+  return raiz;
+}
+/** Os `padrao` de `excluir_da_revisao` do projeto, pelo leitor irmão (nunca do ambiente); `null` se ele falha. Com
+ *  `--base-commit`, os do `HEAD` revisado, nunca os da árvore de trabalho. */
+function exclusoesDoProjeto() {
+  const temporaria = op["base-commit"] ? raizDoFatiamentoNoHead() : undefined;
+  if (temporaria === null) return null;
   try {
+    const r = spawnSync(process.execPath, [join(AQUI, "expx-fatiamento.mjs"), "--formato", "json", "--raiz", temporaria ?? op.raiz], { encoding: "utf8" });
+    if (r.status !== 0) {
+      process.stderr.write(r.stderr ?? "");
+      return null;
+    }
     const lista = JSON.parse(r.stdout).excluir_da_revisao;
     return Array.isArray(lista) ? lista.map((x) => x.padrao) : null;
   } catch {
     return null;
+  } finally {
+    if (temporaria) rmSync(temporaria, { recursive: true, force: true });
   }
 }
 const arvore = (ref) => new Set(git("ls-tree", "-r", "-z", "--name-only", ref).stdout.split("\0").filter(Boolean));

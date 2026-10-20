@@ -561,6 +561,47 @@ describe("expx-revisao.mjs revisar v2: --base-commit", () => {
     expect(revisar(c, "src/a.js")).toMatchObject({ rc: 0, ev: { resultado: "ok" } });
   });
 
+  // com --base-commit, a exclusão que vale é a versionada no HEAD revisado, nunca a da árvore de trabalho
+  const exclusaoGerado = JSON.stringify({ expx_fatiamento: 2, excluir_da_revisao: [
+    { padrao: "^gerado/", classe: "gerado", origem: "scripts/gera.sh", motivo: "saída do gerador" }] });
+  const comGerado = (c: Cenario): string => {
+    const base = git(c.raiz, "rev-parse", "HEAD");
+    escreve(c.raiz, "gerado/saida.js", "x\n");
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "task");
+    return base;
+  };
+
+  it("funcional: excluir_da_revisao só no disco (fora do HEAD) não vale: o arquivo é revisado", () => {
+    const c = cenario();
+    const base = comGerado(c);
+    escreve(c.raiz, ".expx/fatiamento.json", exclusaoGerado);
+    const r = revisar(c, "gerado/saida.js", "T-01", undefined, {}, c.script, ["--base-commit", base]);
+    expect(r).toMatchObject({ rc: 0, ev: { resultado: "ok", arquivos: { "gerado/saida.js": { revisao: "enviado" } } } });
+    expect(r.chamadas).toEqual([["review", "--headless", "--base-commit", base, "--include", "gerado/saida.js"]]);
+  });
+
+  it("funcional: excluir_da_revisao no HEAD vale mesmo apagado do disco → incompleta:excluido-declarado", () => {
+    const c = cenario();
+    escreve(c.raiz, ".expx/fatiamento.json", exclusaoGerado);
+    const base = comGerado(c);
+    rmSync(join(c.raiz, ".expx", "fatiamento.json"));
+    const r = revisar(c, "gerado/saida.js", "T-01", undefined, {}, c.script, ["--base-commit", base]);
+    expect(r).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "excluido-declarado:gerado/saida.js" } });
+    naoChamou(r);
+  });
+
+  it("funcional: .expx/fatiamento.json do HEAD que não é arquivo → indisponivel:fatiamento-invalido, mesmo válido no disco", () => {
+    const c = cenario();
+    escreve(c.raiz, ".expx/fatiamento.json/x", "x\n");
+    const base = comGerado(c);
+    rmSync(join(c.raiz, ".expx"), { recursive: true });
+    escreve(c.raiz, ".expx/fatiamento.json", exclusaoGerado);
+    const r = revisar(c, "gerado/saida.js", "T-01", undefined, {}, c.script, ["--base-commit", base]);
+    expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "fatiamento-invalido" } });
+    naoChamou(r);
+  });
+
   it("funcional: arquivo apagado desde <sha> → removido, não arquivo-inexistente", () => {
     const c = cenario();
     const base = git(c.raiz, "rev-parse", "HEAD");
