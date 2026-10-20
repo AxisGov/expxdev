@@ -773,6 +773,10 @@ describe("expx-revisao.mjs conferir v2", () => {
     ["enviado pulado", (ev: Record<string, any>) => { ev["chamada"].meta.skipped = [{ file: "src/a.js", reason: "too large (5001 lines, max 5000)" }]; }, "cobertura"],
     ["enviado com linhas menores que as do blob", (ev: Record<string, any>) => { ev["arquivos"]["src/a.js"].linhas = 1; }, "L2"],
     ["enviado com bytes menores que os do blob", (ev: Record<string, any>) => { ev["arquivos"]["src/a.js"].bytes = 1; }, "L2"],
+    // sem enviado, nada da CLI seria conferido: a classificação de cada arquivo é refeita
+    ["revisável marcado excluido", (ev: Record<string, any>) => { ev["arquivos"]["src/a.js"].revisao = "excluido"; }, "revisao"],
+    ["revisável marcado nao-revisavel", (ev: Record<string, any>) => { ev["arquivos"]["src/a.js"].revisao = "nao-revisavel"; }, "revisao"],
+    ["revisao desconhecida", (ev: Record<string, any>) => { ev["arquivos"]["src/a.js"].revisao = "foo"; }, "revisao"],
   ])("funcional: ok com %s → FALHA evidencia-invalida:<campo>", (_nome, muda, campo) => {
     reprova(forjada(muda), campo);
   });

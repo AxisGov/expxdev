@@ -330,6 +330,11 @@ function semData(ev) {
  *  (ou undefined): versão, integridade, a chamada, o perfil, falha de lote, L1, L2 (medido de novo no blob do
  *  commit) e a cobertura de cada enviado. */
 function semSinalDaCli(ev, sha) {
+  // a classificação é refeita: sem ela, um revisável marcado `excluido` dispensaria todo o resto. Em `ok`/`achados`
+  // só há `excluido` do núcleo (o do projeto dá `incompleta:excluido-declarado`)
+  const homologado = perfilCli(homologadas().at(-1));
+  const esperada = (f) => (excluido(f, EXCLUIDOS_DO_NUCLEO) ? "excluido" : revisavel(f, homologado) ? "enviado" : "nao-revisavel");
+  if (Object.entries(ev.arquivos).some(([f, a]) => a !== null && a.revisao !== esperada(f))) return "revisao";
   const enviados = Object.keys(ev.arquivos).filter((f) => ev.arquivos[f]?.revisao === "enviado");
   if (enviados.length === 0) return undefined;
   const perfil = typeof ev.cli?.versao === "string" ? perfilCli(ev.cli.versao) : undefined;

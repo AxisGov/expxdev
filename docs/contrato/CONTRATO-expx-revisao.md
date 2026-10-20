@@ -184,6 +184,7 @@ linhas valem na ordem em que aparecem.
 | `blob` ≠ `git rev-parse <sha>:<arquivo>` (ou `null` e o arquivo existe no commit) | FALHA `evidencia-nao-bate:<arquivo>` | FALHA |
 | `indisponivel` | FALHA `indisponivel:<motivo>` | AVISO `indisponivel:<motivo>` |
 | `incompleta` (não depende do modo) | FALHA `incompleta:<motivo>` | FALHA `incompleta:<motivo>` |
+| `ok`/`achados` com a `revisao` de algum arquivo diferente da refeita no `conferir` (`excluido` só nas exclusões do núcleo, que em `ok`/`achados` são as únicas; senão o predicado do perfil) (`revisao`) | FALHA `evidencia-invalida:revisao` | FALHA |
 | `ok`/`achados` com algum `enviado` e: `cli.versao` sem perfil (`cli.versao`); `cli.integridade` ≠ `conferida` (`integridade`); `chamada` nula (`chamada`); `meta` que não é mapa, `max_files` ≠ perfil ou motivo de pulo fora do perfil (`perfil`); `falhas_de_lote` não vazia (`lote-falhou`); mais de 40 `enviado` (`L1`); `enviado` acima de 5.000 linhas ou 204.800 bytes, ou com `bytes`/`linhas` menores que os do blob `<sha>:<arquivo>` medido de novo (`L2`); `enviado` fora de `reviewed_files` ou pulado (`cobertura`) | FALHA `evidencia-invalida:<campo>` | FALHA |
 | achado `aberto`, ou `resultado: achados` | FALHA `achados-abertos:<n>` | FALHA |
 
