@@ -367,3 +367,5 @@ Continuação de `2026-10-18-mergex-revisao-por-task-e-merge-automatico.md` (par
 ## Pergunta que resta
 
 1. **A dispensa de O2 é escrita pela sprintx, com a conta do agente.** O E9 confere a forma e o escopo (só aquela sprint, campos completos, critérios de aceite com teste), mas não consegue provar que foi o desenvolvedor quem a deu: mesma limitação de proveniência da DM-223. O plano aceita o registro como está e o expõe na trilha do PR. Se for preciso prova de autoria (por exemplo, a dispensa confirmada de forma interativa no E9 da própria sprint), é uma condição a mais na Task M2.
+
+> **Emendado em 2026-10-20** pela emenda "limites do CodeAnt, fixos": onde este texto diverge da lista "Emendas aos planos antigos" de `2026-10-20-mergex-limites-do-codeant-parte-2.md`, vale a lista. A1–A4 estão concluídos e superados pelos blocos L0 e L1 daquele plano; o B1 foi reescrito lá. A nota fica no fim para não mudar os números de linha citados.
