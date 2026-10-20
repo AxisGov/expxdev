@@ -796,6 +796,10 @@ describe("expx-revisao.mjs conferir v2", () => {
     ["revisável marcado excluido", (ev: Record<string, any>) => { ev["arquivos"]["src/a.js"].revisao = "excluido"; }, "revisao"],
     ["revisável marcado nao-revisavel", (ev: Record<string, any>) => { ev["arquivos"]["src/a.js"].revisao = "nao-revisavel"; }, "revisao"],
     ["revisao desconhecida", (ev: Record<string, any>) => { ev["arquivos"]["src/a.js"].revisao = "foo"; }, "revisao"],
+    ["chamada com error não nulo", (ev: Record<string, any>) => { ev["chamada"].error = "falhou"; }, "chamada"],
+    ["include diferente dos enviados", (ev: Record<string, any>) => { ev["chamada"].include = ["src/a.js", "src/b.js"]; }, "cobertura"],
+    ["revisado repetido", (ev: Record<string, any>) => { ev["chamada"].meta.reviewed_files = ["src/a.js", "src/a.js"]; }, "cobertura"],
+    ["sobra em reviewed_files", (ev: Record<string, any>) => { ev["chamada"].meta.reviewed_files = ["src/a.js", "src/z.js"]; }, "cobertura"],
   ])("funcional: ok com %s → FALHA evidencia-invalida:<campo>", (_nome, muda, campo) => {
     reprova(forjada(muda), campo);
   });

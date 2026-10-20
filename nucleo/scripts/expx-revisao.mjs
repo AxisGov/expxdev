@@ -340,11 +340,11 @@ function semSinalDaCli(ev, sha) {
   const perfil = typeof ev.cli?.versao === "string" ? perfilCli(ev.cli.versao) : undefined;
   if (!perfil) return "cli.versao";
   if (ev.cli.integridade !== "conferida") return "integridade";
-  if (!ehMapa(ev.chamada)) return "chamada";
+  if (!ehMapa(ev.chamada) || ev.chamada.error !== null) return "chamada";
   const meta = ev.chamada.meta;
   const pulados = ehMapa(meta) && Array.isArray(meta.skipped) ? meta.skipped : undefined;
-  if (!pulados || meta.max_files !== perfil.max_files || !Array.isArray(meta.reviewed_files)
-    || !pulados.every((s) => ehMapa(s) && typeof s.reason === "string" && motivoAceito(s.reason, perfil))) return "perfil";
+  if (!pulados || meta.max_files !== perfil.max_files || !Array.isArray(meta.reviewed_files) || !meta.reviewed_files.every((f) => typeof f === "string")
+    || !pulados.every((s) => ehMapa(s) && typeof s.file === "string" && typeof s.reason === "string" && motivoAceito(s.reason, perfil))) return "perfil";
   if (!Array.isArray(ev.chamada.falhas_de_lote) || ev.chamada.falhas_de_lote.length > 0) return "lote-falhou";
   if (enviados.length > perfil.max_files) return "L1";
   for (const f of enviados) {
@@ -353,7 +353,9 @@ function semSinalDaCli(ev, sha) {
     if (!Number.isSafeInteger(a.bytes) || !Number.isSafeInteger(a.linhas) || a.bytes > perfil.max_bytes || a.linhas > perfil.max_linhas
       || a.bytes < m.bytes || a.linhas < m.linhas) return "L2";
   }
-  if (!enviados.every((f) => meta.reviewed_files.includes(f) && !pulados.some((s) => s.file === f))) return "cobertura";
+  // a mesma reconciliação do `revisar`, com o `--include` igual aos enviados
+  const include = Array.isArray(ev.chamada.include) ? ev.chamada.include : [];
+  if (include.length !== enviados.length || !enviados.every((f) => include.includes(f)) || reconciliar(enviados, meta)) return "cobertura";
 }
 
 /** O veredito de uma task: a evidência tem de existir, bater com o commit e não ter achado aberto. */
