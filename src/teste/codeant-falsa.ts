@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { cpSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { RAIZ_DO_REPO } from "./candidatos.js";
 import { respostaDoCaso, type CasoConformidade } from "./conformidade.js";
@@ -106,7 +106,9 @@ function manifestoDe(pacote: string): Record<string, string> {
 /** Grava a configuração (de novo, para mudar a falsa entre chamadas). */
 export function configurarFalsa(falsa: Falsa, cfg: CfgFalsa): void {
   writeFileSync(join(falsa.dir, "cfg.json"), JSON.stringify({ versao: falsa.packageJson.version, ...cfg }));
+  // a fixture anterior não sobrevive a uma configuração sem ela
   if (cfg.fixture) writeFileSync(join(falsa.dir, "resposta.bin"), respostaDoCaso(cfg.fixture));
+  else rmSync(join(falsa.dir, "resposta.bin"), { force: true });
 }
 
 export function instalarCodeantFalsa(base: string, cfg: CfgFalsa = {}, layout: LayoutFalsa = process.platform === "win32" ? "cmd" : "link"): Falsa {

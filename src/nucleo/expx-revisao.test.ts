@@ -7,7 +7,7 @@ import { delimiter, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ambienteCom, noPath, RAIZ_DO_REPO } from "../teste/candidatos.js";
 import { arquivosDoCaso, respostaDoCaso, type CasoConformidade } from "../teste/conformidade.js";
-import { chamadasDa, instalarCodeantFalsa, nucleoDeTeste, type CfgFalsa, type Falsa } from "../teste/codeant-falsa.js";
+import { chamadasDa, configurarFalsa, instalarCodeantFalsa, nucleoDeTeste, type CfgFalsa, type Falsa } from "../teste/codeant-falsa.js";
 
 // `nucleo/scripts/expx-revisao.mjs`. A CLI do CodeAnt nunca é chamada de verdade: uma `codeant` falsa vem
 // antes no PATH, responde `--version` e um JSON fixo no `review`, e registra os argumentos recebidos.
@@ -512,6 +512,22 @@ describe("expx-revisao.mjs revisar v2: --base-commit", () => {
     const r = revisar(c, "src/a.js", "T-01", undefined, {}, c.script, ["--base-commit", base]);
     expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "arquivo-nao-commitado:src/a.js" } });
     naoChamou(r);
+  });
+
+  it("funcional: CRLF no checkout (core.autocrlf=true) commitado: não é arquivo-nao-commitado e o blob é o do commit", () => {
+    const c = cenario({}, "true");
+    const base = git(c.raiz, "rev-parse", "HEAD");
+    escreve(c.raiz, "src/a.js", "l1\r\nl2\r\nnovo3\r\n");
+    git(c.raiz, "commit", "-q", "-am", "task");
+    const r = revisar(c, "src/a.js", "T-01", undefined, {}, c.script, ["--base-commit", base]);
+    expect(r).toMatchObject({ rc: 0, ev: { resultado: "ok", arquivos: { "src/a.js": { blob: git(c.raiz, "rev-parse", "HEAD:src/a.js"), bytes: 15 } } } });
+  });
+
+  it("funcional: a falsa reconfigurada sem fixture deixa de servir a fixture anterior", () => {
+    const c = cenario({ fixture: "limite41" });
+    configurarFalsa(c.falsa, {});
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 0, ev: { resultado: "ok" } });
   });
 
   it("funcional: arquivo apagado desde <sha> → removido, não arquivo-inexistente", () => {
