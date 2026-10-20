@@ -1,579 +1,311 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { bashDosHooks } from "../teste/candidatos.js";
+import { pathToFileURL } from "node:url";
+import { bashDosHooks, RAIZ_DO_REPO } from "../teste/candidatos.js";
 
-/**
- * `scripts/verificar-fatiamento.sh` (CONTRATO-expx-fatiamento.md): cada regra
- * tem um caso que a reprova e um que a deixa passar. Sem estes, "a guarda
- * existe" seria afirmação sem prova.
- */
+interface PerfilCli {
+  excluidos: { nomes: string[]; extensoes: string[]; sufixos: string[] };
+}
+interface Limites {
+  EXCLUIDOS_DO_NUCLEO: readonly string[];
+  limites(): { l2_linhas: number; l2_bytes: number; l3_arquivos: number };
+  perfilCli(versao: string): PerfilCli | undefined;
+  revisavel(caminho: string, perfil: PerfilCli): boolean;
+  medir(conteudo: Buffer): { linhas: number; bytes: number };
+}
 
-// o bash do Git, nunca o primeiro do PATH: no Windows ele pode ser o do WSL
 const BASH = bashDosHooks();
-const SCRIPT = join(process.cwd(), "scripts", "verificar-fatiamento.sh");
+const SCRIPT = join(RAIZ_DO_REPO, "scripts", "verificar-fatiamento.sh");
+const MODULO = (await import(pathToFileURL(join(RAIZ_DO_REPO, "nucleo", "scripts", "expx-limites.mjs")).href)) as Limites;
+const PERFIL = MODULO.perfilCli("0.5.14")!;
 const criados: string[] = [];
+
 afterEach(() => {
-  for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true });
+  for (const caminho of criados.splice(0)) rmSync(caminho, { recursive: true, force: true });
 });
 
-function git(dir: string, ...args: string[]): void {
-  const r = spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false", ...args], {
-    cwd: dir,
-    encoding: "utf8",
-  });
+function git(diretorio: string, ...args: string[]): string {
+  const r = spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false", ...args],
+    { cwd: diretorio, encoding: "utf8" });
   if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
+  return r.stdout.trim();
 }
 
 function repo(): string {
-  const d = mkdtempSync(join(tmpdir(), "expx-fatia-"));
-  criados.push(d);
-  git(d, "init", "-q", "-b", "main");
-  writeFileSync(join(d, "base.txt"), "base\n");
-  git(d, "add", "-A");
-  git(d, "commit", "-q", "-m", "base");
-  return d;
+  const diretorio = mkdtempSync(join(tmpdir(), "expx-fatia-"));
+  criados.push(diretorio);
+  git(diretorio, "init", "-q", "-b", "main");
+  escreve(diretorio, "base.txt", "base\n");
+  commita(diretorio, "base");
+  return diretorio;
 }
 
-function escreve(d: string, rel: string, conteudo: string): void {
-  mkdirSync(dirname(join(d, rel)), { recursive: true });
-  writeFileSync(join(d, rel), conteudo);
+function escreve(diretorio: string, relativo: string, conteudo: string | Buffer): void {
+  mkdirSync(dirname(join(diretorio, relativo)), { recursive: true });
+  writeFileSync(join(diretorio, relativo), conteudo);
 }
 
-function commita(d: string, msg: string): void {
-  git(d, "add", "-A");
-  git(d, "commit", "-q", "-m", msg);
+function commita(diretorio: string, mensagem: string): void {
+  git(diretorio, "add", "-A");
+  git(diretorio, "commit", "-q", "-m", mensagem);
 }
 
-const linhas = (n: number, prefixo = "linha"): string => Array.from({ length: n }, (_, i) => `${prefixo} ${String(i)}\n`).join("");
+function ambiente(livres: Record<string, string> = {}): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  for (const nome of Object.keys(env)) if (nome.startsWith("FATIA_")) delete env[nome];
+  return { ...env, ...livres };
+}
 
-function verifica(d: string, env: Record<string, string> = {}) {
-  const r = spawnSync(BASH, [SCRIPT, "main", "HEAD"], { cwd: d, encoding: "utf8", env: { ...process.env, ...env } });
+function verifica(diretorio: string, op: { excluir?: string[]; env?: Record<string, string>; planejamento?: boolean } = {}) {
+  const args = [...(op.planejamento ? ["--planejamento"] : []), ...(op.excluir ?? []).flatMap((padrao) => ["--excluir-da-revisao", padrao])];
+  const r = spawnSync(BASH, [SCRIPT, ...args, "main", "HEAD"], { cwd: diretorio, encoding: "utf8", env: ambiente(op.env) });
   return { codigo: r.status, saida: `${r.stdout}${r.stderr}` };
 }
 
-describe("verificar-fatiamento.sh", () => {
-  it("funcional: PR pequena e de um assunto passa", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "a.md", linhas(50));
-    commita(d, "feat: a");
-    const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(0);
-    expect(r.saida).toContain("0 violacao");
-  });
+const semQuebra = (n: number): string => Array.from({ length: n }, (_, i) => `linha ${i + 1}`).join("\n");
+const blob = (d: string, conteudo: string | Buffer): string => {
+  const r = spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: d, input: conteudo, encoding: typeof conteudo === "string" ? "utf8" : undefined });
+  if (r.status !== 0) throw new Error(String(r.stderr));
+  return String(r.stdout).trim();
+};
 
-  it("funcional: F2 — PR acima de 400 linhas reprova, mesmo com commits pequenos", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    for (let i = 0; i < 3; i++) {
-      escreve(d, `f${String(i)}.md`, linhas(200));
-      commita(d, `feat: parte ${String(i)}`);
-    }
-    const r = verifica(d);
-    expect(r.codigo).toBe(1);
-    expect(r.saida).toMatch(/F2: a PR altera 600 linhas/);
-    expect(r.saida).not.toContain("F3");
-  });
+function commitDeArvore(d: string, entradas: Array<[string, string]>, mensagem: string): void {
+  const base = git(d, "rev-parse", "HEAD:base.txt");
+  const todas: Array<[string, string]> = [["base.txt", base], ...entradas].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+  const dados = todas.map(([nome, sha]) => `100644 blob ${sha}\t${nome}\0`).join("");
+  const arvore = spawnSync("git", ["mktree", "-z"], { cwd: d, input: dados, encoding: "utf8" }).stdout.trim();
+  const commit = spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit-tree", arvore, "-p", "HEAD", "-m", mensagem],
+    { cwd: d, encoding: "utf8" }).stdout.trim();
+  git(d, "update-ref", "refs/heads/feature", commit);
+}
 
-  it("funcional: F2 — mais de 20 arquivos reprova", () => {
+describe("verificar-fatiamento.sh — limites fixos L2 e L3", () => {
+  it("L3: 100 arquivos passam e 101 reprovam, sem qualquer desconto", () => {
     const d = repo();
     git(d, "switch", "-q", "-c", "feature");
-    for (let i = 0; i < 21; i++) escreve(d, `p/${String(i)}.md`, "x\n");
-    commita(d, "feat: muitos");
-    const r = verifica(d);
-    expect(r.codigo).toBe(1);
-    expect(r.saida).toMatch(/F2: a PR altera 21 arquivos/);
-  });
-
-  it("funcional: F3 — um commit acima de 300 linhas reprova e nomeia o commit", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "grande.md", linhas(350));
-    commita(d, "feat: commit grande");
-    const r = verifica(d, { FATIA_MAX_LINHAS_PR: "1000" });
-    expect(r.codigo).toBe(1);
-    expect(r.saida).toMatch(/F3: o commit [0-9a-f]+ altera 350 linhas/);
-    expect(r.saida).toContain("feat: commit grande");
-  });
-
-  it("funcional: arquivo gerado (FATIA_IGNORAR) não conta para F2 nem F3", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "fixtures/candidatos/x/gerado.txt", linhas(900));
-    escreve(d, "src.md", linhas(10));
-    commita(d, "chore: snapshot e uso");
-    const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(0);
-  });
-
-  it("funcional: F4 — arquivo acima de 150 KB reprova ao crescer além da tolerância", () => {
-    const d = repo();
-    escreve(d, "enorme.md", "x".repeat(160 * 1024) + "\n");
-    commita(d, "chore: arquivo grande ja existente");
-    git(d, "switch", "-q", "-c", "feature");
-    git(d, "branch", "-f", "main", "HEAD");
-    escreve(d, "enorme.md", "x".repeat(160 * 1024) + "\n" + linhas(400, "novo-conteudo-longo"));
-    commita(d, "feat: engorda");
-    const r = verifica(d, { FATIA_MAX_LINHAS_PR: "1000" });
-    expect(r.codigo).toBe(1);
-    expect(r.saida).toMatch(/F4: os arquivos acima do limite cresceram \d+ bytes/);
-    expect(r.saida).toContain("enorme.md");
-  });
-
-  it("funcional: F4 — arquivo acima do limite que NÃO cresce só avisa", () => {
-    const d = repo();
-    escreve(d, "enorme.md", "x".repeat(160 * 1024) + "\n");
-    commita(d, "chore: arquivo grande ja existente");
-    git(d, "switch", "-q", "-c", "feature");
-    git(d, "branch", "-f", "main", "HEAD");
-    escreve(d, "enorme.md", "y".repeat(160 * 1024) + "\n");
-    commita(d, "fix: troca conteudo sem crescer");
-    const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(0);
-    expect(r.saida).toMatch(/aviso\s+F4: enorme\.md tem 1\d\d KB .*acima do limite/);
-  });
-
-  it("funcional: F4 — arquivo novo acima do limite reprova", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "novo-enorme.md", "z".repeat(170 * 1024) + "\n");
-    commita(d, "feat: arquivo novo enorme");
-    const r = verifica(d);
-    expect(r.codigo).toBe(1);
-    expect(r.saida).toMatch(/F4: os arquivos acima do limite cresceram.*novo-enorme\.md/);
-  });
-
-  it("funcional: F4 — entre 100 e 150 KB só avisa", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "medio.md", "m".repeat(120 * 1024) + "\n");
-    commita(d, "feat: arquivo medio");
-    const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(0);
-    expect(r.saida).toMatch(/aviso\s+F4: medio\.md tem 12[01] KB .*perto do limite/);
-  });
-
-  it("funcional: F4 — arquivo com mais de 4000 linhas reprova ao crescer, mesmo pequeno em KB", () => {
-    const d = repo();
-    escreve(d, "longo.txt", "a\n".repeat(4100));
-    commita(d, "chore: arquivo longo ja existente");
-    git(d, "switch", "-q", "-c", "feature");
-    git(d, "branch", "-f", "main", "HEAD");
-    escreve(d, "longo.txt", "a\n".repeat(4100) + "b\n".repeat(60));
-    commita(d, "feat: engorda em linhas");
-    const r = verifica(d);
-    expect(r.codigo).toBe(1);
-    expect(r.saida).toMatch(/F4: os arquivos acima do limite cresceram \d+ bytes e 60 linhas.*longo\.txt/);
-  });
-
-  it("funcional: F4 — entre 3000 e 4000 linhas só avisa", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "medio.txt", "a\n".repeat(3500));
-    commita(d, "feat: arquivo medio em linhas");
-    const r = verifica(d, { FATIA_MAX_LINHAS_PR: "5000", FATIA_MAX_LINHAS_COMMIT: "5000" });
-    expect(r.codigo, r.saida).toBe(0);
-    expect(r.saida).toMatch(/aviso\s+F4: medio\.txt tem \d+ KB e 3500 linhas, perto do limite/);
-  });
-
-  it("funcional: F4 — a última linha sem quebra conta (4.001 linhas, não 4.000)", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "sem-quebra.txt", "a\n".repeat(4000) + "b");
-    commita(d, "feat: arquivo sem quebra no fim");
-    const r = verifica(d, { FATIA_MAX_LINHAS_PR: "9000", FATIA_MAX_LINHAS_COMMIT: "9000" });
-    expect(r.codigo).toBe(1);
-    expect(r.saida).toMatch(/cresceram \d+ bytes e 4001 linhas.*sem-quebra\.txt/);
-  });
-
-  it("funcional: snapshot gerado acima do limite que cresce não viola F4 (fora da revisão)", () => {
-    const d = repo();
-    escreve(d, "fixtures/candidatos/x/DECISOES.md", "x".repeat(160 * 1024) + "\n");
-    commita(d, "chore: snapshot grande ja existente");
-    git(d, "switch", "-q", "-c", "feature");
-    git(d, "branch", "-f", "main", "HEAD");
-    escreve(d, "fixtures/candidatos/x/DECISOES.md", "x".repeat(190 * 1024) + "\n");
-    commita(d, "chore: snapshot regenerado");
-    const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(0);
-    expect(r.saida).not.toContain("DECISOES.md");
-  });
-
-  it("funcional: arquivo gerado em caminho com espaço também não conta (FATIA_IGNORAR)", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "fixtures/candidatos/pasta com espaco/gerado.txt", linhas(900));
-    escreve(d, "src.md", linhas(10));
-    commita(d, "chore: snapshot em pasta com espaco");
-    const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(0);
-    expect(r.saida).toContain("PR com 10 linhas em 1 arquivo");
-  });
-
-  it("funcional: o padrão de FATIA_IGNORAR casa o nome inteiro — `package-lock.json.backup` conta", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "web/package-lock.json", linhas(900));
-    escreve(d, "package-lock.json.backup", linhas(450));
-    commita(d, "chore: lock e copia do lock");
+    for (let i = 0; i < 97; i++) escreve(d, `src/f${i}.png`, "x\n");
+    escreve(d, "package-lock.json", "{}\n");
+    escreve(d, "docs/entregas/e.md", "x\n");
+    escreve(d, "fixtures/candidatos/c.md", "x\n");
+    commita(d, "cem");
+    expect(verifica(d)).toMatchObject({ codigo: 0, saida: expect.stringContaining("PR com 100 arquivo(s)") });
+    escreve(d, "logo.png", "x");
+    commita(d, "cento e um");
     const r = verifica(d);
     expect(r.codigo, r.saida).toBe(1);
-    expect(r.saida).toContain("PR com 450 linhas em 1 arquivo");
+    expect(r.saida).toContain("VIOLACAO L3: a PR altera 101 arquivos, todos contados (limite 100 do app do CodeAnt); divida a PR");
   });
 
-  it("funcional: código renomeado PARA caminho gerado conta as linhas removidas (F2 e F3)", () => {
+  it("PR de planejamento: so artefatos de metodo, sem L3", () => {
     const d = repo();
-    escreve(d, "produto.md", linhas(1000));
-    commita(d, "feat: produto");
     git(d, "switch", "-q", "-c", "feature");
-    git(d, "branch", "-f", "main", "HEAD");
-    // 450 linhas saem e o resto vai para fixtures/: a similaridade (55%) faz do par uma renomeacao
-    rmSync(join(d, "produto.md"));
-    escreve(d, "fixtures/candidatos/x/produto.md", linhas(1000).split("\n").slice(450).join("\n"));
-    commita(d, "chore: tira codigo do produto para a fixture");
-    const r = verifica(d);
+    for (let i = 0; i < 99; i++) escreve(d, `docs/sprintx/t${i}.md`, "x\n");
+    escreve(d, "docs/entregas/e.md", "x\n");
+    escreve(d, "docs/eventos/v.jsonl", "{}\n");
+    commita(d, "planejamento");
+    const r = verifica(d, { planejamento: true });
+    expect(r.codigo, r.saida).toBe(0);
+    expect(r.saida).toContain("PR de planejamento com 101 arquivo(s)");
+    expect(verifica(d).codigo).toBe(1);
+  });
+
+  it("PR de planejamento recusa caminho fora dos artefatos, inclusive origem de renomeacao", () => {
+    const d = repo();
+    escreve(d, "src/a.ts", "x\n");
+    commita(d, "codigo");
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "docs/sprintx/p.md", "x\n");
+    git(d, "mv", "src/a.ts", "docs/sprintx/a.ts");
+    escreve(d, "docs/sprintxx/b.md", "x\n");
+    commita(d, "mistura");
+    const r = verifica(d, { planejamento: true });
     expect(r.codigo, r.saida).toBe(1);
-    expect(r.saida).toContain("PR com 450 linhas em 1 arquivo");
-    expect(r.saida).toMatch(/F3: o commit \w+ altera 450 linhas/);
+    expect(r.saida).toContain("VIOLACAO planejamento: src/a.ts fora de docs/sprintx/, docs/entregas/ e docs/eventos/");
+    expect(r.saida).toContain("VIOLACAO planejamento: docs/sprintxx/b.md fora de docs/sprintx/, docs/entregas/ e docs/eventos/");
+    expect(r.saida).not.toContain("VIOLACAO planejamento: docs/sprintx/p.md");
   });
 
-  it("funcional: renomeação entre dois caminhos gerados continua fora da conta", () => {
+  it("L3: uma renomeacao conta um arquivo", () => {
     const d = repo();
-    escreve(d, "fixtures/candidatos/x/a.md", linhas(1000));
-    commita(d, "chore: fixture");
+    escreve(d, "antes.md", "x\n");
+    commita(d, "arquivo");
     git(d, "switch", "-q", "-c", "feature");
-    git(d, "branch", "-f", "main", "HEAD");
-    rmSync(join(d, "fixtures/candidatos/x/a.md"));
-    escreve(d, "fixtures/candidatos/y/a.md", linhas(1000).split("\n").slice(450).join("\n"));
-    commita(d, "chore: regenera a fixture");
-    const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(0);
-    expect(r.saida).toContain("PR com 0 linhas em 0 arquivo");
+    git(d, "mv", "antes.md", "depois.md");
+    commita(d, "renomeia");
+    expect(verifica(d)).toMatchObject({ codigo: 0, saida: expect.stringContaining("PR com 1 arquivo(s)") });
   });
 
-  it("funcional: F4 — arquivo grande só renomeado não conta como crescimento", () => {
-    const d = repo();
-    escreve(d, "enorme.md", "x".repeat(160 * 1024) + "\n");
-    commita(d, "chore: arquivo grande ja existente");
-    git(d, "switch", "-q", "-c", "feature");
-    git(d, "branch", "-f", "main", "HEAD");
-    git(d, "mv", "enorme.md", "movido.md");
-    commita(d, "refactor: so renomeia");
-    const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(0);
-    expect(r.saida).toMatch(/aviso\s+F4: movido\.md/);
-  });
-
-  it("funcional: F4 — a tolerância é por PR, somada entre os arquivos acima do limite", () => {
-    const d = repo();
-    escreve(d, "a.md", "x".repeat(160 * 1024) + "\n");
-    escreve(d, "b.md", "y".repeat(160 * 1024) + "\n");
-    commita(d, "chore: dois arquivos grandes ja existentes");
-    git(d, "switch", "-q", "-c", "feature");
-    git(d, "branch", "-f", "main", "HEAD");
-    escreve(d, "a.md", "x".repeat(160 * 1024) + "\n" + "n".repeat(1500) + "\n");
-    escreve(d, "b.md", "y".repeat(160 * 1024) + "\n" + "n".repeat(1500) + "\n");
-    commita(d, "feat: cada um cresce menos que a tolerancia, juntos passam");
-    const r = verifica(d);
-    expect(r.codigo).toBe(1);
-    expect(r.saida).toMatch(/F4: os arquivos acima do limite cresceram 3\d\d\d bytes/);
-  });
-
-  it("funcional: F4 — um byte acima de 150 KiB já é acima do limite", () => {
+  it("nao limita linhas da PR nem do commit", () => {
     const d = repo();
     git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "no-limite.md", "x".repeat(150 * 1024 - 1) + "\n");
-    escreve(d, "um-acima.md", "x".repeat(150 * 1024) + "\n");
-    commita(d, "feat: exatamente no limite e um byte acima");
-    const r = verifica(d);
-    expect(r.codigo).toBe(1);
-    expect(r.saida).toMatch(/aviso\s+F4: no-limite\.md .*perto do limite/);
-    expect(r.saida).toMatch(/F4: os arquivos acima do limite cresceram.*um-acima\.md/);
-    expect(r.saida).not.toMatch(/cresceram.*no-limite\.md/);
-  });
-
-  it("funcional: F6 — a exceção declarada rebaixa F2 e F3 a aviso e imprime o motivo", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "movido.md", linhas(500));
-    commita(d, "refactor: move arquivo");
-    const r = verifica(d, { FATIA_EXCECAO: "movimento mecanico, sem alterar conteudo" });
-    expect(r.codigo, r.saida).toBe(0);
-    expect(r.saida).toContain("excecao declarada: movimento mecanico");
-  });
-
-  it("funcional: a exceção não vale para F4", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "novo-enorme.md", "z".repeat(170 * 1024) + "\n");
-    commita(d, "feat: arquivo novo enorme");
-    const r = verifica(d, { FATIA_EXCECAO: "tentando passar" });
-    expect(r.codigo).toBe(1);
-  });
-
-  it("funcional: artefato de método não conta para F2 por padrão", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    for (let i = 0; i < 30; i++) escreve(d, `docs/entregas/x/${String(i)}.md`, "x\n");
-    escreve(d, "src.md", linhas(10));
-    commita(d, "feat: com artefatos de metodo");
-    const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(0);
-    expect(r.saida).toContain("PR com 10 linhas em 1 arquivo(s)");
-  });
-
-  // capacidade do revisor: 100 arquivos no painel (FATIA_CAPACIDADE_*), nunca calibrável
-  const muitos = (d: string, dir: string, n: number): void => {
-    for (let i = 0; i < n; i++) escreve(d, `${dir}/${String(i)}.md`, "x\n");
-  };
-
-  it("funcional: F2c — 101 arquivos visíveis ao revisor reprovam mesmo com FATIA_MAX_ARQUIVOS=200 e FATIA_EXCECAO", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    muitos(d, "p", 101);
-    commita(d, "feat: muitos arquivos");
-    const r = verifica(d, { FATIA_MAX_ARQUIVOS: "200", FATIA_EXCECAO: "tentando passar" });
-    expect(r.codigo, r.saida).toBe(1);
-    expect(r.saida).toMatch(/VIOLACAO F2c: a PR altera 101 arquivos .*\(limite 100\)/);
-  });
-
-  it("funcional: F2c conta artefato de método que o painel não exclui (FATIA_CAPACIDADE_EXCLUIDO vazio)", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    muitos(d, "docs/entregas/x", 101);
-    commita(d, "feat: muitos artefatos");
+    escreve(d, "a.md", semQuebra(2000));
+    commita(d, "duas mil");
+    for (const nome of ["b", "c", "d", "e"]) escreve(d, `${nome}.md`, semQuebra(250));
+    commita(d, "mais mil");
     expect(verifica(d).codigo).toBe(0);
-    const r = verifica(d, { FATIA_CAPACIDADE_EXCLUIDO: "" });
-    expect(r.codigo, r.saida).toBe(1);
-    expect(r.saida).toContain("F2c:");
-    expect(r.saida).not.toMatch(/F2:/);
   });
 
-  it("funcional: F2c não se afrouxa — FATIA_CAPACIDADE_ARQUIVOS acima de 100 é uso incorreto", () => {
+  it("L2: usa split por quebra nas bordas de 5.000 linhas", () => {
     const d = repo();
     git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "a.md", "x\n");
-    commita(d, "feat: a");
-    const r = verifica(d, { FATIA_CAPACIDADE_ARQUIVOS: "101" });
-    expect(r.codigo, r.saida).toBe(2);
-    expect(r.saida).toContain("FATIA_CAPACIDADE_ARQUIVOS");
-    expect(verifica(d, { FATIA_CAPACIDADE_ARQUIVOS: "50" }).codigo).toBe(0);
-  });
-
-  it("funcional: o teto de F4 não se afrouxa — FATIA_MAX_LINHAS_ARQUIVO acima de 5000 é uso incorreto", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "a.md", "x\n");
-    commita(d, "feat: a");
-    const r = verifica(d, { FATIA_MAX_LINHAS_ARQUIVO: "6000" });
-    expect(r.codigo, r.saida).toBe(2);
-    expect(r.saida).toContain("FATIA_MAX_LINHAS_ARQUIVO");
-    expect(verifica(d, { FATIA_MAX_LINHAS_ARQUIVO: "5000" }).codigo).toBe(0);
-  });
-
-  it("funcional: F2c por padrão exclui o que o painel do método exclui (gerados e artefatos de método)", () => {
-    const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    muitos(d, "fixtures/candidatos/x", 101);
-    commita(d, "chore: snapshot");
+    escreve(d, "passa.txt", semQuebra(5000));
+    escreve(d, "quebra-final.txt", `${semQuebra(5000)}\n`);
+    escreve(d, "cinco-mil-e-uma.txt", semQuebra(5001));
+    commita(d, "bordas de linhas");
     const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(0);
-    expect(r.saida).not.toContain("F2c:");
+    expect(r.codigo).toBe(1);
+    expect(r.saida).not.toMatch(/VIOLACAO L2: passa\.txt/);
+    expect(r.saida).toMatch(/VIOLACAO L2: quebra-final\.txt tem 5001 linhas/);
+    expect(r.saida).toMatch(/VIOLACAO L2: cinco-mil-e-uma\.txt tem 5001 linhas/);
   });
 
-  it("funcional: FATIA_IGNORAR_PROJETO soma ao padrão, nunca o substitui", () => {
+  it("L2: 204.800 bytes passam e 204.801 reprovam", () => {
     const d = repo();
     git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "gerado/x.txt", linhas(500));
-    escreve(d, "package-lock.json", linhas(500));
-    escreve(d, "src.md", linhas(10));
-    commita(d, "feat: com gerados");
-    const r = verifica(d, { FATIA_IGNORAR_PROJETO: "^gerado/" });
-    expect(r.codigo, r.saida).toBe(0);
-    expect(r.saida).toContain("PR com 10 linhas em 1 arquivo(s)");
+    escreve(d, "passa.txt", "x".repeat(204800));
+    escreve(d, "reprova.txt", "x".repeat(204801));
+    commita(d, "bordas de bytes");
+    const r = verifica(d);
+    expect(r.codigo).toBe(1);
+    expect(r.saida).not.toMatch(/VIOLACAO L2: passa\.txt/);
+    expect(r.saida).toMatch(/VIOLACAO L2: reprova\.txt tem 1 linhas e 204801 bytes/);
   });
 
-  // PR com merge de um lado (lado: s1 → s2): base para os casos de medida impossível
-  function comMerge(): { d: string; s1: string } {
+  it("L2: mede o maior entre blob e checkout CRLF somente quando representam o mesmo blob", () => {
     const d = repo();
+    git(d, "config", "core.autocrlf", "true");
     git(d, "switch", "-q", "-c", "feature");
-    escreve(d, "b.md", "b\n");
-    commita(d, "feat: b");
-    git(d, "switch", "-q", "-c", "lado", "main");
-    escreve(d, "s.md", "s1\n");
-    commita(d, "feat: s1");
-    const s1 = spawnSync("git", ["rev-parse", "HEAD"], { cwd: d, encoding: "utf8" }).stdout.trim();
-    escreve(d, "s.md", "s1\ns2\n");
-    commita(d, "feat: s2");
-    git(d, "switch", "-q", "feature");
-    git(d, "merge", "-q", "--no-edit", "lado");
-    return { d, s1 };
-  }
-
-  // `--literal-pathspecs` so aparece no diff por arquivo do F4: falhar ali isola esse passo
-  for (const alvo of ["rev-list", "--name-status", "--remerge-diff", "--literal-pathspecs"]) {
-    it(`funcional: git que falha ao listar (${alvo}) sai com 2, nunca confere lista vazia`, () => {
-      const { d } = comMerge();
-      const real = spawnSync(BASH, ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
-      const bin = join(d, ".bin");
-      mkdirSync(bin);
-      writeFileSync(
-        join(bin, "git"),
-        `#!/usr/bin/env bash\nfor x in "$@"; do [ "$x" = "${alvo}" ] && exit 128; done\nexec "${real}" "$@"\n`,
-        { mode: 0o755 },
-      );
-      // o caminho entra no PATH como o bash o vê (`pwd`): no Git Bash, `C:/...` traria um `:`
-      const r = spawnSync(BASH, ["-c", 'PATH="$(cd "$1" && pwd):$PATH" exec bash "$2" main HEAD', "_", bin, SCRIPT], {
-        cwd: d,
-        encoding: "utf8",
-      });
-      expect(r.status, `${r.stdout}${r.stderr}`).toBe(2);
-    });
-  }
-
-  it("funcional: commit na fronteira de clone raso sai com 2, nunca é medido como raiz", () => {
-    const { d, s1 } = comMerge();
+    escreve(d, "crlf.txt", `${"x".repeat(203)}\n`.repeat(1000));
+    commita(d, "arquivo LF no blob");
+    rmSync(join(d, "crlf.txt"));
+    git(d, "checkout", "--", "crlf.txt");
+    expect(statSync(join(d, "crlf.txt")).size).toBeGreaterThan(204800);
+    expect(verifica(d).saida).toMatch(/VIOLACAO L2: crlf\.txt .* 205000 bytes/);
+    escreve(d, "crlf.txt", `${readFileSync(join(d, "crlf.txt"), "utf8")}alterado`);
     expect(verifica(d).codigo).toBe(0);
-    writeFileSync(join(d, ".git", "shallow"), `${s1}\n`);
-    const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(2);
-    expect(r.saida).toContain("fronteira de um clone raso");
   });
 
-  it("funcional: fronteira rasa num GIT_SHALLOW_FILE externo também sai com 2", () => {
-    const { d, s1 } = comMerge();
-    const fora = join(d, "..", `${d.split(/[\\/]/).pop() ?? "x"}.shallow`);
-    criados.push(fora);
-    writeFileSync(fora, `${s1}\n`);
-    const r = verifica(d, { GIT_SHALLOW_FILE: fora });
-    expect(r.codigo, r.saida).toBe(2);
-    expect(r.saida).toContain("fronteira de um clone raso");
-  });
-
-  it("funcional: F4 — link que vira arquivo de texto acima do limite (mudança de tipo) reprova", () => {
+  it("L2: UTF-8 invalido e medido depois da decodificacao da CLI", () => {
     const d = repo();
-    const blob = spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: d, input: "alvo", encoding: "utf8" }).stdout.trim();
-    git(d, "update-index", "--add", "--cacheinfo", `120000,${blob},grande.md`);
-    git(d, "commit", "-q", "-m", "link");
     git(d, "switch", "-q", "-c", "feature");
-    // pelo indice, e nao pela arvore: com core.symlinks=false (Windows) o git manteria 120000 e daria M
-    const grande = spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: d, input: "w".repeat(170 * 1024) + "\n", encoding: "utf8" }).stdout.trim();
-    git(d, "update-index", "--cacheinfo", `100644,${grande},grande.md`);
-    git(d, "commit", "-q", "-m", "feat: o link vira arquivo grande");
+    const grande = Buffer.concat([Buffer.alloc(68000, 0xff), Buffer.alloc(2000, 0x61)]);
+    const pequeno = Buffer.concat([Buffer.from([0xff]), Buffer.alloc(999, 0x61)]);
+    escreve(d, "grande.dat", grande);
+    escreve(d, "pequeno.dat", pequeno);
+    commita(d, "utf8 invalido");
     const r = verifica(d);
     expect(r.codigo, r.saida).toBe(1);
-    expect(r.saida).toMatch(/F4: .*grande\.md/);
+    expect(r.saida).toContain(`VIOLACAO L2: grande.dat tem ${MODULO.medir(grande).linhas} linhas e ${MODULO.medir(grande).bytes} bytes`);
+    expect(r.saida).not.toMatch(/VIOLACAO L2: pequeno\.dat/);
   });
 
-  it("funcional: submódulo (gitlink) não é medido como arquivo", () => {
+  it("L2 exclui o perfil, o nucleo e o argumento; inclui Markdown e extensao desconhecida", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    const grande = "x".repeat(204801);
+    for (const nome of ["package-lock.json", "logo.png", "manual.pdf", "app.min.js", "docs/sprintx/x.md", "gerado/x.js",
+      "notas.md", "dados.bin2"]) escreve(d, nome, grande);
+    commita(d, "predicado");
+    const r = verifica(d, { excluir: ["^gerado/"] });
+    expect(r.codigo).toBe(1);
+    const violacoes = [...r.saida.matchAll(/VIOLACAO L2: ([^ ]+)/g)].map((m) => m[1]).sort();
+    expect(violacoes).toEqual(["dados.bin2", "notas.md"]);
+  });
+
+  it("L2 ignora apagado e mede renomeado no caminho novo", () => {
+    const d = repo();
+    escreve(d, "apagado.md", "x".repeat(204801));
+    escreve(d, "antes.md", "x".repeat(204801));
+    commita(d, "grandes");
+    git(d, "switch", "-q", "-c", "feature");
+    rmSync(join(d, "apagado.md"));
+    git(d, "mv", "antes.md", "depois.md");
+    commita(d, "apaga e renomeia");
+    const r = verifica(d);
+    expect(r.saida).toMatch(/VIOLACAO L2: depois\.md/);
+    expect(r.saida).not.toContain("apagado.md tem");
+  });
+
+  it.each(["^gerado", "(a|b)/"])("padrao fora da gramatica (%s) sai 2", (padrao) => {
+    const d = repo();
+    expect(verifica(d, { excluir: [padrao] }).codigo).toBe(2);
+  });
+
+  it("aceita ponto escapado em pasta literal", () => {
+    const d = repo();
+    expect(verifica(d, { excluir: ["^a\\.b/"] }).codigo).toBe(0);
+  });
+
+  it("qualquer FATIA_* sai 2 com a mensagem reservada", () => {
+    const d = repo();
+    const r = verifica(d, { env: { FATIA_MAX_LINHAS_PR: "1" } });
+    expect(r.codigo).toBe(2);
+    expect(r.saida).toContain("`FATIA_MAX_LINHAS_PR` não é mais lida (limites do CodeAnt, fixos: emenda de 2026-10-19); remova-a do ambiente");
+  });
+
+  it("as constantes do Bash sao as dos perfis validados", () => {
+    const script = readFileSync(SCRIPT, "utf8");
+    const fixos = MODULO.limites();
+    expect(script).toContain(`MAX_ARQUIVOS_PR=${fixos.l3_arquivos}\n`);
+    expect(script).toContain(`MAX_LINHAS=${fixos.l2_linhas}\n`);
+    expect(script).toContain(`MAX_BYTES=${fixos.l2_bytes}\n`);
+    const lista = (nome: string): string[] => new RegExp(`^${nome}=\\(([^\\n]*)\\)$`, "m").exec(script)![1].split(" ");
+    expect(lista("NOMES_EXCLUIDOS")).toEqual(PERFIL.excluidos.nomes);
+    expect(lista("EXTENSOES_EXCLUIDAS")).toEqual(PERFIL.excluidos.extensoes);
+    expect(lista("SUFIXOS_EXCLUIDOS")).toEqual(PERFIL.excluidos.sufixos);
+    expect(lista("EXCLUIDOS_DO_NUCLEO")).toEqual(MODULO.EXCLUIDOS_DO_NUCLEO.map((p) => p.slice(1)));
+  });
+
+  it("o predicado do Bash coincide com o modulo", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    const nomes = ["a.PNG", ".png", "..png", "a.", "x.min.js", "x.MIN.JS", "a.tar.gz", "Thumbs.db", "go.sum", "notas.md"];
+    const sha = blob(d, "x".repeat(204801));
+    commitDeArvore(d, nomes.map((nome) => [nome, sha]), "tabela do predicado");
+    const r = verifica(d);
+    const medidos = new Set([...r.saida.matchAll(/VIOLACAO L2: ([^ ]+)/g)].map((x) => x[1]));
+    expect([...medidos].sort()).toEqual(nomes.filter((nome) => MODULO.revisavel(nome, PERFIL)).sort());
+  });
+
+  it("submodulo nao e medido e mudanca de tipo para arquivo e", () => {
     const d = repo();
     git(d, "switch", "-q", "-c", "feature");
     git(d, "update-index", "--add", "--cacheinfo", `160000,${"a".repeat(40)},vendor/lib`);
-    git(d, "commit", "-q", "-m", "feat: submodulo");
-    const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(0);
+    git(d, "commit", "-q", "-m", "submodulo");
+    expect(verifica(d).codigo).toBe(0);
+    const link = blob(d, "alvo");
+    git(d, "update-index", "--add", "--cacheinfo", `120000,${link},grande.md`);
+    git(d, "commit", "-q", "-m", "link");
+    git(d, "branch", "-f", "main", "HEAD");
+    const grande = blob(d, "x".repeat(204801));
+    git(d, "update-index", "--cacheinfo", `100644,${grande},grande.md`);
+    git(d, "commit", "-q", "-m", "arquivo");
+    expect(verifica(d).saida).toMatch(/VIOLACAO L2: grande\.md/);
   });
 
-  it("funcional: F3 — merge que resolve conflito com mais de 300 linhas próprias reprova", () => {
-    const d = repo();
-    escreve(d, "c.md", "base\n");
-    commita(d, "c");
-    git(d, "switch", "-q", "-c", "lado");
-    escreve(d, "c.md", "lado\n");
-    commita(d, "lado");
-    git(d, "switch", "-q", "-c", "feature", "main");
-    escreve(d, "c.md", "feature\n");
-    commita(d, "feature");
-    // conflito esperado (sai 1); a identidade vai junto: no CI nao ha user.name, e sem ela
-    // o merge para antes de deixar MERGE_HEAD
-    spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "merge", "-q", "--no-edit", "lado"], { cwd: d, encoding: "utf8" });
-    expect(spawnSync("git", ["rev-parse", "-q", "--verify", "MERGE_HEAD"], { cwd: d }).status).toBe(0);
-    escreve(d, "c.md", linhas(350, "resolucao"));
-    git(d, "add", "-A");
-    git(d, "commit", "-q", "-m", "merge: resolve o conflito");
-    const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(1);
-    expect(r.saida).toMatch(/F3: o merge \w+ resolve \d+ linhas próprias|F3: o merge \w+ resolve \d+ linhas proprias/);
-  });
-
-  it("funcional: F4 — nome de arquivo com quebra de linha é medido, não vira saída 2", () => {
+  it("nome com quebra e metacaractere de pathspec permanecem caminhos literais", () => {
     const d = repo();
     git(d, "switch", "-q", "-c", "feature");
-    const blob = spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: d, input: "x\n", encoding: "utf8" }).stdout.trim();
-    // direto nos objetos: o indice e a arvore de trabalho do Git for Windows recusam \n no caminho
-    const sh = (args: string[], input?: string): string => {
-      const r = spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: d, input, encoding: "utf8" });
-      if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
-      return r.stdout;
-    };
-    const arvore = sh(["mktree", "-z"], `${sh(["ls-tree", "-z", "HEAD"])}100644 blob ${blob}\tlinha\nquebrada.md\0`).trim();
-    const commit = sh(["commit-tree", arvore, "-p", "HEAD", "-m", "feat: nome com quebra"]).trim();
-    sh(["update-ref", "refs/heads/feature", commit]);
+    const pequeno = blob(d, "x\n"), grande = blob(d, "x".repeat(204801));
+    commitDeArvore(d, [["linha\nquebrada.md", pequeno], ["g?.md", grande]], "nomes especiais");
     const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(0);
+    expect(r.codigo).toBe(1);
+    expect(r.saida).toContain("g?.md");
+    expect(r.saida).not.toContain("nao foi possivel");
   });
 
-  it("funcional: F4 — nome com metacaractere de pathspec não casa um arquivo vizinho", () => {
+  it("falha do git e uso incorreto saem 2", () => {
+    expect(spawnSync(BASH, [SCRIPT], { encoding: "utf8", env: ambiente() }).status).toBe(2);
     const d = repo();
-    git(d, "switch", "-q", "-c", "feature");
-    // `g?.md` como padrao casaria `g1.md`, que vem antes na ordem do numstat; sendo
-    // binario, o tipo `-` tiraria do F4 o arquivo grande de texto `g?.md`
-    const obj = (conteudo: string): string =>
-      spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: d, input: conteudo, encoding: "latin1" }).stdout.trim();
-    // direto nos objetos: o indice do Git for Windows recusa `?` no caminho
-    const sh = (args: string[], input?: string): string => {
-      const r = spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: d, input, encoding: "utf8" });
-      if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
-      return r.stdout;
-    };
-    const entradas = `100644 blob ${obj("bin\u0000ario")}\tg1.md\u0000100644 blob ${obj("y".repeat(170 * 1024) + "\n")}\tg?.md\u0000`;
-    const arvore = sh(["mktree", "-z"], `${sh(["ls-tree", "-z", "HEAD"])}${entradas}`).trim();
-    sh(["update-ref", "refs/heads/feature", sh(["commit-tree", arvore, "-p", "HEAD", "-m", "feat: ? ao lado de binario"]).trim()]);
-    const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(1);
-    expect(r.saida).toMatch(/F4: .*g\?\.md/);
-  });
-
-  it("funcional: F4 — textconv local não faz binário passar por texto", () => {
-    const d = repo();
-    // driver local que transforma o binario em texto: o verificador nao deve usa-lo
-    writeFileSync(join(d, ".gitattributes"), "*.bin diff=vira-texto\n");
-    git(d, "config", "diff.vira-texto.textconv", "echo texto");
-    commita(d, "chore: atributos");
-    git(d, "switch", "-q", "-c", "feature");
-    writeFileSync(join(d, "grande.bin"), Buffer.concat([Buffer.from([0]), Buffer.alloc(170 * 1024, 65)]));
-    commita(d, "feat: binario grande");
-    const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(0);
-    expect(r.saida).not.toMatch(/F4: .*grande\.bin/);
-  });
-
-  it("funcional: F3 — renomeação na resolução do merge não conta como arquivo inteiro, mesmo com diff.renames=false", () => {
-    const d = repo();
-    git(d, "config", "diff.renames", "false");
-    escreve(d, "grande.md", linhas(350));
-    escreve(d, "c.md", "base\n");
-    commita(d, "base");
-    git(d, "switch", "-q", "-c", "lado");
-    escreve(d, "c.md", "lado\n");
-    commita(d, "lado");
-    git(d, "switch", "-q", "-c", "feature", "main");
-    escreve(d, "c.md", "feature\n");
-    commita(d, "feature");
-    spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "merge", "-q", "--no-edit", "lado"], { cwd: d, encoding: "utf8" });
-    escreve(d, "c.md", "resolvido\n");
-    git(d, "mv", "grande.md", "grande-movido.md");
-    git(d, "add", "-A");
-    git(d, "commit", "-q", "-m", "merge: resolve e move");
-    const r = verifica(d);
-    expect(r.codigo, r.saida).toBe(0);
-  });
-
-  it("funcional: uso incorreto sai com 2", () => {
-    const r = spawnSync(BASH, [SCRIPT], { encoding: "utf8" });
-    expect(r.status).toBe(2);
+    const real = spawnSync(BASH, ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+    const bin = join(d, ".bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "git"), `#!/usr/bin/env bash\nfor x in "$@"; do [ "$x" = "--name-only" ] && exit 128; done\nexec "${real}" "$@"\n`, { mode: 0o755 });
+    const r = spawnSync(BASH, ["-c", 'PATH="$(cd "$1" && pwd):$PATH" exec bash "$2" main HEAD', "_", bin, SCRIPT],
+      { cwd: d, encoding: "utf8", env: ambiente() });
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(2);
   });
 });

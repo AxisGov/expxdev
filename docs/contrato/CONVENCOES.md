@@ -157,7 +157,7 @@ citar quatro das nove regras e perder as outras cinco.
 | Rastro de eventos | `CONTRATO-expx-eventos.md` | a linha JSONL, seu vocabulário |
 | Hooks | `CONTRATO-expx-eventos.md` | mecânica, modos, regras de hook |
 | Agentes | `CONTRATO-expx-eventos.md` | frontmatter e ferramentas por agente |
-| Fatiamento de mudanças | `CONTRATO-expx-fatiamento.md` | F1–F6: tamanho da PR, do commit e do arquivo, e a promoção de linhas longas; F2c, a capacidade do revisor; a configuração por projeto |
+| Fatiamento de mudanças | `CONTRATO-expx-fatiamento.md` | limites fixos L1 (task), L2 (arquivo) e L3 (PR); F1, F5 e F6; revisão completa, PR de planejamento e entrega sequencial por sprint |
 | Revisão por task | `CONTRATO-expx-revisao.md` | a evidência da CLI do CodeAnt por task, a identidade do achado, `revisar`, `conferir` (V12) e `rejeitar` |
 
 ## Histórico

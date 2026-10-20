@@ -305,5 +305,8 @@ describe(".expx/fatiamento.json é do projeto", () => {
     p = projetoTemporario("fixtures/cli/projeto-limpo");
     await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: catalogoLocal(["sprintx"]) });
     expect(existsSync(join(p.raiz, ".expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs"))).toBe(true);
+    expect(existsSync(join(p.raiz, ".expx/marketplace/plugins/expx/nucleo/scripts/expx-limites.mjs"))).toBe(true);
+    expect(existsSync(join(p.raiz, ".expx/marketplace/plugins/expx/nucleo/scripts/perfis/codeant-cli-0.5.14.json"))).toBe(true);
+    expect(existsSync(join(p.raiz, ".expx/marketplace/plugins/expx/nucleo/scripts/perfis/codeant-app.json"))).toBe(true);
   });
 });

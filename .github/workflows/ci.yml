@@ -78,7 +78,7 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: bash scripts/verificar-fatiamento.sh "origin/$BASE_REF" "$HEAD_SHA"
+        run: bash scripts/verificar-fatiamento.sh --excluir-da-revisao '^fixtures/candidatos/' "origin/$BASE_REF" "$HEAD_SHA"
 
   # Pacote do CLI por commit da main, como release `cli-<sha7>`. O dist/ não é
   # versionado e o `expxdev` do npm é de outro autor, então é daqui que outro

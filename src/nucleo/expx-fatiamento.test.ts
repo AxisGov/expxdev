@@ -45,7 +45,9 @@ describe("expx-fatiamento.mjs", () => {
     expect(r.rc).toBe(0);
     const linhas = r.out.split("\n");
     expect(linhas.filter((l) => l.startsWith("FATIA_"))).toEqual([]);
-    for (const l of ["EXPX_REVISAO_POR_TASK=se_disponivel", "EXPX_ENTREGA=por_trabalho", "EXPX_FATIAMENTO_ORIGEM=padrao"]) expect(linhas).toContain(l);
+    for (const l of ["EXPX_REVISAO_POR_TASK=se_disponivel", "EXPX_ENTREGA=por_trabalho", "EXPX_FATIAMENTO_ORIGEM=padrao",
+      "EXPX_PERFIL_CLI=codeant-cli@0.5.14", "EXPX_L1_ARQUIVOS=40", "EXPX_L2_LINHAS=5000", "EXPX_L2_BYTES=204800",
+      "EXPX_L3_ARQUIVOS=100"]) expect(linhas).toContain(l);
   });
 
   it("funcional: versão 2 mínima é válida", () => {
@@ -154,7 +156,8 @@ describe("expx-fatiamento.mjs", () => {
   it("funcional: --formato json traz só as chaves da versão 2, com os padrões; --validar não imprime nada", () => {
     const raiz = projeto({ expx_fatiamento: 2 });
     expect(JSON.parse(roda(raiz, "--formato", "json").out)).toEqual({ origem: "projeto", revisao_por_task: { modo: "se_disponivel" }, entrega: "por_trabalho",
-      merge_automatico: { ativo: false, caminhos_protegidos: PADRAO }, revisor_bot: [], excluir_da_revisao: [] });
+      merge_automatico: { ativo: false, caminhos_protegidos: PADRAO }, revisor_bot: [], excluir_da_revisao: [],
+      limites: { perfil_cli: "codeant-cli@0.5.14", l1_arquivos: 40, l2_linhas: 5000, l2_bytes: 204800, l3_arquivos: 100 } });
     expect(roda(raiz, "--validar")).toMatchObject({ rc: 0, out: "" });
     expect(roda(raiz, "--formato", "yaml").rc).toBe(2);
   });

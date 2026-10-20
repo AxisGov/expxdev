@@ -4,7 +4,7 @@
 // <motivo>` por erro no stderr, nada no stdout — nunca os padrões. Uso errado: 2.
 import { lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ehRaizDeCodigo, fatiaNoAmbiente, mensagemFatia, prefixoDe } from "./expx-limites.mjs";
+import { ehRaizDeCodigo, fatiaNoAmbiente, limites as limitesFixos, mensagemFatia, prefixoDe } from "./expx-limites.mjs";
 
 const MODOS = ["obrigatoria", "se_disponivel", "desligada"];
 const ENTREGAS = ["por_trabalho", "por_sprint"];
@@ -209,7 +209,8 @@ function resolver(cfg, origem) {
   // independente de merge_automatico: o E9 da mergex reconhece a revisão do bot no PR redirecionado
   const revisor = logins(cfg.revisor_bot, "revisor_bot");
   const excluir = exclusoes(cfg.excluir_da_revisao, "excluir_da_revisao");
-  return { origem, revisao_por_task: { modo }, entrega, merge_automatico: merge, revisor_bot: revisor, excluir_da_revisao: excluir };
+  return { origem, revisao_por_task: { modo }, entrega, merge_automatico: merge, revisor_bot: revisor,
+    excluir_da_revisao: excluir, limites: limitesFixos() };
 }
 
 // `FATIA_*` são reservados para sempre: falham antes do arquivo, com ou sem ele, também no --validar
@@ -233,7 +234,7 @@ if (erros.length > 0 || e === undefined) {
 if (op.validar) process.exit(0);
 
 // Aspas simples quando o valor tem algo além do que o shell lê literalmente.
-const shell = (v) => (/^[A-Za-z0-9_./:^=+-]*$/.test(String(v)) ? String(v) : `'${String(v).replace(/'/g, "'\\''")}'`);
+const shell = (v) => (/^[A-Za-z0-9_./:@^=+-]*$/.test(String(v)) ? String(v) : `'${String(v).replace(/'/g, "'\\''")}'`);
 // nenhuma `FATIA_*`: nenhum limite nem exclusão vem do ambiente (emenda de 2026-10-19)
 const env = {
   EXPX_REVISAO_POR_TASK: e.revisao_por_task.modo,
@@ -243,6 +244,11 @@ const env = {
   EXPX_REVISOR_BOT: e.revisor_bot.join(","), // vírgula: login não tem vírgula
   EXPX_EXCLUIR_DA_REVISAO: e.excluir_da_revisao.map((x) => x.padrao).join("|"), // só as do projeto; | não é de pasta literal
   EXPX_FATIAMENTO_ORIGEM: e.origem,
+  EXPX_PERFIL_CLI: e.limites.perfil_cli,
+  EXPX_L1_ARQUIVOS: e.limites.l1_arquivos,
+  EXPX_L2_LINHAS: e.limites.l2_linhas,
+  EXPX_L2_BYTES: e.limites.l2_bytes,
+  EXPX_L3_ARQUIVOS: e.limites.l3_arquivos,
 };
 const texto = Object.entries(env).map(([k, v]) => `${k}=${shell(v)}\n`).join("");
 process.stdout.write(op.formato === "json" ? `${JSON.stringify(e, null, 2)}\n` : texto);

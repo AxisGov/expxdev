@@ -1,230 +1,201 @@
 #!/usr/bin/env bash
-#
-# Confere o fatiamento de uma mudança (docs/contrato/CONTRATO-expx-fatiamento.md).
-#
-#   bash scripts/verificar-fatiamento.sh <base> <head>
-#
-# Compara <base>...<head> e falha, com a lista de violações, em F2 (PR: linhas e
-# arquivos), F2c (arquivos visíveis ao revisor: capacidade), F3 (linhas por
-# commit) e F4 (tamanho de arquivo, em KB e em linhas; acima do limite o arquivo
-# não cresce, com tolerância POR PR). Saída: 0 sem violação, 1 com, 2 uso ou
-# medição impossível (ref inexistente, sem ancestral comum, `git diff` que falha).
-#
-# Variáveis (padrões no contrato; o leitor `expx-fatiamento.mjs` as preenche a
-# partir de .expx/fatiamento.json):
-#   FATIA_MAX_LINHAS_PR, FATIA_MAX_ARQUIVOS (F2), FATIA_MAX_LINHAS_COMMIT (F3),
-#   FATIA_MAX_KB_ARQUIVO, FATIA_MAX_LINHAS_ARQUIVO (até 5000), FATIA_AVISO_*, FATIA_TOLERANCIA_* (F4)
-#   FATIA_IGNORAR          fora de F2/F3/F4 (não vazia, substitui o padrão, que inclui os artefatos de método)
-#   FATIA_IGNORAR_PROJETO  regex do projeto que SOMA ao FATIA_IGNORAR, nunca o substitui
-#   FATIA_CAPACIDADE_ARQUIVOS  F2c: arquivos que o revisor lê numa PR (100; acima: saída 2)
-#   FATIA_CAPACIDADE_EXCLUIDO  fora de F2c (o painel não os mostra; padrão: o de FATIA_IGNORAR); vazio = nenhum
-#   FATIA_EXCECAO          rebaixa F2 e F3 a aviso; nunca F2c nem F4
+# Verifica apenas os limites fixos observados no CodeAnt (L2 e L3).
+# Uso: bash scripts/verificar-fatiamento.sh [--planejamento] [--excluir-da-revisao <padrao>]... <base> <head>
+# --planejamento: PR de planejamento (contrato, "PR de planejamento"): todo caminho
+# alterado, inclusive a origem de renomeacao, fica sob os artefatos de metodo, e L3
+# nao se aplica.
 
 set -uo pipefail
 
-if [ "$#" -ne 2 ]; then
-  echo "uso: ${0##*/} <base> <head>" >&2
+MAX_ARQUIVOS_PR=100
+MAX_LINHAS=5000
+MAX_BYTES=204800
+NOMES_EXCLUIDOS=(package-lock.json yarn.lock pnpm-lock.yaml composer.lock Gemfile.lock Cargo.lock poetry.lock Pipfile.lock go.sum .DS_Store Thumbs.db)
+EXTENSOES_EXCLUIDAS=(.png .jpg .jpeg .gif .bmp .ico .svg .webp .avif .woff .woff2 .ttf .eot .otf .exe .dll .so .dylib .bin .o .a .class .pyc .pyo .wasm .jar .war .ear .zip .tar .gz .bz2 .7z .rar .mp3 .mp4 .wav .avi .mov .flv .wmv .ogg .webm .min.js .min.css .map .pb .proto.bin .pdf .doc .docx .xls .xlsx .ppt .pptx .csv .tsv .parquet .avro .ndjson .sqlite .db)
+SUFIXOS_EXCLUIDOS=(.min.js .min.css)
+EXCLUIDOS_DO_NUCLEO=(docs/sprintx/ docs/entregas/ docs/eventos/)
+
+uso() {
+  echo "uso: ${0##*/} [--planejamento] [--excluir-da-revisao <padrao>]... <base> <head>" >&2
   exit 2
-fi
-base="$1"; head="$2"
-
-max_linhas_pr="${FATIA_MAX_LINHAS_PR:-400}"
-max_arquivos="${FATIA_MAX_ARQUIVOS:-20}"
-max_linhas_commit="${FATIA_MAX_LINHAS_COMMIT:-300}"
-max_kb="${FATIA_MAX_KB_ARQUIVO:-150}"
-aviso_kb="${FATIA_AVISO_KB:-100}"
-tolerancia_b="${FATIA_TOLERANCIA_B:-2048}"
-max_linhas_arq="${FATIA_MAX_LINHAS_ARQUIVO:-4000}"
-aviso_linhas_arq="${FATIA_AVISO_LINHAS:-3000}"
-tolerancia_l="${FATIA_TOLERANCIA_LINHAS:-20}"
-# o lock casa o nome inteiro (`$`): `package-lock.json.backup` e revisado. Os
-# artefatos de metodo (docs/sprintx, entregas, eventos) nao sao codigo revisado
-padrao='(^|/)(package-lock\.json$|fixtures/candidatos/)|^docs/(sprintx|entregas|eventos)/'
-ignorar="${FATIA_IGNORAR:-$padrao}"
-[ -z "${FATIA_IGNORAR_PROJETO:-}" ] || ignorar="($ignorar)|($FATIA_IGNORAR_PROJETO)"
-cap_arquivos="${FATIA_CAPACIDADE_ARQUIVOS:-100}"
-# capacidade nao se afrouxa: mais estrito vale, acima do teto e uso incorreto
-teto() { # <variavel> <valor> <teto>
-  [[ $2 =~ ^[0-9]+$ ]] && [ "$2" -le "$3" ] \
-    || { echo "$1=$2: inteiro ate $3 (capacidade do revisor)" >&2; exit 2; }
 }
-teto FATIA_CAPACIDADE_ARQUIVOS "$cap_arquivos" 100
-teto FATIA_MAX_LINHAS_ARQUIVO "$max_linhas_arq" 5000
-# sem leitor, o painel e o dos repositorios do metodo, que exclui o mesmo padrao
-# (contrato, F6); num projeto o leitor o informa. Sem `:`: definida e vazia quer
-# dizer que o painel nao exclui nada
-cap_excluido="${FATIA_CAPACIDADE_EXCLUIDO-$padrao}"
-excecao="${FATIA_EXCECAO:-}"
 
-# os limites em KB são comparados em BYTES: dividir por 1024 truncaria, e um
-# arquivo um byte acima de 150 KiB passaria por 150
-max_b=$((max_kb * 1024))
-aviso_b=$((aviso_kb * 1024))
+for nome in $(compgen -e); do
+  case "$nome" in
+    FATIA_*)
+      echo "\`$nome\` não é mais lida (limites do CodeAnt, fixos: emenda de 2026-10-19); remova-a do ambiente" >&2
+      exit 2
+      ;;
+  esac
+done
+
+# Imprime o prefixo literal de ^a/b/; recusa regex, glob, controle e segmento vazio.
+prefixo_de() {
+  local padrao="$1" corpo segmento saida="" i c proximo
+  [ "${padrao#^}" != "$padrao" ] && [ "${padrao%/}" != "$padrao" ] || return 1
+  corpo="${padrao#^}"
+  while [ -n "$corpo" ]; do
+    segmento="${corpo%%/*}"
+    [ -n "$segmento" ] || return 1
+    corpo="${corpo#*/}"
+    i=0
+    while [ "$i" -lt "${#segmento}" ]; do
+      c="${segmento:$i:1}"
+      case "$c" in
+        '\')
+          i=$((i + 1)); [ "$i" -lt "${#segmento}" ] || return 1
+          proximo="${segmento:$i:1}"; [ "$proximo" = "." ] || return 1
+          saida="${saida}."
+          ;;
+        '.'|'^'|'$'|'|'|'?'|'*'|'+'|'('|')'|'['|']'|'{'|'}') return 1 ;;
+        *)
+          case "$c" in $'\001'|$'\002'|$'\003'|$'\004'|$'\005'|$'\006'|$'\007'|$'\010'|$'\011'|$'\012'|$'\013'|$'\014'|$'\015'|$'\016'|$'\017'|$'\020'|$'\021'|$'\022'|$'\023'|$'\024'|$'\025'|$'\026'|$'\027'|$'\030'|$'\031'|$'\032'|$'\033'|$'\034'|$'\035'|$'\036'|$'\037'|$'\177') return 1 ;; esac
+          saida="${saida}${c}"
+          ;;
+      esac
+      i=$((i + 1))
+    done
+    saida="${saida}/"
+  done
+  [ -n "$saida" ] || return 1
+  printf '%s\n' "$saida"
+}
+
+EXCLUIDOS_PROJETO=()
+planejamento=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --planejamento) planejamento=1; shift ;;
+    --excluir-da-revisao)
+      [ "$#" -ge 2 ] || uso
+      prefixo="$(prefixo_de "$2")" || { echo "--excluir-da-revisao: padrão fora da gramática: $2" >&2; exit 2; }
+      EXCLUIDOS_PROJETO+=("$prefixo")
+      shift 2
+      ;;
+    *) break ;;
+  esac
+done
+[ "$#" -eq 2 ] || uso
+base="$1"; head="$2"
 
 git rev-parse --verify --quiet "$base^{commit}" >/dev/null || { echo "base inexistente: $base" >&2; exit 2; }
 git rev-parse --verify --quiet "$head^{commit}" >/dev/null || { echo "head inexistente: $head" >&2; exit 2; }
 mb="$(git merge-base "$base" "$head")" || { echo "sem ancestral comum entre $base e $head" >&2; exit 2; }
 
-violacoes=0
-avisos=0
-viola() { violacoes=$((violacoes + 1)); printf 'VIOLACAO %s\n' "$1"; }
-avisa() { avisos=$((avisos + 1)); printf 'aviso    %s\n' "$1"; }
-# F2 e F3 viram aviso quando há exceção declarada; F4 nunca.
-viola_ou_avisa() {
-  if [ -n "$excecao" ]; then avisa "$1 [excecao declarada: $excecao]"; else viola "$1"; fi
-}
+lista_todos=""; lista_l2=""; conteudo=""; decodificado=""
+trap 'rm -f ${lista_todos:+"$lista_todos"} ${lista_l2:+"$lista_l2"} ${conteudo:+"$conteudo"} ${decodificado:+"$decodificado"}' EXIT
+lista_todos="$(mktemp)" && lista_l2="$(mktemp)" && conteudo="$(mktemp)" && decodificado="$(mktemp)" \
+  || { echo "sem arquivo temporario" >&2; exit 2; }
 
-# KiB com arredondamento para cima, só para exibir
-kib() { echo $((($1 + 1023) / 1024)); }
-
-# linhas alteradas e arquivos de um diff, sem os que casam <padrao> (vazio: nenhum
-# fica de fora; um regex vazio casaria tudo). O numstat vem com -z: o
-# caminho e um campo terminado por NUL, entao espaco, `=>` ou quebra no nome nao o
-# confundem. Na renomeacao o campo do caminho vem vazio e seguem origem e destino;
-# ela so fica fora da conta quando os DOIS casam com o FATIA_IGNORAR — sem isto, um
-# arquivo tirado de fixtures/candidatos/ para um caminho revisado, ou codigo do
-# produto movido para la, esconderia as linhas alteradas no caminho. A saida do
-# git vai para um arquivo, nao para um pipe: um diff que falha tem de falhar aqui.
-soma() { # <padrao> <argumentos do git diff>
-  local x="$1"; shift
-  soma_de "$x" git -c core.quotepath=off diff --numstat -z -M "$@"
-}
-# soma_de <padrao> <comando que imprime numstat -z> — a mesma conta para qualquer fonte de numstat
-soma_de() {
-  local x="$1" t a d p o linhas=0 n=0
-  shift
-  t="$(mktemp)" || return 1
-  "$@" > "$t" || { rm -f "$t"; return 1; }
-  while IFS=$'\t' read -r -d '' a d p; do
-    o="$p"
-    [ -n "$p" ] || { read -r -d '' o; read -r -d '' p; }
-    [ -n "$x" ] && [[ $p =~ $x ]] && [[ $o =~ $x ]] && continue
-    [ "$a" = - ] || linhas=$((linhas + a + d))
-    n=$((n + 1))
-  done < "$t"
-  rm -f "$t"
-  printf '%d %d\n' "$linhas" "$n"
-}
-
-# a medida vai para uma variavel, nunca direto num `read < <(...)`: a substituicao
-# de processo esconde a saida do `git diff`, e um diff que falha (objeto ausente)
-# imprimiria `0 0` e passaria por PR limpo. Nao mediu e saida 2, nunca 0.
-mede() { # <rotulo> <padrao> <argumentos do git diff>
-  local r="$1"; shift
-  soma "$@" || { echo "nao foi possivel medir $r (git diff falhou)" >&2; exit 2; }
-}
-
-# F2 — a PR inteira
-med="$(mede "a PR $mb..$head" "$ignorar" "$mb" "$head")" || exit 2
-read -r linhas_pr arquivos_pr <<< "$med"
-[ "$linhas_pr" -le "$max_linhas_pr" ] \
-  || viola_ou_avisa "F2: a PR altera $linhas_pr linhas (limite $max_linhas_pr); divida por assunto"
-[ "$arquivos_pr" -le "$max_arquivos" ] \
-  || viola_ou_avisa "F2: a PR altera $arquivos_pr arquivos (limite $max_arquivos); divida por assunto"
-
-# F2c — capacidade: os arquivos que o revisor ve no painel. Nao e calibravel nem
-# rebaixada pela excecao (como F4): acima dela a revisao fica parcial
-med="$(mede "a PR $mb..$head" "$cap_excluido" "$mb" "$head")" || exit 2
-read -r _ visiveis <<< "$med"
-[ "$visiveis" -le "$cap_arquivos" ] \
-  || viola "F2c: a PR altera $visiveis arquivos visiveis ao revisor (limite $cap_arquivos); divida a PR"
-
-# As listas que os lacos percorrem vao para arquivo, nunca para `< <(...)`: a
-# substituicao de processo esconde a falha, e um laco sobre lista vazia nao confere nada.
-# a limpeza vem antes dos mktemp: se o segundo falhar, o primeiro nao fica para tras
-lista_c=""; lista_f=""
-trap 'rm -f ${lista_c:+"$lista_c"} ${lista_f:+"$lista_f"}' EXIT
-lista_c="$(mktemp)" && lista_f="$(mktemp)" || { echo "sem arquivo temporario" >&2; exit 2; }
-
-# F3 — cada commit (merges ficam de fora: o conteúdo deles é o dos pais). Commit
-# sem pai (raiz de historia trazida por merge) mede contra a arvore vazia. Na
-# fronteira de um clone raso o commit tambem parece sem pai, mas nao e raiz: ali
-# nao ha medida, e conta-lo inteiro daria uma violacao falsa.
-git rev-list --no-merges "$mb..$head" > "$lista_c" \
-  || { echo "nao foi possivel listar os commits de $mb..$head" >&2; exit 2; }
-vazia="$(git hash-object -t tree /dev/null)"
-raso="${GIT_SHALLOW_FILE:-$(git rev-parse --git-path shallow)}"
-while IFS= read -r c; do
-  if git rev-parse -q --verify "$c^" >/dev/null; then pai="$c^"
-  elif [ -f "$raso" ] && grep -qx "$c" "$raso"; then
-    echo "o commit $c esta na fronteira de um clone raso: sem o pai nao ha medida; aprofunde o clone (git fetch --unshallow)" >&2; exit 2
-  else pai="$vazia"; fi
-  med="$(mede "o commit $c" "$ignorar" "$pai" "$c")" || exit 2
-  read -r l _ <<< "$med"
-  if [ "$l" -gt "$max_linhas_commit" ]; then
-    viola_ou_avisa "F3: o commit $(git rev-parse --short "$c") altera $l linhas (limite $max_linhas_commit): $(git log -1 --format=%s "$c" | cut -c1-70)"
-  fi
-done < "$lista_c"
-
-# F3 nos merges: o conteudo deles e o dos pais, MENOS a resolucao — linhas que nao
-# estao em nenhum pai. `--remerge-diff` mostra so isso (a diferenca entre a mescla
-# automatica e o merge gravado). Merge que nao se mede sai 2, como toda medida
-# impossivel aqui — inclusive no git anterior a 2.36, que nao tem a opcao.
-git rev-list --merges "$mb..$head" > "$lista_c" \
-  || { echo "nao foi possivel listar os merges de $mb..$head" >&2; exit 2; }
-while IFS= read -r c; do
-  # -M explicito, como no soma: com diff.renames=false, renomeacao na resolucao
-  # contaria o arquivo inteiro como apagado e criado
-  med="$(soma_de "$ignorar" git -c core.quotepath=off show -M --remerge-diff --format= --numstat -z "$c")" \
-    || { echo "nao foi possivel medir o merge $c (git show --remerge-diff falhou; exige git 2.36 ou mais novo)" >&2; exit 2; }
-  read -r l _ <<< "$med"
-  if [ "$l" -gt "$max_linhas_commit" ]; then
-    viola_ou_avisa "F3: o merge $(git rev-parse --short "$c") resolve $l linhas proprias (limite $max_linhas_commit): $(git log -1 --format=%s "$c" | cut -c1-70)"
-  fi
-done < "$lista_c"
-
-# F4 — tamanho de arquivo de texto no head. Acima do limite, o crescimento é
-# SOMADO sobre a PR inteira e comparado com a tolerância uma vez. `T` (mudança de
-# tipo: link virou arquivo) entra: o arquivo de texto que sai dali e revisado igual.
-# Com -z, como no `soma`: cada campo termina em NUL, e um nome com quebra de linha
-# chega inteiro, nunca escapado entre aspas (que nao e caminho nenhum).
-git -c core.quotepath=off diff --name-status -z -M --diff-filter=AMRT "$mb" "$head" > "$lista_f" \
+git -c core.quotepath=off diff --name-only -z -M "$mb" "$head" > "$lista_todos" \
   || { echo "nao foi possivel listar os arquivos de $mb..$head" >&2; exit 2; }
-cresc_b=0; cresc_l=0
-acima=()
-while IFS= read -r -d '' st; do
-  a=""; b=""
-  IFS= read -r -d '' a
-  case "$st" in R*|C*) IFS= read -r -d '' b ;; esac
-  [ -n "$st" ] || continue
-  novo="${b:-$a}"
-  # renomeação: o arquivo no ancestral tem o caminho ANTIGO; sem isto, um
-  # arquivo grande só movido pareceria ter crescido do zero ao tamanho inteiro
-  antigo="$a"
-  # gerado (FATIA_IGNORAR) nao e revisado: fica fora de F4 tambem (contrato, F6)
-  [[ $novo =~ $ignorar ]] && continue
-  # submodulo (gitlink, 160000) nao e arquivo: o objeto dele nem esta neste repositorio
-  # --literal-pathspecs: o nome e caminho, nunca padrao — `g[x].md` nao pode casar `gx.md`
-  case "$(git --literal-pathspecs ls-tree "$head" -- "$novo")" in 160000\ *) continue ;; esac
-  # sem o tipo nao ha medida: tipo vazio mediria um binario como texto
-  tipo="$(git --literal-pathspecs -c core.quotepath=off diff --numstat "$mb" "$head" -- "$novo" | awk -F'\t' 'NR == 1 { print $1 }')" \
-    || { echo "nao foi possivel medir $novo (git diff falhou)" >&2; exit 2; }
-  [ "$tipo" = "-" ] && continue   # binário: não é revisado como texto
-  # o arquivo existe no head (A/M/R): sem ler o tamanho dele nao ha medida, e um 0
-  # passaria por arquivo pequeno. No ancestral ele pode nao existir (A): ali, 0.
-  tam_head="$(git cat-file -s "$head:$novo" 2>/dev/null)" \
-    && lin_head="$(git cat-file -p "$head:$novo" 2>/dev/null | awk 'END { print NR }')" \
-    || { echo "nao foi possivel medir $novo no head" >&2; exit 2; }
-  tam_base="$(git cat-file -s "$mb:$antigo" 2>/dev/null || echo 0)"
-  lin_base="$(git cat-file -p "$mb:$antigo" 2>/dev/null | awk 'END { print NR }')"
+total=0
+while IFS= read -r -d '' _; do total=$((total + 1)); done < "$lista_todos"
 
-  # linhas por `awk NR`, nao `wc -l`: o wc conta quebras, e a ultima linha sem
-  # quebra ficaria de fora. O `codeant review` documenta 5.000 linhas por arquivo e o scan de agente
-  # filtra acima disso: o limite em linhas aqui tem folga (4.000)
-  if [ "$tam_head" -gt "$max_b" ] || [ "$lin_head" -gt "$max_linhas_arq" ]; then
-    acima+=("$novo")
-    [ "$tam_head" -gt "$tam_base" ] && cresc_b=$((cresc_b + tam_head - tam_base))
-    [ "$lin_head" -gt "$lin_base" ] && cresc_l=$((cresc_l + lin_head - lin_base))
-    avisa "F4: $novo tem $(kib "$tam_head") KB e $lin_head linhas, acima do limite ($max_kb KB / $max_linhas_arq linhas); precisa ser dividido"
-  elif [ "$tam_head" -gt "$aviso_b" ] || [ "$lin_head" -gt "$aviso_linhas_arq" ]; then
-    avisa "F4: $novo tem $(kib "$tam_head") KB e $lin_head linhas, perto do limite ($max_kb KB / $max_linhas_arq linhas)"
-  fi
-done < "$lista_f"
-
-if [ "$cresc_b" -gt "$tolerancia_b" ] || [ "$cresc_l" -gt "$tolerancia_l" ]; then
-  viola "F4: os arquivos acima do limite cresceram $cresc_b bytes e $cresc_l linhas no total (tolerancia da PR: $tolerancia_b bytes, $tolerancia_l linhas): ${acima[*]}; arquivo acima do limite so diminui ou e dividido"
+violacoes=0
+if [ "$planejamento" -eq 1 ]; then
+  git -c core.quotepath=off diff --name-only -z --no-renames "$mb" "$head" > "$lista_l2" \
+    || { echo "nao foi possivel listar os caminhos de $mb..$head" >&2; exit 2; }
+  while IFS= read -r -d '' caminho; do
+    case "$caminho" in
+      docs/sprintx/*|docs/entregas/*|docs/eventos/*) ;;
+      *)
+        printf 'VIOLACAO planejamento: %s fora de docs/sprintx/, docs/entregas/ e docs/eventos/; o PR de planejamento so leva artefatos de metodo\n' "$caminho"
+        violacoes=$((violacoes + 1))
+        ;;
+    esac
+  done < "$lista_l2"
+elif [ "$total" -gt "$MAX_ARQUIVOS_PR" ]; then
+  printf 'VIOLACAO L3: a PR altera %d arquivos, todos contados (limite %d do app do CodeAnt); divida a PR\n' "$total" "$MAX_ARQUIVOS_PR"
+  violacoes=$((violacoes + 1))
 fi
 
-printf 'fatiamento: %d violacao(oes), %d aviso(s); PR com %d linhas em %d arquivo(s)\n' \
-  "$violacoes" "$avisos" "$linhas_pr" "$arquivos_pr"
+git -c core.quotepath=off diff --name-status -z -M --diff-filter=AMRT "$mb" "$head" > "$lista_l2" \
+  || { echo "nao foi possivel listar os arquivos revisaveis de $mb..$head" >&2; exit 2; }
+
+prefixo_excluido() {
+  local caminho="$1" p
+  for p in "${EXCLUIDOS_DO_NUCLEO[@]}" "${EXCLUIDOS_PROJETO[@]}"; do
+    case "$caminho" in "$p"*) return 0 ;; esac
+  done
+  return 1
+}
+
+revisavel() {
+  local caminho="$1" nome ext prefixo item
+  nome="${caminho##*/}"
+  for item in "${NOMES_EXCLUIDOS[@]}"; do [ "$nome" = "$item" ] && return 1; done
+  ext=""
+  case "$nome" in
+    *.*)
+      prefixo="${nome%.*}"
+      if [ -n "$prefixo" ]; then ext=".${nome##*.}"; fi
+      ;;
+  esac
+  ext="$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')" || return 2
+  for item in "${EXTENSOES_EXCLUIDAS[@]}"; do [ "$ext" = "$item" ] && return 1; done
+  for item in "${SUFIXOS_EXCLUIDOS[@]}"; do case "$nome" in *"$item") return 1 ;; esac; done
+  return 0
+}
+
+# Escreve "linhas bytes" com a mesma decodificacao UTF-8 da CLI.
+medir_arquivo() {
+  local arquivo="$1" bytes linhas
+  command -v iconv >/dev/null 2>&1 || { echo "iconv ausente: nao foi possivel medir $novo" >&2; return 2; }
+  if iconv -f UTF-8 -t UTF-8 "$arquivo" > "$decodificado" 2>/dev/null; then
+    bytes="$(wc -c < "$decodificado")" || return 2
+    linhas="$(wc -l < "$decodificado")" || return 2
+    printf '%d %d\n' "$((linhas + 1))" "$bytes"
+  else
+    command -v node >/dev/null 2>&1 || { echo "node ausente: UTF-8 invalido em $novo nao pode ser medido como a CLI" >&2; return 2; }
+    node -e 'const fs=require("node:fs"),t=fs.readFileSync(0).toString("utf8"); process.stdout.write(`${t.split("\n").length} ${Buffer.byteLength(t,"utf8")}\n`)' < "$arquivo" \
+      || { echo "node falhou ao medir UTF-8 invalido em $novo" >&2; return 2; }
+  fi
+}
+
+while IFS= read -r -d '' estado; do
+  antigo=""; novo=""
+  IFS= read -r -d '' antigo || { echo "lista de arquivos truncada" >&2; exit 2; }
+  case "$estado" in
+    R*|C*) IFS= read -r -d '' novo || { echo "renomeacao truncada" >&2; exit 2; } ;;
+    *) novo="$antigo" ;;
+  esac
+  prefixo_excluido "$novo" && continue
+  revisavel "$novo"; rev=$?
+  [ "$rev" -eq 1 ] && continue
+  [ "$rev" -eq 0 ] || { echo "nao foi possivel classificar $novo" >&2; exit 2; }
+
+  arvore="$(git --literal-pathspecs -c core.quotepath=off ls-tree "$head" -- "$novo")" \
+    || { echo "nao foi possivel consultar $novo no head" >&2; exit 2; }
+  modo="${arvore%% *}"
+  [ "$modo" = "160000" ] && continue
+  [ -n "$arvore" ] || { echo "nao foi possivel localizar $novo no head" >&2; exit 2; }
+  resto="${arvore#* }"; resto="${resto#* }"; oid="${resto%%$'\t'*}"
+  git cat-file blob "$oid" > "$conteudo" 2>/dev/null \
+    || { echo "nao foi possivel medir $novo no head" >&2; exit 2; }
+  medida="$(medir_arquivo "$conteudo")" || exit 2
+  read -r linhas bytes <<< "$medida"
+
+  if [ -f "$novo" ] && [ ! -L "$novo" ]; then
+    oid_checkout="$(git hash-object "$novo" 2>/dev/null)" || { echo "nao foi possivel identificar $novo no checkout" >&2; exit 2; }
+    if [ "$oid_checkout" = "$oid" ]; then
+      medida="$(medir_arquivo "$novo")" || exit 2
+      read -r linhas_checkout bytes_checkout <<< "$medida"
+      [ "$linhas_checkout" -gt "$linhas" ] && linhas="$linhas_checkout"
+      [ "$bytes_checkout" -gt "$bytes" ] && bytes="$bytes_checkout"
+    fi
+  fi
+
+  if [ "$linhas" -gt "$MAX_LINHAS" ] || [ "$bytes" -gt "$MAX_BYTES" ]; then
+    printf 'VIOLACAO L2: %s tem %d linhas e %d bytes pela conta da CLI (limite %d linhas e %d bytes); uma task anterior o divide\n' \
+      "$novo" "$linhas" "$bytes" "$MAX_LINHAS" "$MAX_BYTES"
+    violacoes=$((violacoes + 1))
+  fi
+done < "$lista_l2"
+
+if [ "$planejamento" -eq 1 ]; then
+  printf 'fatiamento: %d violacao(oes); PR de planejamento com %d arquivo(s)\n' "$violacoes" "$total"
+else
+  printf 'fatiamento: %d violacao(oes); PR com %d arquivo(s)\n' "$violacoes" "$total"
+fi
 [ "$violacoes" -eq 0 ]
