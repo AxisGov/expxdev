@@ -9,9 +9,12 @@ import { ambienteCom, noPath, RAIZ_DO_REPO } from "../teste/candidatos.js";
 import { arquivosDoCaso, respostaDoCaso, type CasoConformidade } from "../teste/conformidade.js";
 import { chamadasDa, configurarFalsa, instalarCodeantFalsa, nucleoDeTeste, type CfgFalsa, type Falsa } from "../teste/codeant-falsa.js";
 
-// `nucleo/scripts/expx-revisao.mjs`. A CLI do CodeAnt nunca é chamada de verdade: uma `codeant` falsa vem
-// antes no PATH, responde `--version` e um JSON fixo no `review`, e registra os argumentos recebidos.
+// `nucleo/scripts/expx-revisao.mjs`. A CLI do CodeAnt nunca é chamada de verdade: uma `codeant` falsa, instalada
+// como pacote npm, vem antes no PATH, responde um JSON e registra os argumentos recebidos.
 const SCRIPT = join(RAIZ_DO_REPO, "nucleo", "scripts", "expx-revisao.mjs");
+// `FATIA_*` de quem roda a suíte faria todo subcomando sair 64: os filhos herdam o ambiente sem elas
+// (o caso de `FATIA_*` as passa de propósito)
+for (const k of Object.keys(process.env)) if (k.startsWith("FATIA_")) delete process.env[k];
 const criados: string[] = [];
 afterEach(() => { for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true }); });
 const temp = (p: string): string => { const d = mkdtempSync(join(tmpdir(), p)); criados.push(d); return d; };
