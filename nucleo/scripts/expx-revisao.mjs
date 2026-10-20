@@ -5,7 +5,8 @@
 // revisar: grava docs/entregas/<slug>/revisao/<T-NN.MM>.json (evidência v2); sai 0 (ok), 1 (achado aberto),
 // 2 (indisponivel), 3 (incompleta). conferir: 0 (ok), 1 (FALHA), 3 (só AVISO). Uso errado, inclusive
 // `FATIA_*` no ambiente: 64. Uma chamada só da CLI (sem lotes), pelo arquivo do pacote conferido; a
-// resposta é reconciliada com a task (contrato expx-revisao v2). Nunca lê credencial da CLI.
+// resposta é reconciliada com a task (contrato expx-revisao v2); a evidência guarda as `issues` cruas, e o
+// `conferir` deriva delas os achados. Nunca lê credencial da CLI.
 // EXPX_REVISAO_TESTE_PAUSA é só para teste: um diretório em que o `revisar` cria `pronto` e espera
 // `continuar` entre a releitura e a gravação.
 import { spawnSync } from "node:child_process";
@@ -103,7 +104,7 @@ function grava(task, ev) {
   renameSync(tmp, caminhoEv(task));
 }
 /** A CLI: o arquivo do pacote conferido, pelo `node`; nunca o `codeant` do PATH depois da conferência. */
-const codeant = (bin, a) => spawnSync(process.execPath, [bin, ...a], { cwd: op.raiz, encoding: "utf8", maxBuffer: 64 << 20 });
+const codeant = (bin, a) => spawnSync(process.execPath, [bin, ...a], { cwd: op.raiz, maxBuffer: 64 << 20 });
 const ORIENTACAO = "instale a homologada (npm i -g codeant-cli@0.5.14)";
 /** O pacote do `codeant` do PATH, homologado e íntegro (`{bin, versao, perfil}`), ou o motivo de `indisponivel`. */
 function cliConferida() {
@@ -128,14 +129,13 @@ function cliConferida() {
 function json(texto) {
   for (let i = texto.indexOf("{"); i >= 0; i = texto.indexOf("{", i + 1)) try { return JSON.parse(texto.slice(i, texto.lastIndexOf("}") + 1)); } catch { /* próximo */ }
 }
-/** Linhas que a task alterou em `f` (Set) ou `true` (arquivo novo: todas), desde o `HEAD` ou desde `--base-commit`. */
-function alteradas(f) {
-  const base = op["base-commit"];
-  const novo = base ? git("cat-file", "-e", `${base}:./${f}`).status !== 0 : git("ls-files", "--error-unmatch", "--", f).status !== 0;
-  if (novo) return true;
+/** Linhas que a task alterou em `f` desde o commit `de` até `ate` (sem `ate`, o checkout): Set, ou `true` (todas) se
+ *  `de` é null (sem commit), `f` não existe em `de` (arquivo novo) ou o diff falha. A mesma regra no `revisar` e no `conferir`. */
+function alteradas(f, de, ate) {
+  if (de === null || git("cat-file", "-e", `${de}:./${f}`).status !== 0) return true;
   const s = new Set();
-  const d = base ? git("diff", "-U0", base, "HEAD", "--", f) : git("diff", "-U0", "HEAD", "--", f);
-  if (d.status !== 0) return true; // sem HEAD (ou diff que falha): tudo conta, nunca menos
+  const d = git("diff", "-U0", de, ...(ate ? [ate] : []), "--", f);
+  if (d.status !== 0) return true; // diff que falha: tudo conta, nunca menos
   for (const m of d.stdout.matchAll(/^@@ [^+]*\+(\d+)(?:,(\d+))? @@/gm)) {
     for (let n = 0; n < Number(m[2] ?? 1); n++) s.add(Number(m[1]) + n);
   }
@@ -174,7 +174,7 @@ function medida(f) {
 function foraDoPerfil(j, perfil, status) {
   const m = j.meta;
   const texto = (v) => typeof v === "string";
-  return !(Array.isArray(j.issues) && j.error === null && typeof j.noFiles === "boolean" && ehMapa(m)
+  return !(Array.isArray(j.issues) && j.issues.every(ehMapa) && j.error === null && typeof j.noFiles === "boolean" && ehMapa(m)
     && Array.isArray(m.reviewed_files) && m.reviewed_files.every(texto) && Number.isSafeInteger(m.total_changed)
     && Array.isArray(m.skipped) && m.skipped.every((s) => ehMapa(s) && texto(s.file) && texto(s.reason)) && typeof m.capped === "boolean"
     && m.max_files === perfil.max_files && m.total_changed === m.reviewed_files.length + m.skipped.length
@@ -209,7 +209,9 @@ function revisar() {
   }
   const base = op["base-commit"] ?? null;
   const anterior = le(caminhoEv(op.task));
-  const ev = { expx_revisao: 2, trabalho: op.trabalho, task: op.task, modo: base ? "base-commit" : "uncommitted", base_commit: base, cli: null,
+  // o HEAD da revisão: sem `--base-commit`, as linhas alteradas são as do checkout desde ele (o `conferir` as refaz até o commit)
+  const headDaRevisao = idDe("rev-parse", "--verify", "-q", "HEAD^{commit}") ?? null;
+  const ev = { expx_revisao: 2, trabalho: op.trabalho, task: op.task, modo: base ? "base-commit" : "uncommitted", base_commit: base, head: headDaRevisao, cli: null,
     executada_em: new Date().toISOString(), arquivos: {}, chamada: null, resultado: "ok", achados: [],
     rejeicoes: Array.isArray(anterior?.rejeicoes) ? anterior.rejeicoes : [], removidos_sem_revisao: [] };
   const fim = (resultado, motivo) => Object.assign(ev, { resultado, motivo });
@@ -261,9 +263,11 @@ function revisar() {
     ev.cli = { versao: cli.versao, integridade: "conferida" };
     // 5. uma chamada só, sem lotes
     const r = codeant(cli.bin, ["review", "--headless", ...(base ? ["--base-commit", base] : ["--uncommitted"]), "--include", enviados.join(",")]);
-    const j = json(r.stdout ?? "");
+    const stdout = r.stdout ?? Buffer.alloc(0);
+    const j = json(stdout.toString("utf8"));
     const falhas = String(r.stderr ?? "").split(/\r?\n/).filter((l) => l.startsWith("[error] Failed to review "));
-    ev.chamada = { include: enviados, meta: j?.meta ?? null, error: j === undefined ? `json ilegivel (rc ${r.status})` : j.error ?? null, falhas_de_lote: falhas };
+    ev.chamada = { include: enviados, meta: j?.meta ?? null, error: j === undefined ? `json ilegivel (rc ${r.status})` : j.error ?? null, falhas_de_lote: falhas,
+      issues: j?.issues ?? null, stdout_sha256: createHash("sha256").update(stdout).digest("hex") };
     // 6-9. a resposta cobre a task inteira
     if (falhas.length > 0) return fim("incompleta", "lote-falhou");
     if (j === undefined || (j.error !== null && j.error !== undefined)) return fim("indisponivel", "erro");
@@ -275,7 +279,12 @@ function revisar() {
       const m = medida(f);
       if (!m || ["blob", "bytes", "linhas", "disco"].some((k) => m[k] !== medidas[f][k])) return fim("indisponivel", "arquivo-mudou-durante-revisao");
     }
-    return achados(j.issues, ev);
+    const rejeitadas = new Set([...ev.rejeicoes.map((r) => r?.identidade), ...rejeitadasDoTrabalho()]);
+    const lido = (f) => { try { return readFileSync(join(op.raiz, f), "utf8"); } catch { return ""; } };
+    ev.achados = derivar(j.issues, ev.arquivos, ev.cli.versao, (f) => alteradas(f, base ?? headDaRevisao, base ? headDaRevisao : undefined), lido)
+      .map((a) => ({ ...a, estado: rejeitadas.has(a.identidade) ? "rejeitado" : a.estado }));
+    if (ev.achados.some((a) => a.estado === "aberto")) ev.resultado = "achados";
+    return undefined;
   })();
   // rejeição gravada (rejeitar) enquanto a CLI rodava não se perde: releitura e gravação sob a trava;
   // as de outras tasks do trabalho também são relidas aqui, não só antes da espera pela trava
@@ -303,22 +312,21 @@ function rejeitadasDoTrabalho() {
   }
   return rejeitadas;
 }
-/** Classifica os achados: rejeitado (por esta ou outra task do trabalho), aberto (linha alterada) ou anterior. */
-function achados(issues, ev) {
-  const rejeitadas = new Set([...ev.rejeicoes.map((r) => r.identidade), ...rejeitadasDoTrabalho()]);
-  const cache = {};
-  for (const i of issues) {
+/** Os achados das `issues` da CLI, sem rejeição: `aberto` (linha alterada) ou `anterior`. `alt(f)` dá as linhas alteradas
+ *  de um arquivo da task (Set, ou `true` para todas) e `texto(f)` o conteúdo (ou ""). A mesma regra no `revisar` (checkout)
+ *  e no `conferir` (commit da task), para que `achados` seja derivável das `issues` gravadas. */
+function derivar(issues, arquivos, versao, alt, texto) {
+  const cache = new Map();
+  return issues.map((i) => {
     const arquivo = caminho(String(i.relevant_file ?? ""));
     const linha = Number(i.start_line);
-    const c = (cache[arquivo] ??= { alt: arquivo in ev.arquivos ? alteradas(arquivo) : new Set(),
-      linhas: existsSync(join(op.raiz, arquivo)) ? readFileSync(join(op.raiz, arquivo), "utf8").split(/\r?\n/) : [] });
+    if (!cache.has(arquivo)) cache.set(arquivo, { alt: Object.hasOwn(arquivos, arquivo) ? alt(arquivo) : new Set(), linhas: texto(arquivo).split(/\r?\n/) });
+    const c = cache.get(arquivo);
     const viz = [linha - 2, linha - 1, linha].map((k) => (c.linhas[k] ?? "").trim());
     const label = String(i.label ?? "");
-    const identidade = createHash("sha256").update([label, arquivo, ...viz, ev.cli.versao].join("\0")).digest("hex");
-    const estado = rejeitadas.has(identidade) ? "rejeitado" : c.alt === true || c.alt.has(linha) ? "aberto" : "anterior";
-    ev.achados.push({ identidade, arquivo, linha, label, texto: String(i.issue_content ?? ""), estado });
-  }
-  if (ev.achados.some((a) => a.estado === "aberto")) ev.resultado = "achados";
+    const identidade = createHash("sha256").update([label, arquivo, ...viz, versao].join("\0")).digest("hex");
+    return { identidade, arquivo, linha, label, texto: String(i.issue_content ?? ""), estado: c.alt === true || c.alt.has(linha) ? "aberto" : "anterior" };
+  });
 }
 
 const ehMapa = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -344,7 +352,8 @@ function semSinalDaCli(ev, sha) {
   const perfil = typeof ev.cli?.versao === "string" ? perfilCli(ev.cli.versao) : undefined;
   if (!perfil) return "cli.versao";
   if (ev.cli.integridade !== "conferida") return "integridade";
-  if (!ehMapa(ev.chamada) || ev.chamada.error !== null) return "chamada";
+  if (!ehMapa(ev.chamada) || ev.chamada.error !== null || !Array.isArray(ev.chamada.issues) || !ev.chamada.issues.every(ehMapa)
+    || !/^[0-9a-f]{64}$/.test(ev.chamada.stdout_sha256)) return "chamada";
   const meta = ev.chamada.meta;
   const pulados = ehMapa(meta) && Array.isArray(meta.skipped) ? meta.skipped : undefined;
   if (!pulados || meta.max_files !== perfil.max_files || !Array.isArray(meta.reviewed_files) || !meta.reviewed_files.every((f) => typeof f === "string")
@@ -388,8 +397,47 @@ function veredito(task, sha) {
   if (ev.resultado === "incompleta") return `FALHA incompleta:${ev.motivo}`;
   const falta = semSinalDaCli(ev, sha);
   if (falta) return `FALHA evidencia-invalida:${falta}`;
-  const abertos = ev.achados.filter((a) => a?.estado === "aberto").length;
-  return abertos > 0 || ev.resultado === "achados" ? `FALHA achados-abertos:${abertos}` : "ok";
+  const diverge = achadosDivergem(ev, sha);
+  if (diverge) return `FALHA evidencia-invalida:${diverge}`;
+  const abertos = ev.achados.filter((a) => a.estado === "aberto").length;
+  return abertos > 0 ? `FALHA achados-abertos:${abertos}` : "ok";
+}
+
+const SHA = /^[0-9a-f]{40}([0-9a-f]{24})?$/;
+const ehCommit = (x) => typeof x === "string" && SHA.test(x) && git("cat-file", "-e", `${x}^{commit}`).status === 0;
+/** As identidades rejeitadas na própria evidência e nas do trabalho, como estão no commit da task. */
+function rejeitadasNoCommit(ev, sha) {
+  const s = new Set((Array.isArray(ev.rejeicoes) ? ev.rejeicoes : []).map((r) => r?.identidade));
+  const dir = `docs/entregas/${op.trabalho}/revisao/`;
+  for (const n of git("ls-tree", "-z", "--name-only", sha, "--", dir).stdout.split("\0").filter((x) => x.endsWith(".json"))) {
+    try {
+      const outra = JSON.parse(git("show", `${sha}:./${n}`).stdout.replace(/^\uFEFF/, "")).rejeicoes;
+      for (const r of Array.isArray(outra) ? outra : []) s.add(r?.identidade);
+    } catch { /* evidência ilegível de outra task: não rejeita nada */ }
+  }
+  return s;
+}
+/** Em `ok`/`achados`, o campo que impede derivar os `achados` gravados das `issues` gravadas (`head`, `base_commit`),
+ *  `achados` se eles (ou o `resultado`) não batem com a derivação, ou undefined. Rejeitado só vale com a identidade em
+ *  `rejeicoes` da evidência ou de outra do trabalho no commit. */
+function achadosDivergem(ev, sha) {
+  const enviados = Object.values(ev.arquivos).some((a) => a?.revisao === "enviado");
+  let derivados = [];
+  if (enviados) {
+    if (ev.head !== null && !ehCommit(ev.head)) return "head";
+    if (ev.modo === "base-commit" ? !ehCommit(ev.base_commit) : ev.modo !== "uncommitted" || ev.base_commit !== null) return "base_commit";
+    const de = ev.modo === "base-commit" ? ev.base_commit : ev.head;
+    const texto = (f) => (blobGit(`${sha}:./${f}`) ?? Buffer.alloc(0)).toString("utf8");
+    // pelo JSON, como foi gravado (`NaN` vira `null`)
+    derivados = JSON.parse(JSON.stringify(derivar(ev.chamada.issues, ev.arquivos, ev.cli.versao, (f) => alteradas(f, de, sha), texto)));
+  }
+  const rejeitadas = rejeitadasNoCommit(ev, sha);
+  if (ev.achados.length !== derivados.length || derivados.some((d, k) => {
+    const a = ev.achados[k];
+    return ["identidade", "arquivo", "linha", "label", "texto"].some((c) => a[c] !== d[c])
+      || !(a.estado === d.estado || (a.estado === "rejeitado" && rejeitadas.has(d.identidade)));
+  })) return "achados";
+  if (ev.achados.some((a) => a.estado === "aberto") !== (ev.resultado === "achados")) return "achados";
 }
 
 function conferir() {

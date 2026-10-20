@@ -467,6 +467,7 @@ describe("expx-revisao.mjs revisar v2: depois da CLI", () => {
     ["reviewed_files que não é lista", { resposta: resp({ reviewed_files: 1 }) }],
     ["skipped sem reason", { resposta: resp({ skipped: [{ file: "x.js" }], total_changed: 2 }) }],
     ["saída 1 com error nulo", { resposta: resp(), saida: 1 }],
+    ["issue que não é objeto", { resposta: resp({}, { issues: [null] }) }],
   ])("funcional: %s → incompleta:perfil", (_nome, cfg) => {
     const c = cenario(cfg as CfgFalsa);
     altera3(c.raiz);
@@ -884,5 +885,123 @@ describe("expx-revisao.mjs id de task", () => {
     const c = cenario();
     const sha = git(c.raiz, "rev-parse", "HEAD");
     expect(conferir(c.raiz, "se_disponivel", `T-01=${sha}`)).toMatchObject({ rc: 3, out: "T-01 AVISO evidencia-ausente" });
+  });
+});
+
+describe("expx-revisao.mjs evidência com as issues da CLI: o conferir deriva os achados", () => {
+  const sha256 = (b: Buffer | string): string => createHash("sha256").update(b).digest("hex");
+  /** `src/a.js` com um achado aberto (linha 3) e um anterior (linha 1), revisado e commitado com a task. */
+  function revisada(): { c: Cenario; sha: string } {
+    const c = cenario({ issues: [achado("src/a.js", 3), achado("src/a.js", 1)] });
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js").rc).toBe(1);
+    return { c, sha: commita(c.raiz) };
+  }
+  /** A evidência commitada em `revisada`, editada por `muda` num commit só dela. */
+  function editada(muda: (ev: Record<string, any>) => void): { raiz: string; sha: string } {
+    const { c } = revisada();
+    const ev = evidencia(c.raiz) as Record<string, any>;
+    muda(ev);
+    escreve(c.raiz, EV, JSON.stringify(ev));
+    return { raiz: c.raiz, sha: commita(c.raiz, true) };
+  }
+  const reprova = (f: { raiz: string; sha: string }, campo: string) =>
+    expect(conferir(f.raiz, "obrigatoria", `T-01=${f.sha}`)).toMatchObject({ rc: 1, out: `T-01 FALHA evidencia-invalida:${campo}` });
+
+  it("funcional: o revisar grava as issues cruas, o sha256 do stdout byte a byte e o HEAD", () => {
+    const c = cenario({ avisos: "npm warn x\n", issues: [{ ...achado("src/a.js", 3), extra: { a: 1 } }] });
+    altera3(c.raiz);
+    const head = git(c.raiz, "rev-parse", "HEAD");
+    const r = revisar(c, "src/a.js");
+    const stdout = `npm warn x\n${JSON.stringify({ issues: [{ ...achado("src/a.js", 3), extra: { a: 1 } }],
+      meta: { reviewed_files: ["src/a.js"], total_changed: 1, skipped: [], capped: false, max_files: 40 }, error: null, noFiles: false })}`;
+    expect(r.ev).toMatchObject({ head, chamada: { issues: [{ ...achado("src/a.js", 3), extra: { a: 1 } }], stdout_sha256: sha256(stdout) } });
+  });
+
+  it("funcional: limite40.json servido byte a byte: stdout_sha256 é o do arquivo da conformidade, e o conferir passa", () => {
+    const c = cenario({ fixture: "limite40" });
+    const nomes = poeCaso(c.raiz, arquivosDoCaso("limite40"));
+    expect(revisar(c, nomes.join(",")).ev.chamada).toMatchObject({ issues: [], stdout_sha256: sha256(respostaDoCaso("limite40")) });
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "task");
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${git(c.raiz, "rev-parse", "HEAD")}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it("funcional: evidência íntegra: aberto reprova por achados-abertos; o anterior sozinho passa", () => {
+    const { c, sha } = revisada();
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
+    const c2 = cenario({ issues: [achado("src/a.js", 1)] });
+    altera3(c2.raiz);
+    expect(revisar(c2, "src/a.js").rc).toBe(0);
+    expect(conferir(c2.raiz, "obrigatoria", `T-01=${commita(c2.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it.each([
+    ["achado aberto apagado de achados", (ev: Record<string, any>) => { ev["achados"] = ev["achados"].filter((a: any) => a.estado !== "aberto"); ev["resultado"] = "ok"; }],
+    ["achado aberto virou anterior", (ev: Record<string, any>) => { ev["achados"][0].estado = "anterior"; ev["resultado"] = "ok"; }],
+    ["achado aberto rejeitado sem rejeição gravada", (ev: Record<string, any>) => { ev["achados"][0].estado = "rejeitado"; ev["resultado"] = "ok"; }],
+    ["achados vazio", (ev: Record<string, any>) => { ev["achados"] = []; ev["resultado"] = "ok"; }],
+    ["linha do achado trocada", (ev: Record<string, any>) => { ev["achados"][0].linha = 1; }],
+    ["texto do achado trocado", (ev: Record<string, any>) => { ev["achados"][1].texto = "outro"; }],
+    ["achado a mais", (ev: Record<string, any>) => { ev["achados"].push({ ...ev["achados"][1] }); }],
+    ["resultado ok com achado aberto", (ev: Record<string, any>) => { ev["resultado"] = "ok"; }],
+  ])("funcional: %s → FALHA evidencia-invalida:achados", (_nome, muda) => {
+    reprova(editada(muda), "achados");
+  });
+
+  it.each([
+    ["sem issues", (ev: Record<string, any>) => { delete ev["chamada"].issues; }],
+    ["issues que não é lista", (ev: Record<string, any>) => { ev["chamada"].issues = {}; }],
+    ["issue nula", (ev: Record<string, any>) => { ev["chamada"].issues = [null]; }],
+    ["sem stdout_sha256", (ev: Record<string, any>) => { delete ev["chamada"].stdout_sha256; }],
+  ])("funcional: %s (v2 sem as issues) → FALHA evidencia-invalida:chamada", (_nome, muda) => {
+    reprova(editada(muda), "chamada");
+  });
+
+  it.each([
+    ["head ausente", (ev: Record<string, any>) => { delete ev["head"]; }],
+    ["head que não é sha", (ev: Record<string, any>) => { ev["head"] = "HEAD"; }],
+    ["head inexistente", (ev: Record<string, any>) => { ev["head"] = "0".repeat(40); }],
+  ])("funcional: %s → FALHA evidencia-invalida:head", (_nome, muda) => {
+    reprova(editada(muda), "head");
+  });
+
+  it("funcional: apagar a issue junto com o achado passa: o limite aceito (a defesa é o diff da evidência no PR)", () => {
+    const f = editada((ev) => {
+      ev["chamada"].issues = ev["chamada"].issues.filter((i: any) => i.start_line !== 3);
+      ev["achados"] = ev["achados"].filter((a: any) => a.estado !== "aberto");
+      ev["resultado"] = "ok";
+    });
+    expect(conferir(f.raiz, "obrigatoria", `T-01=${f.sha}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it("funcional: rejeição gravada na evidência de outra task do trabalho, no commit, vale para o achado", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    rejeita(c.raiz, "T-02", [identidade("security", "src/a.js", ["l2", "novo3", "l4"])]);
+    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 0, ev: { resultado: "ok", achados: [{ estado: "rejeitado" }] } });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it("funcional: --base-commit: o conferir deriva as linhas alteradas desde base_commit", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3), achado("src/a.js", 1)] });
+    const base = git(c.raiz, "rev-parse", "HEAD");
+    altera3(c.raiz);
+    git(c.raiz, "commit", "-q", "-am", "task");
+    expect(revisar(c, "src/a.js", "T-01", undefined, {}, c.script, ["--base-commit", base]).rc).toBe(1);
+    const sha = commita(c.raiz, true);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
+    const ev = evidencia(c.raiz) as Record<string, any>;
+    ev["achados"][0].estado = "anterior";
+    ev["resultado"] = "ok";
+    escreve(c.raiz, EV, JSON.stringify(ev));
+    reprova({ raiz: c.raiz, sha: commita(c.raiz, true) }, "achados");
+  });
+
+  it("funcional: CRLF no checkout (core.autocrlf=true): a derivação pelo blob do commit bate com a do disco", () => {
+    const c = cenario({ issues: [achado("src/a.js", 1)] }, "true");
+    escreve(c.raiz, "src/a.js", "l1\r\nl2\r\nnovo3\r\nl4\r\nl5\r\n");
+    expect(revisar(c, "src/a.js").rc).toBe(0);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
   });
 });
