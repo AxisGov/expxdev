@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Verifica apenas os limites fixos observados no CodeAnt (L2 e L3).
-# Uso: bash scripts/verificar-fatiamento.sh [--excluir-da-revisao <padrao>]... <base> <head>
+# Uso: bash scripts/verificar-fatiamento.sh [--planejamento] [--excluir-da-revisao <padrao>]... <base> <head>
+# --planejamento: PR de planejamento (contrato, "PR de planejamento"): todo caminho
+# alterado, inclusive a origem de renomeacao, fica sob os artefatos de metodo, e L3
+# nao se aplica.
 
 set -uo pipefail
 
@@ -13,7 +16,7 @@ SUFIXOS_EXCLUIDOS=(.min.js .min.css)
 EXCLUIDOS_DO_NUCLEO=(docs/sprintx/ docs/entregas/ docs/eventos/)
 
 uso() {
-  echo "uso: ${0##*/} [--excluir-da-revisao <padrao>]... <base> <head>" >&2
+  echo "uso: ${0##*/} [--planejamento] [--excluir-da-revisao <padrao>]... <base> <head>" >&2
   exit 2
 }
 
@@ -59,11 +62,18 @@ prefixo_de() {
 }
 
 EXCLUIDOS_PROJETO=()
-while [ "$#" -gt 0 ] && [ "$1" = "--excluir-da-revisao" ]; do
-  [ "$#" -ge 2 ] || uso
-  prefixo="$(prefixo_de "$2")" || { echo "--excluir-da-revisao: padrão fora da gramática: $2" >&2; exit 2; }
-  EXCLUIDOS_PROJETO+=("$prefixo")
-  shift 2
+planejamento=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --planejamento) planejamento=1; shift ;;
+    --excluir-da-revisao)
+      [ "$#" -ge 2 ] || uso
+      prefixo="$(prefixo_de "$2")" || { echo "--excluir-da-revisao: padrão fora da gramática: $2" >&2; exit 2; }
+      EXCLUIDOS_PROJETO+=("$prefixo")
+      shift 2
+      ;;
+    *) break ;;
+  esac
 done
 [ "$#" -eq 2 ] || uso
 base="$1"; head="$2"
@@ -83,7 +93,19 @@ total=0
 while IFS= read -r -d '' _; do total=$((total + 1)); done < "$lista_todos"
 
 violacoes=0
-if [ "$total" -gt "$MAX_ARQUIVOS_PR" ]; then
+if [ "$planejamento" -eq 1 ]; then
+  git -c core.quotepath=off diff --name-only -z --no-renames "$mb" "$head" > "$lista_l2" \
+    || { echo "nao foi possivel listar os caminhos de $mb..$head" >&2; exit 2; }
+  while IFS= read -r -d '' caminho; do
+    case "$caminho" in
+      docs/sprintx/*|docs/entregas/*|docs/eventos/*) ;;
+      *)
+        printf 'VIOLACAO planejamento: %s fora de docs/sprintx/, docs/entregas/ e docs/eventos/; o PR de planejamento so leva artefatos de metodo\n' "$caminho"
+        violacoes=$((violacoes + 1))
+        ;;
+    esac
+  done < "$lista_l2"
+elif [ "$total" -gt "$MAX_ARQUIVOS_PR" ]; then
   printf 'VIOLACAO L3: a PR altera %d arquivos, todos contados (limite %d do app do CodeAnt); divida a PR\n' "$total" "$MAX_ARQUIVOS_PR"
   violacoes=$((violacoes + 1))
 fi
@@ -171,5 +193,9 @@ while IFS= read -r -d '' estado; do
   fi
 done < "$lista_l2"
 
-printf 'fatiamento: %d violacao(oes); PR com %d arquivo(s)\n' "$violacoes" "$total"
+if [ "$planejamento" -eq 1 ]; then
+  printf 'fatiamento: %d violacao(oes); PR de planejamento com %d arquivo(s)\n' "$violacoes" "$total"
+else
+  printf 'fatiamento: %d violacao(oes); PR com %d arquivo(s)\n' "$violacoes" "$total"
+fi
 [ "$violacoes" -eq 0 ]

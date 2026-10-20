@@ -59,8 +59,8 @@ function ambiente(livres: Record<string, string> = {}): NodeJS.ProcessEnv {
   return { ...env, ...livres };
 }
 
-function verifica(diretorio: string, op: { excluir?: string[]; env?: Record<string, string> } = {}) {
-  const args = (op.excluir ?? []).flatMap((padrao) => ["--excluir-da-revisao", padrao]);
+function verifica(diretorio: string, op: { excluir?: string[]; env?: Record<string, string>; planejamento?: boolean } = {}) {
+  const args = [...(op.planejamento ? ["--planejamento"] : []), ...(op.excluir ?? []).flatMap((padrao) => ["--excluir-da-revisao", padrao])];
   const r = spawnSync(BASH, [SCRIPT, ...args, "main", "HEAD"], { cwd: diretorio, encoding: "utf8", env: ambiente(op.env) });
   return { codigo: r.status, saida: `${r.stdout}${r.stderr}` };
 }
@@ -97,6 +97,35 @@ describe("verificar-fatiamento.sh — limites fixos L2 e L3", () => {
     const r = verifica(d);
     expect(r.codigo, r.saida).toBe(1);
     expect(r.saida).toContain("VIOLACAO L3: a PR altera 101 arquivos, todos contados (limite 100 do app do CodeAnt); divida a PR");
+  });
+
+  it("PR de planejamento: so artefatos de metodo, sem L3", () => {
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    for (let i = 0; i < 99; i++) escreve(d, `docs/sprintx/t${i}.md`, "x\n");
+    escreve(d, "docs/entregas/e.md", "x\n");
+    escreve(d, "docs/eventos/v.jsonl", "{}\n");
+    commita(d, "planejamento");
+    const r = verifica(d, { planejamento: true });
+    expect(r.codigo, r.saida).toBe(0);
+    expect(r.saida).toContain("PR de planejamento com 101 arquivo(s)");
+    expect(verifica(d).codigo).toBe(1);
+  });
+
+  it("PR de planejamento recusa caminho fora dos artefatos, inclusive origem de renomeacao", () => {
+    const d = repo();
+    escreve(d, "src/a.ts", "x\n");
+    commita(d, "codigo");
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "docs/sprintx/p.md", "x\n");
+    git(d, "mv", "src/a.ts", "docs/sprintx/a.ts");
+    escreve(d, "docs/sprintxx/b.md", "x\n");
+    commita(d, "mistura");
+    const r = verifica(d, { planejamento: true });
+    expect(r.codigo, r.saida).toBe(1);
+    expect(r.saida).toContain("VIOLACAO planejamento: src/a.ts fora de docs/sprintx/, docs/entregas/ e docs/eventos/");
+    expect(r.saida).toContain("VIOLACAO planejamento: docs/sprintxx/b.md fora de docs/sprintx/, docs/entregas/ e docs/eventos/");
+    expect(r.saida).not.toContain("VIOLACAO planejamento: docs/sprintx/p.md");
   });
 
   it("L3: uma renomeacao conta um arquivo", () => {

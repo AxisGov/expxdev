@@ -238,13 +238,16 @@ para consumidores que precisam exibi-los ou conferi-los.
 ## Como verificar
 
 ```bash
-bash scripts/verificar-fatiamento.sh \
+bash scripts/verificar-fatiamento.sh [--planejamento] \
   [--excluir-da-revisao '^pasta/']... <base> <head>
 ```
 
 O verificador:
 
 - mede L3 com `git diff --name-only -z -M`, sem desconto;
+- com `--planejamento` (só quem abre o PR de planejamento passa), não aplica L3
+  e reprova todo caminho alterado, inclusive a origem de renomeação, fora de
+  `docs/sprintx/`, `docs/entregas/` e `docs/eventos/`;
 - mede L2 nos caminhos A/M/R/T novos que passam no predicado;
 - ignora em L2 submódulo, exclusões do perfil, exclusões do núcleo e os prefixos
   literais recebidos por argumento;
@@ -253,7 +256,8 @@ O verificador:
 
 O padrão de `--excluir-da-revisao` é pasta literal: começa por `^`, termina em
 `/`, não aceita metacaractere e só aceita ponto como `\.`. O CI do expxdev passa
-`^fixtures/candidatos/` explicitamente.
+`^fixtures/candidatos/` explicitamente e nunca `--planejamento`: os repositórios
+do método não têm PR de planejamento.
 
 ## Histórico
 
