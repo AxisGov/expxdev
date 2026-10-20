@@ -79,13 +79,14 @@ exceto `motivo`:
 | `trabalho`, `task` | o slug e o id da task |
 | `modo` | `uncommitted` ou `base-commit` |
 | `base_commit` | o SHA completo de `--base-commit`, ou `null` |
+| `head` | o SHA completo do `HEAD` quando o `revisar` rodou, ou `null` sem commit; sem `--base-commit`, é dele que as linhas alteradas são medidas |
 | `cli` | `{versao, integridade}`: a versão do `package.json` do pacote e `conferida`; `integridade` `null` quando a CLI foi achada mas não passou; `cli` `null` quando a CLI não foi procurada (nada a revisar, ou um portão antes dela) ou não foi achada |
 | `executada_em` | timestamp ISO (R4) |
 | `arquivos` | `{<caminho>: {blob, bytes, linhas, revisao} \| null}`. `blob`: o sha1 que vai ao commit (sem `--base-commit`, `git hash-object -w`, com os filtros de fim de linha; com, o de `HEAD:<caminho>`). `bytes` e `linhas`: medidos como a CLI (`Buffer.byteLength` e `split('\n').length`) no blob e no checkout, o maior. `revisao`: `enviado`, `nao-revisavel` (fora do predicado da CLI) ou `excluido` (exclusões do núcleo ou do projeto). `null` para arquivo removido |
-| `chamada` | `{include, meta, error, falhas_de_lote}` da única chamada, ou `null` sem chamada. `falhas_de_lote`: as linhas do stderr que começam com `[error] Failed to review ` |
+| `chamada` | `{include, meta, error, falhas_de_lote, issues, stdout_sha256}` da única chamada, ou `null` sem chamada. `falhas_de_lote`: as linhas do stderr que começam com `[error] Failed to review `. `issues`: a lista `issues` do JSON da CLI, crua (cada objeto com todas as chaves que a CLI deu, sem reformatar), ou `null` com JSON ilegível. `stdout_sha256`: sha256, em hex, do stdout da CLI byte a byte (com os avisos do npm), para rastreio |
 | `resultado` | `ok`, `achados` (algum `aberto`), `incompleta` ou `indisponivel` |
 | `motivo` | só com `incompleta` e `indisponivel` (abaixo) |
-| `achados` | `[{identidade, arquivo, linha, label, texto, estado}]`, `estado` ∈ `aberto`, `anterior`, `rejeitado` |
+| `achados` | `[{identidade, arquivo, linha, label, texto, estado}]`, `estado` ∈ `aberto`, `anterior`, `rejeitado`: um por item de `chamada.issues`, na mesma ordem, derivado dele (abaixo) |
 | `rejeicoes` | `[{identidade, motivo, em}]` |
 | `removidos_sem_revisao` | caminhos apagados pela task |
 
@@ -94,6 +95,22 @@ exceto `motivo`:
 com as linhas sem espaço nas pontas e vazias fora do arquivo. As vizinhas separam
 linhas de texto idêntico sem depender do número da linha; mudar o trecho ou a versão
 da CLI muda a identidade e reabre o achado.
+
+**Achados derivados das `issues`.** Cada item de `chamada.issues` dá um achado:
+`arquivo` é o `relevant_file` (no Windows, `\` vira `/`), `linha` o `start_line` como
+número, `label` e `texto` o `label` e o `issue_content` como texto, a identidade como
+acima, e `estado` `aberto` se a linha foi alterada pela task (`revisar`, abaixo), senão
+`anterior`; `rejeitado` se a identidade está em `rejeicoes`. O `revisar` lê as linhas
+vizinhas no checkout; o `conferir`, no blob `<sha>:<arquivo>` do commit da task, que é o
+mesmo (a evidência só vale se os blobs batem). Assim `achados` é derivável das `issues`
+gravadas, e o `conferir` o refaz.
+
+**Limite aceito.** Quem pode editar a evidência pode editar também `issues` (e
+`stdout_sha256`, que o `conferir` não tem como recalcular sem o stdout), `head` e
+`base_commit`: o `conferir` não prova o que a CLI respondeu. A defesa real é a evidência
+commitada junto da task e revisada no PR (desenho de 2026-10-18). O que muda é o
+tamanho da edição: apagar um achado aberto deixa de ser a troca de um campo e passa a
+exigir apagar a issue de `chamada.issues`, o que fica visível no diff da evidência.
 
 ## `revisar`
 
@@ -116,9 +133,9 @@ evidência travada, **75**. Imprime `<task> <resultado>[:<motivo>]`.
   perfil, iguais em todas as homologadas, e não dependem da CLI instalada.
 - **Com `--base-commit`**, cada arquivo da task tem de estar commitado: o
   `hash-object` do checkout igual a `HEAD:<arquivo>`, e o apagado ausente do `HEAD`.
-- Linha alterada é a dos hunks de `git diff -U0 HEAD` (com `--base-commit`,
-  `git diff -U0 <sha> HEAD`); arquivo novo (não rastreado, ou ausente em `<sha>`) ou
-  `git diff` que falha tem todas as linhas alteradas. Achado em linha alterada é
+- Linha alterada é a dos hunks de `git diff -U0 <head>` (o checkout desde o `HEAD`; com
+  `--base-commit`, `git diff -U0 <sha> <head>`); arquivo novo (ausente em `<head>`, ou em
+  `<sha>`), repositório sem commit ou `git diff` que falha tem todas as linhas alteradas. Achado em linha alterada é
   `aberto` e bloqueia; nas demais é `anterior`, não bloqueia e vai para PR própria (F1).
 - Achado cuja identidade está em `rejeicoes` de qualquer evidência do trabalho é
   `rejeitado` (relidas também sob a trava, antes de gravar). Revisar de novo preserva
@@ -154,7 +171,7 @@ O primeiro que se aplica decide o resultado:
 | 5 | — | a chamada |
 | 6 | `incompleta:lote-falhou` | alguma linha do stderr começa com `[error] Failed to review `, qualquer que seja o JSON ou o código de saída |
 | 7 | `indisponivel:erro` | `error` não nulo ou JSON ilegível |
-| 8 | `incompleta:perfil` | topo fora da forma (`issues` lista, `error` nulo, `noFiles` booleano, `meta` objeto); `meta` fora da forma (`reviewed_files` lista de texto, `total_changed` inteiro, `skipped` lista de `{file, reason}` de texto, `capped` booleano); `max_files` ≠ perfil; `total_changed` ≠ revisados + pulados; motivo fora do perfil; código de saída ≠ 0 com `error` nulo |
+| 8 | `incompleta:perfil` | topo fora da forma (`issues` lista de objetos, `error` nulo, `noFiles` booleano, `meta` objeto); `meta` fora da forma (`reviewed_files` lista de texto, `total_changed` inteiro, `skipped` lista de `{file, reason}` de texto, `capped` booleano); `max_files` ≠ perfil; `total_changed` ≠ revisados + pulados; motivo fora do perfil; código de saída ≠ 0 com `error` nulo |
 | 9 | `incompleta:repetido:<f>` | o arquivo duas vezes em `reviewed_files` ∪ `skipped` |
 | 9 | `incompleta:sobra:<f>` | revisado fora dos enviados, ou pulado fora deles por motivo que não seja `binary/generated`, `deleted` ou `excluded by pattern` (os filtros que vêm antes do `--include`) |
 | 9 | `incompleta:pulado:<f>` | enviado em `skipped` |
@@ -187,8 +204,10 @@ linhas valem na ordem em que aparecem.
 | `indisponivel` | FALHA `indisponivel:<motivo>` | AVISO `indisponivel:<motivo>` |
 | `incompleta` (não depende do modo) | FALHA `incompleta:<motivo>` | FALHA `incompleta:<motivo>` |
 | `ok`/`achados` com a `revisao` de algum arquivo diferente da refeita no `conferir` (`excluido` só nas exclusões do núcleo, que em `ok`/`achados` são as únicas; senão o predicado do perfil) (`revisao`) | FALHA `evidencia-invalida:revisao` | FALHA |
-| `ok`/`achados` com algum `enviado` e: `cli.versao` sem perfil (`cli.versao`); `cli.integridade` ≠ `conferida` (`integridade`); `chamada` nula ou com `error` não nulo (`chamada`); `meta` que não é mapa, `max_files` ≠ perfil ou motivo de pulo fora do perfil (`perfil`); `falhas_de_lote` não vazia (`lote-falhou`); mais de 40 `enviado` (`L1`); `enviado` acima de 5.000 linhas ou 204.800 bytes, ou com `bytes`/`linhas` menores que os do blob `<sha>:<arquivo>` medido de novo (`L2`); `include` diferente dos enviados, ou a reconciliação do `revisar` (repetido, sobra, pulado, faltante) que não fecha (`cobertura`) | FALHA `evidencia-invalida:<campo>` | FALHA |
-| achado `aberto`, ou `resultado: achados` | FALHA `achados-abertos:<n>` | FALHA |
+| `ok`/`achados` com algum `enviado` e: `cli.versao` sem perfil (`cli.versao`); `cli.integridade` ≠ `conferida` (`integridade`); `chamada` nula, com `error` não nulo, sem `issues` lista de objetos ou sem `stdout_sha256` de 64 hex (`chamada`), o que reprova a v2 gravada antes de 2026-10-20; `meta` que não é mapa, `max_files` ≠ perfil ou motivo de pulo fora do perfil (`perfil`); `falhas_de_lote` não vazia (`lote-falhou`); mais de 40 `enviado` (`L1`); `enviado` acima de 5.000 linhas ou 204.800 bytes, ou com `bytes`/`linhas` menores que os do blob `<sha>:<arquivo>` medido de novo (`L2`); `include` diferente dos enviados, ou a reconciliação do `revisar` (repetido, sobra, pulado, faltante) que não fecha (`cobertura`) | FALHA `evidencia-invalida:<campo>` | FALHA |
+| `ok`/`achados` com algum `enviado` e `head` que não é `null` nem o SHA completo de um commit (`head`), ou `modo` `base-commit` com `base_commit` que não é o SHA completo de um commit, ou `modo` `uncommitted` com `base_commit` não nulo, ou outro `modo` (`base_commit`) | FALHA `evidencia-invalida:<campo>` | FALHA |
+| `ok`/`achados` com `achados` diferente dos derivados de `chamada.issues` (de nenhuma, sem `enviado`), com as linhas alteradas de `git diff -U0 <de> <sha>` (`<de>`: `base_commit` com `--base-commit`, senão `head`) e as vizinhas do blob do commit: outra quantidade, ordem, `identidade`, `arquivo`, `linha`, `label` ou `texto`, ou `estado` diferente do derivado, exceto `rejeitado` com a identidade em `rejeicoes` da evidência ou de outra evidência do trabalho no commit; ou `resultado` que não é `achados` com algum `aberto` e `ok` sem nenhum | FALHA `evidencia-invalida:achados` | FALHA |
+| achado `aberto` | FALHA `achados-abertos:<n>` | FALHA |
 
 ## `rejeitar`
 
@@ -249,3 +268,4 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-10-19 | Caminhos de `--arquivos` não são aparados: espaço na ponta é parte do nome, e aparar revisava outro arquivo ou o dava por ausente. |
 | 2026-10-20 | **v2** (emenda de 2026-10-19, limites do CodeAnt, fixos): lista exata de versões homologadas, localização e integridade do pacote, execução pelo arquivo conferido; sem lotes; `--base-commit`; exclusões, L1 e L2 antes da CLI; reconciliação com `meta`, `skipped` e stderr; resultado `incompleta` (saída 3); evidência v2; `conferir` reprova `incompleta` em qualquer modo e evidência fora do perfil; `FATIA_*` no ambiente é uso errado. |
 | 2026-10-20 | Revisão da PR 5: `conferir` refaz a classificação `revisao` de cada arquivo (`evidencia-invalida:revisao`), exige `chamada.error` nulo e `include` igual aos enviados, e aplica a reconciliação do `revisar` (`cobertura`); o git recebe caminhos literais. |
+| 2026-10-20 | A evidência guarda as `issues` da CLI cruas, o `stdout_sha256` e o `head` da revisão; o `conferir` deriva os `achados` das `issues` gravadas (`evidencia-invalida:achados`, `head`, `base_commit`), e `rejeitado` exige a rejeição gravada. Continua `expx_revisao: 2`, com os campos novos obrigatórios em `ok`/`achados`: nenhum consumidor grava v2 além do núcleo (a V12 da mergex e a sprintx ainda não existem), e a v2 sem eles reprova (`evidencia-invalida:chamada`) e se revisa de novo. Arquivo novo, no `revisar` sem `--base-commit`, passa a ser o ausente do `HEAD` (antes, o fora do índice), a mesma regra do `conferir`. Limite aceito: quem edita a evidência edita as `issues`; a defesa é o diff da evidência no PR. |
