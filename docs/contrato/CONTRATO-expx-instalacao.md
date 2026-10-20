@@ -231,7 +231,7 @@ Cada item de `excluir_da_revisao` obedece a estas seis regras:
 As exclusões do projeto somam às do núcleo: `^docs/sprintx/`,
 `^docs/entregas/` e `^docs/eventos/`. O projeto não as declara. Os blocos A1 a
 A3 entregam a leitura, a validação e o diagnóstico dessa configuração. O bloco
-B entregará as medidas e o verificador; o bloco C aplicará as exclusões e os
+B entrega as medidas e o verificador; o bloco C aplicará as exclusões e os
 portões na revisão. Nessa integração, o método testará o prefixo literal antes
 de montar `--include`; a sintaxe glob do `--exclude` da CLI não participará. Um
 arquivo coberto ficará fora da revisão por task, de L1 e de L2, mas continuará
@@ -258,11 +258,12 @@ O leitor único é
 
 - `node <L>` imprime somente `EXPX_REVISAO_POR_TASK`, `EXPX_ENTREGA`,
   `EXPX_MERGE_AUTOMATICO`, `EXPX_CAMINHOS_PROTEGIDOS`, `EXPX_REVISOR_BOT`,
-  `EXPX_EXCLUIR_DA_REVISAO` e `EXPX_FATIAMENTO_ORIGEM`, em formato seguro para
-  `eval`;
+  `EXPX_EXCLUIR_DA_REVISAO`, `EXPX_FATIAMENTO_ORIGEM`, `EXPX_PERFIL_CLI`,
+  `EXPX_L1_ARQUIVOS`, `EXPX_L2_LINHAS`, `EXPX_L2_BYTES` e
+  `EXPX_L3_ARQUIVOS`, em formato seguro para `eval`;
 - `node <L> --formato json` imprime as mesmas decisões como `origem`,
-  `revisao_por_task`, `entrega`, `merge_automatico`, `revisor_bot` e
-  `excluir_da_revisao`;
+  `revisao_por_task`, `entrega`, `merge_automatico`, `revisor_bot`,
+  `excluir_da_revisao` e `limites`;
 - `node <L> --validar` apenas valida. Arquivo ausente usa os padrões; presente
   e inválido sai 1 sem stdout, nunca cai silenciosamente nos padrões. BOM e
   CRLF são aceitos. O arquivo pertence ao projeto: `init`, `add`, `remove` e

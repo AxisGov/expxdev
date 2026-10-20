@@ -142,4 +142,46 @@ describe("perfis e limites do CodeAnt", () => {
       rmSync(raiz, { recursive: true, force: true });
     }
   });
+
+  it("ordena versoes semanticamente e usa a mais nova como perfil ativo", async () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-perfis-semver-"));
+    try {
+      const scripts = join(raiz, "scripts"), perfis = join(scripts, "perfis");
+      mkdirSync(perfis, { recursive: true });
+      copyFileSync(join(RAIZ_DO_REPO, "nucleo", "scripts", "expx-limites.mjs"), join(scripts, "expx-limites.mjs"));
+      copyFileSync(join(RAIZ_DO_REPO, "nucleo", "scripts", "perfis", "codeant-app.json"), join(perfis, "codeant-app.json"));
+      const perfil = JSON.parse(readFileSync(join(RAIZ_DO_REPO, "nucleo", "scripts", "perfis", "codeant-cli-0.5.14.json"), "utf8"));
+      writeFileSync(join(perfis, "codeant-cli-0.5.14.json"), JSON.stringify(perfil));
+      perfil.versao = "0.10.0";
+      perfil.package_json.version = "0.10.0";
+      writeFileSync(join(perfis, "codeant-cli-0.10.0.json"), JSON.stringify(perfil));
+
+      const modulo = await import(`${pathToFileURL(join(scripts, "expx-limites.mjs")).href}?semver=1`) as Limites;
+      expect(modulo.homologadas()).toEqual(["0.5.14", "0.10.0"]);
+      expect(modulo.limites().perfil_cli).toBe("codeant-cli@0.10.0");
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ["nome do pacote", (perfil: any) => { perfil.package_json.name = "outro"; }, "package_json.name"],
+    ["caminho absoluto", (perfil: any) => { perfil.manifesto["/fora.js"] = "a".repeat(64); }, "manifesto./fora.js"],
+    ["caminho com retorno", (perfil: any) => { perfil.manifesto["../fora.js"] = "a".repeat(64); }, "manifesto.../fora.js"],
+    ["caminho Windows", (perfil: any) => { perfil.manifesto["src\\fora.js"] = "a".repeat(64); }, "manifesto.src\\fora.js"],
+  ])("recusa perfil com %s", async (_caso, alterar, campo) => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-perfis-caminhos-"));
+    try {
+      const scripts = join(raiz, "scripts"), perfis = join(scripts, "perfis");
+      mkdirSync(perfis, { recursive: true });
+      copyFileSync(join(RAIZ_DO_REPO, "nucleo", "scripts", "expx-limites.mjs"), join(scripts, "expx-limites.mjs"));
+      copyFileSync(join(RAIZ_DO_REPO, "nucleo", "scripts", "perfis", "codeant-app.json"), join(perfis, "codeant-app.json"));
+      const perfil = JSON.parse(readFileSync(join(RAIZ_DO_REPO, "nucleo", "scripts", "perfis", "codeant-cli-0.5.14.json"), "utf8"));
+      alterar(perfil);
+      writeFileSync(join(perfis, "codeant-cli-0.5.14.json"), JSON.stringify(perfil));
+      await expect(import(`${pathToFileURL(join(scripts, "expx-limites.mjs")).href}?invalido=${encodeURIComponent(campo)}`)).rejects.toThrow(campo);
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
+  });
 });

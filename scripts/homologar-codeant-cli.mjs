@@ -108,27 +108,84 @@ function listaDe(fonte, nome) {
   return valores;
 }
 
-function sufixosDe(fonte) {
-  const valores = [];
-  const regex = /\.endsWith\(\s*(['"])((?:\\.|(?!\1)[^\\])*)\1\s*\)/g;
-  let casamento;
-  while ((casamento = regex.exec(fonte)) !== null) valores.push(desescaparTexto(casamento[2], casamento[1]));
-  if (valores.length === 0) falha("fonte não reconhecida (endsWith); homologue à mão");
-  return [...new Set(valores)];
+function mascararNaoCodigo(fonte) {
+  const saida = Array(fonte.length).fill(" ");
+  let estado = "codigo";
+  for (let i = 0; i < fonte.length; i += 1) {
+    const atual = fonte[i], proximo = fonte[i + 1];
+    if (estado === "linha") { if (atual === "\n") { saida[i] = atual; estado = "codigo"; } continue; }
+    if (estado === "bloco") { if (atual === "*" && proximo === "/") { estado = "codigo"; i += 1; } continue; }
+    if (estado !== "codigo") {
+      if (atual === "\\") i += 1;
+      else if (atual === estado) estado = "codigo";
+      continue;
+    }
+    if (atual === "/" && proximo === "/") { estado = "linha"; i += 1; continue; }
+    if (atual === "/" && proximo === "*") { estado = "bloco"; i += 1; continue; }
+    if (atual === "'" || atual === '"' || atual === "`") { estado = atual; continue; }
+    saida[i] = atual;
+  }
+  return saida.join("");
+}
+
+function corpoDaFuncao(fonte, nome) {
+  const regex = new RegExp(`function\\s+${nome}\\s*\\(\\s*filePath\\s*\\)\\s*\\{`, "g");
+  const cabecalhos = [...mascararNaoCodigo(fonte).matchAll(regex)];
+  if (cabecalhos.length !== 1) falha(`fonte não reconhecida (${nome}); homologue à mão`);
+  const cabecalho = cabecalhos[0];
+  const inicio = cabecalho.index + cabecalho[0].length;
+  let profundidade = 1;
+  let estado = "codigo";
+  for (let i = inicio; i < fonte.length; i += 1) {
+    const atual = fonte[i], proximo = fonte[i + 1];
+    if (estado === "linha") { if (atual === "\n") estado = "codigo"; continue; }
+    if (estado === "bloco") { if (atual === "*" && proximo === "/") { estado = "codigo"; i += 1; } continue; }
+    if (estado !== "codigo") {
+      if (atual === "\\") i += 1;
+      else if (atual === estado) estado = "codigo";
+      continue;
+    }
+    if (atual === "/" && proximo === "/") { estado = "linha"; i += 1; continue; }
+    if (atual === "/" && proximo === "*") { estado = "bloco"; i += 1; continue; }
+    if (atual === "'" || atual === '"' || atual === "`") { estado = atual; continue; }
+    if (atual === "{") profundidade += 1;
+    if (atual === "}" && --profundidade === 0) return fonte.slice(inicio, i);
+  }
+  falha(`fonte não reconhecida (${nome} incompleta); homologue à mão`);
+}
+
+function normalizarCodigo(codigo) {
+  let saida = "", estado = "codigo";
+  for (let i = 0; i < codigo.length; i += 1) {
+    const atual = codigo[i], proximo = codigo[i + 1];
+    if (estado === "linha") { if (atual === "\n") estado = "codigo"; continue; }
+    if (estado === "bloco") { if (atual === "*" && proximo === "/") { estado = "codigo"; i += 1; } continue; }
+    if (estado !== "codigo") {
+      saida += atual;
+      if (atual === "\\" && proximo !== undefined) saida += codigo[++i];
+      else if (atual === estado) estado = "codigo";
+      continue;
+    }
+    if (/\s/u.test(atual)) continue;
+    if (atual === "/" && proximo === "/") { estado = "linha"; i += 1; continue; }
+    if (atual === "/" && proximo === "*") { estado = "bloco"; i += 1; continue; }
+    saida += atual;
+    if (atual === "'" || atual === '"') estado = atual;
+    else if (atual === "`") falha("fonte não reconhecida (template no predicado); homologue à mão");
+  }
+  if (estado !== "codigo" && estado !== "linha") falha("fonte não reconhecida (predicado incompleto); homologue à mão");
+  return saida;
 }
 
 function conferirPredicado(fonte) {
-  const exigidos = [
-    /(?:const|let|var)\s+basename\s*=\s*path\.basename\s*\(\s*filePath\s*\)/,
-    /EXCLUDED_FILENAMES\.has\s*\(\s*basename\s*\)/,
-    /(?:const|let|var)\s+ext\s*=\s*path\.extname\s*\(\s*basename\s*\)\.toLowerCase\s*\(\s*\)/,
-    /EXCLUDED_EXTENSIONS\.has\s*\(\s*ext\s*\)/,
-    /basename\.endsWith\s*\(/,
-  ];
-  if (exigidos.some((regex) => !regex.test(fonte))) falha("fonte não reconhecida (isReviewableFile); homologue à mão");
+  const corpo = normalizarCodigo(corpoDaFuncao(fonte, "isReviewableFile"));
+  const forma = /^constbasename=path\.basename\(filePath\);if\(EXCLUDED_FILENAMES\.has\(basename\)\)returnfalse;constext=path\.extname\(basename\)\.toLowerCase\(\);if\(EXCLUDED_EXTENSIONS\.has\(ext\)\)returnfalse;if\(basename\.endsWith\((['"])((?:\\.|(?!\1)[^\\])*)\1\)\|\|basename\.endsWith\((['"])((?:\\.|(?!\3)[^\\])*)\3\)\)returnfalse;returntrue;$/;
+  const casamento = forma.exec(corpo);
+  if (!casamento) falha("fonte não reconhecida (isReviewableFile); homologue à mão");
   if (!fonte.includes("too large (") || !fonte.includes("-file limit")) {
     falha("fonte não reconhecida (motivos de pulo); homologue à mão");
   }
+  return [desescaparTexto(casamento[2], casamento[1]), desescaparTexto(casamento[4], casamento[3])];
 }
 
 function arquivosRegulares(raiz) {
@@ -175,18 +232,19 @@ async function executar() {
     if (tar.status !== 0) falha(`não foi possível extrair o tarball: ${String(tar.stderr).trim()}`);
     const pacote = join(extraido, "package");
     const packageJson = JSON.parse(readFileSync(join(pacote, "package.json"), "utf8"));
-    if (packageJson?.name !== "codeant-cli" || packageJson?.version !== op.versao || !(typeof packageJson?.bin === "string" || typeof packageJson?.bin === "object")) {
+    const bin = packageJson?.bin;
+    if (packageJson?.name !== "codeant-cli" || packageJson?.version !== op.versao || bin === null || typeof bin !== "object"
+      || Array.isArray(bin) || Object.keys(bin).length !== 1 || typeof bin.codeant !== "string" || bin.codeant === "") {
       falha("package.json do tarball não identifica o codeant-cli homologado");
     }
 
     const fonte = readFileSync(join(pacote, ...FONTE.split("/")), "utf8");
-    conferirPredicado(fonte);
+    const sufixos = conferirPredicado(fonte);
     const maxFiles = valorInteiro(fonte, "MAX_REVIEW_FILES");
     const maxLinhas = valorInteiro(fonte, "MAX_FILE_LINES");
     const maxBytes = valorInteiro(fonte, "MAX_FILE_SIZE_BYTES");
     const nomes = listaDe(fonte, "EXCLUDED_FILENAMES");
     const extensoes = listaDe(fonte, "EXCLUDED_EXTENSIONS");
-    const sufixos = sufixosDe(fonte);
 
     const perfil = {
       perfil: "codeant-cli",

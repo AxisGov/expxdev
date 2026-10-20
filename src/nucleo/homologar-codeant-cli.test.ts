@@ -55,13 +55,17 @@ function sha256(conteudo: Buffer): string {
   return createHash("sha256").update(conteudo).digest("hex");
 }
 
-function montar(fonte = FONTE, packument?: Record<string, unknown>): Cenario {
+function montar(
+  fonte = FONTE,
+  packument?: Record<string, unknown>,
+  packageJson: Record<string, unknown> = { name: "codeant-cli", version: VERSAO, bin: { codeant: "src/index.js" } },
+): Cenario {
   const raiz = mkdtempSync(join(tmpdir(), "expx-homologar-codeant-"));
   temporarios.push(raiz);
   const pacote = join(raiz, "conteudo", "package");
   mkdirSync(join(pacote, "src", "utils"), { recursive: true });
   const arquivos: Record<string, Buffer> = {
-    "package.json": Buffer.from(`${JSON.stringify({ name: "codeant-cli", version: VERSAO, bin: { codeant: "src/index.js" } }, null, 2)}\n`),
+    "package.json": Buffer.from(`${JSON.stringify(packageJson, null, 2)}\n`),
     "src/index.js": Buffer.from("#!/usr/bin/env node\n"),
     "src/utils/reviewApiHelper.js": Buffer.from(fonte),
   };
@@ -171,6 +175,55 @@ describe("homologar-codeant-cli.mjs", () => {
     const r = rodar(c);
     expect(r.status).toBe(1);
     expect(r.stderr).toContain("homologue à mão");
+  });
+
+  it.each([
+    ["resultado invertido", FONTE.replace("return false;", "return true;")],
+    ["exclusao adicional", FONTE.replace("  return true;", "  if (basename === 'extra.js') return false;\n  return true;")],
+    ["ramos reordenados", FONTE.replace(
+      "  if (EXCLUDED_FILENAMES.has(basename)) return false;\n  const ext = path.extname(basename).toLowerCase();\n  if (EXCLUDED_EXTENSIONS.has(ext)) return false;",
+      "  const ext = path.extname(basename).toLowerCase();\n  if (EXCLUDED_EXTENSIONS.has(ext)) return false;\n  if (EXCLUDED_FILENAMES.has(basename)) return false;",
+    )],
+  ])("funcional: predicado com %s exige homologacao manual", (_caso, fonte) => {
+    const r = rodar(montar(fonte));
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("homologue");
+  });
+
+  it("funcional: endsWith fora do predicado nao altera os sufixos homologados", () => {
+    const c = montar(`${FONTE}\nconst irrelevante = nome.endsWith('.fora');\n`);
+    const r = rodar(c);
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(0);
+    const perfil = JSON.parse(readFileSync(join(c.saida, "codeant-cli-0.5.14.json"), "utf8"));
+    expect(perfil.excluidos.sufixos).toEqual([".min.js", ".min.css"]);
+  });
+
+  it("funcional: predicado comentado nao mascara uma implementacao divergente", () => {
+    const predicado = FONTE.match(/function isReviewableFile[\s\S]*?\n}/)![0];
+    const divergente = FONTE.replace("return false;", "return true;");
+    const r = rodar(montar(`/* ${predicado} */\n${divergente}`));
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("homologue");
+  });
+
+  it("funcional: duas declaracoes do predicado exigem homologacao manual", () => {
+    const duplicado = `${FONTE}\nfunction isReviewableFile(filePath) { return true; }\n`;
+    const r = rodar(montar(duplicado));
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("homologue");
+  });
+
+  it.each([
+    ["string", "src/index.js"],
+    ["objeto vazio", {}],
+    ["comando extra", { codeant: "src/index.js", outro: "src/index.js" }],
+    ["alvo nao textual", { codeant: 42 }],
+  ])("funcional: package.json bin %s e recusado", (_caso, bin) => {
+    const c = montar(FONTE, undefined, { name: "codeant-cli", version: VERSAO, bin });
+    const r = rodar(c);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("package.json");
+    expect(existsSync(join(c.saida, "codeant-cli-0.5.14.json"))).toBe(false);
   });
 
   it("funcional: argumentos incompletos saem 2 sem escrever", () => {

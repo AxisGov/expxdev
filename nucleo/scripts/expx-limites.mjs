@@ -60,6 +60,7 @@ export function fatiaNoAmbiente(env) {
 
 /** `FATIA_*` são reservados para sempre: nenhum limite nem exclusão vem do ambiente. */
 const DIRETORIO_PERFIS = new URL("./perfis/", import.meta.url);
+const SEMVER = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const erroPerfil = (arquivo, campo, motivo) => { throw new Error(`perfil ${arquivo}: ${campo} ${motivo}`); };
 const objeto = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 
@@ -96,11 +97,39 @@ function lerJson(arquivo) {
   catch (e) { erroPerfil(arquivo, "JSON", `invalido (${e.message})`); }
 }
 
+function compararSemver(a, b) {
+  const pa = SEMVER.exec(a), pb = SEMVER.exec(b);
+  for (let i = 1; i <= 3; i += 1) {
+    const diferenca = Number(pa[i]) - Number(pb[i]);
+    if (diferenca !== 0) return diferenca;
+  }
+  const preA = pa[4]?.split("."), preB = pb[4]?.split(".");
+  if (!preA || !preB) return preA ? -1 : preB ? 1 : 0;
+  for (let i = 0; i < Math.max(preA.length, preB.length); i += 1) {
+    if (preA[i] === undefined || preB[i] === undefined) return preA[i] === undefined ? -1 : 1;
+    if (preA[i] === preB[i]) continue;
+    const numA = /^[0-9]+$/.test(preA[i]), numB = /^[0-9]+$/.test(preB[i]);
+    if (numA && numB) return Number(preA[i]) - Number(preB[i]);
+    if (numA !== numB) return numA ? -1 : 1;
+    return preA[i].localeCompare(preB[i]);
+  }
+  return 0;
+}
+
+function caminhoDeManifesto(v, arquivo) {
+  texto(v, arquivo, `manifesto.${v}`);
+  const partes = v.split("/");
+  if (v.includes("\\") || posix.isAbsolute(v) || /^[A-Za-z]:\//.test(v) || posix.normalize(v) !== v
+    || partes.some((parte) => parte === "" || parte === "." || parte === "..")) {
+    erroPerfil(arquivo, `manifesto.${v}`, "deve ser caminho POSIX relativo normalizado");
+  }
+}
+
 function validarPerfilCli(arquivo, esperado) {
   const p = objetoExato(lerJson(arquivo), arquivo, "raiz", ["perfil", "versao", "integridade", "git_head", "fonte", "max_files",
     "max_linhas", "max_bytes", "excluidos", "motivos", "package_json", "manifesto"]);
   if (p.perfil !== "codeant-cli") erroPerfil(arquivo, "perfil", "deve ser codeant-cli");
-  texto(p.versao, arquivo, "versao");
+  texto(p.versao, arquivo, "versao", SEMVER);
   if (p.versao !== esperado) erroPerfil(arquivo, "versao", `difere do nome do arquivo (${esperado})`);
   texto(p.integridade, arquivo, "integridade", /^sha512-[A-Za-z0-9+/]+={0,2}$/);
   texto(p.git_head, arquivo, "git_head", /^[0-9a-f]{40}$/);
@@ -123,13 +152,14 @@ function validarPerfilCli(arquivo, esperado) {
   });
   const pacote = objetoExato(p.package_json, arquivo, "package_json", ["name", "version", "bin"]);
   texto(pacote.name, arquivo, "package_json.name");
+  if (pacote.name !== "codeant-cli") erroPerfil(arquivo, "package_json.name", "deve ser codeant-cli");
   texto(pacote.version, arquivo, "package_json.version");
   if (pacote.version !== p.versao) erroPerfil(arquivo, "package_json.version", "difere de versao");
   const bin = objetoExato(pacote.bin, arquivo, "package_json.bin", ["codeant"]);
   texto(bin.codeant, arquivo, "package_json.bin.codeant");
   if (!objeto(p.manifesto) || Object.keys(p.manifesto).length === 0) erroPerfil(arquivo, "manifesto", "deve ser objeto nao vazio");
   for (const [caminho, sha] of Object.entries(p.manifesto)) {
-    texto(caminho, arquivo, `manifesto.${caminho}`);
+    caminhoDeManifesto(caminho, arquivo);
     texto(sha, arquivo, `manifesto.${caminho}`, /^[0-9a-f]{64}$/);
   }
   return p;
@@ -147,7 +177,9 @@ function validarPerfilApp() {
 }
 
 const VERSOES = readdirSync(DIRETORIO_PERFIS).map((nome) => /^codeant-cli-(.+)\.json$/.exec(nome)).filter(Boolean)
-  .map((m) => m[1]).sort();
+  .map((m) => m[1]);
+for (const versao of VERSOES) if (!SEMVER.test(versao)) erroPerfil(`codeant-cli-${versao}.json`, "versao", "deve ser SemVer");
+VERSOES.sort(compararSemver);
 if (VERSOES.length === 0) erroPerfil("perfis", "codeant-cli", "ausente");
 const PERFIS_CLI = new Map(VERSOES.map((versao) => [versao, validarPerfilCli(`codeant-cli-${versao}.json`, versao)]));
 const PERFIL_APP = validarPerfilApp();
