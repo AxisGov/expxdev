@@ -77,14 +77,18 @@ function medirBlob(ref) {
   return conteudo ? medir(conteudo) : undefined;
 }
 /** A medida da CLI do arquivo do checkout, pela mesma regra de `medirBlob`: lê no máximo LEITURA_MAXIMA + 1 bytes, mesmo
- *  que o arquivo cresça durante a leitura. */
+ *  que o arquivo cresça durante a leitura. Undefined se ele não abre ou não se lê (apagado ou trocado por pasta depois do
+ *  `hash-object`): quem mede dá a falta como `arquivo-inexistente` ou `arquivo-mudou-durante-revisao`, nunca uma exceção. */
 function medirArquivo(f) {
-  const fd = openSync(join(op.raiz, f), "r");
+  let fd;
+  try { fd = openSync(join(op.raiz, f), "r"); } catch { return undefined; }
   try {
     const buf = Buffer.alloc(LEITURA_MAXIMA + 1);
     let n = 0;
     for (let k; n < buf.length && (k = readSync(fd, buf, n, buf.length - n, null)) > 0;) n += k;
     return n > LEITURA_MAXIMA ? { linhas: null, bytes: Math.max(n, fstatSync(fd).size) } : medir(buf.subarray(0, n));
+  } catch {
+    return undefined;
   } finally {
     closeSync(fd);
   }
@@ -224,6 +228,7 @@ function medida(f) {
   const a = medirBlob(blob);
   if (!a) return undefined;
   const b = medirArquivo(f);
+  if (!b) return undefined;
   const linhas = a.linhas === null || b.linhas === null ? null : Math.max(a.linhas, b.linhas);
   return { blob, bytes: Math.max(a.bytes, b.bytes), linhas, disco };
 }

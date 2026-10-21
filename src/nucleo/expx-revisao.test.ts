@@ -279,6 +279,26 @@ describe("expx-revisao.mjs revisar", () => {
     altera3(c.raiz);
     expect(revisar(c, "src/a.js")).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "arquivo-mudou-durante-revisao" } });
   });
+
+  it.each([
+    [1, "arquivo-inexistente:src/a.js"],
+    [2, "arquivo-mudou-durante-revisao"],
+  ])("funcional: arquivo apagado entre o hash-object e o open da medida (open nº %i) → indisponivel:%s, com evidência", (n, motivo) => {
+    const c = cenario();
+    altera3(c.raiz);
+    // o openSync do script apaga o arquivo antes de abri-lo na n-ésima vez: a troca entre a conferência e a leitura
+    const pre = join(temp("expx-open-"), "pre.mjs");
+    writeFileSync(pre, `import fs from "node:fs"; import { syncBuiltinESMExports } from "node:module";
+const open = fs.openSync; let n = 0;
+fs.openSync = (...a) => { if (String(a[0]).split(String.fromCharCode(92)).join("/").endsWith("/src/a.js") && ++n === ${n}) fs.rmSync(a[0]); return open(...a); };
+syncBuiltinESMExports();
+`);
+    const r = spawnSync(process.execPath, ["--import", pathToFileURL(pre).href, c.script, "revisar", "--trabalho", "w", "--task", "T-01", "--arquivos", "src/a.js",
+      "--raiz", c.raiz], { encoding: "utf8", env: ambienteCom(`${c.falsa.path}${delimiter}${PATH}`, {}) });
+    expect(existsSync(join(c.raiz, "src/a.js"))).toBe(false);
+    expect({ rc: r.status, out: r.stdout }).toEqual({ rc: 2, out: `T-01 indisponivel:${motivo}\n` });
+    expect(evidencia(c.raiz)).toMatchObject({ resultado: "indisponivel", motivo });
+  });
 });
 
 const grava = (d: string, rel: string, b: Buffer): void => { mkdirSync(dirname(join(d, rel)), { recursive: true }); writeFileSync(join(d, rel), b); };
