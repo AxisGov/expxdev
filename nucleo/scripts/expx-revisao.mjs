@@ -2,8 +2,11 @@
 //   node expx-revisao.mjs revisar --trabalho <slug> --task <T-NN.MM> --arquivos <a,b,...> [--base-commit <sha>] [--raiz <dir>]
 //   node expx-revisao.mjs conferir --trabalho <slug> --modo <obrigatoria|se_disponivel|desligada> --task <T-NN.MM>=<sha> [...]
 //   node expx-revisao.mjs rejeitar --trabalho <slug> --task <T-NN.MM> --identidade <hex> --motivo <texto>
+//   node expx-revisao.mjs listar --trabalho <slug> --task <T-NN.MM>=<sha> [...]
 // revisar: grava docs/entregas/<slug>/revisao/<T-NN.MM>.json (evidência v2); sai 0 (ok), 1 (achado aberto),
-// 2 (indisponivel), 3 (incompleta). conferir: 0 (ok), 1 (FALHA), 3 (só AVISO). Uso errado, inclusive
+// 2 (indisponivel), 3 (incompleta). conferir: 0 (ok), 1 (FALHA), 3 (só AVISO). listar (só leitura): uma linha de JSON
+// `expx_revisao_listar: 1` com os rejeitados, as rejeições e os removidos da evidência que o `conferir` aceita; 0
+// (todas listadas), 1 (alguma inválida), 3 (alguma ausente). Uso errado, inclusive
 // `FATIA_*` no ambiente: 64. Uma chamada só da CLI (sem lotes), pelo arquivo do pacote conferido; a
 // resposta é reconciliada com a task (contrato expx-revisao v2); a evidência guarda as `issues` cruas, e o
 // `conferir` deriva delas os achados. Nunca lê credencial da CLI.
@@ -19,9 +22,9 @@ import { fileURLToPath } from "node:url";
 import { conferirIntegridade, excluido, EXCLUIDOS_DO_NUCLEO, fatiaNoAmbiente, homologadas, localizarPacote, medir, mensagemFatia,
   motivoAceito, perfilCli, revisavel } from "./expx-limites.mjs";
 
-const OBRIGATORIOS = { revisar: ["task", "arquivos"], conferir: ["modo", "task"], rejeitar: ["task", "identidade", "motivo"] };
+const OBRIGATORIOS = { revisar: ["task", "arquivos"], conferir: ["modo", "task"], rejeitar: ["task", "identidade", "motivo"], listar: ["task"] };
 function uso(msg) {
-  process.stderr.write(`expx-revisao: ${msg}\nuso: node expx-revisao.mjs revisar|conferir|rejeitar --trabalho <slug> ... (cabecalho do script)\n`);
+  process.stderr.write(`expx-revisao: ${msg}\nuso: node expx-revisao.mjs revisar|conferir|rejeitar|listar --trabalho <slug> ... (cabecalho do script)\n`);
   process.exit(64);
 }
 const [cmd, ...args] = process.argv.slice(2);
@@ -38,14 +41,16 @@ for (let i = 0; i < args.length; i += 2) {
   if (args[i + 1] === undefined) uso(`${args[i]} exige valor`);
   op[args[i].slice(2)] = args[i + 1];
   if (args[i] === "--task") op.tasks.push(args[i + 1]);
+  // o `listar` não depende do modo nem grava nada: só `--trabalho`, `--task` e `--raiz`
+  if (cmd === "listar" && !/^--(raiz|trabalho|task)$/.test(args[i])) uso(`${args[i]} nao vale no listar`);
 }
 // `--arquivos` não é aparado: espaço é parte do nome
 for (const k of ["trabalho", ...OBRIGATORIOS[cmd]]) if (!(k === "arquivos" ? op[k] : op[k]?.trim())) uso(`--${k} obrigatorio`);
 if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(op.trabalho)) uso(`trabalho invalido: ${op.trabalho}`);
 // id `T-NN.MM` da sprintx/runx (sprint.task) ou o legado `T-<dígitos>` (como antes); vira nome de arquivo, então nada além disso
-const TASK = cmd === "conferir" ? /^T-(\d+|\d{2}\.\d{2})=[^\s:]+$/ : /^T-(\d+|\d{2}\.\d{2})$/;
+const TASK = ["conferir", "listar"].includes(cmd) ? /^T-(\d+|\d{2}\.\d{2})=[^\s:]+$/ : /^T-(\d+|\d{2}\.\d{2})$/;
 for (const t of op.tasks) if (!TASK.test(t)) uso(`task invalida: ${t}`);
-if (cmd !== "conferir" && op.tasks.length > 1) uso("--task uma vez so");
+if (!["conferir", "listar"].includes(cmd) && op.tasks.length > 1) uso("--task uma vez so");
 if (cmd === "conferir" && !["obrigatoria", "se_disponivel", "desligada"].includes(op.modo)) uso(`modo invalido: ${op.modo}`);
 if (cmd === "rejeitar" && !/^[0-9a-f]{64}$/.test(op.identidade)) uso(`identidade invalida: ${op.identidade}`);
 if (op["base-commit"] !== undefined && cmd !== "revisar") uso("--base-commit so no revisar");
@@ -451,53 +456,83 @@ function naoCoberto(ev, sha) {
   return diffs.flatMap((d) => d.stdout.split("\0")).find((f) => f !== "" && contam(f) && !Object.hasOwn(ev.arquivos, f));
 }
 
+/** `rejeicoes` ou `removidos_sem_revisao` fora da forma que o `listar` devolve (o nome do campo), ou undefined:
+ *  `rejeicoes` lista de `{identidade, motivo, em}` (hex de 64, texto, texto); `removidos_sem_revisao` lista de textos sem
+ *  repetição, exatamente os arquivos `null` de `arquivos` (o `revisar` grava os dois juntos). */
+function semListas(ev) {
+  if (!Array.isArray(ev.rejeicoes) || !ev.rejeicoes.every((r) => ehMapa(r) && /^[0-9a-f]{64}$/.test(r.identidade)
+    && typeof r.motivo === "string" && typeof r.em === "string")) return "rejeicoes";
+  const removidos = ev.removidos_sem_revisao;
+  const nulos = Object.keys(ev.arquivos).filter((f) => ev.arquivos[f] === null);
+  if (!Array.isArray(removidos) || !removidos.every((f) => typeof f === "string") || new Set(removidos).size !== removidos.length
+    || removidos.length !== nulos.length || !nulos.every((f) => removidos.includes(f))) return "removidos_sem_revisao";
+}
+
+/** A evidência da task no commit, pela validação do `conferir` (a mesma no `listar`): `{ausente: true}`, `{falha: <motivo>}`
+ *  (FALHA em qualquer modo) ou `{ev}`, válida, com qualquer `resultado`. */
+function avaliar(task, sha) {
+  if (git("rev-parse", "--verify", "-q", `${sha}^{commit}`).status !== 0) return { falha: `commit-inexistente:${sha}` };
+  // a evidência que vale é a do commit da task (o E1 a commita junto), nunca a do disco
+  const doCommit = git("show", `${sha}:./docs/entregas/${op.trabalho}/revisao/${task}.json`);
+  if (doCommit.status !== 0) return { ausente: true };
+  const falha = (motivo) => ({ falha: motivo });
+  let ev;
+  try { ev = JSON.parse(doCommit.stdout.replace(/^\uFEFF/, "")); } catch { return falha("evidencia-invalida"); }
+  if (ehMapa(ev) && ev.expx_revisao !== 2) return falha("evidencia-invalida:versao");
+  if (!ehMapa(ev) || ev.task !== task || ev.trabalho !== op.trabalho || !ehMapa(ev.arquivos)
+    || Object.keys(ev.arquivos).length === 0 || !Object.values(ev.arquivos).every((a) => a === null || ehMapa(a)) || !Array.isArray(ev.achados)
+    || !ev.achados.every((a) => ehMapa(a) && /^[0-9a-f]{64}$/.test(a.identidade) && ["aberto", "anterior", "rejeitado"].includes(a.estado))
+    || !["ok", "achados", "indisponivel", "incompleta"].includes(ev.resultado)) return falha("evidencia-invalida");
+  const lista = semListas(ev);
+  if (lista) return falha(`evidencia-invalida:${lista}`);
+  const concluida = ["ok", "achados"].includes(ev.resultado);
+  if (concluida && semData(ev)) return falha("evidencia-invalida:executada_em");
+  for (const [f, a] of Object.entries(ev.arquivos)) {
+    const r = git("rev-parse", "--verify", "-q", `${sha}:./${f}`);
+    if ((r.status === 0 ? r.stdout.trim() : null) !== (a === null ? null : a.blob)) return falha(`evidencia-nao-bate:${f}`);
+  }
+  const descoberto = naoCoberto(ev, sha);
+  if (descoberto !== undefined) return falha(`evidencia-invalida:cobertura${descoberto ? `:${descoberto}` : ""}`);
+  // indisponivel e incompleta: nada da CLI a conferir (o `veredito` as reprova ou avisa pelo motivo)
+  if (!concluida) return { ev };
+  const falta = semSinalDaCli(ev, sha) ?? achadosDivergem(ev, sha);
+  return falta ? falha(`evidencia-invalida:${falta}`) : { ev };
+}
+
 /** O veredito de uma task: a evidência tem de existir, bater com o commit e não ter achado aberto. */
 function veredito(task, sha) {
   if (op.modo === "desligada") return "ok";
   const nivel = op.modo === "obrigatoria" ? "FALHA" : "AVISO";
-  if (git("rev-parse", "--verify", "-q", `${sha}^{commit}`).status !== 0) return `FALHA commit-inexistente:${sha}`;
-  // a evidência que vale é a do commit da task (o E1 a commita junto), nunca a do disco
-  const doCommit = git("show", `${sha}:./docs/entregas/${op.trabalho}/revisao/${task}.json`);
-  if (doCommit.status !== 0) return `${nivel} evidencia-ausente`;
-  let ev;
-  try { ev = JSON.parse(doCommit.stdout.replace(/^\uFEFF/, "")); } catch { return "FALHA evidencia-invalida"; }
-  if (ehMapa(ev) && ev.expx_revisao !== 2) return "FALHA evidencia-invalida:versao";
-  if (!ehMapa(ev) || ev.task !== task || ev.trabalho !== op.trabalho || !ehMapa(ev.arquivos)
-    || Object.keys(ev.arquivos).length === 0 || !Object.values(ev.arquivos).every((a) => a === null || ehMapa(a)) || !Array.isArray(ev.achados)
-    || !ev.achados.every((a) => ehMapa(a) && /^[0-9a-f]{64}$/.test(a.identidade) && ["aberto", "anterior", "rejeitado"].includes(a.estado))
-    || !["ok", "achados", "indisponivel", "incompleta"].includes(ev.resultado)) return "FALHA evidencia-invalida";
-  const concluida = ["ok", "achados"].includes(ev.resultado);
-  if (concluida && semData(ev)) return "FALHA evidencia-invalida:executada_em";
-  for (const [f, a] of Object.entries(ev.arquivos)) {
-    const r = git("rev-parse", "--verify", "-q", `${sha}:./${f}`);
-    if ((r.status === 0 ? r.stdout.trim() : null) !== (a === null ? null : a.blob)) return `FALHA evidencia-nao-bate:${f}`;
-  }
-  const descoberto = naoCoberto(ev, sha);
-  if (descoberto !== undefined) return `FALHA evidencia-invalida:cobertura${descoberto ? `:${descoberto}` : ""}`;
+  const { ausente, falha, ev } = avaliar(task, sha);
+  if (ausente) return `${nivel} evidencia-ausente`;
+  if (falha) return `FALHA ${falha}`;
   if (ev.resultado === "indisponivel") return `${nivel} indisponivel:${ev.motivo}`;
   // a mudança que a CLI não cobre não depende do modo
   if (ev.resultado === "incompleta") return `FALHA incompleta:${ev.motivo}`;
-  const falta = semSinalDaCli(ev, sha);
-  if (falta) return `FALHA evidencia-invalida:${falta}`;
-  const diverge = achadosDivergem(ev, sha);
-  if (diverge) return `FALHA evidencia-invalida:${diverge}`;
   const abertos = ev.achados.filter((a) => a.estado === "aberto").length;
   return abertos > 0 ? `FALHA achados-abertos:${abertos}` : "ok";
 }
 
 const SHA = /^[0-9a-f]{40}([0-9a-f]{24})?$/;
 const ehCommit = (x) => typeof x === "string" && SHA.test(x) && git("cat-file", "-e", `${x}^{commit}`).status === 0;
-/** As identidades rejeitadas na própria evidência e nas do trabalho, como estão no commit da task. */
-function rejeitadasNoCommit(ev, sha) {
-  const s = new Set((Array.isArray(ev.rejeicoes) ? ev.rejeicoes : []).map((r) => r?.identidade));
+/** As rejeições da própria evidência e das do trabalho, como estão no commit da task: identidade → `{task, motivo, em}`,
+ *  a primeira de cada (as da própria evidência antes; `motivo` e `em` que não são texto, `null`). */
+function rejeicoesNoCommit(ev, sha) {
+  const m = new Map();
+  const texto = (v) => (typeof v === "string" ? v : null);
+  const poe = (task, lista) => {
+    for (const r of Array.isArray(lista) ? lista : []) if (ehMapa(r) && !m.has(r.identidade)) m.set(r.identidade, { task, motivo: texto(r.motivo), em: texto(r.em) });
+  };
+  poe(ev.task, ev.rejeicoes);
   const dir = `docs/entregas/${op.trabalho}/revisao/`;
   for (const n of git("ls-tree", "-z", "--name-only", sha, "--", dir).stdout.split("\0").filter((x) => x.endsWith(".json"))) {
     try {
-      const outra = JSON.parse(git("show", `${sha}:./${n}`).stdout.replace(/^\uFEFF/, "")).rejeicoes;
-      for (const r of Array.isArray(outra) ? outra : []) s.add(r?.identidade);
+      const outra = n.slice(dir.length, -".json".length);
+      const lista = JSON.parse(git("show", `${sha}:./${n}`).stdout.replace(/^\uFEFF/, "")).rejeicoes;
+      poe(outra, lista);
     } catch { /* evidência ilegível de outra task: não rejeita nada */ }
   }
-  return s;
+  return m;
 }
 /** Em `ok`/`achados`, o campo que impede derivar os `achados` gravados das `issues` gravadas (`head`, `base_commit`),
  *  `achados` se eles (ou o `resultado`) não batem com a derivação, ou undefined. Rejeitado só vale com a identidade em
@@ -513,7 +548,7 @@ function achadosDivergem(ev, sha) {
     // pelo JSON, como foi gravado (`NaN` vira `null`)
     derivados = JSON.parse(JSON.stringify(derivar(ev.chamada.issues, ev.arquivos, ev.cli.versao, (f) => alteradas(f, de, sha), texto)));
   }
-  const rejeitadas = rejeitadasNoCommit(ev, sha);
+  const rejeitadas = rejeicoesNoCommit(ev, sha);
   if (ev.achados.length !== derivados.length || derivados.some((d, k) => {
     const a = ev.achados[k];
     return ["identidade", "arquivo", "linha", "label", "texto"].some((c) => a[c] !== d[c])
@@ -526,6 +561,29 @@ function conferir() {
   const linhas = op.tasks.map((p) => { const [task, sha] = p.split("="); return `${task} ${veredito(task, sha)}`; });
   process.stdout.write(`${linhas.join("\n")}\n`);
   process.exit(linhas.some((l) => l.includes(" FALHA ")) ? 1 : linhas.some((l) => l.includes(" AVISO ")) ? 3 : 0);
+}
+
+/** O que a mergex lê das evidências (D1, D2, condição 6 da M2), só da evidência que o `conferir` aceita: uma linha de JSON
+ *  `{expx_revisao_listar: 1, trabalho, tasks: [...]}`, uma entrada por `--task`, na ordem dada. Sai 0 (todas listadas),
+ *  1 (alguma `invalida`) ou 3 (alguma `ausente`, nenhuma `invalida`). Só leitura. */
+function listar() {
+  const texto = (v) => (typeof v === "string" ? v : null);
+  const tasks = op.tasks.map((p) => {
+    const [task, sha] = p.split("=");
+    const { ausente, falha, ev } = avaliar(task, sha);
+    if (!ev) {
+      return { task, commit: sha, listagem: ausente ? "ausente" : "invalida", causa: ausente ? "evidencia-ausente" : falha, resultado: null, motivo: null,
+        rejeitados: [], rejeicoes: [], removidos_sem_revisao: [] };
+    }
+    const rejeicoes = rejeicoesNoCommit(ev, sha);
+    return { task, commit: sha, listagem: "ok", causa: null, resultado: ev.resultado, motivo: texto(ev.motivo),
+      rejeitados: ev.achados.filter((a) => a.estado === "rejeitado").map((a) => ({ identidade: a.identidade, arquivo: texto(a.arquivo),
+        linha: Number.isSafeInteger(a.linha) ? a.linha : null, label: texto(a.label), texto: texto(a.texto), rejeicao: rejeicoes.get(a.identidade) ?? null })),
+      rejeicoes: ev.rejeicoes.map((r) => ({ identidade: r.identidade, motivo: r.motivo, em: r.em })),
+      removidos_sem_revisao: [...ev.removidos_sem_revisao] };
+  });
+  process.stdout.write(`${JSON.stringify({ expx_revisao_listar: 1, trabalho: op.trabalho, tasks })}\n`);
+  process.exit(tasks.some((t) => t.listagem === "invalida") ? 1 : tasks.some((t) => t.listagem === "ausente") ? 3 : 0);
 }
 
 function rejeitar() {
@@ -547,4 +605,4 @@ function rejeitar() {
   }
 }
 
-({ revisar, conferir, rejeitar })[cmd]();
+({ revisar, conferir, rejeitar, listar })[cmd]();

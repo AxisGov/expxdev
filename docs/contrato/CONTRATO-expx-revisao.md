@@ -2,7 +2,7 @@
 
 Cada task do método passa pela CLI do CodeAnt, e o portão do PR confere que passou.
 Este contrato define a CLI aceita, a evidência que a revisão grava, a identidade de
-um achado, e o que `revisar`, `conferir` e `rejeitar` fazem. Quem o implementa é
+um achado, e o que `revisar`, `conferir`, `rejeitar` e `listar` fazem. Quem o implementa é
 `nucleo/scripts/expx-revisao.mjs`, com as regras fixas de `nucleo/scripts/expx-limites.mjs`
 e os perfis de `nucleo/scripts/perfis/`, instalados em
 `.expx/marketplace/plugins/expx/nucleo/scripts/`; quem o chama são a sprintx (passo
@@ -202,6 +202,7 @@ linhas valem na ordem em que aparecem.
 | evidência ausente do commit | FALHA `evidencia-ausente` | AVISO `evidencia-ausente` |
 | `expx_revisao` ≠ 2 (a v1 inclusive: a task se revisa de novo) | FALHA `evidencia-invalida:versao` | FALHA |
 | JSON ilegível; outra task ou trabalho; `arquivos` que não é mapa, vazio ou com valor que não é mapa nem `null`; `achados` fora da forma; `resultado` fora dos quatro | FALHA `evidencia-invalida` | FALHA |
+| `rejeicoes` que não é lista de `{identidade, motivo, em}` (hex de 64, texto, texto) (`rejeicoes`); `removidos_sem_revisao` que não é lista de textos sem repetição igual aos arquivos `null` de `arquivos` (`removidos_sem_revisao`) | FALHA `evidencia-invalida:<campo>` | FALHA |
 | `ok`/`achados` com `executada_em` fora de ISO 8601 ou data impossível | FALHA `evidencia-invalida:executada_em` | FALHA |
 | `blob` ≠ `git rev-parse <sha>:<arquivo>` (ou `null` e o arquivo existe no commit) | FALHA `evidencia-nao-bate:<arquivo>` | FALHA |
 | arquivo que a task altera fora das chaves de `arquivos`, em qualquer `resultado` (abaixo, "Cobertura do commit"); o primeiro, na ordem do `git diff`; sem o nome, se o diff falha | FALHA `evidencia-invalida:cobertura:<arquivo>` | FALHA |
@@ -242,6 +243,49 @@ Só o desenvolvedor rejeita. O agente classifica, deduplica e contesta (bloqueio
 a rejeição gravada não basta: **cada achado rejeitado é confirmação obrigatória
 no PR**, e o E9 da mergex não mergeia sem a confirmação explícita do
 desenvolvedor no PR para cada um.
+
+## `listar`
+
+`node expx-revisao.mjs listar --trabalho <slug> --task <T-NN.MM>=<sha> [...]`
+
+Só leitura: o que a mergex precisa das evidências (achados rejeitados e removidos na
+descrição do PR, D1; confirmação por achado rejeitado no E9, D2; condição 6 do merge
+automático, M2), sem ler a evidência com `jq`. A entrada é a do `conferir`, sem
+`--modo` (só `--trabalho`, `--task` e `--raiz`; outro argumento é uso errado,
+**64**). A evidência lida é a do commit da task, com a **mesma validação do
+`conferir`** (a mesma função): a que o `conferir` reprova por ser inválida nunca é
+listada.
+
+Saída: **uma linha** de JSON, nesta forma e nesta ordem de chaves (versão
+`expx_revisao_listar: 1`; mudar a forma é versão nova):
+
+```json
+{"expx_revisao_listar":1,"trabalho":"<slug>","tasks":[
+  {"task":"T-01.02","commit":"<sha como dado>","listagem":"ok","causa":null,
+   "resultado":"ok","motivo":null,
+   "rejeitados":[{"identidade":"<hex>","arquivo":"src/a.js","linha":3,"label":"security","texto":"...",
+                  "rejeicao":{"task":"T-01.02","motivo":"falso positivo","em":"2026-10-20T12:00:00.000Z"}}],
+   "rejeicoes":[{"identidade":"<hex>","motivo":"falso positivo","em":"2026-10-20T12:00:00.000Z"}],
+   "removidos_sem_revisao":["src/velho.js"]}]}
+```
+
+(acima em várias linhas só para leitura). Uma entrada por `--task`, na ordem dada:
+
+| Chave | O que é |
+|---|---|
+| `listagem` | `ok` (evidência válida, com qualquer `resultado`), `ausente` (sem evidência no commit) ou `invalida` (a que o `conferir` reprova: `commit-inexistente`, `evidencia-invalida…`, `evidencia-nao-bate…`) |
+| `causa` | `null` com `ok`; `evidencia-ausente`; ou o motivo do `conferir`, sem o `FALHA ` (`evidencia-invalida:cobertura:src/b.js`) |
+| `resultado`, `motivo` | os da evidência (`motivo` só com `incompleta` e `indisponivel`, senão `null`); `null` com `listagem` diferente de `ok` |
+| `rejeitados` | cada achado `rejeitado`, na ordem de `achados`, com a rejeição que vale: a da própria evidência, senão a primeira de outra evidência do trabalho no commit (`task` é a dela; `motivo` e `em` que não são texto, `null`). Não há autor gravado: só o desenvolvedor rejeita, e a confirmação é a do E9 |
+| `rejeicoes` | as `rejeicoes` da evidência, como gravadas |
+| `removidos_sem_revisao` | os da evidência |
+
+Com `listagem` diferente de `ok`, as três listas são vazias. Em `ok`/`achados` os achados são os derivados
+das `issues` (o `conferir` os refaz); em `incompleta`/`indisponivel` o `revisar` não
+grava achado, e o que houver é listado como está (listar a mais faz esperar, nunca
+passar). Sai **0** (todas `ok`), **1** (alguma `invalida`) ou **3** (alguma `ausente`,
+nenhuma `invalida`), como o `conferir`; `FATIA_*` no ambiente, **64**. Quem decide o
+portão continua sendo o `conferir`: o `listar` não dá veredito.
 
 ## Orientação ao consumidor
 
@@ -292,3 +336,4 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-10-20 | Leitura limitada a 1 MiB (antes, até 1 GiB na memória; achado do CodeAnt na AxisGov/mergex#38): blob ou checkout maior não é lido, e a medida é o tamanho em bytes com `linhas` `null`, o que dá `incompleta:L2:<f>` no `revisar` e `evidencia-invalida:L2` no `conferir`. O checkout é lido até 1 MiB + 1 byte, mesmo que cresça durante a leitura. Blob que o git não lê não é medido como 0 bytes: `indisponivel:arquivo-inexistente:<f>` no `revisar` e `evidencia-invalida:L2` no `conferir`. Nenhum motivo novo. |
 | 2026-10-20 | A medida do checkout que não abre (arquivo apagado ou trocado por pasta entre o `hash-object` e o `open`) deixa de ser exceção não tratada, que encerrava o `revisar` sem evidência (achado do CodeAnt na AxisGov/mergex#40, na cópia gerada): vira `indisponivel:arquivo-inexistente:<f>` antes da CLI e `indisponivel:arquivo-mudou-durante-revisao` depois dela. Nenhum motivo novo. |
 | 2026-10-20 | `conferir` exige que a evidência cubra o commit da task (decisão do usuário de 2026-10-20): arquivo que a task altera — o diff do commit contra o primeiro pai e, com `--base-commit`, desde `base_commit`; sem os não revisáveis, as exclusões do núcleo (a evidência inclusive) e o `excluir_da_revisao` do commit — fora das chaves de `arquivos` é `FALHA evidencia-invalida:cobertura:<arquivo>`, em qualquer `resultado` e modo. Antes, a evidência de uma passagem anterior da task dava `ok` a um commit com arquivo novo sem novo `revisar`. |
+| 2026-10-20 | Subcomando `listar` (decisão do usuário de 2026-10-20, ponto 1 do plano `2026-10-20-mergex-limites-do-codeant-parte-2.md`): só leitura, com a validação do `conferir`, devolve numa linha de JSON (`expx_revisao_listar: 1`) os achados rejeitados com a rejeição que vale, as `rejeicoes` e os `removidos_sem_revisao` da evidência no commit, para as D1, D2 e a condição 6 da M2 da mergex não lerem a evidência com `jq`; sai 0, 1 (inválida) ou 3 (ausente). O `conferir` passa a exigir `rejeicoes` e `removidos_sem_revisao` na forma que o `listar` devolve (`evidencia-invalida:rejeicoes`, `evidencia-invalida:removidos_sem_revisao`); o `revisar` e o `rejeitar` já os gravavam assim. |
