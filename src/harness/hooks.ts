@@ -77,8 +77,23 @@ function artefatosDoNucleo(comLembrete: boolean): Artefato[] {
   const saida: Artefato[] = [];
   const sync = join(PASTA_DO_NUCLEO, "expx-session-sync.mjs");
   if (existsSync(sync)) saida.push({ ...artefato(sync, ".claude/hooks/expx-session-sync.mjs", SKILL_DO_NUCLEO, "nucleo"), executavel: false });
-  const lembrete = join(PASTA_DO_NUCLEO, "expx-lembrete.sh");
-  if (comLembrete && existsSync(lembrete)) saida.push(artefato(lembrete, ".claude/hooks/expx-lembrete.sh", SKILL_DO_NUCLEO, "nucleo"));
+  if (comLembrete) {
+    const arquivos = [
+      { nome: "expx-lembrete.sh", executavel: true },
+      { nome: "expx-lembrete.mjs", executavel: false },
+      { nome: "expx-lembrete-estado.mjs", executavel: false },
+    ] as const;
+    for (const { nome, executavel } of arquivos) {
+      const origem = join(PASTA_DO_NUCLEO, nome);
+      if (!existsSync(origem)) continue;
+      for (const destino of [
+        `.claude/hooks/${nome}`,
+        `.expx/marketplace/plugins/expx/nucleo/hooks/${nome}`,
+      ]) {
+        saida.push({ ...artefato(origem, destino, SKILL_DO_NUCLEO, "nucleo"), executavel });
+      }
+    }
+  }
   return saida;
 }
 
@@ -114,8 +129,10 @@ export function hooksPorNome(artefatos: readonly Artefato[], skills: readonly Sk
     if (a.tipo !== "nucleo" && a.tipo !== "hook") continue;
     if (a.tipo === "hook" && semManifesto.get(a.skill) !== true) continue;
     // só o nível de cima de `.claude/hooks/`: é onde mora hook solto
+    if (!a.destino.startsWith(".claude/hooks/")) continue;
     const rel = a.destino.slice(".claude/hooks/".length);
     if (rel.includes("/")) continue;
+    if (!a.executavel && !rel.endsWith("expx-session-sync.mjs")) continue;
     if (a.tipo === "hook" && !(rel.startsWith(`${a.skill}-`) || rel.startsWith(`${a.skill}.`))) continue;
     saida.push({ skill: a.skill, relativo: a.destino });
   }

@@ -88,6 +88,23 @@ function commitarTudo(produto: string, mensagem: string): void {
 }
 
 describe("certificação D-03: freeze local no SessionStart", () => {
+  it("integração: init local materializa wrapper e módulos no produto e marketplace", () => {
+    const fontes = fontesCandidatas();
+    const produto = novoProduto("expx-d03-lembrete-");
+    const isolado = larIsolado();
+    const env = ambienteCom(pathControlado(true), { ...isolado.env, EXPX_SKILLS_LOCAIS: fontes });
+    const resultado = rodarExpx(["init", "--skills", "sprintx,mergex", "--yes"], produto, env);
+    expect.soft(resultado.status, `${resultado.stdout}${resultado.stderr}`).toBe(0);
+
+    for (const nome of ["expx-lembrete.sh", "expx-lembrete.mjs", "expx-lembrete-estado.mjs"]) {
+      expect.soft(existsSync(join(produto, ".claude", "hooks", nome)), `produto: ${nome}`).toBe(true);
+      expect.soft(
+        existsSync(join(produto, ".expx", "marketplace", "plugins", "expx", "nucleo", "hooks", nome)),
+        `marketplace: ${nome}`,
+      ).toBe(true);
+    }
+  });
+
   it("integração: lock P0.2 real (SprintX/MergeX -local), árvore limpa, startup — projeto byte a byte igual e nenhum update", () => {
     const lock = JSON.parse(readFileSync(LOCK_P02, "utf8")) as { skills: Record<string, { commit: string }> };
     expect(lock.skills["sprintx"]?.commit).toBe("4e1f7b88d85f-local");

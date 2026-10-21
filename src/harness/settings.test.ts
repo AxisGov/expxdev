@@ -142,6 +142,26 @@ describe("registro dos hooks no settings", () => {
  * que ele resolve é exatamente a etapa de escolher o processo não acontecer.
  */
 describe("hook de lembrete das skills", () => {
+  it("funcional: expx-lembrete usa timeout 1 sem declarar onFailure", () => {
+    const p = projetoTemporario();
+    try {
+      const r = mesclarSettings(p.raiz, "/tmp/mkt", [
+        { skill: "runx", relativo: ".claude/hooks/expx-lembrete.sh" },
+      ]);
+      expect(r.ok).toBe(true);
+      const s = JSON.parse(readFileSync(caminhoDoSettings(p.raiz), "utf8")) as {
+        hooks: Record<string, Array<{ hooks: Array<Record<string, unknown>> }>>;
+      };
+      const lembrete = (s.hooks["UserPromptSubmit"] ?? [])
+        .flatMap((grupo) => grupo.hooks)
+        .find((hook) => String(hook["command"]).includes("expx-lembrete.sh"));
+      expect.soft(lembrete?.["timeout"]).toBe(1);
+      expect(Object.prototype.hasOwnProperty.call(lembrete ?? {}, "onFailure")).toBe(false);
+    } finally {
+      p.descartar();
+    }
+  });
+
   it("funcional: expx-lembrete é registrado em UserPromptSubmit", () => {
     const p = projetoTemporario();
     try {

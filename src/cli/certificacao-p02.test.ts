@@ -170,6 +170,25 @@ afterAll(() => {
 });
 
 describe("P0.2 — init real de SprintX + MergeX", () => {
+  it("integração: wrapper e módulos do lembrete entram no produto, marketplace e lock", () => {
+    const lock = json(join(A, ".expx", "expx-lock.json"));
+    const arquivos = (lock["instalacao"] as Json)["arquivos"] as Record<string, string>;
+    const relativos = [
+      ".claude/hooks/expx-lembrete.sh",
+      ".claude/hooks/expx-lembrete.mjs",
+      ".claude/hooks/expx-lembrete-estado.mjs",
+      ".expx/marketplace/plugins/expx/nucleo/hooks/expx-lembrete.sh",
+      ".expx/marketplace/plugins/expx/nucleo/hooks/expx-lembrete.mjs",
+      ".expx/marketplace/plugins/expx/nucleo/hooks/expx-lembrete-estado.mjs",
+    ];
+
+    for (const relativo of relativos) {
+      const caminho = join(A, ...relativo.split("/"));
+      expect.soft(existsSync(caminho), relativo).toBe(true);
+      if (existsSync(caminho)) expect.soft(arquivos[relativo], relativo).toBe(sha256(caminho));
+    }
+  });
+
   it("integração: o init real sai 0 e não registra plugin fora da fixture (claude ausente do PATH)", () => {
     expect(saidaA.stderr).toBe("");
     expect(saidaA.status).toBe(0);
