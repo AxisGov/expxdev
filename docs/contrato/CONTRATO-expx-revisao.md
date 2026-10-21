@@ -220,7 +220,9 @@ isso, a evidência de uma passagem anterior da task dava `ok` a um commit que tr
 arquivo novo sem novo `revisar`. Alterados são os nomes de
 `git diff --no-renames --ignore-submodules=all --name-only <pai> <sha>`, com `<pai>` o
 primeiro pai de `<sha>` (num merge, tudo o que ele traz ao primeiro pai, o que reprova o
-merge que traga arquivo de fora da evidência; num commit raiz, a árvore inteira), e, com
+merge que traga arquivo de fora da evidência; num commit raiz, a árvore inteira; o pai vem
+do cabeçalho do commit, e o pai ausente do repositório, como num clone raso, faz o diff
+falhar: não verificável, `evidencia-invalida:cobertura` sem nome), e, com
 `modo` `base-commit`, também os de `git diff <base_commit> <sha>`: a task revisada já
 commitada vai de `base_commit` até o commit da evidência, que muitas vezes só traz a
 evidência. Sem renomeação, o nome antigo e o novo contam. Saem da conta, como no

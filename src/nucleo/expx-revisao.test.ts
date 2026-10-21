@@ -1281,3 +1281,26 @@ describe("expx-revisao.mjs listar: o que a mergex lê da evidência no commit", 
     expect(roda(c.raiz, "listar", ...a)).toMatchObject({ rc: 64, out: "" });
   });
 });
+
+describe("expx-revisao.mjs conferir e listar: casos de borda da cobertura e da saída", () => {
+  it("funcional: clone raso sem o pai do commit da task: FALHA evidencia-invalida:cobertura (não verificável), nunca a árvore inteira", () => {
+    const c = cenario();
+    escreve(c.raiz, "src/c.js", "c\n");
+    expect(revisar(c, "src/c.js").rc).toBe(0);
+    commita(c.raiz);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${git(c.raiz, "rev-parse", "HEAD")}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+    const raso = join(temp("expx-raso-"), "r");
+    git(tmpdir(), "clone", "-q", "--depth", "1", pathToFileURL(c.raiz).href, raso);
+    expect(conferir(raso, "obrigatoria", `T-01=${git(raso, "rev-parse", "HEAD")}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:cobertura" });
+  });
+
+  it("funcional: listar dá motivo null em ok mesmo com motivo gravado", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    escreve(c.raiz, EV, JSON.stringify({ ...(evidencia(c.raiz) as object), motivo: "x" }));
+    const r = roda(c.raiz, "listar", "--task", `T-01=${commita(c.raiz)}`);
+    expect(r.rc).toBe(0);
+    expect(JSON.parse(r.out)).toMatchObject({ tasks: [{ listagem: "ok", resultado: "ok", motivo: null }] });
+  });
+});

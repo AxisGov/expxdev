@@ -446,7 +446,11 @@ function semSinalDaCli(ev, sha) {
  *  do `.expx/fatiamento.json` do commit (leitor que falha: nenhuma, nunca menos conta). */
 function naoCoberto(ev, sha) {
   const opcoes = ["--no-ext-diff", "--no-renames", "--ignore-submodules=all", "--name-only", "-z"];
-  const pai = idDe("rev-parse", "--verify", "-q", `${sha}^1^{commit}`);
+  // o pai pelo cabeçalho do commit, não por `<sha>^1`: num clone raso o pai existe mas não foi baixado, e o diff falha
+  // (não verificável), em vez de o commit passar por raiz e cobrar a árvore inteira
+  const cabecalho = git("cat-file", "commit", sha);
+  if (cabecalho.status !== 0) return "";
+  const pai = /^parent ([0-9a-f]+)$/m.exec(cabecalho.stdout.split(/\r?\n\r?\n/)[0])?.[1];
   const diffs = [pai ? git("diff", ...opcoes, pai, sha) : git("diff-tree", "--root", "-r", "--no-commit-id", ...opcoes, sha)];
   if (ev.modo === "base-commit" && ehCommit(ev.base_commit)) diffs.push(git("diff", ...opcoes, ev.base_commit, sha));
   if (diffs.some((d) => d.status !== 0)) return "";
@@ -576,14 +580,16 @@ function listar() {
         rejeitados: [], rejeicoes: [], removidos_sem_revisao: [] };
     }
     const rejeicoes = rejeicoesNoCommit(ev, sha);
-    return { task, commit: sha, listagem: "ok", causa: null, resultado: ev.resultado, motivo: texto(ev.motivo),
+    return { task, commit: sha, listagem: "ok", causa: null, resultado: ev.resultado,
+      motivo: ["incompleta", "indisponivel"].includes(ev.resultado) ? texto(ev.motivo) : null,
       rejeitados: ev.achados.filter((a) => a.estado === "rejeitado").map((a) => ({ identidade: a.identidade, arquivo: texto(a.arquivo),
         linha: Number.isSafeInteger(a.linha) ? a.linha : null, label: texto(a.label), texto: texto(a.texto), rejeicao: rejeicoes.get(a.identidade) ?? null })),
       rejeicoes: ev.rejeicoes.map((r) => ({ identidade: r.identidade, motivo: r.motivo, em: r.em })),
       removidos_sem_revisao: [...ev.removidos_sem_revisao] };
   });
   process.stdout.write(`${JSON.stringify({ expx_revisao_listar: 1, trabalho: op.trabalho, tasks })}\n`);
-  process.exit(tasks.some((t) => t.listagem === "invalida") ? 1 : tasks.some((t) => t.listagem === "ausente") ? 3 : 0);
+  // `exitCode`, não `exit`: o JSON numa linha só é inteiro mesmo num pipe assíncrono (Windows)
+  process.exitCode = tasks.some((t) => t.listagem === "invalida") ? 1 : tasks.some((t) => t.listagem === "ausente") ? 3 : 0;
 }
 
 function rejeitar() {
