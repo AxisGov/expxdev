@@ -61,7 +61,9 @@ const le = (f) => { try { return JSON.parse(readFileSync(f, "utf8").replace(/^\u
 // todo caminho dado ao git é literal: glob (`src/[id].ts`) ou pathspec mágico (`:(top)x`) no nome trariam os
 // hunks de outro arquivo, ou nenhum, e o achado em linha alterada viraria `anterior`
 const GIT_ENV = { ...process.env, GIT_LITERAL_PATHSPECS: "1" };
-const git = (...a) => spawnSync("git", a, { cwd: op.raiz, encoding: "utf8", env: GIT_ENV });
+// a saída de listas (`diff --name-only`, `ls-tree -r`) passa de 1 MiB, o padrão do `spawnSync`, em commit grande: cortada, o
+// git daria por falha (e um commit coberto por não verificável); blob nunca vem por aqui (`blobGit`, limitado)
+const git = (...a) => spawnSync("git", a, { cwd: op.raiz, encoding: "utf8", env: GIT_ENV, maxBuffer: 256 << 20 });
 // Nada acima de LEITURA_MAXIMA vai inteiro à memória. É muito acima de L2 (204.800 bytes), e a decodificação da CLI
 // nunca encolhe o conteúdo (cada sequência UTF-8 inválida, de até 3 bytes, vira um U+FFFD, de 3): o que passa dele já
 // reprova L2 só pelo tamanho, e a medida fica o tamanho em bytes, com as linhas desconhecidas (`null`).

@@ -1304,3 +1304,19 @@ describe("expx-revisao.mjs conferir e listar: casos de borda da cobertura e da s
     expect(JSON.parse(r.out)).toMatchObject({ tasks: [{ listagem: "ok", resultado: "ok", motivo: null }] });
   });
 });
+
+describe("expx-revisao.mjs conferir: commit com lista de caminhos acima de 1 MiB", () => {
+  it("funcional: 5.000 caminhos longos excluídos pelo núcleo (diff > 1 MiB) e o revisável coberto → ok, não cobertura", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    git(c.raiz, "add", "src", "docs");
+    const blob = git(c.raiz, "hash-object", "-w", "src/a.js");
+    const nome = "n".repeat(200);
+    const linhas = Array.from({ length: 5000 }, (_, i) => `100644 ${blob}\tdocs/entregas/w/gerado/${i}-${nome}.txt`).join("\n");
+    const r = spawnSync("git", ["update-index", "--index-info"], { cwd: c.raiz, input: `${linhas}\n`, encoding: "utf8" });
+    expect(r.status).toBe(0);
+    git(c.raiz, "commit", "-q", "-m", "task");
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${git(c.raiz, "rev-parse", "HEAD")}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  }, 60000);
+});
