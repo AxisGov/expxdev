@@ -214,11 +214,13 @@ antes disso.
 
 ## BASELINE-POS-MUDANCA
 
-- ExpxDev: base `5cb817b`; Task 15 em `4dda809`; suíte final com 131 arquivos
-  verdes, 1 arquivo deliberadamente opt-in, 1.347 testes verdes e 32 pulados;
-  typecheck e `git diff --check` verdes.
-- RunX: base `4480d78`; implementação até `a66b55b`; bancadas finais
-  `90/90`, `49/49`, `9/9`, `4/4` e `6/6`, com `git diff --check` verde.
+- ExpxDev: base `5cb817b`; Task 15 em `4dda809`; correção da revisão em
+  `aed93c0`; suíte final com 131 arquivos verdes, 1 arquivo deliberadamente
+  opt-in, 1.348 testes verdes e 32 pulados; typecheck e `git diff --check`
+  verdes.
+- RunX: base `4480d78`; implementação e correção da revisão até `b9b1041`;
+  bancadas finais `90/90`, `50/50`, `12/12`, `4/4` e `7/7`, ponte `11/11`,
+  com `git diff --check` verde.
 - Núcleo RunX: 20.363 → 5.169 bytes, redução de 15.194 bytes (74,6%);
   estimativa de tokens 5.091 → 1.293. O limite de 8.000 bytes e a redução
   mínima de 60,7% foram atendidos.
@@ -232,5 +234,11 @@ antes disso.
   e deltas pareados diagnósticos permanecem registrados na seção anterior.
 - Volume: 226 bytes na primeira injeção, zero na supressão e 467 bytes no
   fallback. Caminho normal com Bash + um Node; fallback somente Bash.
+- O comando dedicado retorna exit 1 quando `gate.passed` é falso; essa decisão
+  tem teste unitário e não exige repetir as 200 amostras.
 - Fontes canônicas e instalação: espelhos idênticos, três artefatos do hook
   preservados byte a byte e sincronização sem restauração da versão antiga.
+- Revisão final única: 0 Critical e 5 Important, todos fechados em uma rodada
+  TDD, sem segunda leitura. Foram cobertos bootstrap E1→E2, término após
+  reconstrução, recuperação no Claude/OpenCode/MimoCode, regras de caminho e
+  exit code do benchmark.
