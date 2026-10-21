@@ -80,6 +80,117 @@ termina com exit 0 e `86 ok, 0 falhas`.
   instalação removeu uma adulteração deliberada e restaurou o hash canônico.
 - Nenhum consumidor real e nenhuma cópia RunX dentro do ExpxDev foram alterados.
 
+## Benchmark interrompido — Task 15
+
+Comando: `node scripts/benchmark-expx-lembrete.mjs --json`, Windows x64,
+Node `v24.18.0`, wrapper real pelo Git Bash, 10 aquecimentos e 200 amostras por
+cenário.
+
+| Cenário | p50 | p95 | Bytes |
+|---|---:|---:|---:|
+| primeira injeção | 462,787 ms | 694,976 ms | 227 |
+| repetição suprimida | 486,451 ms | 676,537 ms | 0 |
+| fallback shell stateless | 928,886 ms | 1.143,977 ms | 493 |
+
+O volume atende ao limite de 768 bytes e a supressão produz zero byte, mas os
+três p95 excedem o orçamento imutável de 100 ms. Conforme a condição de parada
+da Task 15, o limite não foi elevado, a Task 16 não começou e nenhuma revisão,
+push ou PR foi executada.
+
+### Decomposição do piso — investigação autorizada
+
+Diagnóstico rápido feito pelo mesmo `spawnSync`, com 5 aquecimentos e 30
+amostras por componente, sem alteração de produção:
+
+| Componente | p50 | p95 | Processos externos por caminho |
+|---|---:|---:|---:|
+| overhead do harness | 0,000 ms | 0,000 ms | 0 |
+| processo vazio (`cmd /c exit 0`) | 13,118 ms | 14,862 ms | 1 |
+| inicialização Git Bash (`bash -c :`) | 40,137 ms | 167,561 ms | 1 |
+| script shell no-op | 41,239 ms | 60,531 ms | 1 |
+| `node -e ""` | 46,620 ms | 53,483 ms | 1 |
+| `node --version` | 25,008 ms | 154,360 ms | 1 |
+| módulo ESM direto, com estado | 60,509 ms | 68,588 ms | 1 |
+| wrapper, primeira injeção | 280,733 ms | 651,896 ms | 5 |
+| wrapper, repetição suprimida | 373,845 ms | 651,866 ms | 5 |
+| fallback shell | 726,484 ms | 1.392,229 ms | mínimo 12 |
+| lock por `mkdir` | 0,471 ms | 0,680 ms | 0 adicionais |
+| leitura do estado | 0,060 ms | 0,098 ms | 0 adicionais |
+| fsync + rename atômico | 1,936 ms | 2,666 ms | 0 adicionais |
+
+O caminho normal inicia `bash`, `cat`, `dirname`, `node --version` e o Node do
+módulo. O fallback acrescenta parsing/normalização/classificação por processos
+externos (`jq`, Python e cinco `grep` neste cenário). O estado seguro não é a
+causa dominante: lock, leitura e escrita atômica somam poucos milissegundos,
+enquanto o encadeamento de processos explica o custo incremental do wrapper.
+
+Como a primeira medição do Bash contrastou com o no-op, o piso foi confirmado
+isoladamente pelo mesmo mecanismo: 10 aquecimentos e 50 amostras de
+`bash -c :` deram p50 39,566 ms, p95 154,539 ms e faixa 34,108–270,015 ms.
+Portanto, o custo inevitável anterior ao hook já viola o orçamento p95 de
+100 ms. Esse diagnóstico motivou a decisão humana posterior de manter 100 ms
+absolutos em POSIX/WSL e usar delta pareado de 100 ms no Windows/Git Bash.
+
+Proposta formal, não aplicada: preferir execução nativa do módulo ESM sem Git
+Bash, pois o caminho direto mediu p95 68,588 ms e preserva o motor e o estado
+seguro. Alternativas que também exigem decisão explícita são orçamento por
+plataforma, orçamento incremental acima do piso de spawn ou processo
+persistente que elimine um spawn por prompt.
+
+### Gate incremental pareado — decisão humana e duas tentativas
+
+A especificação e o plano passaram a exigir 10 aquecimentos e 200 amostras
+intercaladas. A decisão humana final definiu o gate do Windows/Git Bash como
+`max(0, p95 candidato - p95 baseline equivalente) <= 100 ms`. O p95 dos
+deltas amostra a amostra permanece publicado apenas como diagnóstico dos picos
+não correlacionados do scheduler.
+
+A primeira tentativa removeu `cat`, `dirname`, `node --version`, `jq`, Python,
+`grep`, `sed` e `awk` do wrapper. O caminho normal caiu de cinco executáveis
+para Bash + um Node, com saída capturada antes de publicação; o fallback caiu
+para apenas Bash. O commit local é `011371e`.
+
+| Tentativa 1 | Absoluto p50/p95 | Baseline p50/p95 | Incremental p95 | Delta pareado p50/p95 | Bytes |
+|---|---:|---:|---:|---:|---:|
+| primeira injeção | 142,575/240,811 ms | 118,632/225,180 ms | 15,631 ms | 21,948/126,293 ms | 0–226* |
+| repetição | 135,787/247,574 ms | 117,556/219,347 ms | 28,227 ms | 19,067/127,958 ms | 0 |
+| fallback | 37,273/50,972 ms | 34,217/44,048 ms | 6,924 ms | 2,999/8,650 ms | 467 |
+
+\* O primeiro benchmark reutilizou dez identidades de aquecimento nas amostras;
+isso explicou os zeros e foi corrigido antes da segunda medição, sem mudar o
+gate da tentativa.
+
+A segunda tentativa removeu o bootstrap `node -e` e o import dinâmico: a
+checagem de versão e o marcador de sucesso foram para o entrypoint do módulo,
+que passou a ser executado diretamente pelo único Node.
+
+| Tentativa 2 | Absoluto p50/p95 | Baseline p50/p95 | Incremental p95 | Delta pareado p50/p95 | Bytes |
+|---|---:|---:|---:|---:|---:|
+| primeira injeção | 137,717/242,785 ms | 120,721/227,975 ms | 14,810 ms | 15,260/122,156 ms | 226 |
+| repetição | 133,252/241,652 ms | 120,528/219,921 ms | 21,731 ms | 14,283/120,674 ms | 0 |
+| fallback | 36,955/47,111 ms | 34,591/43,652 ms | 3,459 ms | 2,401/10,174 ms | 467 |
+
+Esses números anteriores são somente diagnóstico e não serão reutilizados como
+prova final. A Task 15 exige uma medição fresca pela fórmula corrigida antes de
+qualquer commit de benchmark ou início da Task 16.
+
+### Medição fresca — gate corrigido
+
+Comando: `node scripts/benchmark-expx-lembrete.mjs --json`, Windows x64,
+Node `v24.18.0`, Git Bash, 10 aquecimentos e 200 amostras intercaladas por
+cenário e baseline equivalente. Esta é a medição usada para a decisão.
+
+| Cenário | Absoluto p50/p95 | Baseline p50/p95 | Incremental p95 | Delta pareado p50/p95 | Bytes |
+|---|---:|---:|---:|---:|---:|
+| primeira injeção | 134,216/244,875 ms | 118,888/345,366 ms | **0,000 ms** | 13,814/122,460 ms | 226 |
+| repetição | 152,468/355,697 ms | 136,807/306,432 ms | **49,265 ms** | 14,924/178,623 ms | 0 |
+| fallback | 37,281/151,987 ms | 34,830/147,851 ms | **4,136 ms** | 2,256/110,696 ms | 467 |
+
+O gate `percentile_difference_p95_ms` ficou verde nos três cenários. O p95
+dos deltas pareados permanece visível como diagnóstico, sem participar do
+veredito. O caminho normal usa Bash + um Node; o fallback usa somente Bash.
+O volume permanece dentro de 768 bytes e a supressão emite zero byte.
+
 ## Comparação com os critérios da Fase 1
 
 - worktrees externas aos `node_modules`: atendido;

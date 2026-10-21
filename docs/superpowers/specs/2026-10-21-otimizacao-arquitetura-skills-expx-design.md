@@ -272,19 +272,29 @@ fail-open e pode gerar uma duplicata, mas nunca corrupção nem bloqueio.
 O benchmark roda o evento completo, incluindo wrapper, processo Node,
 classificação, lock e estado, em três cenários: primeira injeção, repetição
 suprimida e fallback sem Node. Para cada ambiente suportado são 10 aquecimentos
-e 200 amostras sequenciais, medindo relógio monotônico e reportando p50/p95
-antes e depois.
+e 200 amostras do cenário e do piso equivalente, com ordem intercalada ou
+randomizada, medindo relógio monotônico e reportando p50/p95 absolutos, a
+diferença entre os p95 e o p95 dos deltas pareados.
 
 Critérios:
 
-- p95 de até 100 ms para classificação e decisão local com Node;
+- p95 absoluto de até 100 ms em POSIX/WSL quando o launcher permitir esse
+  orçamento;
+- no Windows/Git Bash, `incremental_p95 = max(0, p95 absoluto do candidato -
+  p95 absoluto da baseline equivalente)` de até 100 ms; a baseline é Git Bash
+  iniciando um Node no-op para o caminho Node e Git Bash executando um script
+  no-op para o fallback;
+- a latência absoluta continua obrigatória no relatório mesmo quando não é o
+  gate da plataforma;
 - nenhuma dependência externa nova e nenhuma rede;
 - saída total de uma injeção ou delta de no máximo 768 bytes; supressão emite
   zero bytes;
 - timeout configurado em 1 segundo e fail-open comprovado;
-- se a baseline medida já exceder 100 ms em um ambiente suportado, a
-  especificação volta ao usuário com a medição; o plano não aumenta o limite
-  por conta própria.
+- a diferença de percentis é o gate no Windows/Git Bash; o p95 dos deltas
+  amostra a amostra continua publicado apenas como diagnóstico, pois os dois
+  processos independentes sofrem picos não correlacionados do scheduler;
+- um piso absoluto acima de 100 ms no Windows/Git Bash não aumenta o limite:
+  muda somente o gate para o delta pareado definido acima.
 
 ## 6. Política de agentes
 

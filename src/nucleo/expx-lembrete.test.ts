@@ -392,3 +392,47 @@ describe("volume com estado seguro pendente", () => {
     expect(estado.trabalhos).toHaveLength(64);
   });
 });
+
+describe("benchmark reproduzível do lembrete (caso 23)", () => {
+  it("publica pares alternados, deltas, processos, gate e bytes dos três cenários", () => {
+    const resultado = spawnSync(process.execPath, [resolve("scripts/benchmark-expx-lembrete.mjs"), "--json"], {
+      cwd: resolve("."), encoding: "utf8", timeout: 180_000,
+    });
+    expect(resultado.status, resultado.stderr).toBe(0);
+    const medicao = JSON.parse(resultado.stdout) as {
+      schema: number; warmups: number; samples: number; pairing: string;
+      gate: { kind: string; limit_ms: number; passed: boolean };
+      scenarios: Record<string, {
+        absolute: { p50_ms: number; p95_ms: number };
+        baseline: { p50_ms: number; p95_ms: number };
+        incremental_p95_ms: number;
+        paired_delta: { p50_ms: number; p95_ms: number };
+        bytes_max: number;
+        processes: { baseline: number; hook: number; node_invocations: number };
+      }>;
+    };
+    expect(medicao.schema).toBe(2);
+    expect(medicao.warmups).toBe(10);
+    expect(medicao.samples).toBe(200);
+    expect(medicao.pairing).toBe("alternating");
+    expect(Object.keys(medicao.scenarios).sort()).toEqual(["fallback", "first_injection", "repetition"]);
+    expect(medicao.gate.kind).toBe(process.platform === "win32"
+      ? "percentile_difference_p95_ms"
+      : "absolute_p95_ms");
+    expect(medicao.gate.limit_ms).toBe(100);
+    expect(medicao.gate.passed).toBe(true);
+    for (const cenario of Object.values(medicao.scenarios)) {
+      expect.soft(cenario.absolute.p95_ms).toBeGreaterThanOrEqual(0);
+      expect.soft(cenario.baseline.p95_ms).toBeGreaterThanOrEqual(0);
+      expect.soft(cenario.incremental_p95_ms).toBe(
+        Math.max(0, Number((cenario.absolute.p95_ms - cenario.baseline.p95_ms).toFixed(3))),
+      );
+      expect.soft(cenario.incremental_p95_ms).toBeLessThanOrEqual(100);
+      expect.soft(cenario.paired_delta.p95_ms).toBeGreaterThanOrEqual(0);
+    }
+    expect(medicao.scenarios.first_injection?.processes.node_invocations).toBe(1);
+    expect(medicao.scenarios.first_injection?.bytes_max).toBeLessThanOrEqual(768);
+    expect(medicao.scenarios.repetition?.bytes_max).toBe(0);
+    expect(medicao.scenarios.fallback?.bytes_max).toBeLessThanOrEqual(768);
+  }, 200_000);
+});

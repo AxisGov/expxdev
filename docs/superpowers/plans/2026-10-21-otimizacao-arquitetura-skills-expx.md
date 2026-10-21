@@ -268,12 +268,12 @@ Se o clone administrativo do RunX não existir, obtê-lo do repositório canôni
 
 - [ ] **Repositório/worktree:** ExpxDev — `F:/Projetos/.worktrees/expxdev-otimiza-skills`.
 - [ ] **Arquivos exatos:** criar `scripts/benchmark-expx-lembrete.mjs`; alterar `src/nucleo/expx-lembrete.test.ts` e o arquivo de baseline.
-- [ ] **Interfaces — consome:** wrapper real, 10 aquecimentos + 200 amostras por cenário, relógio monotônico, PATH normal/sem Node.
-- [ ] **Interfaces — produz:** JSON/texto com p50/p95 para primeira injeção, repetição e fallback; bytes de cada saída.
+- [ ] **Interfaces — consome:** wrapper real, 10 aquecimentos + 200 amostras intercaladas ou randomizadas por cenário/piso equivalente, relógio monotônico, PATH normal/sem Node.
+- [ ] **Interfaces — produz:** JSON/texto com p50/p95 absolutos, `max(0, p95 candidato - p95 baseline)` e p50/p95 diagnóstico dos deltas pareados para primeira injeção, repetição e fallback; bytes e processos de cada caminho.
 - [ ] **Teste RED:** invocar script inexistente e exigir schema, contagens, percentis e limites; falha esperada é arquivo ausente.
-- [ ] **Implementação mínima:** spawn sequencial do wrapper com fixtures isoladas; percentil determinístico; sem rede; não mascarar timeout/falha.
-- [ ] **Comando GREEN:** `node scripts/benchmark-expx-lembrete.mjs --json` sai 0, Node local tem p95 ≤100 ms, saída de injeção/delta ≤768 bytes e supressão 0.
-- [ ] **Critério de término:** before/after, plataforma, versões, p50/p95 e bytes estão registrados. Se a baseline válida já exceder 100 ms, parar e devolver a medição sem elevar o limite.
+- [ ] **Implementação mínima:** spawn intercalado do wrapper e do piso equivalente; percentil determinístico do valor absoluto, da diferença dos p95 e de `hook - baseline` por par; sem rede; não mascarar timeout/falha; reduzir o caminho normal a um único Node antes de aceitar o resultado.
+- [ ] **Comando GREEN:** `node scripts/benchmark-expx-lembrete.mjs --json` sai 0; POSIX/WSL usa p95 absoluto ≤100 ms quando o launcher permitir; Windows/Git Bash usa `max(0, p95 candidato - p95 baseline) ≤100 ms`; saída de injeção/delta ≤768 bytes e supressão 0.
+- [ ] **Critério de término:** before/after, plataforma, versões, processos, p50/p95 absolutos, diferença dos p95, p50/p95 diagnóstico dos deltas pareados e bytes estão registrados.
 - [ ] **Commit local esperado:** `test: medir latencia e volume do lembrete expx`.
 
 ### Task 16: Fechar matriz, métricas, suítes e revisão única
@@ -329,7 +329,7 @@ Se o clone administrativo do RunX não existir, obtê-lo do repositório canôni
 
 - Escolher como integrar cada branch local depois da validação; este plano não autoriza push, PR ou merge.
 - Decidir qualquer baseline que não possa ficar verde apenas com correção do ambiente de testes.
-- Decidir se aceita uma plataforma suportada cuja baseline válida já exceda p95 de 100 ms; o implementador não pode elevar o limite.
+- Windows/Git Bash usa o gate incremental pareado da Task 15; qualquer outra exceção de plataforma exige nova decisão humana.
 - Autorizar explicitamente qualquer mudança de contrato público descoberta como indispensável; o plano presume compatibilidade total.
 - Revisar e aprovar o resultado deste plano antes de iniciar a Task 1.
 
