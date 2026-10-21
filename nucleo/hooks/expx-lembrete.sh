@@ -37,6 +37,30 @@ set -u
 EVENTO="$(cat 2>/dev/null || true)"
 [ -z "$EVENTO" ] && exit 0
 
+# O motor Node concentra identidade e decisao. O classificador shell abaixo e
+# o fallback stateless para runtime ausente/incompativel ou pacote incompleto.
+DIR_HOOK="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd)" || DIR_HOOK=""
+if command -v node >/dev/null 2>&1 && [ -n "$DIR_HOOK" ] && [ -f "$DIR_HOOK/expx-lembrete.mjs" ]; then
+  NODE_VERSAO="$(node --version 2>/dev/null || true)"
+  NODE_VERSAO="${NODE_VERSAO#v}"
+  IFS=. read -r NODE_MAIOR NODE_MENOR NODE_PATCH <<EOF
+$NODE_VERSAO
+EOF
+  case "$NODE_MAIOR:$NODE_MENOR:$NODE_PATCH" in
+    *[!0-9:]*|::*|*::* ) NODE_COMPATIVEL=0 ;;
+    *)
+      NODE_COMPATIVEL=0
+      if [ "$NODE_MAIOR" -gt 20 ] || { [ "$NODE_MAIOR" -eq 20 ] && [ "$NODE_MENOR" -ge 19 ]; }; then
+        NODE_COMPATIVEL=1
+      fi
+      ;;
+  esac
+  if [ "$NODE_COMPATIVEL" -eq 1 ]; then
+    printf '%s' "$EVENTO" | node "$DIR_HOOK/expx-lembrete.mjs" 2>/dev/null || true
+    exit 0
+  fi
+fi
+
 # O prompt do usuario. Com jq quando existe; sem jq, um grep tolerante.
 if command -v jq >/dev/null 2>&1; then
   PROMPT="$(printf '%s' "$EVENTO" | jq -r '.prompt // empty' 2>/dev/null)"
