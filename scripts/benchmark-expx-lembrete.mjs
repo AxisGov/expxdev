@@ -4,6 +4,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } 
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
+import { pathToFileURL } from "node:url";
 
 const WARMUPS = 10;
 const SAMPLES = 200;
@@ -111,6 +112,11 @@ function ambienteSemNode() {
   return { ...process.env, PATH: temporario("expx-benchmark-sem-node-") };
 }
 
+export function codigoSaidaDoGate(gate) {
+  return gate.passed ? 0 : 1;
+}
+
+function main() {
 try {
   const moduloNoopDir = temporario("expx-benchmark-node-module-");
   const moduloNoop = join(moduloNoopDir, "noop.mjs");
@@ -176,6 +182,10 @@ exit 0
       process.stdout.write(`${nome}: abs p50=${dados.absolute.p50_ms}ms p95=${dados.absolute.p95_ms}ms; incremental p95=${dados.incremental_p95_ms}ms; paired delta p50=${dados.paired_delta.p50_ms}ms p95=${dados.paired_delta.p95_ms}ms; bytes=${dados.bytes_min}-${dados.bytes_max}\n`);
     }
   }
+  process.exitCode = codigoSaidaDoGate(gate);
 } finally {
   for (const caminho of temporarios.reverse()) rmSync(caminho, { recursive: true, force: true });
 }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main();

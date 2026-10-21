@@ -4,6 +4,8 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+// @ts-expect-error benchmark é um módulo Node distribuído fora de src/.
+import { codigoSaidaDoGate } from "../../scripts/benchmark-expx-lembrete.mjs";
 // @ts-expect-error O motor ESM e distribuido ao lado do wrapper shell.
 import { main } from "../../nucleo/hooks/expx-lembrete.mjs";
 
@@ -438,4 +440,11 @@ describe.runIf(process.env.EXPX_BENCHMARK_OFICIAL === "1")("benchmark reproduzí
     expect(medicao.scenarios.repetition?.bytes_max).toBe(0);
     expect(medicao.scenarios.fallback?.bytes_max).toBeLessThanOrEqual(768);
   }, 380_000);
+});
+
+describe("veredito do benchmark dedicado", () => {
+  it("retorna exit não zero quando o gate reprova sem repetir a medição", () => {
+    expect(codigoSaidaDoGate({ passed: true })).toBe(0);
+    expect(codigoSaidaDoGate({ passed: false })).toBe(1);
+  });
 });
