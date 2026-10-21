@@ -199,7 +199,7 @@ linhas valem na ordem em que aparecem.
 |---|---|---|
 | `desligada` | ok | ok |
 | `<sha>` não é commit | FALHA `commit-inexistente:<sha>` | FALHA |
-| evidência ausente do commit | FALHA `evidencia-ausente` | AVISO `evidencia-ausente` |
+| evidência ausente do commit (fora da árvore dele; na árvore e ilegível para o git, como objeto apagado, é `evidencia-invalida`, abaixo) | FALHA `evidencia-ausente` | AVISO `evidencia-ausente` |
 | `expx_revisao` ≠ 2 (a v1 inclusive: a task se revisa de novo) | FALHA `evidencia-invalida:versao` | FALHA |
 | JSON ilegível; outra task ou trabalho; `arquivos` que não é mapa, vazio ou com valor que não é mapa nem `null`; `achados` fora da forma; `resultado` fora dos quatro | FALHA `evidencia-invalida` | FALHA |
 | `rejeicoes` que não é lista de `{identidade, motivo, em}` (hex de 64, texto, texto) (`rejeicoes`); `removidos_sem_revisao` que não é lista de textos sem repetição igual aos arquivos `null` de `arquivos` (`removidos_sem_revisao`) | FALHA `evidencia-invalida:<campo>` | FALHA |
@@ -222,7 +222,8 @@ arquivo novo sem novo `revisar`. Alterados são os nomes de
 primeiro pai de `<sha>` (num merge, tudo o que ele traz ao primeiro pai, o que reprova o
 merge que traga arquivo de fora da evidência; num commit raiz, a árvore inteira; o pai vem
 do cabeçalho do commit, e o pai ausente do repositório, como num clone raso, faz o diff
-falhar: não verificável, `evidencia-invalida:cobertura` sem nome), e, com
+falhar: não verificável, `evidencia-invalida:cobertura` sem nome, como `modo` fora dos dois ou,
+em `base-commit`, `base_commit` que não é commit, em qualquer `resultado`), e, com
 `modo` `base-commit`, também os de `git diff <base_commit> <sha>`: a task revisada já
 commitada vai de `base_commit` até o commit da evidência, que muitas vezes só traz a
 evidência. Sem renomeação, o nome antigo e o novo contam. Saem da conta, como no
@@ -340,3 +341,4 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-10-20 | `conferir` exige que a evidência cubra o commit da task (decisão do usuário de 2026-10-20): arquivo que a task altera — o diff do commit contra o primeiro pai e, com `--base-commit`, desde `base_commit`; sem os não revisáveis, as exclusões do núcleo (a evidência inclusive) e o `excluir_da_revisao` do commit — fora das chaves de `arquivos` é `FALHA evidencia-invalida:cobertura:<arquivo>`, em qualquer `resultado` e modo. Antes, a evidência de uma passagem anterior da task dava `ok` a um commit com arquivo novo sem novo `revisar`. |
 | 2026-10-20 | Subcomando `listar` (decisão do usuário de 2026-10-20, ponto 1 do plano `2026-10-20-mergex-limites-do-codeant-parte-2.md`): só leitura, com a validação do `conferir`, devolve numa linha de JSON (`expx_revisao_listar: 1`) os achados rejeitados com a rejeição que vale, as `rejeicoes` e os `removidos_sem_revisao` da evidência no commit, para as D1, D2 e a condição 6 da M2 da mergex não lerem a evidência com `jq`; sai 0, 1 (inválida) ou 3 (ausente). O `conferir` passa a exigir `rejeicoes` e `removidos_sem_revisao` na forma que o `listar` devolve (`evidencia-invalida:rejeicoes`, `evidencia-invalida:removidos_sem_revisao`); o `revisar` e o `rejeitar` já os gravavam assim. |
 | 2026-10-20 | Revisão da PR 72 (CodeAnt): a saída das listas do git (`diff --name-only`, `ls-tree -r`) é lida até 256 MiB, não até 1 MiB (o padrão do `spawnSync`), e o commit grande coberto deixa de dar `evidencia-invalida:cobertura`. |
+| 2026-10-20 | Revisão da PR 72 (CodeAnt, 2ª rodada): a evidência na árvore do commit que o git não lê é `evidencia-invalida` (antes, `evidencia-ausente`, AVISO em `se_disponivel`); na cobertura, `modo` fora dos dois ou `base_commit` que não é commit (que em `indisponivel`/`incompleta` nada mais conferia) é `evidencia-invalida:cobertura`. |

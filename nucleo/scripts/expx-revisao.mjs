@@ -454,7 +454,9 @@ function naoCoberto(ev, sha) {
   if (cabecalho.status !== 0) return "";
   const pai = /^parent ([0-9a-f]+)$/m.exec(cabecalho.stdout.split(/\r?\n\r?\n/)[0])?.[1];
   const diffs = [pai ? git("diff", ...opcoes, pai, sha) : git("diff-tree", "--root", "-r", "--no-commit-id", ...opcoes, sha)];
-  if (ev.modo === "base-commit" && ehCommit(ev.base_commit)) diffs.push(git("diff", ...opcoes, ev.base_commit, sha));
+  // `modo` fora dos dois, ou `base_commit` que não é commit (em `indisponivel`/`incompleta` nada mais os confere): não verificável
+  if (ev.modo === "base-commit" ? !ehCommit(ev.base_commit) : ev.modo !== "uncommitted") return "";
+  if (ev.modo === "base-commit") diffs.push(git("diff", ...opcoes, ev.base_commit, sha));
   if (diffs.some((d) => d.status !== 0)) return "";
   const homologado = perfilCli(homologadas().at(-1));
   const exclusoes = exclusoesDoProjeto(sha) ?? [];
@@ -477,11 +479,15 @@ function semListas(ev) {
 /** A evidência da task no commit, pela validação do `conferir` (a mesma no `listar`): `{ausente: true}`, `{falha: <motivo>}`
  *  (FALHA em qualquer modo) ou `{ev}`, válida, com qualquer `resultado`. */
 function avaliar(task, sha) {
+  const falha = (motivo) => ({ falha: motivo });
   if (git("rev-parse", "--verify", "-q", `${sha}^{commit}`).status !== 0) return { falha: `commit-inexistente:${sha}` };
   // a evidência que vale é a do commit da task (o E1 a commita junto), nunca a do disco
   const doCommit = git("show", `${sha}:./docs/entregas/${op.trabalho}/revisao/${task}.json`);
-  if (doCommit.status !== 0) return { ausente: true };
-  const falha = (motivo) => ({ falha: motivo });
+  // ausente é a que não está na árvore do commit; a que está e o git não lê (objeto apagado ou corrompido) é inválida
+  if (doCommit.status !== 0) {
+    const naArvore = git("ls-tree", "-z", "--name-only", sha, "--", `docs/entregas/${op.trabalho}/revisao/${task}.json`);
+    return naArvore.status === 0 && naArvore.stdout === "" ? { ausente: true } : falha("evidencia-invalida");
+  }
   let ev;
   try { ev = JSON.parse(doCommit.stdout.replace(/^\uFEFF/, "")); } catch { return falha("evidencia-invalida"); }
   if (ehMapa(ev) && ev.expx_revisao !== 2) return falha("evidencia-invalida:versao");

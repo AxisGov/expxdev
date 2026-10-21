@@ -1320,3 +1320,25 @@ describe("expx-revisao.mjs conferir: commit com lista de caminhos acima de 1 MiB
     expect(conferir(c.raiz, "obrigatoria", `T-01=${git(c.raiz, "rev-parse", "HEAD")}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
   }, 60000);
 });
+
+describe("expx-revisao.mjs conferir: evidência que não se lê e base_commit que não é commit", () => {
+  it("funcional: evidência no commit cujo blob o git não lê → FALHA evidencia-invalida em qualquer modo, nunca AVISO evidencia-ausente", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    const sha = commita(c.raiz);
+    const blob = git(c.raiz, "rev-parse", `${sha}:${EV}`);
+    rmSync(join(c.raiz, ".git", "objects", blob.slice(0, 2), blob.slice(2)), { force: true });
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida" });
+  });
+
+  it("funcional: indisponivel com modo base-commit e base_commit que não é commit → FALHA evidencia-invalida:cobertura, não AVISO", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js", "T-01", semCodeant());
+    const ev = evidencia(c.raiz) as Record<string, any>;
+    expect(ev).toMatchObject({ resultado: "indisponivel", motivo: "cli-ausente" });
+    escreve(c.raiz, EV, JSON.stringify({ ...ev, modo: "base-commit", base_commit: "0".repeat(40) }));
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:cobertura" });
+  });
+});
