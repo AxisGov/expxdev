@@ -48,8 +48,7 @@ case "$CAMINHO_HOOK" in
 esac
 if command -v node >/dev/null 2>&1 && [ -n "$DIR_HOOK" ] && [ -f "$DIR_HOOK/expx-lembrete.mjs" ]; then
   MARCADOR_NODE="__EXPX_NODE_OK_V1__"
-  BOOTSTRAP_NODE='const [maior, menor] = process.versions.node.split(".").map(Number); if (maior < 20 || (maior === 20 && menor < 19)) process.exit(78); const entrada = require("node:fs").readFileSync(0, "utf8"); import(require("node:url").pathToFileURL(process.argv[2]).href).then((m) => { const saida = m.main({ input: entrada, write: () => undefined }); process.stdout.write("__EXPX_NODE_OK_V1__" + saida); }).catch(() => { process.exitCode = 1; });'
-  SAIDA_NODE="$(node -e "$BOOTSTRAP_NODE" expx-lembrete-bootstrap "$DIR_HOOK/expx-lembrete.mjs" <<< "$EVENTO" 2>/dev/null)"
+  SAIDA_NODE="$(node "$DIR_HOOK/expx-lembrete.mjs" <<< "$EVENTO" 2>/dev/null)"
   STATUS_NODE=$?
   if [ "$STATUS_NODE" -eq 0 ]; then
     case "$SAIDA_NODE" in

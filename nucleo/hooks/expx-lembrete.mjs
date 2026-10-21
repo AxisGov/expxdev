@@ -12,6 +12,7 @@ import {
 } from "./expx-lembrete-estado.mjs";
 
 const VERSAO_CHAVE = "v1";
+const MARCADOR_WRAPPER = "__EXPX_NODE_OK_V1__";
 
 const REGRAS = [
   ["memox", "a pergunta e sobre o passado do codigo", /(ja (aconteceu|deu|teve|foi) (antes|isso)|e recorrente|voltou a (acontecer|dar)|historico (do|da|de)|quem mexeu|ja foi (decidido|tentado|descartado)|regressao)/],
@@ -217,5 +218,11 @@ export function main(io = {}) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main();
+  const [maior, menor] = process.versions.node.split(".").map(Number);
+  if (maior < 20 || (maior === 20 && menor < 19)) {
+    process.exitCode = 78;
+  } else {
+    const saida = main({ write: () => undefined });
+    process.stdout.write(`${MARCADOR_WRAPPER}${saida}`);
+  }
 }
