@@ -62,6 +62,24 @@ RunX e recriação somente da worktree nova e limpa. A suíte de hooks emite um
 aviso preexistente sobre as chaves extras `harness` e `sessao` no rastro, mas
 termina com exit 0 e `86 ok, 0 falhas`.
 
+## Integração cruzada local — Task 14
+
+- Fonte ExpxDev: esta worktree, com o hook empacotado no commit `45af739`.
+- Fonte RunX: `F:/Projetos/.worktrees/runx-otimiza-skills`, fornecida
+  explicitamente por `EXPX_RUNX_CANONICA`; a bancada cria somente uma cópia Git
+  descartável sob o temporário do teste para o mecanismo oficial
+  `EXPX_SKILLS_LOCAIS`.
+- RED: apontar apenas para o diretório pai da worktree resolveu a origem remota,
+  não a worktree local; o teste falhou antes do alias temporário.
+- GREEN ExpxDev: `npm.cmd test -- src/cli/certificacao-p02.test.ts` com a variável
+  explícita — 52/52 testes, exit 0, 155,75 s.
+- GREEN RunX: `bash .claude/hooks/testes/testar-instalacao.sh` — 6/6 controles,
+  exit 0.
+- A instalação temporária recebeu os três artefatos do lembrete, `timeout: 1`
+  sem `onFailure`, núcleo RunX ≤8 KB, referências e agentes novos. Uma segunda
+  instalação removeu uma adulteração deliberada e restaurou o hash canônico.
+- Nenhum consumidor real e nenhuma cópia RunX dentro do ExpxDev foram alterados.
+
 ## Comparação com os critérios da Fase 1
 
 - worktrees externas aos `node_modules`: atendido;

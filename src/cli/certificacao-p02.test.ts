@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   ambienteCom,
@@ -39,6 +39,67 @@ import {
  */
 
 type Json = Record<string, any>;
+
+describe("P1 — integração local com RunX otimizada", () => {
+  it("integração: init e reinstalação combinam as duas fontes canônicas sem restaurar cópia antiga", () => {
+    const canonica = process.env["EXPX_RUNX_CANONICA"];
+    expect(canonica, "EXPX_RUNX_CANONICA é obrigatória nesta certificação").toBeTruthy();
+    if (!canonica) return;
+
+    const fontesLocais = temporarios.novo("expx-runx-canonica-");
+    cpSync(canonica, join(fontesLocais, "runx"), {
+      recursive: true,
+      filter: (origem) => !origem.endsWith(".git"),
+    });
+    const fonteRunx = join(fontesLocais, "runx");
+    gitEm(fonteRunx, "init", "-q", "-b", "main");
+    gitEm(fonteRunx, "config", "user.email", "runx@example.invalid");
+    gitEm(fonteRunx, "config", "user.name", "RunX local");
+    gitEm(fonteRunx, "add", "-A");
+    gitEm(fonteRunx, "commit", "-q", "-m", "runx: fonte canonica temporaria");
+    const isolado = larIsolado();
+    const p = produto("expx-integracao-runx-");
+    const env = ambienteCom(pathControlado(true), {
+      ...isolado.env,
+      EXPX_SKILLS_LOCAIS: fontesLocais,
+    });
+    const instalar = (): ReturnType<typeof rodarExpx> => rodarExpx(
+      ["init", "--skills", "runx", "--yes"], p, env,
+    );
+
+    const primeira = instalar();
+    expect(primeira.status, `${primeira.stdout}\n${primeira.stderr}`).toBe(0);
+
+    const artefatosLembrete = ["expx-lembrete.sh", "expx-lembrete.mjs", "expx-lembrete-estado.mjs"];
+    for (const nome of artefatosLembrete) {
+      const fonte = join(process.cwd(), "nucleo", "hooks", nome);
+      const instalado = join(p, ".claude", "hooks", nome);
+      const marketplace = join(p, ".expx", "marketplace", "plugins", "expx", "nucleo", "hooks", nome);
+      expect(sha256(instalado), nome).toBe(sha256(fonte));
+      expect(sha256(marketplace), `marketplace/${nome}`).toBe(sha256(fonte));
+    }
+
+    const settings = json(join(p, ".claude", "settings.json"));
+    const lembrete = hooksDoSettings(settings).find((item) => String(item.hook["command"]).includes("expx-lembrete.sh"));
+    expect(lembrete?.hook["timeout"]).toBe(1);
+    expect(lembrete?.hook).not.toHaveProperty("onFailure");
+
+    const fonteSkill = join(canonica, ".claude", "skills", "runx");
+    const instaladaSkill = join(p, ".claude", "skills", "runx");
+    expect(readFileSync(join(instaladaSkill, "SKILL.md"), "utf8")).toContain("usage_limit_reached");
+    expect(readFileSync(join(instaladaSkill, "references", "06-estado.md"), "utf8")).toContain("mecanico_triagem");
+    expect(readFileSync(join(p, ".claude", "agents", "revisor-testes.md"), "utf8")).toContain("model: haiku");
+    expect(Buffer.byteLength(readFileSync(join(instaladaSkill, "SKILL.md")))).toBeLessThanOrEqual(8000);
+    for (const relativo of arvore(fonteSkill)) {
+      expect(sha256(join(instaladaSkill, relativo)), relativo).toBe(sha256(join(fonteSkill, relativo)));
+    }
+
+    appendFileSync(join(instaladaSkill, "SKILL.md"), "\nCOPIA-OBSOLETA\n");
+    const segunda = instalar();
+    expect(segunda.status, `${segunda.stdout}\n${segunda.stderr}`).toBe(0);
+    expect(sha256(join(instaladaSkill, "SKILL.md"))).toBe(sha256(join(fonteSkill, "SKILL.md")));
+  });
+});
 
 let fontes = "";
 /** O HOME descartável de TODO init e doctor desta bancada. */
