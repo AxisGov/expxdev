@@ -18,6 +18,12 @@ type Evento = {
 };
 type Projeto = { raiz: string; scratchpad: string };
 
+function caminhoParaBash(caminho: string): string {
+  const normalizado = caminho.replaceAll("\\", "/");
+  const unidade = /^([A-Za-z]):\/(.*)$/u.exec(normalizado);
+  return unidade ? `/${unidade[1]?.toLowerCase()}/${unidade[2]}` : normalizado;
+}
+
 function definirTrabalho(raiz: string, trabalho: string, fase: string): void {
   const pasta = join(raiz, ".expx");
   mkdirSync(pasta, { recursive: true });
@@ -98,6 +104,32 @@ function pathComNodeIncompativel(): { path: string; marcador: string } {
   writeFileSync(node, `#!/bin/sh\nprintf chamado > "$EXPX_NODE_MARCADOR"\nprintf 'v18.0.0\\n'\n`);
   chmodSync(node, 0o755);
   return { path: `${pasta}${delimiter}${process.env.PATH ?? ""}`, marcador };
+}
+
+function pathComNodeInstrumentado(): { ambiente: NodeJS.ProcessEnv; marcador: string } {
+  const pasta = mkdtempSync(join(tmpdir(), "expx-node-instrumentado-"));
+  temporarios.push(pasta);
+  const marcador = join(pasta, "invocacoes.log");
+  const node = join(pasta, "node");
+  writeFileSync(node, "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$EXPX_NODE_MARCADOR\"\nexec \"$EXPX_NODE_REAL\" \"$@\"\n");
+  chmodSync(node, 0o755);
+  return {
+    ambiente: {
+      PATH: `${pasta}${delimiter}${process.env.PATH ?? ""}`,
+      EXPX_NODE_MARCADOR: caminhoParaBash(marcador),
+      EXPX_NODE_REAL: caminhoParaBash(process.execPath),
+    },
+    marcador,
+  };
+}
+
+function pathComNodeQueFalha(): NodeJS.ProcessEnv {
+  const pasta = mkdtempSync(join(tmpdir(), "expx-node-falha-"));
+  temporarios.push(pasta);
+  const node = join(pasta, "node");
+  writeFileSync(node, "#!/bin/sh\ncase \"$1\" in\n  --version) printf 'v24.18.0\\n'; exit 0 ;;\n  *) printf 'SAIDA-PARCIAL-PROIBIDA'; exit 1 ;;\nesac\n");
+  chmodSync(node, 0o755);
+  return { PATH: `${pasta}${delimiter}${process.env.PATH ?? ""}` };
 }
 
 function caminhoEstado(projeto: Projeto): string {
@@ -300,6 +332,23 @@ describe("estado seguro e concorrencia pendentes", () => {
 });
 
 describe("fallback do wrapper", () => {
+
+  it("inicia o Node no maximo uma vez no caminho normal", () => {
+    const projeto = criarProjeto();
+    const instrumentado = pathComNodeInstrumentado();
+
+    expect.soft(executarHook(projeto, evento(projeto), instrumentado.ambiente)).toContain("runx");
+    const invocacoes = readFileSync(instrumentado.marcador, "utf8").trim().split(/\r?\n/u);
+    expect(invocacoes).toHaveLength(1);
+  });
+
+  it("captura a saida do Node e nunca publica trecho parcial antes do fallback", () => {
+    const projeto = criarProjeto();
+    const saida = executarHookBruto(projeto, evento(projeto), pathComNodeQueFalha());
+
+    expect.soft(saida).not.toContain("SAIDA-PARCIAL-PROIBIDA");
+    expect(JSON.parse(saida).hookSpecificOutput.additionalContext).toContain("runx");
+  });
 
   it("consulta Node incompatível e usa o fallback shell stateless (caso 18)", () => {
     const projeto = criarProjeto();

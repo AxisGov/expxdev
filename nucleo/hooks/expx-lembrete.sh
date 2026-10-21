@@ -33,41 +33,44 @@
 
 set -u
 
-# Sem stdin utilizavel, nao ha o que fazer.
-EVENTO="$(cat 2>/dev/null || true)"
+# Sem stdin utilizavel, nao ha o que fazer. `read -d ''` consome ate EOF sem
+# abrir `cat`; o `|| true` preserva fail-open porque EOF e o caso normal.
+EVENTO=""
+IFS= read -r -d '' EVENTO || true
 [ -z "$EVENTO" ] && exit 0
 
 # O motor Node concentra identidade e decisao. O classificador shell abaixo e
 # o fallback stateless para runtime ausente/incompativel ou pacote incompleto.
-DIR_HOOK="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd)" || DIR_HOOK=""
+CAMINHO_HOOK="${0//\\//}"
+case "$CAMINHO_HOOK" in
+  */*) DIR_HOOK="${CAMINHO_HOOK%/*}" ;;
+  *) DIR_HOOK="." ;;
+esac
 if command -v node >/dev/null 2>&1 && [ -n "$DIR_HOOK" ] && [ -f "$DIR_HOOK/expx-lembrete.mjs" ]; then
-  NODE_VERSAO="$(node --version 2>/dev/null || true)"
-  NODE_VERSAO="${NODE_VERSAO#v}"
-  IFS=. read -r NODE_MAIOR NODE_MENOR NODE_PATCH <<EOF
-$NODE_VERSAO
-EOF
-  case "$NODE_MAIOR:$NODE_MENOR:$NODE_PATCH" in
-    *[!0-9:]*|::*|*::* ) NODE_COMPATIVEL=0 ;;
-    *)
-      NODE_COMPATIVEL=0
-      if [ "$NODE_MAIOR" -gt 20 ] || { [ "$NODE_MAIOR" -eq 20 ] && [ "$NODE_MENOR" -ge 19 ]; }; then
-        NODE_COMPATIVEL=1
-      fi
-      ;;
-  esac
-  if [ "$NODE_COMPATIVEL" -eq 1 ]; then
-    printf '%s' "$EVENTO" | node "$DIR_HOOK/expx-lembrete.mjs" 2>/dev/null || true
-    exit 0
+  MARCADOR_NODE="__EXPX_NODE_OK_V1__"
+  BOOTSTRAP_NODE='const [maior, menor] = process.versions.node.split(".").map(Number); if (maior < 20 || (maior === 20 && menor < 19)) process.exit(78); const entrada = require("node:fs").readFileSync(0, "utf8"); import(require("node:url").pathToFileURL(process.argv[2]).href).then((m) => { const saida = m.main({ input: entrada, write: () => undefined }); process.stdout.write("__EXPX_NODE_OK_V1__" + saida); }).catch(() => { process.exitCode = 1; });'
+  SAIDA_NODE="$(node -e "$BOOTSTRAP_NODE" expx-lembrete-bootstrap "$DIR_HOOK/expx-lembrete.mjs" <<< "$EVENTO" 2>/dev/null)"
+  STATUS_NODE=$?
+  if [ "$STATUS_NODE" -eq 0 ]; then
+    case "$SAIDA_NODE" in
+      "$MARCADOR_NODE"*)
+        printf '%s' "${SAIDA_NODE#"$MARCADOR_NODE"}"
+        exit 0
+        ;;
+    esac
   fi
 fi
 
-# O prompt do usuario. Com jq quando existe; sem jq, um grep tolerante.
-if command -v jq >/dev/null 2>&1; then
-  PROMPT="$(printf '%s' "$EVENTO" | jq -r '.prompt // empty' 2>/dev/null)"
-else
-  PROMPT="$(printf '%s' "$EVENTO" \
-    | grep -o '"prompt"[[:space:]]*:[[:space:]]*"[^"]*"' \
-    | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')"
+# O fallback evita processos auxiliares: extracao suficiente para o JSON do
+# evento, normalizacao e classificacao usam apenas builtins do Bash.
+PROMPT=""
+if [[ "$EVENTO" =~ \"prompt\"[[:space:]]*:[[:space:]]*\"(([^\"\\]|\\.)*)\" ]]; then
+  PROMPT="${BASH_REMATCH[1]}"
+  PROMPT="${PROMPT//\\\"/\"}"
+  PROMPT="${PROMPT//\\n/$'\n'}"
+  PROMPT="${PROMPT//\\r/$'\r'}"
+  PROMPT="${PROMPT//\\t/$'\t'}"
+  PROMPT="${PROMPT//\\\\/\\}"
 fi
 [ -z "$PROMPT" ] && exit 0
 
@@ -77,20 +80,12 @@ fi
 # Minusculas e SEM acento: a pessoa digita "nao acompanha", "codigo", "calculo"
 # tanto quanto as formas acentuadas, e um padrao que so casa com acento perde
 # metade dos relatos reais.
-# O `tr`/`sed` do BSD trabalha byte a byte e corta caracteres multibyte no
-# meio, produzindo lixo invalido. O Python resolve isso com uma passada de
-# normalizacao Unicode; sem ele, cai para minusculas so em ASCII, que ainda
-# casa a maioria dos padroes.
-if command -v python3 >/dev/null 2>&1; then
-  P="$(printf '%s' "$PROMPT" | python3 -c "
-import sys,unicodedata
-t=sys.stdin.read().lower()
-print(''.join(c for c in unicodedata.normalize('NFD',t) if unicodedata.category(c)!='Mn'))
-" 2>/dev/null)"
-else
-  P="$(printf '%s' "$PROMPT" | tr '[:upper:]' '[:lower:]')"
-fi
-[ -z "$P" ] && P="$(printf '%s' "$PROMPT" | tr '[:upper:]' '[:lower:]')"
+P="${PROMPT,,}"
+P="${P//á/a}"; P="${P//à/a}"; P="${P//â/a}"; P="${P//ã/a}"; P="${P//ä/a}"
+P="${P//é/e}"; P="${P//è/e}"; P="${P//ê/e}"; P="${P//ë/e}"
+P="${P//í/i}"; P="${P//ì/i}"; P="${P//î/i}"; P="${P//ï/i}"
+P="${P//ó/o}"; P="${P//ò/o}"; P="${P//ô/o}"; P="${P//õ/o}"; P="${P//ö/o}"
+P="${P//ú/u}"; P="${P//ù/u}"; P="${P//û/u}"; P="${P//ü/u}"; P="${P//ç/c}"
 
 RAIZ="${CLAUDE_PROJECT_DIR:-$PWD}"
 
@@ -101,7 +96,7 @@ instalada() {
   return 1
 }
 
-casa() { printf '%s' "$P" | grep -Eq "$1"; }
+casa() { [[ "$P" =~ $1 ]]; }
 
 # ------------------------------------------------------------------ gatilhos
 #
@@ -131,7 +126,7 @@ elif casa '(seria bom se|seria legal se|poderia (ter|fazer)|vale a pena|ja exist
   SKILL="prodx"; MOTIVO="e um pedido cru, e decidir SE vira trabalho vem antes de planejar"
 
 # runx — defeito no que ja existe
-elif casa '(\bbug\b|defeito|nao funciona|parou de funcionar|nao esta funcionando|nao acompanha|nao segue o padrao|(esta|ta|vindo|vem|veio|calculando|somando|mostrando|exibindo) errad|valor errado|(errado|divergente|incorret)|nao responde|nao carrega|nao salva|nao aparece|trava|travando|quebrou|quebrado|erro ao|falha ao|deveria .* mas)'; then
+elif casa '((^|[^[:alnum:]_])bug([^[:alnum:]_]|$)|defeito|nao funciona|parou de funcionar|nao esta funcionando|nao acompanha|nao segue o padrao|(esta|ta|vindo|vem|veio|calculando|somando|mostrando|exibindo) errad|valor errado|(errado|divergente|incorret)|nao responde|nao carrega|nao salva|nao aparece|trava|travando|quebrou|quebrado|erro ao|falha ao|deveria .* mas)'; then
   SKILL="runx"; MOTIVO="e um defeito em algo que ja existe"
 
 # sprintx — construir algo novo
@@ -150,11 +145,10 @@ ANTES de ler codigo, formar hipotese ou editar qualquer arquivo: leia a descrica
 
 Hipotese tecnica forte nao dispensa esta checagem — e justamente quando ela mais protege."
 
-if command -v jq >/dev/null 2>&1; then
-  jq -n --arg t "$TEXTO" \
-    '{hookSpecificOutput:{hookEventName:"UserPromptSubmit",additionalContext:$t}}' 2>/dev/null || true
-else
-  ESC="$(printf '%s' "$TEXTO" | sed 's/\\/\\\\/g; s/"/\\"/g' | awk '{printf "%s\\n",$0}')"
-  printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"%s"}}\n' "$ESC"
-fi
+ESC="${TEXTO//\\/\\\\}"
+ESC="${ESC//\"/\\\"}"
+ESC="${ESC//$'\n'/\\n}"
+ESC="${ESC//$'\r'/\\r}"
+ESC="${ESC//$'\t'/\\t}"
+printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"%s"}}\n' "$ESC"
 exit 0
