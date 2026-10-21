@@ -1,18 +1,17 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  realpathSync,
-  writeFileSync,
-} from "node:fs";
-import { isAbsolute, join, parse, resolve } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { join, parse, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  comLock,
+  gravarEstadoAtomico,
+  lerEstado,
+  podarEstado,
+  selecionarRaizEstado,
+} from "./expx-lembrete-estado.mjs";
 
 const VERSAO_CHAVE = "v1";
-const TTL_EVENTO_MS = 24 * 60 * 60 * 1_000;
-const TTL_TRABALHO_MS = 7 * 24 * 60 * 60 * 1_000;
 
 const REGRAS = [
   ["memox", "a pergunta e sobre o passado do codigo", /(ja (aconteceu|deu|teve|foi) (antes|isso)|e recorrente|voltou a (acontecer|dar)|historico (do|da|de)|quem mexeu|ja foi (decidido|tentado|descartado)|regressao)/],
@@ -93,16 +92,9 @@ function estadoVazio() {
   return { versao: 1, eventos: [], trabalhos: [] };
 }
 
-function podar(estado, agora) {
-  return {
-    versao: 1,
-    eventos: estado.eventos.filter((item) => agora - item.timestamp <= TTL_EVENTO_MS),
-    trabalhos: estado.trabalhos.filter((item) => agora - item.timestamp <= TTL_TRABALHO_MS),
-  };
-}
-
 export function decidirInjecao(contexto, estadoRecebido = estadoVazio()) {
-  const estado = podar({
+  const estado = podarEstado({
+    versao: 1,
     eventos: Array.isArray(estadoRecebido?.eventos) ? estadoRecebido.eventos : [],
     trabalhos: Array.isArray(estadoRecebido?.trabalhos) ? estadoRecebido.trabalhos : [],
   }, contexto.agora);
@@ -167,28 +159,6 @@ function serializar(texto) {
   })}\n`;
 }
 
-function caminhoDoEstado(input) {
-  const scratchpad = typeof input?.scratchpad_dir === "string" ? input.scratchpad_dir : "";
-  if (!scratchpad || !isAbsolute(scratchpad)) return null;
-  return join(scratchpad, "expx", "lembrete-v1", "estado.json");
-}
-
-function lerEstadoMinimo(caminho) {
-  if (!existsSync(caminho)) return { estado: estadoVazio(), corrompido: false };
-  try {
-    const estado = JSON.parse(readFileSync(caminho, "utf8"));
-    if (!Array.isArray(estado?.eventos) || !Array.isArray(estado?.trabalhos)) throw new Error("estado invalido");
-    return { estado, corrompido: false };
-  } catch {
-    return { estado: estadoVazio(), corrompido: true };
-  }
-}
-
-function gravarEstadoMinimo(caminho, estado) {
-  mkdirSync(resolve(caminho, ".."), { recursive: true });
-  writeFileSync(caminho, `${JSON.stringify(estado)}\n`);
-}
-
 export function main(io = {}) {
   let saida = "";
   try {
@@ -208,20 +178,34 @@ export function main(io = {}) {
       trabalho: identificarTrabalho(input, cwd),
       agora: typeof io.agora === "function" ? io.agora() : Date.now(),
     };
-    const caminhoEstado = sessao ? caminhoDoEstado(input) : null;
-    const lido = caminhoEstado ? lerEstadoMinimo(caminhoEstado) : { estado: estadoVazio(), corrompido: false };
-
-    if (lido.corrompido) {
-      saida = serializar(lembreteCompleto(classificacao.skill, classificacao.motivo));
+    let decisao;
+    if (!sessao) {
+      decisao = decidirInjecao(contexto, estadoVazio());
     } else {
-      const decisao = decidirInjecao(contexto, lido.estado);
-      if (caminhoEstado && decisao.mudou) gravarEstadoMinimo(caminhoEstado, decisao.estado);
-      if (decisao.emitir) {
-        const texto = decisao.tipo === "delta"
-          ? lembreteDelta(classificacao.skill, classificacao.motivo)
-          : lembreteCompleto(classificacao.skill, classificacao.motivo);
-        saida = serializar(texto);
-      }
+      const raizEstado = selecionarRaizEstado(input, io.estado);
+      const execucao = raizEstado
+        ? comLock(raizEstado, () => {
+          const lido = lerEstado(raizEstado);
+          if (lido.hostil) return { conservador: true };
+          const calculada = decidirInjecao(contexto, lido.estado);
+          const estado = podarEstado(calculada.estado, contexto.agora);
+          if ((calculada.mudou || lido.corrompido || lido.normalizado)
+            && !gravarEstadoAtomico(raizEstado, estado, { agora: () => contexto.agora })) {
+            return { conservador: true };
+          }
+          return { decisao: { ...calculada, estado } };
+        })
+        : { adquirido: false };
+      decisao = execucao.adquirido && !execucao.erro && execucao.valor?.decisao
+        ? execucao.valor.decisao
+        : { emitir: true, tipo: "completo" };
+    }
+
+    if (decisao.emitir) {
+      const texto = decisao.tipo === "delta"
+        ? lembreteDelta(classificacao.skill, classificacao.motivo)
+        : lembreteCompleto(classificacao.skill, classificacao.motivo);
+      saida = serializar(texto);
     }
   } catch {
     saida = "";

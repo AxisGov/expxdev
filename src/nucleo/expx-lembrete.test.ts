@@ -4,6 +4,8 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+// @ts-expect-error O motor ESM e distribuido ao lado do wrapper shell.
+import { main } from "../../nucleo/hooks/expx-lembrete.mjs";
 
 const HOOK = resolve("nucleo/hooks/expx-lembrete.sh");
 const GIT_BASH = "C:/Program Files/Git/bin/bash.exe";
@@ -287,7 +289,10 @@ describe("estado seguro e concorrencia pendentes", () => {
     symlinkSync(alvo, raizEstado, process.platform === "win32" ? "junction" : "dir");
 
     expect.soft(lstatSync(raizEstado).isSymbolicLink()).toBe(true);
-    expect.soft(executarHook(projeto, evento(projeto, { prompt_id: "prompt-2" }))).not.toBeNull();
+    expect.soft(executarHook(projeto, evento(projeto, {
+      prompt_id: "prompt-2",
+      session_id: `sessao-symlink-${projeto.raiz}`,
+    }))).not.toBeNull();
     expect(readFileSync(sentinela, "utf8")).toBe("intacto\n");
     expect(readdirSync(alvo)).toEqual(["sentinela.txt"]);
   });
@@ -320,5 +325,21 @@ describe("volume com estado seguro pendente", () => {
 
     expect.soft(Buffer.byteLength(primeira, "utf8")).toBeLessThanOrEqual(768);
     expect(repetida).toBe("");
+
+    const limitado = criarProjeto();
+    for (let indice = 0; indice < 70; indice += 1) {
+      definirTrabalho(limitado.raiz, `OC-LIMITE-${indice}`, "E1");
+      main({
+        input: JSON.stringify(evento(limitado, { prompt_id: `prompt-limite-${indice}` })),
+        env: { ...process.env, CLAUDE_PROJECT_DIR: limitado.raiz },
+        write: () => undefined,
+      });
+    }
+    const estado = JSON.parse(readFileSync(caminhoEstado(limitado), "utf8")) as {
+      eventos: unknown[];
+      trabalhos: unknown[];
+    };
+    expect.soft(estado.eventos).toHaveLength(64);
+    expect(estado.trabalhos).toHaveLength(64);
   });
 });
