@@ -73,7 +73,8 @@ CLI uma vez (`--uncommitted` ou `--base-commit <sha>`) pelo arquivo conferido,
 reconcilia a resposta com a task e grava a evidência v2 em
 `docs/entregas/<trabalho>/revisao/<T-NN.MM>.json`; sai 0 (`ok`), 1 (achado aberto),
 2 (`indisponivel`) ou 3 (`incompleta`). `conferir` é a regra da V12 da mergex
-(`incompleta` é FALHA em qualquer modo); `rejeitar` registra a rejeição de um
+(`incompleta` é FALHA em qualquer modo, e a evidência tem de cobrir os arquivos
+que o commit da task altera); `rejeitar` registra a rejeição de um
 achado pelo desenvolvedor. Qualquer `FATIA_*` no ambiente sai 64. A sprintx
 (passo de revisão da F6) e a mergex (E2, V12) passam a chamá-lo nos planos delas.
 

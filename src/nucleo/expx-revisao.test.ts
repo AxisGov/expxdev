@@ -1088,3 +1088,77 @@ describe("expx-revisao.mjs evidência com as issues da CLI: o conferir deriva os
     expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
   });
 });
+
+describe("expx-revisao.mjs conferir: a evidência cobre o commit da task", () => {
+  const cobre = (raiz: string, sha: string, falta?: string) => expect(conferir(raiz, "obrigatoria", `T-01=${sha}`))
+    .toMatchObject(falta ? { rc: 1, out: `T-01 FALHA evidencia-invalida:cobertura:${falta}` } : { rc: 0, out: "T-01 ok" });
+  const todos = (raiz: string, msg = "task"): string => { git(raiz, "add", "-A"); git(raiz, "commit", "-q", "-m", msg); return git(raiz, "rev-parse", "HEAD"); };
+
+  it("funcional: segunda passagem com arquivo novo sem revisar → FALHA cobertura:<f>, em qualquer modo; com novo revisar → ok", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    const primeira = commita(c.raiz);
+    cobre(c.raiz, primeira);
+    escreve(c.raiz, "src/b.js", "b\n");
+    const sem = commita(c.raiz);
+    cobre(c.raiz, sem, "src/b.js");
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${sem}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:cobertura:src/b.js" });
+    git(c.raiz, "reset", "-q", "--hard", primeira);
+    escreve(c.raiz, "src/b.js", "b\n");
+    expect(revisar(c, "src/b.js").rc).toBe(0);
+    cobre(c.raiz, commita(c.raiz));
+  });
+
+  it("funcional: não revisável, exclusão do núcleo e excluir_da_revisao do commit saem da conta; revisável fora da evidência não", () => {
+    const c = cenario();
+    escreve(c.raiz, ".expx/fatiamento.json", JSON.stringify({ expx_fatiamento: 2, excluir_da_revisao: [
+      { padrao: "^gerado/", classe: "gerado", origem: "scripts/gera.sh", motivo: "saída do gerador" }] }));
+    todos(c.raiz, "config");
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    escreve(c.raiz, "logo.png", "png\n");
+    escreve(c.raiz, "docs/sprintx/estado.md", "# estado\n");
+    escreve(c.raiz, "gerado/saida.js", "x\n");
+    cobre(c.raiz, todos(c.raiz));
+    escreve(c.raiz, "src/b.js", "b\n");
+    cobre(c.raiz, todos(c.raiz, "mais"), "src/b.js");
+  });
+
+  it("funcional: arquivo apagado pelo commit e fora da evidência → FALHA cobertura:<f>", () => {
+    const c = cenario();
+    escreve(c.raiz, "src/b.js", "b\n");
+    todos(c.raiz, "b");
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    rmSync(join(c.raiz, "src/b.js"));
+    cobre(c.raiz, commita(c.raiz), "src/b.js");
+  });
+
+  it("funcional: merge como commit da task conta tudo o que ele traz ao primeiro pai", () => {
+    const c = cenario();
+    git(c.raiz, "checkout", "-q", "-b", "lado");
+    escreve(c.raiz, "src/c.js", "c\n");
+    todos(c.raiz, "lado");
+    git(c.raiz, "checkout", "-q", "main");
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    cobre(c.raiz, commita(c.raiz));
+    git(c.raiz, "merge", "-q", "--no-ff", "-m", "merge", "lado");
+    cobre(c.raiz, git(c.raiz, "rev-parse", "HEAD"), "src/c.js");
+  });
+
+  it("funcional: --base-commit: conta também o que mudou desde base_commit, não só o commit da evidência", () => {
+    const c = cenario();
+    const base = git(c.raiz, "rev-parse", "HEAD");
+    altera3(c.raiz);
+    git(c.raiz, "commit", "-q", "-am", "task");
+    expect(revisar(c, "src/a.js", "T-01", undefined, {}, c.script, ["--base-commit", base]).rc).toBe(0);
+    cobre(c.raiz, commita(c.raiz, true));
+    git(c.raiz, "reset", "-q", "--hard", "HEAD~1");
+    escreve(c.raiz, "src/b.js", "b\n");
+    todos(c.raiz, "outra");
+    expect(revisar(c, "src/a.js", "T-01", undefined, {}, c.script, ["--base-commit", base]).rc).toBe(0);
+    cobre(c.raiz, commita(c.raiz, true), "src/b.js");
+  });
+});

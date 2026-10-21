@@ -180,15 +180,15 @@ function alteradas(f, de, ate) {
 }
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-/** Com `--base-commit`, uma pasta temporária com o `.expx/fatiamento.json` do `HEAD` revisado, para o leitor: ausente
- *  no `HEAD`, a pasta fica sem ele (os padrões, como o ausente no disco); entrada que não é arquivo comum (pasta, link,
- *  submódulo) ou `ls-tree` que falha: `null` (inválido, nunca os padrões). */
-function raizDoFatiamentoNoHead() {
-  const r = git("ls-tree", "-z", "HEAD", "--", ".expx/fatiamento.json");
+/** Uma pasta temporária com o `.expx/fatiamento.json` do commit `rev` (o `HEAD` revisado, com `--base-commit`; o da task,
+ *  no `conferir`), para o leitor: ausente no commit, a pasta fica sem ele (os padrões, como o ausente no disco); entrada que
+ *  não é arquivo comum (pasta, link, submódulo) ou `ls-tree` que falha: `null` (inválido, nunca os padrões). */
+function raizDoFatiamentoNoCommit(rev) {
+  const r = git("ls-tree", "-z", rev, "--", ".expx/fatiamento.json");
   const entrada = r.status === 0 ? r.stdout.split("\0")[0] : undefined;
   const [modo, tipo, oid] = (entrada ?? "").split("\t")[0].split(" ");
   if (entrada === undefined || (entrada !== "" && (tipo !== "blob" || !["100644", "100755"].includes(modo)))) {
-    process.stderr.write("expx-revisao: .expx/fatiamento.json do HEAD nao e arquivo comum legivel\n");
+    process.stderr.write(`expx-revisao: .expx/fatiamento.json de ${rev} nao e arquivo comum legivel\n`);
     return null;
   }
   const raiz = mkdtempSync(join(tmpdir(), "expx-fatiamento-"));
@@ -198,10 +198,10 @@ function raizDoFatiamentoNoHead() {
   }
   return raiz;
 }
-/** Os `padrao` de `excluir_da_revisao` do projeto, pelo leitor irmão (nunca do ambiente); `null` se ele falha. Com
- *  `--base-commit`, os do `HEAD` revisado, nunca os da árvore de trabalho. */
-function exclusoesDoProjeto() {
-  const temporaria = op["base-commit"] ? raizDoFatiamentoNoHead() : undefined;
+/** Os `padrao` de `excluir_da_revisao` do projeto, pelo leitor irmão (nunca do ambiente); `null` se ele falha. Com `rev`
+ *  (`--base-commit`: o `HEAD` revisado; no `conferir`: o commit da task), os do commit, nunca os da árvore de trabalho. */
+function exclusoesDoProjeto(rev) {
+  const temporaria = rev ? raizDoFatiamentoNoCommit(rev) : undefined;
   if (temporaria === null) return null;
   try {
     const r = spawnSync(process.execPath, [join(AQUI, "expx-fatiamento.mjs"), "--formato", "json", "--raiz", temporaria ?? op.raiz], { encoding: "utf8" });
@@ -286,7 +286,7 @@ function revisar() {
   const presentes = arquivos.filter((f) => existsSync(join(op.raiz, f)));
   const removidos = arquivos.filter((f) => !presentes.includes(f));
   for (const f of removidos) { ev.arquivos[f] = null; ev.removidos_sem_revisao.push(f); }
-  const exclusoes = virgula ? [] : exclusoesDoProjeto();
+  const exclusoes = virgula ? [] : exclusoesDoProjeto(op["base-commit"] ? "HEAD" : undefined);
   // os portões antes da CLI não dependem da versão instalada: os números são iguais em todas as homologadas
   const perfil = perfilCli(homologadas().at(-1));
   const medidas = {};
@@ -433,6 +433,24 @@ function semSinalDaCli(ev, sha) {
   if (include.length !== enviados.length || !enviados.every((f) => include.includes(f)) || reconciliar(enviados, meta)) return "cobertura";
 }
 
+/** O primeiro arquivo que o commit da task altera e a evidência não cobre (fora das chaves de `arquivos`), `""` se o
+ *  diff falha, ou undefined. Alterados: o diff de `sha` contra o primeiro pai (no merge, tudo o que ele traz à linha; na
+ *  raiz, a árvore inteira) e, com `--base-commit`, também desde `base_commit` (a task inteira, não só o commit da
+ *  evidência); sem renomeação (o nome antigo e o novo contam), sem submódulo. Saem da conta, como no `revisar`: o não
+ *  revisável pelo predicado do perfil, as exclusões do núcleo (a própria evidência entre elas) e as de `excluir_da_revisao`
+ *  do `.expx/fatiamento.json` do commit (leitor que falha: nenhuma, nunca menos conta). */
+function naoCoberto(ev, sha) {
+  const opcoes = ["--no-ext-diff", "--no-renames", "--ignore-submodules=all", "--name-only", "-z"];
+  const pai = idDe("rev-parse", "--verify", "-q", `${sha}^1^{commit}`);
+  const diffs = [pai ? git("diff", ...opcoes, pai, sha) : git("diff-tree", "--root", "-r", "--no-commit-id", ...opcoes, sha)];
+  if (ev.modo === "base-commit" && ehCommit(ev.base_commit)) diffs.push(git("diff", ...opcoes, ev.base_commit, sha));
+  if (diffs.some((d) => d.status !== 0)) return "";
+  const homologado = perfilCli(homologadas().at(-1));
+  const exclusoes = exclusoesDoProjeto(sha) ?? [];
+  const contam = (f) => revisavel(f, homologado) && !excluido(f, EXCLUIDOS_DO_NUCLEO) && !excluido(f, exclusoes);
+  return diffs.flatMap((d) => d.stdout.split("\0")).find((f) => f !== "" && contam(f) && !Object.hasOwn(ev.arquivos, f));
+}
+
 /** O veredito de uma task: a evidência tem de existir, bater com o commit e não ter achado aberto. */
 function veredito(task, sha) {
   if (op.modo === "desligada") return "ok";
@@ -454,6 +472,8 @@ function veredito(task, sha) {
     const r = git("rev-parse", "--verify", "-q", `${sha}:./${f}`);
     if ((r.status === 0 ? r.stdout.trim() : null) !== (a === null ? null : a.blob)) return `FALHA evidencia-nao-bate:${f}`;
   }
+  const descoberto = naoCoberto(ev, sha);
+  if (descoberto !== undefined) return `FALHA evidencia-invalida:cobertura${descoberto ? `:${descoberto}` : ""}`;
   if (ev.resultado === "indisponivel") return `${nivel} indisponivel:${ev.motivo}`;
   // a mudança que a CLI não cobre não depende do modo
   if (ev.resultado === "incompleta") return `FALHA incompleta:${ev.motivo}`;
