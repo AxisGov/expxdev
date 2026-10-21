@@ -179,6 +179,8 @@ qualquer commit de benchmark ou início da Task 16.
 Comando: `node scripts/benchmark-expx-lembrete.mjs --json`, Windows x64,
 Node `v24.18.0`, Git Bash, 10 aquecimentos e 200 amostras intercaladas por
 cenário e baseline equivalente. Esta é a medição usada para a decisão.
+Ela foi executada em processo dedicado; a suíte paralela não repete o gate,
+pois sua contenção altera a configuração do experimento.
 
 | Cenário | Absoluto p50/p95 | Baseline p50/p95 | Incremental p95 | Delta pareado p50/p95 | Bytes |
 |---|---:|---:|---:|---:|---:|
@@ -209,3 +211,26 @@ Decisão: **APTO PARA A FASE 2**, condicionada a autorização explícita em nov
 retomada. A próxima ação exata é iniciar a Task 2 no worktree ExpxDev, escrevendo
 os testes RED de classificação, identidades e deduplicação. Esta execução para
 antes disso.
+
+## BASELINE-POS-MUDANCA
+
+- ExpxDev: base `5cb817b`; Task 15 em `4dda809`; suíte final com 131 arquivos
+  verdes, 1 arquivo deliberadamente opt-in, 1.347 testes verdes e 32 pulados;
+  typecheck e `git diff --check` verdes.
+- RunX: base `4480d78`; implementação até `a66b55b`; bancadas finais
+  `90/90`, `49/49`, `9/9`, `4/4` e `6/6`, com `git diff --check` verde.
+- Núcleo RunX: 20.363 → 5.169 bytes, redução de 15.194 bytes (74,6%);
+  estimativa de tokens 5.091 → 1.293. O limite de 8.000 bytes e a redução
+  mínima de 60,7% foram atendidos.
+- Matriz: 24/24. Casos 1–18, 20, 22 e 24 estão nomeados em
+  `src/nucleo/expx-lembrete.test.ts`; caso 19 está em
+  `src/harness/settings.test.ts`; caso 21 também cobre transição/JSONL/handoff
+  em `.claude/hooks/testes/testar-estado.sh`; caso 23 é o benchmark dedicado.
+- Benchmark oficial Windows/Git Bash: 10 aquecimentos + 200 amostras
+  intercaladas; incremental p95 de 0,000 ms na primeira injeção, 49,265 ms na
+  repetição e 4,136 ms no fallback. Os três cenários atendem ≤100 ms; absolutos
+  e deltas pareados diagnósticos permanecem registrados na seção anterior.
+- Volume: 226 bytes na primeira injeção, zero na supressão e 467 bytes no
+  fallback. Caminho normal com Bash + um Node; fallback somente Bash.
+- Fontes canônicas e instalação: espelhos idênticos, três artefatos do hook
+  preservados byte a byte e sincronização sem restauração da versão antiga.

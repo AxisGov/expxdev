@@ -272,7 +272,7 @@ Se o clone administrativo do RunX não existir, obtê-lo do repositório canôni
 - [ ] **Interfaces — produz:** JSON/texto com p50/p95 absolutos, `max(0, p95 candidato - p95 baseline)` e p50/p95 diagnóstico dos deltas pareados para primeira injeção, repetição e fallback; bytes e processos de cada caminho.
 - [ ] **Teste RED:** invocar script inexistente e exigir schema, contagens, percentis e limites; falha esperada é arquivo ausente.
 - [ ] **Implementação mínima:** spawn intercalado do wrapper e do piso equivalente; percentil determinístico do valor absoluto, da diferença dos p95 e de `hook - baseline` por par; sem rede; não mascarar timeout/falha; reduzir o caminho normal a um único Node antes de aceitar o resultado.
-- [ ] **Comando GREEN:** `node scripts/benchmark-expx-lembrete.mjs --json` sai 0; POSIX/WSL usa p95 absoluto ≤100 ms quando o launcher permitir; Windows/Git Bash usa `max(0, p95 candidato - p95 baseline) ≤100 ms`; saída de injeção/delta ≤768 bytes e supressão 0.
+- [ ] **Comando GREEN:** em processo dedicado, fora da suíte paralela, `node scripts/benchmark-expx-lembrete.mjs --json` sai 0; POSIX/WSL usa p95 absoluto ≤100 ms quando o launcher permitir; Windows/Git Bash usa `max(0, p95 candidato - p95 baseline) ≤100 ms`; saída de injeção/delta ≤768 bytes e supressão 0. O caso Vitest correspondente só roda com `EXPX_BENCHMARK_OFICIAL=1`; `npm.cmd test` não repete a medição.
 - [ ] **Critério de término:** before/after, plataforma, versões, processos, p50/p95 absolutos, diferença dos p95, p50/p95 diagnóstico dos deltas pareados e bytes estão registrados.
 - [ ] **Commit local esperado:** `test: medir latencia e volume do lembrete expx`.
 

@@ -276,6 +276,11 @@ e 200 amostras do cenário e do piso equivalente, com ordem intercalada ou
 randomizada, medindo relógio monotônico e reportando p50/p95 absolutos, a
 diferença entre os p95 e o p95 dos deltas pareados.
 
+A medição oficial roda em processo dedicado, fora da suíte paralela, para que
+outros testes não disputem o scheduler com o candidato e sua baseline. A suíte
+funcional mantém o caso disponível para execução explícita; o gate canônico é
+o comando dedicado do benchmark.
+
 Critérios:
 
 - p95 absoluto de até 100 ms em POSIX/WSL quando o launcher permitir esse
@@ -294,7 +299,7 @@ Critérios:
   amostra a amostra continua publicado apenas como diagnóstico, pois os dois
   processos independentes sofrem picos não correlacionados do scheduler;
 - um piso absoluto acima de 100 ms no Windows/Git Bash não aumenta o limite:
-  muda somente o gate para o delta pareado definido acima.
+  muda somente o gate para a diferença de percentis definida acima.
 
 ## 6. Política de agentes
 
