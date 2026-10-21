@@ -158,7 +158,7 @@ citar quatro das nove regras e perder as outras cinco.
 | Hooks | `CONTRATO-expx-eventos.md` | mecânica, modos, regras de hook |
 | Agentes | `CONTRATO-expx-eventos.md` | frontmatter e ferramentas por agente |
 | Fatiamento de mudanças | `CONTRATO-expx-fatiamento.md` | limites fixos L1 (task), L2 (arquivo) e L3 (PR); F1, F5 e F6; revisão completa, PR de planejamento e entrega sequencial por sprint |
-| Revisão por task | `CONTRATO-expx-revisao.md` | a CLI homologada e a integridade do pacote, a evidência v2 por task, os dois portões (cobertura completa e zero achado aberto), os resultados `incompleta` e `indisponivel`, a identidade do achado, `revisar`, `conferir` (V12) e `rejeitar` |
+| Revisão por task | `CONTRATO-expx-revisao.md` | a CLI homologada e a integridade do pacote, a evidência v2 por task, os dois portões (cobertura completa e zero achado aberto), os resultados `incompleta` e `indisponivel`, a identidade do achado, `revisar`, `conferir` (V12), `rejeitar` e `listar` |
 
 ## Histórico
 

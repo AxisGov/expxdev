@@ -279,6 +279,26 @@ describe("expx-revisao.mjs revisar", () => {
     altera3(c.raiz);
     expect(revisar(c, "src/a.js")).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "arquivo-mudou-durante-revisao" } });
   });
+
+  it.each([
+    [1, "arquivo-inexistente:src/a.js"],
+    [2, "arquivo-mudou-durante-revisao"],
+  ])("funcional: arquivo apagado entre o hash-object e o open da medida (open nº %i) → indisponivel:%s, com evidência", (n, motivo) => {
+    const c = cenario();
+    altera3(c.raiz);
+    // o openSync do script apaga o arquivo antes de abri-lo na n-ésima vez: a troca entre a conferência e a leitura
+    const pre = join(temp("expx-open-"), "pre.mjs");
+    writeFileSync(pre, `import fs from "node:fs"; import { syncBuiltinESMExports } from "node:module";
+const open = fs.openSync; let n = 0;
+fs.openSync = (...a) => { if (String(a[0]).split(String.fromCharCode(92)).join("/").endsWith("/src/a.js") && ++n === ${n}) fs.rmSync(a[0]); return open(...a); };
+syncBuiltinESMExports();
+`);
+    const r = spawnSync(process.execPath, ["--import", pathToFileURL(pre).href, c.script, "revisar", "--trabalho", "w", "--task", "T-01", "--arquivos", "src/a.js",
+      "--raiz", c.raiz], { encoding: "utf8", env: ambienteCom(`${c.falsa.path}${delimiter}${PATH}`, {}) });
+    expect(existsSync(join(c.raiz, "src/a.js"))).toBe(false);
+    expect({ rc: r.status, out: r.stdout }).toEqual({ rc: 2, out: `T-01 indisponivel:${motivo}\n` });
+    expect(evidencia(c.raiz)).toMatchObject({ resultado: "indisponivel", motivo });
+  });
 });
 
 const grava = (d: string, rel: string, b: Buffer): void => { mkdirSync(dirname(join(d, rel)), { recursive: true }); writeFileSync(join(d, rel), b); };
@@ -421,7 +441,7 @@ describe("expx-revisao.mjs revisar v2: portões antes da CLI", () => {
     naoChamou(r);
   });
 
-  it("funcional: FATIA_X no ambiente → rc 64 com a mensagem, sem evidência, nos três subcomandos", () => {
+  it("funcional: FATIA_X no ambiente → rc 64 com a mensagem, sem evidência, nos quatro subcomandos", () => {
     const c = cenario();
     altera3(c.raiz);
     const r = revisar(c, "src/a.js", "T-01", undefined, { FATIA_X: "" });
@@ -430,7 +450,7 @@ describe("expx-revisao.mjs revisar v2: portões antes da CLI", () => {
     naoChamou(r);
     const env = ambienteCom(PATH, { FATIA_X: "1" });
     for (const a of [["conferir", "--modo", "obrigatoria", "--task", `T-01=${git(c.raiz, "rev-parse", "HEAD")}`],
-      ["rejeitar", "--task", "T-01", "--identidade", "a".repeat(64), "--motivo", "fp"]]) {
+      ["rejeitar", "--task", "T-01", "--identidade", "a".repeat(64), "--motivo", "fp"], ["listar", "--task", `T-01=${git(c.raiz, "rev-parse", "HEAD")}`]]) {
       const s = spawnSync(process.execPath, [c.script, ...a, "--trabalho", "w", "--raiz", c.raiz], { encoding: "utf8", env });
       expect([s.status, s.stderr.includes("`FATIA_X` não é mais lida")]).toEqual([64, true]);
     }
@@ -1066,5 +1086,259 @@ describe("expx-revisao.mjs evidência com as issues da CLI: o conferir deriva os
     escreve(c.raiz, "src/a.js", "l1\r\nl2\r\nnovo3\r\nl4\r\nl5\r\n");
     expect(revisar(c, "src/a.js").rc).toBe(0);
     expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+});
+
+describe("expx-revisao.mjs conferir: a evidência cobre o commit da task", () => {
+  const cobre = (raiz: string, sha: string, falta?: string) => expect(conferir(raiz, "obrigatoria", `T-01=${sha}`))
+    .toMatchObject(falta ? { rc: 1, out: `T-01 FALHA evidencia-invalida:cobertura:${falta}` } : { rc: 0, out: "T-01 ok" });
+  const todos = (raiz: string, msg = "task"): string => { git(raiz, "add", "-A"); git(raiz, "commit", "-q", "-m", msg); return git(raiz, "rev-parse", "HEAD"); };
+
+  it("funcional: segunda passagem com arquivo novo sem revisar → FALHA cobertura:<f>, em qualquer modo; com novo revisar → ok", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    const primeira = commita(c.raiz);
+    cobre(c.raiz, primeira);
+    escreve(c.raiz, "src/b.js", "b\n");
+    const sem = commita(c.raiz);
+    cobre(c.raiz, sem, "src/b.js");
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${sem}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:cobertura:src/b.js" });
+    git(c.raiz, "reset", "-q", "--hard", primeira);
+    escreve(c.raiz, "src/b.js", "b\n");
+    expect(revisar(c, "src/b.js").rc).toBe(0);
+    cobre(c.raiz, commita(c.raiz));
+  });
+
+  it("funcional: não revisável, exclusão do núcleo e excluir_da_revisao do commit saem da conta; revisável fora da evidência não", () => {
+    const c = cenario();
+    escreve(c.raiz, ".expx/fatiamento.json", JSON.stringify({ expx_fatiamento: 2, excluir_da_revisao: [
+      { padrao: "^gerado/", classe: "gerado", origem: "scripts/gera.sh", motivo: "saída do gerador" }] }));
+    todos(c.raiz, "config");
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    escreve(c.raiz, "logo.png", "png\n");
+    escreve(c.raiz, "docs/sprintx/estado.md", "# estado\n");
+    escreve(c.raiz, "gerado/saida.js", "x\n");
+    cobre(c.raiz, todos(c.raiz));
+    escreve(c.raiz, "src/b.js", "b\n");
+    cobre(c.raiz, todos(c.raiz, "mais"), "src/b.js");
+  });
+
+  it("funcional: arquivo apagado pelo commit e fora da evidência → FALHA cobertura:<f>", () => {
+    const c = cenario();
+    escreve(c.raiz, "src/b.js", "b\n");
+    todos(c.raiz, "b");
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    rmSync(join(c.raiz, "src/b.js"));
+    cobre(c.raiz, commita(c.raiz), "src/b.js");
+  });
+
+  it("funcional: merge como commit da task conta tudo o que ele traz ao primeiro pai", () => {
+    const c = cenario();
+    git(c.raiz, "checkout", "-q", "-b", "lado");
+    escreve(c.raiz, "src/c.js", "c\n");
+    todos(c.raiz, "lado");
+    git(c.raiz, "checkout", "-q", "main");
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    cobre(c.raiz, commita(c.raiz));
+    git(c.raiz, "merge", "-q", "--no-ff", "-m", "merge", "lado");
+    cobre(c.raiz, git(c.raiz, "rev-parse", "HEAD"), "src/c.js");
+  });
+
+  it("funcional: --base-commit: conta também o que mudou desde base_commit, não só o commit da evidência", () => {
+    const c = cenario();
+    const base = git(c.raiz, "rev-parse", "HEAD");
+    altera3(c.raiz);
+    git(c.raiz, "commit", "-q", "-am", "task");
+    expect(revisar(c, "src/a.js", "T-01", undefined, {}, c.script, ["--base-commit", base]).rc).toBe(0);
+    cobre(c.raiz, commita(c.raiz, true));
+    git(c.raiz, "reset", "-q", "--hard", "HEAD~1");
+    escreve(c.raiz, "src/b.js", "b\n");
+    todos(c.raiz, "outra");
+    expect(revisar(c, "src/a.js", "T-01", undefined, {}, c.script, ["--base-commit", base]).rc).toBe(0);
+    cobre(c.raiz, commita(c.raiz, true), "src/b.js");
+  });
+});
+
+describe("expx-revisao.mjs listar: o que a mergex lê da evidência no commit", () => {
+  type Listada = { task: string; commit: string; listagem: string; causa: string | null; resultado: string | null; motivo: string | null;
+    rejeitados: unknown[]; rejeicoes: unknown[]; removidos_sem_revisao: string[] };
+  const listar = (raiz: string, ...pares: string[]) => {
+    const r = roda(raiz, "listar", ...pares.flatMap((p) => ["--task", p]));
+    return { rc: r.rc, err: r.err, out: r.out, j: (r.rc === 64 ? undefined : JSON.parse(r.out)) as { expx_revisao_listar: number; trabalho: string; tasks: Listada[] } };
+  };
+  const vazia = { resultado: null, motivo: null, rejeitados: [], rejeicoes: [], removidos_sem_revisao: [] };
+  const ISO = expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/);
+
+  it("funcional: achado rejeitado com a rejeição da própria evidência: a saída exata, uma linha de JSON, sai 0", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3), achado("src/a.js", 1)] });
+    altera3(c.raiz);
+    const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
+    expect(roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "falso positivo").rc).toBe(0);
+    const sha = commita(c.raiz);
+    const r = listar(c.raiz, `T-01=${sha}`);
+    expect(r.out.split("\n")).toHaveLength(1);
+    expect(r).toMatchObject({ rc: 0, j: { expx_revisao_listar: 1, trabalho: "w", tasks: [{ task: "T-01", commit: sha, listagem: "ok", causa: null,
+      resultado: "ok", motivo: null, removidos_sem_revisao: [],
+      rejeicoes: [{ identidade: id, motivo: "falso positivo", em: ISO }],
+      rejeitados: [{ identidade: id, arquivo: "src/a.js", linha: 3, label: "security", texto: "x", rejeicao: { task: "T-01", motivo: "falso positivo", em: ISO } }] }] } });
+    expect(Object.keys(r.j.tasks[0] ?? {})).toEqual(["task", "commit", "listagem", "causa", "resultado", "motivo", "rejeitados", "rejeicoes", "removidos_sem_revisao"]);
+  });
+
+  it("funcional: rejeição gravada na evidência de outra task do trabalho: rejeicao aponta a task dela", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    const id = identidade("security", "src/a.js", ["l2", "novo3", "l4"]);
+    rejeita(c.raiz, "T-02", [id]);
+    revisar(c, "src/a.js");
+    expect(listar(c.raiz, `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 0, j: { tasks: [{ listagem: "ok", resultado: "ok", rejeicoes: [],
+      rejeitados: [{ identidade: id, rejeicao: { task: "T-02", motivo: "fp", em: "x" } }] }] } });
+  });
+
+  it("funcional: pulos.json (notas.md, manual.pdf, logo.png, package-lock.json, apagado.js) → removidos_sem_revisao [apagado.js]", () => {
+    const tarefa = ["notas.md", "manual.pdf", "logo.png", "package-lock.json", "apagado.js"];
+    const c = cenario({ resposta: doFixture("pulos", (f) => tarefa.includes(f)) });
+    poeCaso(c.raiz, arquivosDoCaso("pulos"), tarefa);
+    expect(revisar(c, tarefa.join(",")).rc).toBe(0);
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "task");
+    expect(listar(c.raiz, `T-01=${git(c.raiz, "rev-parse", "HEAD")}`)).toMatchObject({ rc: 0, j: { tasks: [{ listagem: "ok", resultado: "ok",
+      rejeitados: [], rejeicoes: [], removidos_sem_revisao: ["apagado.js"] }] } });
+  });
+
+  it("funcional: limite41.json a uma task com f01–f40 → listada, resultado incompleta e motivo sobra:f41.js", () => {
+    const c = cenario({ fixture: "limite41" });
+    const nomes = poeCaso(c.raiz, arquivosDoCaso("limite41")).slice(0, 40);
+    expect(revisar(c, nomes.join(",")).rc).toBe(3);
+    git(c.raiz, "add", "--", ...nomes, "docs");
+    git(c.raiz, "commit", "-q", "-m", "task");
+    expect(listar(c.raiz, `T-01=${git(c.raiz, "rev-parse", "HEAD")}`)).toMatchObject({ rc: 0, j: { tasks: [{ listagem: "ok",
+      resultado: "incompleta", motivo: "sobra:f41.js", rejeitados: [] }] } });
+  });
+
+  it("funcional: evidência inválida para o conferir nunca é listada: listagem invalida com a causa do conferir, listas vazias, sai 1", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    const ev = evidencia(c.raiz) as Record<string, any>;
+    ev["achados"][0].estado = "rejeitado"; // sem a rejeição gravada
+    ev["resultado"] = "ok";
+    escreve(c.raiz, EV, JSON.stringify(ev));
+    const sha = commita(c.raiz);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:achados" });
+    expect(listar(c.raiz, `T-01=${sha}`)).toMatchObject({ rc: 1, j: { tasks: [{ task: "T-01", commit: sha, listagem: "invalida",
+      causa: "evidencia-invalida:achados", ...vazia }] } });
+  });
+
+  it("funcional: segunda passagem sem novo revisar: invalida por cobertura, como no conferir", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    commita(c.raiz);
+    escreve(c.raiz, "src/b.js", "b\n");
+    expect(listar(c.raiz, `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, j: { tasks: [{ listagem: "invalida", causa: "evidencia-invalida:cobertura:src/b.js" }] } });
+  });
+
+  it("funcional: ausente sai 3; commit inexistente é invalida e sai 1; várias tasks na ordem dada", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    const sha = commita(c.raiz);
+    expect(listar(c.raiz, `T-01=${sha}`, `T-02=${sha}`)).toMatchObject({ rc: 3, j: { tasks: [{ task: "T-01", listagem: "ok" },
+      { task: "T-02", listagem: "ausente", causa: "evidencia-ausente", ...vazia }] } });
+    const zero = "0".repeat(40);
+    expect(listar(c.raiz, `T-02=${sha}`, `T-01=${zero}`)).toMatchObject({ rc: 1, j: { tasks: [{ task: "T-02", listagem: "ausente" },
+      { task: "T-01", commit: zero, listagem: "invalida", causa: `commit-inexistente:${zero}` }] } });
+  });
+
+  it.each([
+    ["rejeição sem motivo", (ev: Record<string, any>) => { ev["rejeicoes"] = [{ identidade: "a".repeat(64), em: "x" }]; }, "rejeicoes"],
+    ["rejeicoes que não é lista", (ev: Record<string, any>) => { ev["rejeicoes"] = {}; }, "rejeicoes"],
+    ["removido que não está nulo em arquivos", (ev: Record<string, any>) => { ev["removidos_sem_revisao"] = ["src/a.js"]; }, "removidos_sem_revisao"],
+    ["removidos_sem_revisao ausente", (ev: Record<string, any>) => { delete ev["removidos_sem_revisao"]; }, "removidos_sem_revisao"],
+  ])("funcional: %s → conferir FALHA evidencia-invalida:<campo> e listar invalida", (_nome, muda, campo) => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    const ev = evidencia(c.raiz) as Record<string, any>;
+    muda(ev);
+    escreve(c.raiz, EV, JSON.stringify(ev));
+    const sha = commita(c.raiz);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 1, out: `T-01 FALHA evidencia-invalida:${campo}` });
+    expect(listar(c.raiz, `T-01=${sha}`)).toMatchObject({ rc: 1, j: { tasks: [{ listagem: "invalida", causa: `evidencia-invalida:${campo}` }] } });
+  });
+
+  it.each([
+    ["sem --task", []],
+    ["--modo (o listar não depende do modo)", ["--modo", "obrigatoria", "--task", "T-01=abc"]],
+    ["task sem sha", ["--task", "T-01"]],
+    ["--identidade", ["--task", "T-01=abc", "--identidade", "a".repeat(64)]],
+  ])("funcional: uso errado (%s) → 64, sem saída", (_nome, a) => {
+    const c = cenario();
+    expect(roda(c.raiz, "listar", ...a)).toMatchObject({ rc: 64, out: "" });
+  });
+});
+
+describe("expx-revisao.mjs conferir e listar: casos de borda da cobertura e da saída", () => {
+  it("funcional: clone raso sem o pai do commit da task: FALHA evidencia-invalida:cobertura (não verificável), nunca a árvore inteira", () => {
+    const c = cenario();
+    escreve(c.raiz, "src/c.js", "c\n");
+    expect(revisar(c, "src/c.js").rc).toBe(0);
+    commita(c.raiz);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${git(c.raiz, "rev-parse", "HEAD")}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+    const raso = join(temp("expx-raso-"), "r");
+    git(tmpdir(), "clone", "-q", "--depth", "1", pathToFileURL(c.raiz).href, raso);
+    expect(conferir(raso, "obrigatoria", `T-01=${git(raso, "rev-parse", "HEAD")}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:cobertura" });
+  });
+
+  it("funcional: listar dá motivo null em ok mesmo com motivo gravado", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    escreve(c.raiz, EV, JSON.stringify({ ...(evidencia(c.raiz) as object), motivo: "x" }));
+    const r = roda(c.raiz, "listar", "--task", `T-01=${commita(c.raiz)}`);
+    expect(r.rc).toBe(0);
+    expect(JSON.parse(r.out)).toMatchObject({ tasks: [{ listagem: "ok", resultado: "ok", motivo: null }] });
+  });
+});
+
+describe("expx-revisao.mjs conferir: commit com lista de caminhos acima de 1 MiB", () => {
+  it("funcional: 5.000 caminhos longos excluídos pelo núcleo (diff > 1 MiB) e o revisável coberto → ok, não cobertura", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    git(c.raiz, "add", "src", "docs");
+    const blob = git(c.raiz, "hash-object", "-w", "src/a.js");
+    const nome = "n".repeat(200);
+    const linhas = Array.from({ length: 5000 }, (_, i) => `100644 ${blob}\tdocs/entregas/w/gerado/${i}-${nome}.txt`).join("\n");
+    const r = spawnSync("git", ["update-index", "--index-info"], { cwd: c.raiz, input: `${linhas}\n`, encoding: "utf8" });
+    expect(r.status).toBe(0);
+    git(c.raiz, "commit", "-q", "-m", "task");
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${git(c.raiz, "rev-parse", "HEAD")}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  }, 60000);
+});
+
+describe("expx-revisao.mjs conferir: evidência que não se lê e base_commit que não é commit", () => {
+  it("funcional: evidência no commit cujo blob o git não lê → FALHA evidencia-invalida em qualquer modo, nunca AVISO evidencia-ausente", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    const sha = commita(c.raiz);
+    const blob = git(c.raiz, "rev-parse", `${sha}:${EV}`);
+    rmSync(join(c.raiz, ".git", "objects", blob.slice(0, 2), blob.slice(2)), { force: true });
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida" });
+  });
+
+  it("funcional: indisponivel com modo base-commit e base_commit que não é commit → FALHA evidencia-invalida:cobertura, não AVISO", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js", "T-01", semCodeant());
+    const ev = evidencia(c.raiz) as Record<string, any>;
+    expect(ev).toMatchObject({ resultado: "indisponivel", motivo: "cli-ausente" });
+    escreve(c.raiz, EV, JSON.stringify({ ...ev, modo: "base-commit", base_commit: "0".repeat(40) }));
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:cobertura" });
   });
 });

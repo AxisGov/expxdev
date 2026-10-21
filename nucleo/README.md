@@ -11,7 +11,7 @@ foram selecionadas.
 | `hooks/expx-rastro.sh` | O rastro de eventos, os modos de hook e o `trabalho_id` |
 | `scripts/expx-fatiamento.mjs` | O leitor único de `.expx/fatiamento.json` (seção `scripts/` abaixo) |
 | `scripts/expx-limites.mjs` | As exclusões do núcleo, a gramática de `excluir_da_revisao` e a regra dos nomes `FATIA_*` reservados |
-| `scripts/expx-revisao.mjs` | A revisão por task pela CLI do CodeAnt: `revisar`, `conferir`, `rejeitar` (seção `scripts/` abaixo) |
+| `scripts/expx-revisao.mjs` | A revisão por task pela CLI do CodeAnt: `revisar`, `conferir`, `rejeitar`, `listar` (seção `scripts/` abaixo) |
 | `commands/onboarding.md` | `/expx:onboarding` — orquestra o mapeamento inicial (stackx, designx, legadox, memox, prodx) das camadas instaladas. Não é núcleo de hook: `montarPlugin` o copia à parte, direto para `commands/` na raiz do plugin — não para dentro de `nucleo/` — porque é assim que o Claude Code descobre um comando. |
 
 ## Como chega até um projeto
@@ -73,8 +73,10 @@ CLI uma vez (`--uncommitted` ou `--base-commit <sha>`) pelo arquivo conferido,
 reconcilia a resposta com a task e grava a evidência v2 em
 `docs/entregas/<trabalho>/revisao/<T-NN.MM>.json`; sai 0 (`ok`), 1 (achado aberto),
 2 (`indisponivel`) ou 3 (`incompleta`). `conferir` é a regra da V12 da mergex
-(`incompleta` é FALHA em qualquer modo); `rejeitar` registra a rejeição de um
-achado pelo desenvolvedor. Qualquer `FATIA_*` no ambiente sai 64. A sprintx
+(`incompleta` é FALHA em qualquer modo, e a evidência tem de cobrir os arquivos
+que o commit da task altera); `rejeitar` registra a rejeição de um
+achado pelo desenvolvedor; `listar` devolve, em JSON, os achados rejeitados, as
+rejeições e os removidos da evidência que o `conferir` aceita. Qualquer `FATIA_*` no ambiente sai 64. A sprintx
 (passo de revisão da F6) e a mergex (E2, V12) passam a chamá-lo nos planos delas.
 
 ## Por que existe

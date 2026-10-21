@@ -2,8 +2,11 @@
 //   node expx-revisao.mjs revisar --trabalho <slug> --task <T-NN.MM> --arquivos <a,b,...> [--base-commit <sha>] [--raiz <dir>]
 //   node expx-revisao.mjs conferir --trabalho <slug> --modo <obrigatoria|se_disponivel|desligada> --task <T-NN.MM>=<sha> [...]
 //   node expx-revisao.mjs rejeitar --trabalho <slug> --task <T-NN.MM> --identidade <hex> --motivo <texto>
+//   node expx-revisao.mjs listar --trabalho <slug> --task <T-NN.MM>=<sha> [...]
 // revisar: grava docs/entregas/<slug>/revisao/<T-NN.MM>.json (evidência v2); sai 0 (ok), 1 (achado aberto),
-// 2 (indisponivel), 3 (incompleta). conferir: 0 (ok), 1 (FALHA), 3 (só AVISO). Uso errado, inclusive
+// 2 (indisponivel), 3 (incompleta). conferir: 0 (ok), 1 (FALHA), 3 (só AVISO). listar (só leitura): uma linha de JSON
+// `expx_revisao_listar: 1` com os rejeitados, as rejeições e os removidos da evidência que o `conferir` aceita; 0
+// (todas listadas), 1 (alguma inválida), 3 (alguma ausente). Uso errado, inclusive
 // `FATIA_*` no ambiente: 64. Uma chamada só da CLI (sem lotes), pelo arquivo do pacote conferido; a
 // resposta é reconciliada com a task (contrato expx-revisao v2); a evidência guarda as `issues` cruas, e o
 // `conferir` deriva delas os achados. Nunca lê credencial da CLI.
@@ -19,9 +22,9 @@ import { fileURLToPath } from "node:url";
 import { conferirIntegridade, excluido, EXCLUIDOS_DO_NUCLEO, fatiaNoAmbiente, homologadas, localizarPacote, medir, mensagemFatia,
   motivoAceito, perfilCli, revisavel } from "./expx-limites.mjs";
 
-const OBRIGATORIOS = { revisar: ["task", "arquivos"], conferir: ["modo", "task"], rejeitar: ["task", "identidade", "motivo"] };
+const OBRIGATORIOS = { revisar: ["task", "arquivos"], conferir: ["modo", "task"], rejeitar: ["task", "identidade", "motivo"], listar: ["task"] };
 function uso(msg) {
-  process.stderr.write(`expx-revisao: ${msg}\nuso: node expx-revisao.mjs revisar|conferir|rejeitar --trabalho <slug> ... (cabecalho do script)\n`);
+  process.stderr.write(`expx-revisao: ${msg}\nuso: node expx-revisao.mjs revisar|conferir|rejeitar|listar --trabalho <slug> ... (cabecalho do script)\n`);
   process.exit(64);
 }
 const [cmd, ...args] = process.argv.slice(2);
@@ -38,14 +41,16 @@ for (let i = 0; i < args.length; i += 2) {
   if (args[i + 1] === undefined) uso(`${args[i]} exige valor`);
   op[args[i].slice(2)] = args[i + 1];
   if (args[i] === "--task") op.tasks.push(args[i + 1]);
+  // o `listar` não depende do modo nem grava nada: só `--trabalho`, `--task` e `--raiz`
+  if (cmd === "listar" && !/^--(raiz|trabalho|task)$/.test(args[i])) uso(`${args[i]} nao vale no listar`);
 }
 // `--arquivos` não é aparado: espaço é parte do nome
 for (const k of ["trabalho", ...OBRIGATORIOS[cmd]]) if (!(k === "arquivos" ? op[k] : op[k]?.trim())) uso(`--${k} obrigatorio`);
 if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(op.trabalho)) uso(`trabalho invalido: ${op.trabalho}`);
 // id `T-NN.MM` da sprintx/runx (sprint.task) ou o legado `T-<dígitos>` (como antes); vira nome de arquivo, então nada além disso
-const TASK = cmd === "conferir" ? /^T-(\d+|\d{2}\.\d{2})=[^\s:]+$/ : /^T-(\d+|\d{2}\.\d{2})$/;
+const TASK = ["conferir", "listar"].includes(cmd) ? /^T-(\d+|\d{2}\.\d{2})=[^\s:]+$/ : /^T-(\d+|\d{2}\.\d{2})$/;
 for (const t of op.tasks) if (!TASK.test(t)) uso(`task invalida: ${t}`);
-if (cmd !== "conferir" && op.tasks.length > 1) uso("--task uma vez so");
+if (!["conferir", "listar"].includes(cmd) && op.tasks.length > 1) uso("--task uma vez so");
 if (cmd === "conferir" && !["obrigatoria", "se_disponivel", "desligada"].includes(op.modo)) uso(`modo invalido: ${op.modo}`);
 if (cmd === "rejeitar" && !/^[0-9a-f]{64}$/.test(op.identidade)) uso(`identidade invalida: ${op.identidade}`);
 if (op["base-commit"] !== undefined && cmd !== "revisar") uso("--base-commit so no revisar");
@@ -56,7 +61,9 @@ const le = (f) => { try { return JSON.parse(readFileSync(f, "utf8").replace(/^\u
 // todo caminho dado ao git é literal: glob (`src/[id].ts`) ou pathspec mágico (`:(top)x`) no nome trariam os
 // hunks de outro arquivo, ou nenhum, e o achado em linha alterada viraria `anterior`
 const GIT_ENV = { ...process.env, GIT_LITERAL_PATHSPECS: "1" };
-const git = (...a) => spawnSync("git", a, { cwd: op.raiz, encoding: "utf8", env: GIT_ENV });
+// a saída de listas (`diff --name-only`, `ls-tree -r`) passa de 1 MiB, o padrão do `spawnSync`, em commit grande: cortada, o
+// git daria por falha (e um commit coberto por não verificável); blob nunca vem por aqui (`blobGit`, limitado)
+const git = (...a) => spawnSync("git", a, { cwd: op.raiz, encoding: "utf8", env: GIT_ENV, maxBuffer: 256 << 20 });
 // Nada acima de LEITURA_MAXIMA vai inteiro à memória. É muito acima de L2 (204.800 bytes), e a decodificação da CLI
 // nunca encolhe o conteúdo (cada sequência UTF-8 inválida, de até 3 bytes, vira um U+FFFD, de 3): o que passa dele já
 // reprova L2 só pelo tamanho, e a medida fica o tamanho em bytes, com as linhas desconhecidas (`null`).
@@ -77,14 +84,18 @@ function medirBlob(ref) {
   return conteudo ? medir(conteudo) : undefined;
 }
 /** A medida da CLI do arquivo do checkout, pela mesma regra de `medirBlob`: lê no máximo LEITURA_MAXIMA + 1 bytes, mesmo
- *  que o arquivo cresça durante a leitura. */
+ *  que o arquivo cresça durante a leitura. Undefined se ele não abre ou não se lê (apagado ou trocado por pasta depois do
+ *  `hash-object`): quem mede dá a falta como `arquivo-inexistente` ou `arquivo-mudou-durante-revisao`, nunca uma exceção. */
 function medirArquivo(f) {
-  const fd = openSync(join(op.raiz, f), "r");
+  let fd;
+  try { fd = openSync(join(op.raiz, f), "r"); } catch { return undefined; }
   try {
     const buf = Buffer.alloc(LEITURA_MAXIMA + 1);
     let n = 0;
     for (let k; n < buf.length && (k = readSync(fd, buf, n, buf.length - n, null)) > 0;) n += k;
     return n > LEITURA_MAXIMA ? { linhas: null, bytes: Math.max(n, fstatSync(fd).size) } : medir(buf.subarray(0, n));
+  } catch {
+    return undefined;
   } finally {
     closeSync(fd);
   }
@@ -176,15 +187,15 @@ function alteradas(f, de, ate) {
 }
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-/** Com `--base-commit`, uma pasta temporária com o `.expx/fatiamento.json` do `HEAD` revisado, para o leitor: ausente
- *  no `HEAD`, a pasta fica sem ele (os padrões, como o ausente no disco); entrada que não é arquivo comum (pasta, link,
- *  submódulo) ou `ls-tree` que falha: `null` (inválido, nunca os padrões). */
-function raizDoFatiamentoNoHead() {
-  const r = git("ls-tree", "-z", "HEAD", "--", ".expx/fatiamento.json");
+/** Uma pasta temporária com o `.expx/fatiamento.json` do commit `rev` (o `HEAD` revisado, com `--base-commit`; o da task,
+ *  no `conferir`), para o leitor: ausente no commit, a pasta fica sem ele (os padrões, como o ausente no disco); entrada que
+ *  não é arquivo comum (pasta, link, submódulo) ou `ls-tree` que falha: `null` (inválido, nunca os padrões). */
+function raizDoFatiamentoNoCommit(rev) {
+  const r = git("ls-tree", "-z", rev, "--", ".expx/fatiamento.json");
   const entrada = r.status === 0 ? r.stdout.split("\0")[0] : undefined;
   const [modo, tipo, oid] = (entrada ?? "").split("\t")[0].split(" ");
   if (entrada === undefined || (entrada !== "" && (tipo !== "blob" || !["100644", "100755"].includes(modo)))) {
-    process.stderr.write("expx-revisao: .expx/fatiamento.json do HEAD nao e arquivo comum legivel\n");
+    process.stderr.write(`expx-revisao: .expx/fatiamento.json de ${rev} nao e arquivo comum legivel\n`);
     return null;
   }
   const raiz = mkdtempSync(join(tmpdir(), "expx-fatiamento-"));
@@ -194,10 +205,10 @@ function raizDoFatiamentoNoHead() {
   }
   return raiz;
 }
-/** Os `padrao` de `excluir_da_revisao` do projeto, pelo leitor irmão (nunca do ambiente); `null` se ele falha. Com
- *  `--base-commit`, os do `HEAD` revisado, nunca os da árvore de trabalho. */
-function exclusoesDoProjeto() {
-  const temporaria = op["base-commit"] ? raizDoFatiamentoNoHead() : undefined;
+/** Os `padrao` de `excluir_da_revisao` do projeto, pelo leitor irmão (nunca do ambiente); `null` se ele falha. Com `rev`
+ *  (`--base-commit`: o `HEAD` revisado; no `conferir`: o commit da task), os do commit, nunca os da árvore de trabalho. */
+function exclusoesDoProjeto(rev) {
+  const temporaria = rev ? raizDoFatiamentoNoCommit(rev) : undefined;
   if (temporaria === null) return null;
   try {
     const r = spawnSync(process.execPath, [join(AQUI, "expx-fatiamento.mjs"), "--formato", "json", "--raiz", temporaria ?? op.raiz], { encoding: "utf8" });
@@ -224,6 +235,7 @@ function medida(f) {
   const a = medirBlob(blob);
   if (!a) return undefined;
   const b = medirArquivo(f);
+  if (!b) return undefined;
   const linhas = a.linhas === null || b.linhas === null ? null : Math.max(a.linhas, b.linhas);
   return { blob, bytes: Math.max(a.bytes, b.bytes), linhas, disco };
 }
@@ -281,7 +293,7 @@ function revisar() {
   const presentes = arquivos.filter((f) => existsSync(join(op.raiz, f)));
   const removidos = arquivos.filter((f) => !presentes.includes(f));
   for (const f of removidos) { ev.arquivos[f] = null; ev.removidos_sem_revisao.push(f); }
-  const exclusoes = virgula ? [] : exclusoesDoProjeto();
+  const exclusoes = virgula ? [] : exclusoesDoProjeto(op["base-commit"] ? "HEAD" : undefined);
   // os portões antes da CLI não dependem da versão instalada: os números são iguais em todas as homologadas
   const perfil = perfilCli(homologadas().at(-1));
   const medidas = {};
@@ -428,51 +440,111 @@ function semSinalDaCli(ev, sha) {
   if (include.length !== enviados.length || !enviados.every((f) => include.includes(f)) || reconciliar(enviados, meta)) return "cobertura";
 }
 
+/** O primeiro arquivo que o commit da task altera e a evidência não cobre (fora das chaves de `arquivos`), `""` se o
+ *  diff falha, ou undefined. Alterados: o diff de `sha` contra o primeiro pai (no merge, tudo o que ele traz à linha; na
+ *  raiz, a árvore inteira) e, com `--base-commit`, também desde `base_commit` (a task inteira, não só o commit da
+ *  evidência); sem renomeação (o nome antigo e o novo contam), sem submódulo. Saem da conta, como no `revisar`: o não
+ *  revisável pelo predicado do perfil, as exclusões do núcleo (a própria evidência entre elas) e as de `excluir_da_revisao`
+ *  do `.expx/fatiamento.json` do commit (leitor que falha: nenhuma, nunca menos conta). */
+function naoCoberto(ev, sha) {
+  const opcoes = ["--no-ext-diff", "--no-renames", "--ignore-submodules=all", "--name-only", "-z"];
+  // o pai pelo cabeçalho do commit, não por `<sha>^1`: num clone raso o pai existe mas não foi baixado, e o diff falha
+  // (não verificável), em vez de o commit passar por raiz e cobrar a árvore inteira
+  const cabecalho = git("cat-file", "commit", sha);
+  if (cabecalho.status !== 0) return "";
+  const pai = /^parent ([0-9a-f]+)$/m.exec(cabecalho.stdout.split(/\r?\n\r?\n/)[0])?.[1];
+  const diffs = [pai ? git("diff", ...opcoes, pai, sha) : git("diff-tree", "--root", "-r", "--no-commit-id", ...opcoes, sha)];
+  // `modo` fora dos dois, ou `base_commit` que não é commit (em `indisponivel`/`incompleta` nada mais os confere): não verificável
+  if (ev.modo === "base-commit" ? !ehCommit(ev.base_commit) : ev.modo !== "uncommitted") return "";
+  if (ev.modo === "base-commit") diffs.push(git("diff", ...opcoes, ev.base_commit, sha));
+  if (diffs.some((d) => d.status !== 0)) return "";
+  const homologado = perfilCli(homologadas().at(-1));
+  const exclusoes = exclusoesDoProjeto(sha) ?? [];
+  const contam = (f) => revisavel(f, homologado) && !excluido(f, EXCLUIDOS_DO_NUCLEO) && !excluido(f, exclusoes);
+  return diffs.flatMap((d) => d.stdout.split("\0")).find((f) => f !== "" && contam(f) && !Object.hasOwn(ev.arquivos, f));
+}
+
+/** `rejeicoes` ou `removidos_sem_revisao` fora da forma que o `listar` devolve (o nome do campo), ou undefined:
+ *  `rejeicoes` lista de `{identidade, motivo, em}` (hex de 64, texto, texto); `removidos_sem_revisao` lista de textos sem
+ *  repetição, exatamente os arquivos `null` de `arquivos` (o `revisar` grava os dois juntos). */
+function semListas(ev) {
+  if (!Array.isArray(ev.rejeicoes) || !ev.rejeicoes.every((r) => ehMapa(r) && /^[0-9a-f]{64}$/.test(r.identidade)
+    && typeof r.motivo === "string" && typeof r.em === "string")) return "rejeicoes";
+  const removidos = ev.removidos_sem_revisao;
+  const nulos = Object.keys(ev.arquivos).filter((f) => ev.arquivos[f] === null);
+  if (!Array.isArray(removidos) || !removidos.every((f) => typeof f === "string") || new Set(removidos).size !== removidos.length
+    || removidos.length !== nulos.length || !nulos.every((f) => removidos.includes(f))) return "removidos_sem_revisao";
+}
+
+/** A evidência da task no commit, pela validação do `conferir` (a mesma no `listar`): `{ausente: true}`, `{falha: <motivo>}`
+ *  (FALHA em qualquer modo) ou `{ev}`, válida, com qualquer `resultado`. */
+function avaliar(task, sha) {
+  const falha = (motivo) => ({ falha: motivo });
+  if (git("rev-parse", "--verify", "-q", `${sha}^{commit}`).status !== 0) return { falha: `commit-inexistente:${sha}` };
+  // a evidência que vale é a do commit da task (o E1 a commita junto), nunca a do disco
+  const doCommit = git("show", `${sha}:./docs/entregas/${op.trabalho}/revisao/${task}.json`);
+  // ausente é a que não está na árvore do commit; a que está e o git não lê (objeto apagado ou corrompido) é inválida
+  if (doCommit.status !== 0) {
+    const naArvore = git("ls-tree", "-z", "--name-only", sha, "--", `docs/entregas/${op.trabalho}/revisao/${task}.json`);
+    return naArvore.status === 0 && naArvore.stdout === "" ? { ausente: true } : falha("evidencia-invalida");
+  }
+  let ev;
+  try { ev = JSON.parse(doCommit.stdout.replace(/^\uFEFF/, "")); } catch { return falha("evidencia-invalida"); }
+  if (ehMapa(ev) && ev.expx_revisao !== 2) return falha("evidencia-invalida:versao");
+  if (!ehMapa(ev) || ev.task !== task || ev.trabalho !== op.trabalho || !ehMapa(ev.arquivos)
+    || Object.keys(ev.arquivos).length === 0 || !Object.values(ev.arquivos).every((a) => a === null || ehMapa(a)) || !Array.isArray(ev.achados)
+    || !ev.achados.every((a) => ehMapa(a) && /^[0-9a-f]{64}$/.test(a.identidade) && ["aberto", "anterior", "rejeitado"].includes(a.estado))
+    || !["ok", "achados", "indisponivel", "incompleta"].includes(ev.resultado)) return falha("evidencia-invalida");
+  const lista = semListas(ev);
+  if (lista) return falha(`evidencia-invalida:${lista}`);
+  const concluida = ["ok", "achados"].includes(ev.resultado);
+  if (concluida && semData(ev)) return falha("evidencia-invalida:executada_em");
+  for (const [f, a] of Object.entries(ev.arquivos)) {
+    const r = git("rev-parse", "--verify", "-q", `${sha}:./${f}`);
+    if ((r.status === 0 ? r.stdout.trim() : null) !== (a === null ? null : a.blob)) return falha(`evidencia-nao-bate:${f}`);
+  }
+  const descoberto = naoCoberto(ev, sha);
+  if (descoberto !== undefined) return falha(`evidencia-invalida:cobertura${descoberto ? `:${descoberto}` : ""}`);
+  // indisponivel e incompleta: nada da CLI a conferir (o `veredito` as reprova ou avisa pelo motivo)
+  if (!concluida) return { ev };
+  const falta = semSinalDaCli(ev, sha) ?? achadosDivergem(ev, sha);
+  return falta ? falha(`evidencia-invalida:${falta}`) : { ev };
+}
+
 /** O veredito de uma task: a evidência tem de existir, bater com o commit e não ter achado aberto. */
 function veredito(task, sha) {
   if (op.modo === "desligada") return "ok";
   const nivel = op.modo === "obrigatoria" ? "FALHA" : "AVISO";
-  if (git("rev-parse", "--verify", "-q", `${sha}^{commit}`).status !== 0) return `FALHA commit-inexistente:${sha}`;
-  // a evidência que vale é a do commit da task (o E1 a commita junto), nunca a do disco
-  const doCommit = git("show", `${sha}:./docs/entregas/${op.trabalho}/revisao/${task}.json`);
-  if (doCommit.status !== 0) return `${nivel} evidencia-ausente`;
-  let ev;
-  try { ev = JSON.parse(doCommit.stdout.replace(/^\uFEFF/, "")); } catch { return "FALHA evidencia-invalida"; }
-  if (ehMapa(ev) && ev.expx_revisao !== 2) return "FALHA evidencia-invalida:versao";
-  if (!ehMapa(ev) || ev.task !== task || ev.trabalho !== op.trabalho || !ehMapa(ev.arquivos)
-    || Object.keys(ev.arquivos).length === 0 || !Object.values(ev.arquivos).every((a) => a === null || ehMapa(a)) || !Array.isArray(ev.achados)
-    || !ev.achados.every((a) => ehMapa(a) && /^[0-9a-f]{64}$/.test(a.identidade) && ["aberto", "anterior", "rejeitado"].includes(a.estado))
-    || !["ok", "achados", "indisponivel", "incompleta"].includes(ev.resultado)) return "FALHA evidencia-invalida";
-  const concluida = ["ok", "achados"].includes(ev.resultado);
-  if (concluida && semData(ev)) return "FALHA evidencia-invalida:executada_em";
-  for (const [f, a] of Object.entries(ev.arquivos)) {
-    const r = git("rev-parse", "--verify", "-q", `${sha}:./${f}`);
-    if ((r.status === 0 ? r.stdout.trim() : null) !== (a === null ? null : a.blob)) return `FALHA evidencia-nao-bate:${f}`;
-  }
+  const { ausente, falha, ev } = avaliar(task, sha);
+  if (ausente) return `${nivel} evidencia-ausente`;
+  if (falha) return `FALHA ${falha}`;
   if (ev.resultado === "indisponivel") return `${nivel} indisponivel:${ev.motivo}`;
   // a mudança que a CLI não cobre não depende do modo
   if (ev.resultado === "incompleta") return `FALHA incompleta:${ev.motivo}`;
-  const falta = semSinalDaCli(ev, sha);
-  if (falta) return `FALHA evidencia-invalida:${falta}`;
-  const diverge = achadosDivergem(ev, sha);
-  if (diverge) return `FALHA evidencia-invalida:${diverge}`;
   const abertos = ev.achados.filter((a) => a.estado === "aberto").length;
   return abertos > 0 ? `FALHA achados-abertos:${abertos}` : "ok";
 }
 
 const SHA = /^[0-9a-f]{40}([0-9a-f]{24})?$/;
 const ehCommit = (x) => typeof x === "string" && SHA.test(x) && git("cat-file", "-e", `${x}^{commit}`).status === 0;
-/** As identidades rejeitadas na própria evidência e nas do trabalho, como estão no commit da task. */
-function rejeitadasNoCommit(ev, sha) {
-  const s = new Set((Array.isArray(ev.rejeicoes) ? ev.rejeicoes : []).map((r) => r?.identidade));
+/** As rejeições da própria evidência e das do trabalho, como estão no commit da task: identidade → `{task, motivo, em}`,
+ *  a primeira de cada (as da própria evidência antes; `motivo` e `em` que não são texto, `null`). */
+function rejeicoesNoCommit(ev, sha) {
+  const m = new Map();
+  const texto = (v) => (typeof v === "string" ? v : null);
+  const poe = (task, lista) => {
+    for (const r of Array.isArray(lista) ? lista : []) if (ehMapa(r) && !m.has(r.identidade)) m.set(r.identidade, { task, motivo: texto(r.motivo), em: texto(r.em) });
+  };
+  poe(ev.task, ev.rejeicoes);
   const dir = `docs/entregas/${op.trabalho}/revisao/`;
   for (const n of git("ls-tree", "-z", "--name-only", sha, "--", dir).stdout.split("\0").filter((x) => x.endsWith(".json"))) {
     try {
-      const outra = JSON.parse(git("show", `${sha}:./${n}`).stdout.replace(/^\uFEFF/, "")).rejeicoes;
-      for (const r of Array.isArray(outra) ? outra : []) s.add(r?.identidade);
+      const outra = n.slice(dir.length, -".json".length);
+      const lista = JSON.parse(git("show", `${sha}:./${n}`).stdout.replace(/^\uFEFF/, "")).rejeicoes;
+      poe(outra, lista);
     } catch { /* evidência ilegível de outra task: não rejeita nada */ }
   }
-  return s;
+  return m;
 }
 /** Em `ok`/`achados`, o campo que impede derivar os `achados` gravados das `issues` gravadas (`head`, `base_commit`),
  *  `achados` se eles (ou o `resultado`) não batem com a derivação, ou undefined. Rejeitado só vale com a identidade em
@@ -488,7 +560,7 @@ function achadosDivergem(ev, sha) {
     // pelo JSON, como foi gravado (`NaN` vira `null`)
     derivados = JSON.parse(JSON.stringify(derivar(ev.chamada.issues, ev.arquivos, ev.cli.versao, (f) => alteradas(f, de, sha), texto)));
   }
-  const rejeitadas = rejeitadasNoCommit(ev, sha);
+  const rejeitadas = rejeicoesNoCommit(ev, sha);
   if (ev.achados.length !== derivados.length || derivados.some((d, k) => {
     const a = ev.achados[k];
     return ["identidade", "arquivo", "linha", "label", "texto"].some((c) => a[c] !== d[c])
@@ -501,6 +573,31 @@ function conferir() {
   const linhas = op.tasks.map((p) => { const [task, sha] = p.split("="); return `${task} ${veredito(task, sha)}`; });
   process.stdout.write(`${linhas.join("\n")}\n`);
   process.exit(linhas.some((l) => l.includes(" FALHA ")) ? 1 : linhas.some((l) => l.includes(" AVISO ")) ? 3 : 0);
+}
+
+/** O que a mergex lê das evidências (D1, D2, condição 6 da M2), só da evidência que o `conferir` aceita: uma linha de JSON
+ *  `{expx_revisao_listar: 1, trabalho, tasks: [...]}`, uma entrada por `--task`, na ordem dada. Sai 0 (todas listadas),
+ *  1 (alguma `invalida`) ou 3 (alguma `ausente`, nenhuma `invalida`). Só leitura. */
+function listar() {
+  const texto = (v) => (typeof v === "string" ? v : null);
+  const tasks = op.tasks.map((p) => {
+    const [task, sha] = p.split("=");
+    const { ausente, falha, ev } = avaliar(task, sha);
+    if (!ev) {
+      return { task, commit: sha, listagem: ausente ? "ausente" : "invalida", causa: ausente ? "evidencia-ausente" : falha, resultado: null, motivo: null,
+        rejeitados: [], rejeicoes: [], removidos_sem_revisao: [] };
+    }
+    const rejeicoes = rejeicoesNoCommit(ev, sha);
+    return { task, commit: sha, listagem: "ok", causa: null, resultado: ev.resultado,
+      motivo: ["incompleta", "indisponivel"].includes(ev.resultado) ? texto(ev.motivo) : null,
+      rejeitados: ev.achados.filter((a) => a.estado === "rejeitado").map((a) => ({ identidade: a.identidade, arquivo: texto(a.arquivo),
+        linha: Number.isSafeInteger(a.linha) ? a.linha : null, label: texto(a.label), texto: texto(a.texto), rejeicao: rejeicoes.get(a.identidade) ?? null })),
+      rejeicoes: ev.rejeicoes.map((r) => ({ identidade: r.identidade, motivo: r.motivo, em: r.em })),
+      removidos_sem_revisao: [...ev.removidos_sem_revisao] };
+  });
+  process.stdout.write(`${JSON.stringify({ expx_revisao_listar: 1, trabalho: op.trabalho, tasks })}\n`);
+  // `exitCode`, não `exit`: o JSON numa linha só é inteiro mesmo num pipe assíncrono (Windows)
+  process.exitCode = tasks.some((t) => t.listagem === "invalida") ? 1 : tasks.some((t) => t.listagem === "ausente") ? 3 : 0;
 }
 
 function rejeitar() {
@@ -522,4 +619,4 @@ function rejeitar() {
   }
 }
 
-({ revisar, conferir, rejeitar })[cmd]();
+({ revisar, conferir, rejeitar, listar })[cmd]();
