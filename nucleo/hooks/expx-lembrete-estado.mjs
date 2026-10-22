@@ -164,7 +164,14 @@ export function comLock(raiz, acao, opcoes = {}) {
 
 function registroValido(item) {
   return item && item.versao === 1 && /^[a-f0-9]{64}$/.test(item.hash)
-    && typeof item.skill === "string" && Number.isFinite(item.timestamp);
+    && typeof item.skill === "string" && Number.isFinite(item.timestamp)
+    && (item.sessao === undefined || /^[a-f0-9]{64}$/.test(item.sessao));
+}
+
+function registroSanitizado({ versao, hash, skill, timestamp, sessao }) {
+  return sessao === undefined
+    ? { versao, hash, skill, timestamp }
+    : { versao, hash, skill, timestamp, sessao };
 }
 
 function sanitizar(estado) {
@@ -173,8 +180,8 @@ function sanitizar(estado) {
   }
   return {
     versao: 1,
-    eventos: estado.eventos.filter(registroValido).map(({ versao, hash, skill, timestamp }) => ({ versao, hash, skill, timestamp })),
-    trabalhos: estado.trabalhos.filter(registroValido).map(({ versao, hash, skill, timestamp }) => ({ versao, hash, skill, timestamp })),
+    eventos: estado.eventos.filter(registroValido).map(registroSanitizado),
+    trabalhos: estado.trabalhos.filter(registroValido).map(registroSanitizado),
   };
 }
 

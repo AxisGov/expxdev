@@ -111,6 +111,7 @@ export function decidirInjecao(contexto, estadoRecebido = estadoVazio()) {
     contexto.trabalho,
     contexto.skill,
   ]);
+  const sessao = hash("sessao", [contexto.sessao]);
 
   if (evento && estado.eventos.some((item) => item.hash === evento)) {
     return { emitir: false, tipo: "nenhum", estado, mudou: false };
@@ -130,13 +131,13 @@ export function decidirInjecao(contexto, estadoRecebido = estadoVazio()) {
 
   return {
     emitir: true,
-    tipo: estado.trabalhos.length === 0 ? "completo" : "delta",
+    tipo: estado.trabalhos.some((item) => item.sessao === sessao) ? "delta" : "completo",
     estado: {
       ...estado,
       eventos: [...estado.eventos, ...registroEvento],
       trabalhos: [
         ...estado.trabalhos,
-        { versao: 1, hash: trabalho, skill: contexto.skill, timestamp: contexto.agora },
+        { versao: 1, hash: trabalho, skill: contexto.skill, timestamp: contexto.agora, sessao },
       ],
     },
     mudou: true,

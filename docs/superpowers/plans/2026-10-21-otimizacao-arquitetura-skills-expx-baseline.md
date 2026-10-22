@@ -242,3 +242,15 @@ antes disso.
   TDD, sem segunda leitura. Foram cobertos bootstrap E1→E2, término após
   reconstrução, recuperação no Claude/OpenCode/MimoCode, regras de caminho e
   exit code do benchmark.
+
+### Ocorrência de fatiamento na validação da PR #73
+
+- A falha integral de `L3: 100 arquivos passam e 101 reprovam, sem qualquer
+  desconto` não foi reproduzida: o caso isolado passou, o arquivo completo
+  passou com 21/21 testes e o lote focal passou com 115 testes e 2 ignorados.
+- Nenhum processo órfão de Node, Bash, Git ou Vitest e nenhum temporário do
+  fatiamento permaneceu após as três execuções.
+- Classificação provisória: **C — provável contenção da suíte paralela**. A
+  decisão é não alterar `fatiamento.test.ts`, `verificar-fatiamento.sh`,
+  `expx-limites.mjs` nem `candidatos.ts`; a CI limpa em Windows e Ubuntu é o
+  gate integral da P1.

@@ -199,6 +199,21 @@ describe("classifica, identifica, deduplica e emite delta no hook expx-lembrete"
     expect(executarHook(projeto, { ...a, prompt_id: "prompt-3" })).toBeNull();
   });
 
+  it("envia lembrete completo na primeira correspondencia de cada sessao", () => {
+    const projeto = criarProjeto();
+    const primeira = executarHook(projeto, evento(projeto, { session_id: "sessao-a" }));
+    const segunda = executarHook(projeto, evento(projeto, {
+      prompt_id: "prompt-2",
+      session_id: "sessao-b",
+    }));
+
+    expect.soft(primeira).toContain("ANTES de ler codigo");
+    expect.soft(segunda).toContain("ANTES de ler codigo");
+    const estado = readFileSync(caminhoEstado(projeto), "utf8");
+    expect(estado).not.toContain("sessao-a");
+    expect(estado).not.toContain("sessao-b");
+  });
+
   it("preserva a supressao ao retomar a mesma sessao (caso 8)", () => {
     const projeto = criarProjeto();
     executarHook(projeto, evento(projeto));

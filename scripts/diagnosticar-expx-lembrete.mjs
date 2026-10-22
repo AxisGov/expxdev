@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
+import { pathToFileURL } from "node:url";
 import {
   comLock,
   gravarEstadoAtomico,
@@ -22,7 +23,9 @@ const SAMPLES = 30;
 const HOOK = resolve("nucleo/hooks/expx-lembrete.sh");
 const MODULE = resolve("nucleo/hooks/expx-lembrete.mjs");
 const GIT_BASH = "C:/Program Files/Git/bin/bash.exe";
-const BASH = process.platform === "win32" && existsSync(GIT_BASH) ? GIT_BASH : "bash";
+export const BASH = process.platform === "win32" && existsSync(GIT_BASH)
+  ? GIT_BASH
+  : [process.env.BASH, "/usr/bin/bash", "/bin/bash"].find((caminho) => caminho && existsSync(caminho)) ?? "bash";
 const temporarios = [];
 
 function temporario(prefixo) {
@@ -87,10 +90,28 @@ function executarHook(p, entrada, env = process.env) {
   });
 }
 
-function ambienteFallback() {
-  return { ...process.env, PATH: temporario("expx-diag-sem-node-") };
+export function ambienteFallback(pathVazio = temporario("expx-diag-sem-node-")) {
+  return { ...process.env, PATH: pathVazio };
 }
 
+export function estadoLeituraDiagnostico() {
+  return { versao: 1, eventos: [], trabalhos: [] };
+}
+
+export function estadoEscritaDiagnostico(indice, agora = Date.now()) {
+  return {
+    versao: 1,
+    eventos: [{
+      versao: 1,
+      hash: String(indice).padStart(64, "0"),
+      skill: "runx",
+      timestamp: agora,
+    }],
+    trabalhos: [],
+  };
+}
+
+function main() {
 try {
   const noopDir = temporario("expx-diag-noop-");
   const noop = join(noopDir, "noop.sh");
@@ -132,7 +153,7 @@ try {
     }),
     medir("state_read", () => {
       const raiz = temporario("expx-diag-read-");
-      gravarEstadoAtomico(raiz, { version: 1, sessions: {}, works: {} });
+      gravarEstadoAtomico(raiz, estadoLeituraDiagnostico());
       return raiz;
     }, (raiz) => {
       const inicio = performance.now();
@@ -141,7 +162,7 @@ try {
     }),
     medir("state_fsync_rename", () => temporario("expx-diag-write-"), (raiz, i) => {
       const inicio = performance.now();
-      gravarEstadoAtomico(raiz, { version: 1, sessions: { [`s${i}`]: { hash: "h", skill: "runx", timestamp: Date.now() } }, works: {} });
+      gravarEstadoAtomico(raiz, estadoEscritaDiagnostico(i));
       return performance.now() - inicio;
     }),
   ]);
@@ -164,3 +185,6 @@ try {
 } finally {
   for (const caminho of temporarios.reverse()) rmSync(caminho, { recursive: true, force: true });
 }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main();

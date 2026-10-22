@@ -213,6 +213,15 @@ fase, inclusive E4→E3, conserva a chave de trabalho e não reinjeta. Nova sess
 injeta uma vez, mesmo no mesmo cwd e trabalho. Dois cwd na mesma sessão têm
 chaves de trabalho distintas.
 
+Para distinguir o primeiro lembrete de cada sessão sem persistir seu
+identificador cru, o registro de trabalho pode conter `sessao`, um SHA-256
+versionado derivado da identidade de sessão. O campo é opcional para
+compatibilidade com estados anteriores: um registro legado sem `sessao`
+provoca, no máximo, um novo lembrete completo conservador e passa a ser
+substituído naturalmente pelo TTL e pelo limite existentes. O hash de sessão
+não altera as chaves de evento ou trabalho e nunca inclui prompt ou hash de
+prompt.
+
 ### 5.3 Eventos não digitados pelo usuário
 
 O Claude Code documenta que `UserPromptSubmit` também dispara para tarefa

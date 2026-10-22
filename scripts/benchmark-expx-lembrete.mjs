@@ -10,7 +10,9 @@ const WARMUPS = 10;
 const SAMPLES = 200;
 const HOOK = resolve("nucleo/hooks/expx-lembrete.sh");
 const GIT_BASH = "C:/Program Files/Git/bin/bash.exe";
-const BASH = process.platform === "win32" && existsSync(GIT_BASH) ? GIT_BASH : "bash";
+export const BASH = process.platform === "win32" && existsSync(GIT_BASH)
+  ? GIT_BASH
+  : [process.env.BASH, "/usr/bin/bash", "/bin/bash"].find((caminho) => caminho && existsSync(caminho)) ?? "bash";
 const temporarios = [];
 
 function temporario(prefixo) {
@@ -108,8 +110,8 @@ function medirPar(nome, preparar, medirHook, medirBaseline, processos) {
   }];
 }
 
-function ambienteSemNode() {
-  return { ...process.env, PATH: temporario("expx-benchmark-sem-node-") };
+export function ambienteSemNode(pathVazio = temporario("expx-benchmark-sem-node-")) {
+  return { ...process.env, PATH: pathVazio };
 }
 
 export function codigoSaidaDoGate(gate) {

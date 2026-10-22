@@ -60,7 +60,7 @@ export function entradaPorNome(h: HookInstalado): EntradaHook | null {
   const hook = h.relativo.endsWith("expx-session-sync.mjs")
     ? { type: "command", command: "node", args: [`\${CLAUDE_PROJECT_DIR}/${h.relativo}`] }
     : h.relativo.endsWith("expx-lembrete.sh")
-      ? { type: "command", command: `$CLAUDE_PROJECT_DIR/${h.relativo}`, timeout: 1 }
+      ? { type: "command", command: `"$CLAUDE_PROJECT_DIR/${h.relativo}"`, timeout: 1 }
       : { type: "command", command: `$CLAUDE_PROJECT_DIR/${h.relativo}` };
   return { skill: h.skill, evento, hook };
 }

@@ -1,5 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
 import { mesclarSettings, lerPluginsHabilitados, caminhoDoSettings } from "./settings.js";
@@ -159,6 +161,35 @@ describe("hook de lembrete das skills", () => {
       expect(Object.prototype.hasOwnProperty.call(lembrete ?? {}, "onFailure")).toBe(false);
     } finally {
       p.descartar();
+    }
+  });
+
+  it("funcional: expx-lembrete executa quando CLAUDE_PROJECT_DIR contém espaços", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx projeto com espacos-"));
+    try {
+      const relativo = ".claude/hooks/expx-lembrete.sh";
+      const caminho = join(raiz, ...relativo.split("/"));
+      mkdirSync(join(raiz, ".claude", "hooks"), { recursive: true });
+      writeFileSync(caminho, "#!/usr/bin/env bash\nprintf caminho-com-espacos-ok\n");
+      chmodSync(caminho, 0o755);
+      const r = mesclarSettings(raiz, "/tmp/mkt", [{ skill: "runx", relativo }]);
+      expect(r.ok).toBe(true);
+      const s = JSON.parse(readFileSync(caminhoDoSettings(raiz), "utf8")) as {
+        hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>>;
+      };
+      const command = s.hooks["UserPromptSubmit"]?.[0]?.hooks[0]?.command ?? "";
+      const bash = process.platform === "win32" && existsSync("C:/Program Files/Git/bin/bash.exe")
+        ? "C:/Program Files/Git/bin/bash.exe"
+        : "/bin/bash";
+      const execucao = spawnSync(bash, ["-lc", command], {
+        cwd: raiz,
+        encoding: "utf8",
+        env: { ...process.env, CLAUDE_PROJECT_DIR: raiz },
+      });
+      expect(execucao.status, execucao.stderr).toBe(0);
+      expect(execucao.stdout).toBe("caminho-com-espacos-ok");
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
     }
   });
 
