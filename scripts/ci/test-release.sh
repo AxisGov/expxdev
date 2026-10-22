@@ -34,6 +34,22 @@ grep -Fq 'gh release create' "$release" || falha 'workflow não publica a GitHub
 ! grep -R -E -n 'npm[[:space:]]+publish' "$raiz/.github/workflows" \
   || falha 'workflow não pode publicar no npm'
 
+prepare_block="$(sed -n '/^  prepare:/,/^  publish:/p' "$release")"
+publish_block="$(sed -n '/^  publish:/,$p' "$release")"
+[ -n "$prepare_block" ] && [ -n "$publish_block" ] || falha 'jobs prepare/publish ausentes'
+! grep -Fq 'contents: write' <<<"$prepare_block" \
+  || falha 'job que executa código selecionado recebeu escrita'
+grep -Fq 'needs: prepare' <<<"$publish_block" || falha 'publicação não depende da preparação read-only'
+grep -Fq 'contents: write' <<<"$publish_block" || falha 'job de publicação não recebeu escrita'
+! grep -Fq 'actions/checkout' <<<"$publish_block" \
+  || falha 'job privilegiado não pode fazer checkout do SHA selecionado'
+! grep -Fq 'preparar-release.mjs' <<<"$publish_block" \
+  || falha 'job privilegiado não pode executar o preflight do SHA selecionado'
+grep -Fq 'gh api --method POST "repos/$GH_REPO/git/refs"' <<<"$publish_block" \
+  || falha 'tag não é reservada atomicamente'
+grep -Fq -- '--verify-tag' <<<"$publish_block" \
+  || falha 'release pode recriar uma tag sem verificação'
+
 temporario="$(mktemp -d)"
 trap 'rm -rf "$temporario"' EXIT
 fixture="$temporario/repo com espacos"

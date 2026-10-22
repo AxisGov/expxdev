@@ -21,13 +21,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: release explícita v${{ inputs.version }}
+  prepare:
+    name: preparar v${{ inputs.version }} sem permissao de escrita
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      contents: write
+      contents: read
       actions: read
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      sha: ${{ steps.release.outputs.sha }}
+      version: ${{ steps.release.outputs.version }}
+      sha256: ${{ steps.release.outputs.sha256 }}
 
     steps:
       - name: Checkout selected SHA
@@ -69,25 +74,98 @@ jobs:
           --sha "$SELECTED_SHA"
           --output "$RUNNER_TEMP/expxdev-release-$SELECTED_VERSION"
 
-      - name: Publish GitHub Release
+      - name: Upload immutable release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: expxdev-release-${{ steps.release.outputs.version }}
+          path: |
+            ${{ steps.release.outputs.tgz }}
+            ${{ steps.release.outputs.checksum }}
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: publicar v${{ needs.prepare.outputs.version }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Setup Node for metadata validation
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+
+      - name: Download validated release candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: expxdev-release-${{ needs.prepare.outputs.version }}
+          path: ${{ runner.temp }}/expxdev-release-${{ needs.prepare.outputs.version }}
+
+      - name: Revalidate, reserve tag and publish
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ steps.release.outputs.tag }}
-          SHA: ${{ steps.release.outputs.sha }}
-          TGZ: ${{ steps.release.outputs.tgz }}
-          CHECKSUM: ${{ steps.release.outputs.checksum }}
-          VERSION: ${{ steps.release.outputs.version }}
+          REQUESTED_SHA: ${{ inputs.ref }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+          SHA: ${{ needs.prepare.outputs.sha }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          EXPECTED_SHA256: ${{ needs.prepare.outputs.sha256 }}
         shell: bash
         run: |
-          gh release create "$TAG" "$TGZ" "$CHECKSUM" \
-            --target "$SHA" \
+          set -euo pipefail
+          [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]
+          [ "$SHA" = "$REQUESTED_SHA" ]
+          [ "$VERSION" = "$REQUESTED_VERSION" ]
+          [ "$TAG" = "v$VERSION" ]
+
+          pasta="$RUNNER_TEMP/expxdev-release-$VERSION"
+          tgz="$pasta/expxdev-$VERSION.tgz"
+          checksum="$tgz.sha256"
+          [ -f "$tgz" ] && [ -f "$checksum" ]
+          [ "$(wc -l < "$checksum" | tr -d " ")" = 1 ]
+          [ "$(cut -d " " -f 1 "$checksum")" = "$EXPECTED_SHA256" ]
+          (cd "$pasta" && sha256sum -c "expxdev-$VERSION.tgz.sha256")
+          interna="$(tar -xOf "$tgz" package/package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);console.log(p.name+"@"+p.version)})')"
+          [ "$interna" = "expxdev@$VERSION" ]
+
+          merge_base="$(gh api "repos/$GH_REPO/compare/$SHA...main" --jq .merge_base_commit.sha)"
+          [ "$merge_base" = "$SHA" ]
+          for workflow in ci.yml proveniencia.yml; do
+            runs="$(gh run list -R "$GH_REPO" --workflow "$workflow" --commit "$SHA" --event push --limit 20 --json status,conclusion,headSha)"
+            node -e 'const [runs,sha,wf]=process.argv.slice(1);if(!JSON.parse(runs).some(r=>r.headSha===sha&&r.status==="completed"&&r.conclusion==="success")){throw new Error("check obrigatorio sem sucesso: "+wf)}' "$runs" "$SHA" "$workflow"
+          done
+
+          if tag_atual="$(gh api "repos/$GH_REPO/git/ref/tags/$TAG" 2>&1)"; then
+            echo "::error::tag ja existe: $TAG ($tag_atual)"
+            exit 1
+          elif ! grep -q "HTTP 404" <<<"$tag_atual"; then
+            echo "::error::nao foi possivel confirmar ausencia da tag $TAG: $tag_atual"
+            exit 1
+          fi
+          if release_atual="$(gh release view "$TAG" -R "$GH_REPO" --json tagName 2>&1)"; then
+            echo "::error::release ja existe: $TAG ($release_atual)"
+            exit 1
+          elif [ "$release_atual" != "release not found" ]; then
+            echo "::error::nao foi possivel confirmar ausencia da release $TAG: $release_atual"
+            exit 1
+          fi
+
+          gh api --method POST "repos/$GH_REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$SHA" >/dev/null
+          gh release create "$TAG" "$tgz" "$checksum" \
+            --repo "$GH_REPO" \
+            --verify-tag \
             --title "ExpxDev $VERSION" \
             --latest=false \
-            --notes "Distribuição AxisGov do ExpxDev $VERSION no commit $SHA. Não publicada no npm."
+            --notes "Distribuicao AxisGov do ExpxDev $VERSION no commit $SHA. Nao publicada no npm."
 
           dono="$(gh api "repos/$GH_REPO/commits/$TAG" --jq .sha)"
-          [ "$dono" = "$SHA" ] || { echo "::error::$TAG aponta para $dono, não para $SHA"; exit 1; }
-          esperado="$(basename "$TGZ"),$(basename "$CHECKSUM")"
-          atual="$(gh release view "$TAG" --json isDraft,assets --jq 'select(.isDraft == false) | [.assets[].name] | sort | join(",")')"
-          [ "$atual" = "$esperado" ] || { echo "::error::$TAG saiu com assets inesperados: $atual"; exit 1; }
+          [ "$dono" = "$SHA" ]
+          esperado="$(basename "$tgz"),$(basename "$checksum")"
+          atual="$(gh release view "$TAG" -R "$GH_REPO" --json isDraft,assets --jq 'select(.isDraft == false) | [.assets[].name] | sort | join(",")')"
+          [ "$atual" = "$esperado" ]
