@@ -101,11 +101,15 @@ describe("identidade da release no docs-site", () => {
     expect(site).toContain(
       `<div class="cartao__num">${String(SUBCOMANDOS.length)}</div><div class="cartao__rot">subcomandos do CLI</div>`,
     );
-    expect(apresentacao).toContain(
-      `<div class="stat-value">${String(CATALOGO.length)}</div>\n            <div class="stat-label mono">SKILLS NO CATÁLOGO</div>`,
+    expect(apresentacao).toMatch(
+      new RegExp(
+        `<div class="stat-value">${String(CATALOGO.length)}</div>\\r?\\n\\s*<div class="stat-label mono">SKILLS NO CATÁLOGO</div>`,
+      ),
     );
-    expect(apresentacao).toContain(
-      `<div class="stat-value">${String(SUBCOMANDOS.length)}</div>\n            <div class="stat-label mono">SUBCOMANDOS DO CLI</div>`,
+    expect(apresentacao).toMatch(
+      new RegExp(
+        `<div class="stat-value">${String(SUBCOMANDOS.length)}</div>\\r?\\n\\s*<div class="stat-label mono">SUBCOMANDOS DO CLI</div>`,
+      ),
     );
   });
 
