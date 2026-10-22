@@ -34,7 +34,8 @@ export const CATALOGO: readonly Skill[] = [
   },
   {
     nome: "runx",
-    repositorio: "https://github.com/bittencourtthulio/runx",
+    repositorio: "https://github.com/AxisGov/runx",
+    origensLegadas: ["https://github.com/bittencourtthulio/runx"],
     papel: "ocorrencias de manutencao do dia a dia",
     camada: false,
   },
@@ -142,20 +143,38 @@ function origemDoCatalogo(skill: Skill): string {
   return skill.repositorio;
 }
 
+function normalizarOrigem(origem: string): string {
+  return origem.trim().replace(/\/+$/, "").replace(/\.git$/i, "").toLowerCase();
+}
+
+/**
+ * Canonicaliza apenas origens que pertencem ao catálogo.
+ *
+ * Uma origem customizada (inclusive caminho local) é configuração da pessoa e
+ * permanece intacta. O sufixo opcional `.git` não cria uma segunda identidade
+ * para o mesmo remoto legado.
+ */
+export function repositorioCanonico(nome: string, origemAtual?: string): string | undefined {
+  const skill = CATALOGO.find((x) => x.nome === nome);
+  if (skill === undefined) return origemAtual;
+  if (origemAtual === undefined) return skill.repositorio;
+
+  const atual = normalizarOrigem(origemAtual);
+  const gerenciadas = [skill.repositorio, ...(skill.origensLegadas ?? [])].map(normalizarOrigem);
+  return gerenciadas.includes(atual) ? skill.repositorio : origemAtual;
+}
+
 /** Resolve a origem sem trocar uma customizacao por uma origem gerenciada. */
 export function resolverOrigem(
   nome: string,
   origemAtual?: string,
   origemExplicita?: string,
 ): string | undefined {
-  if (origemExplicita !== undefined) return origemExplicita;
+  if (origemExplicita !== undefined) return repositorioCanonico(nome, origemExplicita);
   const skill = CATALOGO.find((x) => x.nome === nome);
   if (skill === undefined) return origemAtual;
-  if (
-    origemAtual !== undefined &&
-    origemAtual !== skill.repositorio &&
-    !(skill.origensLegadas ?? []).includes(origemAtual)
-  ) return origemAtual;
+  const resolvida = repositorioCanonico(nome, origemAtual);
+  if (resolvida !== skill.repositorio) return resolvida;
   return origemDoCatalogo(skill);
 }
 

@@ -1,8 +1,9 @@
-import { lerLock } from "../nucleo/lock.js";
-import { resolverOrigem } from "../nucleo/catalogo.js";
+import { caminhoDoLock, lerLock, type Lock } from "../nucleo/lock.js";
+import { repositorioCanonico, resolverOrigem } from "../nucleo/catalogo.js";
 import { executarInit } from "../cli/init.js";
 import { compararComRemoto, type ItemComparacao } from "./comparar.js";
 import { verificarModificacaoLocal } from "./modificacao.js";
+import { escreverArquivoAtomico } from "../plugin/atomico.js";
 
 /**
  * O `update`: descobre, mostra, confirma e aplica — nessa ordem.
@@ -88,6 +89,29 @@ export type ResultadoUpdate = {
   mensagens: string[];
 };
 
+function migrarProveniencias(
+  lock: Lock,
+  somente?: readonly string[],
+): { lock: Lock; migradas: string[] } {
+  const filtro = somente !== undefined && somente.length > 0 ? new Set(somente) : undefined;
+  let skills = lock.skills;
+  const migradas: string[] = [];
+
+  for (const [nome, travada] of Object.entries(lock.skills)) {
+    if (filtro !== undefined && !filtro.has(nome)) continue;
+    const canonica = repositorioCanonico(nome, travada.repositorio);
+    if (canonica === undefined || canonica === travada.repositorio) continue;
+    if (skills === lock.skills) skills = { ...lock.skills };
+    skills[nome] = { ...travada, repositorio: canonica };
+    migradas.push(nome);
+  }
+
+  return {
+    lock: skills === lock.skills ? lock : { ...lock, skills },
+    migradas,
+  };
+}
+
 export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate> {
   const mensagens: string[] = [];
   const bloqueadas: Array<{ nome: string; motivo: string }> = [];
@@ -96,6 +120,7 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   if (!l.ok) {
     return { ok: false, aplicou: false, atualizadas: [], emDia: [], bloqueadas: [], mensagens: [l.erro] };
   }
+  const migracao = migrarProveniencias(l.lock, op.skills);
 
   const referencias = op.to !== undefined && op.skills?.[0] !== undefined ? { [op.skills[0]]: op.to } : undefined;
   const origens: Record<string, string> = {};
@@ -143,11 +168,32 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   }
 
   const podeAplicar = (op.sim ?? false) || (op.interativo ?? false);
-  if (op.check === true || candidatas.length === 0 || !podeAplicar) {
-    if (op.check !== true && candidatas.length > 0 && !podeAplicar) {
+  if (migracao.migradas.length > 0) {
+    mensagens.push(`proveniencia canonica pendente: ${migracao.migradas.join(", ")}`);
+  }
+  if (op.check === true || !podeAplicar) {
+    if (op.check !== true && (candidatas.length > 0 || migracao.migradas.length > 0) && !podeAplicar) {
       mensagens.push("sem confirmacao disponivel: nada foi aplicado (use --yes para aplicar sem perguntar)");
     }
     return { ok: true, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens };
+  }
+  if (candidatas.length === 0) {
+    if (migracao.migradas.length === 0) {
+      return { ok: true, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens };
+    }
+    escreverArquivoAtomico(
+      caminhoDoLock(op.raiz),
+      `${JSON.stringify(migracao.lock, null, 2)}\n`,
+    );
+    mensagens.push(AVISO_ROLLBACK);
+    return {
+      ok: true,
+      aplicou: true,
+      atualizadas: migracao.migradas,
+      emDia,
+      bloqueadas,
+      mensagens,
+    };
   }
 
   // Remonta do zero com as versões novas, mantendo a seleção e o harness.
@@ -175,7 +221,7 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   return {
     ok: init.ok,
     aplicou: true,
-    atualizadas: candidatas.map((c) => c.nome),
+    atualizadas: [...new Set([...candidatas.map((c) => c.nome), ...migracao.migradas])],
     emDia,
     bloqueadas,
     mensagens,

@@ -68,12 +68,12 @@
     "painel"
   ],
   "author": "Expx",
-  "homepage": "https://github.com/bittencourtthulio/expxdev#readme",
+  "homepage": "https://github.com/AxisGov/expxdev#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bittencourtthulio/expxdev.git"
+    "url": "git+https://github.com/AxisGov/expxdev.git"
   },
   "bugs": {
-    "url": "https://github.com/bittencourtthulio/expxdev/issues"
+    "url": "https://github.com/AxisGov/expxdev/issues"
   }
 }

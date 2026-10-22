@@ -1,5 +1,9 @@
 # Expx Skills Architecture Optimization Implementation Plan
 
+> **Registro histórico.** As origens e worktrees citados neste plano são a
+> fotografia usada em 2026-10-21, não instruções operacionais atuais. Consulte
+> `docs/expx-cli/base/10-proveniencia-skills.md` para a proveniência canônica.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Reduzir tokens, reinjeções do hook, agentes redundantes e churn de estado sem alterar a semântica `E1 INVESTIGAÇÃO → E2 PLANO → E3 FIX → E4 QA → E5 RELATÓRIO` nem os artefatos públicos do Expx.

@@ -11,6 +11,9 @@ type Pacote = {
   bin: Record<string, string>;
   files: string[];
   version: string;
+  homepage: string;
+  repository: { type: string; url: string };
+  bugs: { url: string };
 };
 
 let p: ProjetoTemporario | undefined;
@@ -33,6 +36,23 @@ describe("pacote publicável", () => {
     expect(p.bin["expx-painel"]).toBe("dist/cli/principal.js");
     expect(p.files).toContain("dist");
     expect(p.files).toContain("ui/dist");
+  });
+
+  it("integração: metadados públicos apontam para o repositório canônico AxisGov", () => {
+    const p = pacote();
+    expect(p.homepage).toBe("https://github.com/AxisGov/expxdev#readme");
+    expect(p.repository.url).toBe("git+https://github.com/AxisGov/expxdev.git");
+    expect(p.bugs.url).toBe("https://github.com/AxisGov/expxdev/issues");
+    const readme = readFileSync("README.md", "utf8");
+    expect(readme).not.toContain("bittencourtthulio.github.io/expxdev");
+    expect(readme).not.toContain("www.npmjs.com/package/expxdev");
+  });
+
+  it("integração: catálogo compilado contém as quatro origens canônicas AxisGov", () => {
+    const compilado = readFileSync("dist/nucleo/catalogo.js", "utf8");
+    for (const nome of ["runx", "mergex", "sprintx", "buildx"]) {
+      expect(compilado).toContain(`https://github.com/AxisGov/${nome}`);
+    }
   });
 
   it("funcional: expx --ajuda lista os seis subcomandos e devolve 0", async () => {

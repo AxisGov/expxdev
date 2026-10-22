@@ -1,42 +1,42 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/banner-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/banner-light.svg">
-  <img alt="expx — o CLI do metodo Expx" src="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/banner-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/banner-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/banner-light.svg">
+  <img alt="expx — o CLI do metodo Expx" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/banner-light.svg" width="100%">
 </picture>
 
 <p>
-  <a href="https://www.npmjs.com/package/expxdev"><img alt="npm: expxdev" src="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/badge-npm.svg"></a>
-  <img alt="harness: Claude Code" src="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/badge-claude.svg">
-  <img alt="harness: OpenCode" src="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/badge-opencode.svg">
-  <img alt="testes: 231 passed" src="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/badge-testes.svg">
-  <img alt="schema expx v1" src="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/badge-schema.svg">
-  <img alt="node >=20.19" src="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/badge-node.svg">
-  <img alt="licenca MIT" src="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/badge-license.svg">
+  <a href="https://github.com/AxisGov/expxdev/releases"><img alt="releases: expxdev" src="https://img.shields.io/github/v/release/AxisGov/expxdev?display_name=tag&amp;label=release"></a>
+  <img alt="harness: Claude Code" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/badge-claude.svg">
+  <img alt="harness: OpenCode" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/badge-opencode.svg">
+  <img alt="testes: 231 passed" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/badge-testes.svg">
+  <img alt="schema expx v1" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/badge-schema.svg">
+  <img alt="node >=20.19" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/badge-node.svg">
+  <img alt="licenca MIT" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/badge-license.svg">
 </p>
 
 <strong>O CLI do método Expx</strong> — instala, atualiza e diagnostica o ecossistema<br>
 de skills para <a href="https://claude.com/claude-code">Claude Code</a> e <a href="https://opencode.ai">OpenCode</a>, e sobe o painel de operação.
 
 <p>
-  <a href="https://bittencourtthulio.github.io/expxdev/"><strong>📘 Documentação completa</strong></a>
+  <a href="https://github.com/AxisGov/expxdev"><strong>📘 Documentação completa</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://bittencourtthulio.github.io/expxdev/#instalacao">Instalação</a>
+  <a href="#instalar-a-partir-da-release">Instalação</a>
   &nbsp;·&nbsp;
-  <a href="https://bittencourtthulio.github.io/expxdev/#ecossistema">As nove skills</a>
+  <a href="#o-ecossistema">As nove skills</a>
   &nbsp;·&nbsp;
-  <a href="https://bittencourtthulio.github.io/expxdev/#comandos">Referência do CLI</a>
+  <a href="#subcomandos">Referência do CLI</a>
   &nbsp;·&nbsp;
-  <a href="https://bittencourtthulio.github.io/expxdev/#schema">Contratos</a>
+  <a href="#os-dois-contratos-compartilhados">Contratos</a>
   &nbsp;·&nbsp;
-  <a href="https://bittencourtthulio.github.io/expxdev/apresentacao.html"><strong>🎤 Apresentação para o time</strong></a>
+  <a href="https://github.com/AxisGov/expxdev/blob/main/docs-site/apresentacao.html"><strong>🎤 Apresentação para o time</strong></a>
 </p>
 
 </div>
 
 > **Precisa apresentar o método para o seu time?** A
-> [apresentação completa](https://bittencourtthulio.github.io/expxdev/apresentacao.html) é um deck
+> [apresentação completa](https://github.com/AxisGov/expxdev/blob/main/docs-site/apresentacao.html) é um deck
 > técnico navegável — pronto para um dev sênior ou CTO usar em reunião de engenharia, mostrando como o
 > time passa a trabalhar com IA usando a stack Expx de ponta a ponta.
 
@@ -117,21 +117,21 @@ painel que lê o que elas gravam.
 ## O ecossistema
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/ecossistema-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/ecossistema-light.svg">
-  <img alt="O CLI busca as nove skills, empacota como plugin e configura os dois harnesses" src="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/ecossistema-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/ecossistema-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/ecossistema-light.svg">
+  <img alt="O CLI busca as nove skills, empacota como plugin e configura os dois harnesses" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/ecossistema-light.svg" width="100%">
 </picture>
 
 | Skill | O que faz | Quando usar |
 |---|---|---|
-| **[sprintx](https://github.com/bittencourtthulio/sprintx)** | Planeja e executa **features novas** em seis fases: ingestão → descoberta → plano → orquestrador → auditoria → execução. Todo o esforço vai para o planejamento, e a execução é autônoma porque a ambiguidade já foi eliminada. | Construir algo que não existe |
-| **[runx](https://github.com/bittencourtthulio/runx)** | A metade **Run**: ocorrências de manutenção em produção, em cinco estágios — investigação com causa raiz comprovada, plano, fix sob TDD, QA independente e relatórios de fechamento. | Corrigir, ajustar ou investigar o que já está no ar |
+| **[sprintx](https://github.com/AxisGov/sprintx)** | Planeja e executa **features novas** em seis fases: ingestão → descoberta → plano → orquestrador → auditoria → execução. Todo o esforço vai para o planejamento, e a execução é autônoma porque a ambiguidade já foi eliminada. | Construir algo que não existe |
+| **[runx](https://github.com/AxisGov/runx)** | A metade **Run**: ocorrências de manutenção em produção, em cinco estágios — investigação com causa raiz comprovada, plano, fix sob TDD, QA independente e relatórios de fechamento. | Corrigir, ajustar ou investigar o que já está no ar |
 | **[legadox](https://github.com/bittencourtthulio/legadox)** | **Camada** que endurece o trabalho em projetos legados. Não acrescenta fase: muda o *rigor* de cada uma, proporcional ao raio de impacto da mudança. | Mexer em código sem testes ou sem dono |
 | **[stackx](https://github.com/bittencourtthulio/stackx)** | **Camada** que descobre o dialeto técnico do repositório — convenções, padrões e aderência — para o código novo parecer com o que já existe. | Entrar em base desconhecida |
-| **[mergex](https://github.com/bittencourtthulio/mergex)** | Versionamento, entrega e revisão: branch, um commit por task, portão de prontidão, descrição de PR, pacote de QA e abertura do pull request. | Levar o trabalho pronto até o merge |
+| **[mergex](https://github.com/AxisGov/mergex)** | Versionamento, entrega e revisão: branch, um commit por task, portão de prontidão, descrição de PR, pacote de QA e abertura do pull request. | Levar o trabalho pronto até o merge |
 | **[memox](https://github.com/bittencourtthulio/MemoX)** | **Camada** de memória: indexa os artefatos já fechados — relatórios, causas raiz, decisões, QA, entregas — e responde o que já se sabe sobre um arquivo antes de alguém mexer nele. | Saber se este arquivo já quebrou antes |
 | **[prodx](https://github.com/bittencourtthulio/prodx)** | **Camada** de produto: recebe o pedido cru, tria, verifica se o que foi pedido já existe e emite um veredito com evidência para assinatura humana. Três dos quatro vereditos encerram o pedido sem gerar código. | Decidir se vale fazer, antes de planejar |
-| **[buildx](https://github.com/bittencourtthulio/buildx)** | Orquestra um **projeto inteiro**, da descrição ao sistema pronto: mapeia o escopo completo, decide a stack e conduz `prodx` → `stackx` → `sprintx` → `mergex` feature a feature, recursivamente, até o fim. | Construir um sistema do zero, não uma feature isolada |
+| **[buildx](https://github.com/AxisGov/buildx)** | Orquestra um **projeto inteiro**, da descrição ao sistema pronto: mapeia o escopo completo, decide a stack e conduz `prodx` → `stackx` → `sprintx` → `mergex` feature a feature, recursivamente, até o fim. | Construir um sistema do zero, não uma feature isolada |
 | **[designx](https://github.com/bittencourtthulio/designx)** | **Camada** de design: cartografa o design system do projeto e audita conformidade visual contra ele. | Garantir consistência visual quando o projeto tem UI |
 
 **Camadas** (`legadox`, `stackx`, `memox`, `prodx`, `designx`) sozinhas não fazem nada — elas
@@ -165,9 +165,9 @@ execução autônoma guiada por um arquivo orquestrador.
 ## Como as peças se encaixam
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/metodo-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/metodo-light.svg">
-  <img alt="O metodo Expx de ponta a ponta: o gatilho escolhe entre sprintx e runx, as camadas stackx e legadox modificam as duas, a mergex entrega e o painel le tudo" src="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/metodo-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/metodo-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/metodo-light.svg">
+  <img alt="O metodo Expx de ponta a ponta: o gatilho escolhe entre sprintx e runx, as camadas stackx e legadox modificam as duas, a mergex entrega e o painel le tudo" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/metodo-light.svg" width="100%">
 </picture>
 
 Em uma frase: **`prodx` diz se vale fazer, `stackx` diz como este projeto escreve código,
@@ -202,9 +202,9 @@ colateral mais perigoso que existe, porque vem com a justificativa de estar segu
 ## As três camadas de garantia
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/camadas-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/camadas-light.svg">
-  <img alt="As tres camadas que garantem o metodo: a skill instrui, o hook barra de forma deterministica, e o agente julga em contexto proprio" src="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/camadas-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/camadas-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/camadas-light.svg">
+  <img alt="As tres camadas que garantem o metodo: a skill instrui, o hook barra de forma deterministica, e o agente julga em contexto proprio" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/camadas-light.svg" width="100%">
 </picture>
 
 Uma regra escrita na skill é uma instrução — e instrução é coisa que o modelo pode esquecer na
@@ -300,9 +300,9 @@ anotar nada**, e é isso que calibra a estimativa da `sprintx` nas features segu
 ## O que fica no seu projeto
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/disco-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/disco-light.svg">
-  <img alt="O que cada skill grava no seu projeto e quem le o que: as skills escrevem, os hooks acrescentam o rastro, e o painel apenas le" src="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/disco-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/disco-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/disco-light.svg">
+  <img alt="O que cada skill grava no seu projeto e quem le o que: as skills escrevem, os hooks acrescentam o rastro, e o painel apenas le" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/disco-light.svg" width="100%">
 </picture>
 
 `<trabalho_id>` é o mesmo identificador em todas as skills: o `<slug-da-feature>` da `sprintx`
@@ -354,9 +354,9 @@ escrever nada** — é o modo de simulação, e é o que protege um CI de escrev
 ## Anatomia do `init`, passo a passo
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/plugin-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/plugin-light.svg">
-  <img alt="Anatomia do que o expx init monta: o marketplace local, o plugin expx com so as skills escolhidas, e o lock que trava versao e hash de cada arquivo" src="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/plugin-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/plugin-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/plugin-light.svg">
+  <img alt="Anatomia do que o expx init monta: o marketplace local, o plugin expx com so as skills escolhidas, e o lock que trava versao e hash de cada arquivo" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/plugin-light.svg" width="100%">
 </picture>
 
 Para cada skill selecionada, em ordem:
@@ -493,9 +493,9 @@ npx --yes --package ~/expx-cli/cli-<sha7>/expxdev-0.7.0.tgz expx init --skills b
 ## Versão, lock e atualização
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/lock-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/lock-light.svg">
-  <img alt="Instalacao travada por lock; atualizacao explicita que nunca sobrescreve trabalho local" src="https://raw.githubusercontent.com/bittencourtthulio/expxdev/main/.github/assets/lock-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/lock-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/lock-light.svg">
+  <img alt="Instalacao travada por lock; atualizacao explicita que nunca sobrescreve trabalho local" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/lock-light.svg" width="100%">
 </picture>
 
 O `expx-lock.json` guarda, por skill: o repositório, a referência resolvida, se ela está
@@ -789,13 +789,13 @@ MIT
 <div align="center">
 <sub>Parte do método <strong>Expx</strong> ·
 expxdev ·
-<a href="https://github.com/bittencourtthulio/sprintx">sprintx</a> ·
-<a href="https://github.com/bittencourtthulio/runx">runx</a> ·
+<a href="https://github.com/AxisGov/sprintx">sprintx</a> ·
+<a href="https://github.com/AxisGov/runx">runx</a> ·
 <a href="https://github.com/bittencourtthulio/legadox">legadox</a> ·
 <a href="https://github.com/bittencourtthulio/stackx">stackx</a> ·
-<a href="https://github.com/bittencourtthulio/mergex">mergex</a> ·
+<a href="https://github.com/AxisGov/mergex">mergex</a> ·
 <a href="https://github.com/bittencourtthulio/MemoX">memox</a> ·
 <a href="https://github.com/bittencourtthulio/prodx">prodx</a> ·
-<a href="https://github.com/bittencourtthulio/buildx">buildx</a> ·
+<a href="https://github.com/AxisGov/buildx">buildx</a> ·
 <a href="https://github.com/bittencourtthulio/designx">designx</a></sub>
 </div>

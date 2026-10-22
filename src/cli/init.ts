@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { resolverOrigem } from "../nucleo/catalogo.js";
+import { repositorioCanonico, resolverOrigem } from "../nucleo/catalogo.js";
 import { resolverAlvo } from "../nucleo/versao.js";
 import { buscarSkill } from "../nucleo/busca.js";
 import { detectarLayout } from "../nucleo/layout.js";
@@ -297,10 +297,10 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
 }
 
 /** A mesma resolução: mesma origem, referência, commit e bytes da skill. */
-function mesmaResolucao(a: Omit<SkillTravada, "resolvido_em">, b: SkillTravada): boolean {
+function mesmaResolucao(nome: string, a: Omit<SkillTravada, "resolvido_em">, b: SkillTravada): boolean {
   const hashes = (x: Record<string, string>): string => JSON.stringify(Object.entries(x).sort(([p], [q]) => (p < q ? -1 : p > q ? 1 : 0)));
   return (
-    a.repositorio === b.repositorio &&
+    repositorioCanonico(nome, a.repositorio) === repositorioCanonico(nome, b.repositorio) &&
     a.referencia === b.referencia &&
     a.travado === b.travado &&
     a.commit === b.commit &&
@@ -313,10 +313,18 @@ function mesmaResolucao(a: Omit<SkillTravada, "resolvido_em">, b: SkillTravada):
  * resolução, a data dele é mantida: um `init` repetido não resolveu nada novo,
  * e reescrever a data sujaria a árvore só porque o dia virou.
  */
-function dataDaResolucao(nova: Omit<SkillTravada, "resolvido_em">, anterior: SkillTravada | undefined): string {
+function dataDaResolucao(
+  nome: string,
+  nova: Omit<SkillTravada, "resolvido_em">,
+  anterior: SkillTravada | undefined,
+): string {
   // só uma data de verdade é preservada: o schema aceita qualquer texto, e
   // manter um valor inválido o perpetuaria em todo `init` seguinte
-  if (anterior !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(anterior.resolvido_em) && mesmaResolucao(nova, anterior)) {
+  if (
+    anterior !== undefined &&
+    /^\d{4}-\d{2}-\d{2}$/.test(anterior.resolvido_em) &&
+    mesmaResolucao(nome, nova, anterior)
+  ) {
     return anterior.resolvido_em;
   }
   return new Date().toISOString().slice(0, 10);
@@ -407,7 +415,7 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
       referencia: resolucao.referencia,
       travado: resolucao.travado,
       commit: resolucao.commit,
-      resolvido_em: dataDaResolucao(resolucao, travadasAntes[nome]),
+      resolvido_em: dataDaResolucao(nome, resolucao, travadasAntes[nome]),
       arquivos: resolucao.arquivos,
     };
     instaladas.push(nome);
