@@ -1,5 +1,10 @@
 # Otimização da arquitetura de instruções e execução das skills Expx
 
+> **Registro histórico.** A origem RunX citada abaixo documenta o ambiente
+> existente em 2026-10-21 e não pode ser usada para clone, instalação, update
+> ou certificação. A origem canônica atual está registrada em
+> `docs/expx-cli/base/10-proveniencia-skills.md`.
+
 Data: 2026-10-21. Repositórios envolvidos: `AxisGov/expxdev` e
 `bittencourtthulio/runx`. Estado: **abordagem arquitetural aprovada;
 especificação aguardando revisão do usuário; implementação ainda não

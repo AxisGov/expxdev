@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { resolverOrigem } from "../nucleo/catalogo.js";
+import { repositorioCanonico, resolverOrigem } from "../nucleo/catalogo.js";
 import { resolverAlvo } from "../nucleo/versao.js";
 import { buscarSkill } from "../nucleo/busca.js";
 import { detectarLayout } from "../nucleo/layout.js";
@@ -44,6 +44,7 @@ import { comporModos, consolidarModos, lerModosDaSkill, type ModosPublicados } f
 import { ORIGEM_DO_PLUGIN } from "../plugin/manifestos.js";
 import { materializarCodex } from "../harness/codex.js";
 import { lerOverridesDoProjeto, planejarAgentes, planejarLimpeza } from "../harness/agentes.js";
+import { adquirirBloqueioOperacao } from "../nucleo/bloqueio-operacao.js";
 
 /**
  * O fluxo do `init`: busca, PLANEJA, VALIDA, aplica e trava.
@@ -297,10 +298,10 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
 }
 
 /** A mesma resolução: mesma origem, referência, commit e bytes da skill. */
-function mesmaResolucao(a: Omit<SkillTravada, "resolvido_em">, b: SkillTravada): boolean {
+function mesmaResolucao(nome: string, a: Omit<SkillTravada, "resolvido_em">, b: SkillTravada): boolean {
   const hashes = (x: Record<string, string>): string => JSON.stringify(Object.entries(x).sort(([p], [q]) => (p < q ? -1 : p > q ? 1 : 0)));
   return (
-    a.repositorio === b.repositorio &&
+    repositorioCanonico(nome, a.repositorio) === repositorioCanonico(nome, b.repositorio) &&
     a.referencia === b.referencia &&
     a.travado === b.travado &&
     a.commit === b.commit &&
@@ -313,13 +314,32 @@ function mesmaResolucao(a: Omit<SkillTravada, "resolvido_em">, b: SkillTravada):
  * resolução, a data dele é mantida: um `init` repetido não resolveu nada novo,
  * e reescrever a data sujaria a árvore só porque o dia virou.
  */
-function dataDaResolucao(nova: Omit<SkillTravada, "resolvido_em">, anterior: SkillTravada | undefined): string {
+function dataDaResolucao(
+  nome: string,
+  nova: Omit<SkillTravada, "resolvido_em">,
+  anterior: SkillTravada | undefined,
+): string {
   // só uma data de verdade é preservada: o schema aceita qualquer texto, e
   // manter um valor inválido o perpetuaria em todo `init` seguinte
-  if (anterior !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(anterior.resolvido_em) && mesmaResolucao(nova, anterior)) {
+  if (
+    anterior !== undefined &&
+    dataIsoValida(anterior.resolvido_em) &&
+    mesmaResolucao(nome, nova, anterior)
+  ) {
     return anterior.resolvido_em;
   }
   return new Date().toISOString().slice(0, 10);
+}
+
+function dataIsoValida(valor: string): boolean {
+  const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(valor);
+  if (partes === null) return false;
+  const ano = Number(partes[1]);
+  const mes = Number(partes[2]);
+  const dia = Number(partes[3]);
+  const data = new Date("2000-01-01T00:00:00.000Z");
+  data.setUTCFullYear(ano, mes - 1, dia);
+  return data.getUTCFullYear() === ano && data.getUTCMonth() === mes - 1 && data.getUTCDate() === dia;
 }
 
 export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
@@ -407,7 +427,7 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
       referencia: resolucao.referencia,
       travado: resolucao.travado,
       commit: resolucao.commit,
-      resolvido_em: dataDaResolucao(resolucao, travadasAntes[nome]),
+      resolvido_em: dataDaResolucao(nome, resolucao, travadasAntes[nome]),
       arquivos: resolucao.arquivos,
     };
     instaladas.push(nome);
@@ -442,29 +462,37 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     skills: travadas,
     instalacao: instalacaoTravada(p.plano),
   };
-  const troca = prepararTroca(join(op.raiz, ".expx", "marketplace"), (tmp) => {
-    montarMarketplace(tmp, montaveis, versaoDoCli());
-  });
-  try {
-    aplicarArtefatos(op.raiz, p.plano.projeto);
-    for (const rel of p.plano.remover) rmSync(join(op.raiz, ...rel.split("/")), { force: true });
-    if (p.plano.settings !== undefined) gravarSettings(p.plano.settings);
-    if (op.harness.includes("codex")) {
-      try {
-        const aviso = materializarCodex(op.raiz);
-        if (aviso !== undefined) avisos.push(aviso);
-      } catch (erro) {
-        avisos.push(`Codex: nao foi possivel materializar os hooks: ${erro instanceof Error ? erro.message : "falha de filesystem"}`);
-      }
-    }
-    if (p.plano.modos !== undefined) escreverArquivoAtomico(join(op.raiz, ".expx", "hooks.json"), p.plano.modos.texto);
-    troca.publicar();
-  } catch (e: unknown) {
-    troca.descartar();
-    throw e;
+  const bloqueio = adquirirBloqueioOperacao(op.raiz);
+  if (!bloqueio.ok) {
+    return { ok: false, instaladas: [], falhas, erros: [bloqueio.erro], naoTravadas, avisos };
   }
-  // O lock por último: ele é a afirmação de que a instalação está completa.
-  escreverArquivoAtomico(caminhoDoLock(op.raiz), `${JSON.stringify(lock, null, 2)}\n`);
+  try {
+    const troca = prepararTroca(join(op.raiz, ".expx", "marketplace"), (tmp) => {
+      montarMarketplace(tmp, montaveis, versaoDoCli());
+    });
+    try {
+      aplicarArtefatos(op.raiz, p.plano.projeto);
+      for (const rel of p.plano.remover) rmSync(join(op.raiz, ...rel.split("/")), { force: true });
+      if (p.plano.settings !== undefined) gravarSettings(p.plano.settings);
+      if (op.harness.includes("codex")) {
+        try {
+          const aviso = materializarCodex(op.raiz);
+          if (aviso !== undefined) avisos.push(aviso);
+        } catch (erro) {
+          avisos.push(`Codex: nao foi possivel materializar os hooks: ${erro instanceof Error ? erro.message : "falha de filesystem"}`);
+        }
+      }
+      if (p.plano.modos !== undefined) escreverArquivoAtomico(join(op.raiz, ".expx", "hooks.json"), p.plano.modos.texto);
+      troca.publicar();
+    } catch (e: unknown) {
+      troca.descartar();
+      throw e;
+    }
+    // O lock por último: ele é a afirmação de que a instalação está completa.
+    escreverArquivoAtomico(caminhoDoLock(op.raiz), `${JSON.stringify(lock, null, 2)}\n`);
+  } finally {
+    bloqueio.liberar();
+  }
 
   // O bit de execução foi gravado em disco, mas num repositório com
   // `core.filemode=false` o git NÃO vai versioná-lo — e o próximo clone ou

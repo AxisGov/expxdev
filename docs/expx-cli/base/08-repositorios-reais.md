@@ -1,5 +1,11 @@
 # Os cinco repositórios — estrutura real verificada
 
+> **Registro histórico de 2026-08-29.** As URLs
+> `bittencourtthulio/{sprintx,runx,mergex}` abaixo registram a origem
+> observada naquela auditoria e não são instruções de instalação ou update.
+> O estado canônico atual está em
+> [`10-proveniencia-skills.md`](10-proveniencia-skills.md).
+
 Área externa. Substitui a presunção do `04-skills-do-ecossistema.md` por fato: os cinco repositórios foram clonados e inspecionados.
 
 ## Contrato de entrada

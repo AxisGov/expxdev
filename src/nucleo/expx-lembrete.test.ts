@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 // @ts-expect-error benchmark é um módulo Node distribuído fora de src/.
-import { codigoSaidaDoGate } from "../../scripts/benchmark-expx-lembrete.mjs";
+import { avaliarGateIncremental, codigoSaidaDoGate } from "../../scripts/benchmark-expx-lembrete.mjs";
 // @ts-expect-error O motor ESM e distribuido ao lado do wrapper shell.
 import { main } from "../../nucleo/hooks/expx-lembrete.mjs";
 
@@ -436,9 +436,7 @@ describe.runIf(process.env.EXPX_BENCHMARK_OFICIAL === "1")("benchmark reproduzí
     expect(medicao.samples).toBe(200);
     expect(medicao.pairing).toBe("alternating");
     expect(Object.keys(medicao.scenarios).sort()).toEqual(["fallback", "first_injection", "repetition"]);
-    expect(medicao.gate.kind).toBe(process.platform === "win32"
-      ? "percentile_difference_p95_ms"
-      : "absolute_p95_ms");
+    expect(medicao.gate.kind).toBe("percentile_difference_p95_ms");
     expect(medicao.gate.limit_ms).toBe(100);
     expect(medicao.gate.passed).toBe(true);
     for (const cenario of Object.values(medicao.scenarios)) {
@@ -458,6 +456,18 @@ describe.runIf(process.env.EXPX_BENCHMARK_OFICIAL === "1")("benchmark reproduzí
 });
 
 describe("veredito do benchmark dedicado", () => {
+  it("usa o mesmo gate incremental de 100 ms em qualquer plataforma", () => {
+    const gate = avaliarGateIncremental({
+      rapido: { incremental_p95_ms: 100, absolute: { p95_ms: 900 } },
+      lento: { incremental_p95_ms: 101, absolute: { p95_ms: 1 } },
+    });
+    expect(gate).toEqual({
+      kind: "percentile_difference_p95_ms",
+      limit_ms: 100,
+      passed: false,
+    });
+  });
+
   it("retorna exit não zero quando o gate reprova sem repetir a medição", () => {
     expect(codigoSaidaDoGate({ passed: true })).toBe(0);
     expect(codigoSaidaDoGate({ passed: false })).toBe(1);

@@ -1,0 +1,38 @@
+# arquivo<TAB>ocorrencia normalizada (%2E representa ponto)<TAB>quantidade<TAB>finalidade<TAB>justificativa
+docs/expx-cli/base/10-proveniencia-skills.md	github%2Ecom/bittencourtthulio/sprintx	1	documentacao historica de proveniencia	registra de forma explicita a origem anterior para orientar migracoes
+docs/expx-cli/base/10-proveniencia-skills.md	github%2Ecom/bittencourtthulio/runx	1	documentacao historica de proveniencia	registra de forma explicita a origem anterior para orientar migracoes
+docs/expx-cli/base/10-proveniencia-skills.md	github%2Ecom/bittencourtthulio/mergex	1	documentacao historica de proveniencia	registra de forma explicita a origem anterior para orientar migracoes
+docs/expx-cli/base/10-proveniencia-skills.md	github%2Ecom/bittencourtthulio/buildx	1	documentacao historica de proveniencia	registra de forma explicita a origem anterior para orientar migracoes
+docs/superpowers/plans/2026-10-21-otimizacao-arquitetura-skills-expx-baseline.md	github%2Ecom/bittencourtthulio/runx.git	1	registro historico de benchmark	preserva a medicao anterior sem autorizar operacao remota atual
+fixtures/candidatos/mergex/.claude/skills/mergex/references/00-schema.md	github%2Ecom/bittencourtthulio/sprintx	1	fixture de migracao mergex	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/mergex/.claude/skills/mergex/references/00-schema.md	github%2Ecom/bittencourtthulio/runx	1	fixture de migracao mergex	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/mergex/README.md	raw%2Egithubusercontent%2Ecom/bittencourtthulio/mergex	10	fixture de migracao mergex	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/mergex/README.md	bittencourtthulio%2Egithub%2Eio/expxdev	4	fixture de migracao mergex	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/mergex/README.md	github%2Ecom/bittencourtthulio/expxdev	4	fixture de migracao mergex	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/mergex/README.md	github%2Ecom/bittencourtthulio/sprintx	3	fixture de migracao mergex	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/mergex/README.md	github%2Ecom/bittencourtthulio/runx	3	fixture de migracao mergex	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/mergex/README.md	github%2Ecom/bittencourtthulio/buildx	2	fixture de migracao mergex	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/mergex/README.md	github%2Ecom/bittencourtthulio/mergex.git	2	fixture de migracao mergex	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/sprintx/.claude/skills/sprintx/SKILL.md	github%2Ecom/bittencourtthulio/mergex	1	fixture de migracao sprintx	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/sprintx/.claude/skills/sprintx/references/00-schema.md	github%2Ecom/bittencourtthulio/runx	1	fixture de migracao sprintx	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/sprintx/README.md	raw%2Egithubusercontent%2Ecom/bittencourtthulio/sprintx	10	fixture de migracao sprintx	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/sprintx/README.md	bittencourtthulio%2Egithub%2Eio/expxdev	4	fixture de migracao sprintx	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/sprintx/README.md	github%2Ecom/bittencourtthulio/expxdev	4	fixture de migracao sprintx	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/sprintx/README.md	github%2Ecom/bittencourtthulio/runx	5	fixture de migracao sprintx	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/sprintx/README.md	github%2Ecom/bittencourtthulio/mergex	2	fixture de migracao sprintx	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/sprintx/README.md	github%2Ecom/bittencourtthulio/buildx	2	fixture de migracao sprintx	snapshot legado usado para testar descoberta e migracao de candidatos
+fixtures/candidatos/sprintx/README.md	github%2Ecom/bittencourtthulio/sprintx.git	1	fixture de migracao sprintx	snapshot legado usado para testar descoberta e migracao de candidatos
+src/cli/pacote.test.ts	bittencourtthulio%2Egithub%2Eio/expxdev	1	teste negativo de empacotamento	prova que a documentacao publicada nao conserva o site legado
+src/nucleo/catalogo.test.ts	github%2Ecom/bittencourtthulio/runx	1	fixture de migracao do catalogo	prova o mapeamento exato entre origem anterior e origem AxisGov
+src/nucleo/catalogo.test.ts	github%2Ecom/bittencourtthulio/mergex	1	fixture de migracao do catalogo	prova o mapeamento exato entre origem anterior e origem AxisGov
+src/nucleo/catalogo.test.ts	github%2Ecom/bittencourtthulio/sprintx	1	fixture de migracao do catalogo	prova o mapeamento exato entre origem anterior e origem AxisGov
+src/nucleo/catalogo.test.ts	github%2Ecom/bittencourtthulio/buildx	1	fixture de migracao do catalogo	prova o mapeamento exato entre origem anterior e origem AxisGov
+src/nucleo/catalogo.ts	github%2Ecom/bittencourtthulio/sprintx	1	mapa explicito origensLegadas	permite reconhecer e migrar instalacoes sprintx existentes
+src/nucleo/catalogo.ts	github%2Ecom/bittencourtthulio/runx	1	mapa explicito origensLegadas	permite reconhecer e migrar instalacoes runx existentes
+src/nucleo/catalogo.ts	github%2Ecom/bittencourtthulio/mergex	1	mapa explicito origensLegadas	permite reconhecer e migrar instalacoes mergex existentes
+src/nucleo/catalogo.ts	github%2Ecom/bittencourtthulio/buildx	1	mapa explicito origensLegadas	permite reconhecer e migrar instalacoes buildx existentes
+src/nucleo/lock.test.ts	github%2Ecom/bittencourtthulio/sprintx	1	fixture de lock legado	prova leitura e migracao de lock criado antes da mudanca de origem
+src/update/proveniencia.test.ts	github%2Ecom/bittencourtthulio/runx	1	fixture de migracao de update	prova que update reconhece a origem anterior e grava AxisGov
+src/update/proveniencia.test.ts	github%2Ecom/bittencourtthulio/mergex	1	fixture de migracao de update	prova que update reconhece a origem anterior e grava AxisGov
+src/update/proveniencia.test.ts	github%2Ecom/bittencourtthulio/sprintx	1	fixture de migracao de update	prova que update reconhece a origem anterior e grava AxisGov
+src/update/proveniencia.test.ts	github%2Ecom/bittencourtthulio/buildx	1	fixture de migracao de update	prova que update reconhece a origem anterior e grava AxisGov

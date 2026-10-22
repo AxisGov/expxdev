@@ -1,18 +1,28 @@
-# As cinco skills do ecossistema Expx
+# As nove skills do ecossistema Expx
 
 Área interna/externa. O que o CLI busca, empacota e instala. Fatos apurados a partir das skills INSTALADAS na máquina (`~/.claude/skills/`), não da documentação dos repositórios.
 
 ## Contrato de entrada
 
-As cinco skills e seus repositórios (promptcli1.md:11-16):
+As nove skills e seus repositórios atuais:
 
 | Skill | Repositório | Papel |
 |---|---|---|
-| `sprintx` | `https://github.com/bittencourtthulio/sprintx` | planeja e executa features novas |
-| `runx` | `https://github.com/bittencourtthulio/runx` | ocorrências de manutenção do dia a dia |
+| `sprintx` | `https://github.com/AxisGov/sprintx` | planeja e executa features novas |
+| `runx` | `https://github.com/AxisGov/runx` | ocorrências de manutenção do dia a dia |
 | `legadox` | `https://github.com/bittencourtthulio/legadox` | camada para projetos legados |
 | `stackx` | `https://github.com/bittencourtthulio/stackx` | descobre o dialeto técnico do repositório |
-| `mergex` | `https://github.com/bittencourtthulio/mergex` | versionamento, entrega e revisão de PRs |
+| `mergex` | `https://github.com/AxisGov/mergex` | versionamento, entrega e revisão de PRs |
+| `memox` | `https://github.com/bittencourtthulio/MemoX` | memória dos artefatos já fechados |
+| `prodx` | `https://github.com/bittencourtthulio/prodx` | camada de produto |
+| `buildx` | `https://github.com/AxisGov/buildx` | orquestra um projeto inteiro |
+| `designx` | `https://github.com/bittencourtthulio/designx` | cartografa e audita o design system |
+
+RunX, MergeX, SprintX e BuildX têm propriedade canônica confirmada na
+organização AxisGov. LegadoX, StackX, MemoX, ProdX e DesignX permanecem com a
+origem observada no catálogo; sua propriedade canônica ainda não foi decidida.
+O inventário completo e os testes de origem estão em
+[`10-proveniencia-skills.md`](10-proveniencia-skills.md).
 
 Estrutura real observada em `sprintx` e `runx` (as duas que existem em disco):
 

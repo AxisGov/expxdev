@@ -123,4 +123,23 @@ describe("flags do update", () => {
     };
     expect(lock.skills.sprintx.repositorio).toBe(repo);
   });
+
+  it("funcional: falha do init nao informa aplicacao nem skill atualizada", async () => {
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    repos.push(repo);
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: repo } });
+
+    rmSync(join(repo, ".claude/skills/sprintx/SKILL.md"));
+    const env = { ...process.env, GIT_AUTHOR_NAME: "e", GIT_AUTHOR_EMAIL: "e@e.invalid", GIT_COMMITTER_NAME: "e", GIT_COMMITTER_EMAIL: "e@e.invalid" };
+    execFileSync("git", ["add", "-A"], { cwd: repo, env });
+    execFileSync("git", ["commit", "-q", "-m", "publica layout invalido"], { cwd: repo, env });
+    execFileSync("git", ["tag", "v1.1.0"], { cwd: repo, env });
+
+    const r = await executarUpdate({ raiz: p.raiz, sim: true, origens: { sprintx: repo } });
+    expect(r.ok).toBe(false);
+    expect(r.aplicou).toBe(false);
+    expect(r.atualizadas).toEqual([]);
+    expect(r.mensagens).not.toContain(AVISO_ROLLBACK);
+  });
 });

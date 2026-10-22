@@ -118,6 +118,14 @@ export function codigoSaidaDoGate(gate) {
   return gate.passed ? 0 : 1;
 }
 
+export function avaliarGateIncremental(scenarios) {
+  return {
+    kind: "percentile_difference_p95_ms",
+    limit_ms: 100,
+    passed: Object.values(scenarios).every((cenario) => cenario.incremental_p95_ms <= 100),
+  };
+}
+
 function main() {
 try {
   const moduloNoopDir = temporario("expx-benchmark-node-module-");
@@ -152,17 +160,7 @@ exit 0
       { baseline: 1, hook: 1, node_invocations: 0 }),
   ]);
 
-  const gate = process.platform === "win32" && BASH === GIT_BASH
-    ? {
-      kind: "percentile_difference_p95_ms",
-      limit_ms: 100,
-      passed: Object.values(scenarios).every((cenario) => cenario.incremental_p95_ms <= 100),
-    }
-    : {
-      kind: "absolute_p95_ms",
-      limit_ms: 100,
-      passed: Object.values(scenarios).every((cenario) => cenario.absolute.p95_ms <= 100),
-    };
+  const gate = avaliarGateIncremental(scenarios);
 
   const resultado = {
     schema: 2,

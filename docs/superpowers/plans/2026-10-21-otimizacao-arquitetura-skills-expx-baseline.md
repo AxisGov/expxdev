@@ -1,5 +1,10 @@
 # Baseline da otimização da arquitetura das skills Expx
 
+> **Registro histórico.** As origens e caminhos desta baseline descrevem o
+> ambiente medido em 2026-10-21. Não devem ser usados para clone, instalação,
+> update ou certificação. A proveniência canônica atual está em
+> `docs/expx-cli/base/10-proveniencia-skills.md`.
+
 Data: 2026-10-21. Escopo executado: somente Fase 1 / Task 1 do plano
 `2026-10-21-otimizacao-arquitetura-skills-expx.md`.
 
@@ -254,3 +259,39 @@ antes disso.
   decisão é não alterar `fatiamento.test.ts`, `verificar-fatiamento.sh`,
   `expx-limites.mjs` nem `candidatos.ts`; a CI limpa em Windows e Ubuntu é o
   gate integral da P1.
+
+### Fechamento P1.1 — proveniência AxisGov e gate uniforme
+
+- Bases canônicas confirmadas em 2026-10-22: ExpxDev `6bc58bd`, RunX
+  `979143f`, MergeX `8d4e4b7`, SprintX `285a337` e BuildX `6cd5dbd`, todos
+  publicados sob a organização `AxisGov`.
+- Suíte integral ExpxDev: 135 arquivos verdes, 1 arquivo opt-in ignorado,
+  1.402 testes verdes e 7 ignorados. O typecheck também permaneceu verde.
+- RunX: bancadas finais de hooks, conteúdo, estado, espelho e instalação
+  verdes; a instalação temporária preservou núcleo, referências, assets e
+  agentes byte a byte. A trava adicional de proveniência AxisGov passou.
+- Certificação canônica: `expx init --skills runx --harness claude,opencode`
+  foi exercitado sem override de origem; o lock gravou `AxisGov/runx`, os dois
+  harnesses foram materializados e a reinstalação removeu adulteração local.
+- Migração: locks antigos de RunX, MergeX, SprintX e BuildX são reconhecidos e
+  alteram somente a proveniência; a segunda passagem não escreve e origens
+  locais/customizadas permitidas são preservadas.
+- Benchmark oficial Linux/WSL, Node `v22.23.1`, 10 aquecimentos e 200 amostras
+  intercaladas por cenário. O gate uniforme
+  `percentile_difference_p95_ms <= 100` passou: 15,103 ms na primeira
+  injeção, 11,776 ms na repetição e 1,061 ms no fallback. Como diagnóstico, os
+  deltas pareados p50/p95 foram 14,164/19,583 ms, 9,916/17,279 ms e
+  0,999/1,790 ms, respectivamente.
+- Volumes da medição Linux/WSL: 466 bytes na primeira injeção, zero na
+  supressão e 467 bytes no fallback.
+- `npm pack` real: `expxdev-0.7.0.tgz`, 388.946 bytes, 402 entradas, SHA-256
+  `535d17a4c60bb4b4a0ae03935deedf91c69c28baa90d0b743e98ed8e6ac4d0d2`.
+  O `package.json` empacotado aponta para `AxisGov/expxdev` e o catálogo
+  compilado contém as quatro origens canônicas AxisGov.
+- A revisão independente única encontrou um bypass alto nos filtros de PR e
+  no regex HTTPS dos guards, uma lacuna média na proteção da origem observada
+  de StackX e links públicos inválidos. A correção removeu todos os filtros de
+  caminho, passou a cobrir HTTPS, SSH, git e assets raw, adicionou um guard no
+  ExpxDev, fixou em teste as cinco origens com propriedade pendente e ajustou
+  os links. A validação focal posterior ficou verde em 48/48 testes e nos cinco
+  guards de proveniência.

@@ -4,6 +4,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CATALOGO, buscarNoCatalogo, ehCamada, NOMES, resolverOrigem } from "./catalogo.js";
 
+const SKILLS_AXISGOV = [
+  ["runx", "https://github.com/AxisGov/runx", "https://github.com/bittencourtthulio/runx"],
+  ["mergex", "https://github.com/AxisGov/mergex", "https://github.com/bittencourtthulio/mergex"],
+  ["sprintx", "https://github.com/AxisGov/sprintx", "https://github.com/bittencourtthulio/sprintx"],
+  ["buildx", "https://github.com/AxisGov/buildx", "https://github.com/bittencourtthulio/buildx"],
+] as const;
+
+const SKILLS_PROPRIEDADE_PENDENTE = [
+  ["legadox", "https://github.com/bittencourtthulio/legadox"],
+  ["stackx", "https://github.com/bittencourtthulio/stackx"],
+  ["memox", "https://github.com/bittencourtthulio/MemoX"],
+  ["prodx", "https://github.com/bittencourtthulio/prodx"],
+  ["designx", "https://github.com/bittencourtthulio/designx"],
+] as const;
+
 describe("catálogo das skills", () => {
   it("integração: tem as nove skills do catalogo e nenhuma URL repetida", () => {
     expect(CATALOGO).toHaveLength(9);
@@ -57,27 +72,35 @@ describe("catálogo das skills", () => {
     expect(ehCamada("buildx")).toBe(false);
   });
 
-  it("funcional: sprintx e mergex apontam para AxisGov", () => {
-    expect(buscarNoCatalogo("sprintx")?.repositorio).toBe("https://github.com/AxisGov/sprintx");
-    expect(buscarNoCatalogo("mergex")?.repositorio).toBe("https://github.com/AxisGov/mergex");
+  it.each(SKILLS_AXISGOV)("funcional: %s aponta exclusivamente para AxisGov", (nome, canonica) => {
+    expect(buscarNoCatalogo(nome)?.repositorio).toBe(canonica);
   });
 
-  it("funcional: runx continua apontando para bittencourtthulio", () => {
-    expect(buscarNoCatalogo("runx")?.repositorio).toBe("https://github.com/bittencourtthulio/runx");
+  it.each(SKILLS_PROPRIEDADE_PENDENTE)(
+    "funcional: %s preserva a origem observada enquanto a propriedade esta pendente",
+    (nome, observada) => {
+      expect(buscarNoCatalogo(nome)?.repositorio).toBe(observada);
+    },
+  );
+
+  it.each(SKILLS_AXISGOV)(
+    "funcional: origem legada de %s, com ou sem .git, migra para AxisGov",
+    (nome, canonica, legada) => {
+      expect(resolverOrigem(nome, legada)).toBe(canonica);
+      expect(resolverOrigem(nome, `${legada}.git`)).toBe(canonica);
+      expect(resolverOrigem(nome, undefined, legada)).toBe(canonica);
+    },
+  );
+
+  it.each(SKILLS_AXISGOV)("funcional: origem customizada permitida de %s permanece", (nome) => {
+    expect(resolverOrigem(nome, `https://git.example/${nome}`)).toBe(`https://git.example/${nome}`);
   });
 
-  it("funcional: origem legada migra para AxisGov e customizada permanece", () => {
-    expect(resolverOrigem("sprintx", "https://github.com/bittencourtthulio/sprintx")).toBe(
-      "https://github.com/AxisGov/sprintx",
-    );
-    expect(resolverOrigem("sprintx", "https://git.example/sprintx")).toBe("https://git.example/sprintx");
-  });
-
-  it("funcional: origem explícita vence a origem gerenciada", () => {
+  it("funcional: origem explícita customizada vence a origem gerenciada", () => {
     expect(
       resolverOrigem(
         "sprintx",
-        "https://github.com/bittencourtthulio/sprintx",
+        "https://github.com/AxisGov/sprintx",
         "https://git.example/sprintx",
       ),
     ).toBe("https://git.example/sprintx");
@@ -129,7 +152,7 @@ describe("origem local das skills", () => {
 
   it("funcional: sem a variável, o catálogo aponta para o GitHub", () => {
     delete process.env["EXPX_SKILLS_LOCAIS"];
-    expect(buscarNoCatalogo("runx")?.repositorio).toBe("https://github.com/bittencourtthulio/runx");
+    expect(buscarNoCatalogo("runx")?.repositorio).toBe("https://github.com/AxisGov/runx");
   });
 
   it("funcional: com a variável, a skill existente na pasta vem do disco", () => {
@@ -156,6 +179,6 @@ describe("origem local das skills", () => {
 
   it("funcional: variável vazia é tratada como ausente", () => {
     process.env["EXPX_SKILLS_LOCAIS"] = "   ";
-    expect(buscarNoCatalogo("runx")?.repositorio).toBe("https://github.com/bittencourtthulio/runx");
+    expect(buscarNoCatalogo("runx")?.repositorio).toBe("https://github.com/AxisGov/runx");
   });
 });
