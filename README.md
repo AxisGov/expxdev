@@ -521,9 +521,9 @@ repositório. A linha AxisGov não executa `npm publish`. Como o `dist/` não é
 pacote certificado de uma GitHub Release SemVer explícita:
 
 ```bash
-gh release download v0.10.0 -R AxisGov/expxdev -D ~/expx-cli/v0.10.0
-(cd ~/expx-cli/v0.10.0 && sha256sum -c expxdev-0.10.0.tgz.sha256)
-npx --yes --package ~/expx-cli/v0.10.0/expxdev-0.10.0.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+gh release download v0.11.0 -R AxisGov/expxdev -D ~/expx-cli/v0.11.0
+(cd ~/expx-cli/v0.11.0 && sha256sum -c expxdev-0.11.0.tgz.sha256)
+npx --yes --package ~/expx-cli/v0.11.0/expxdev-0.11.0.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -532,7 +532,7 @@ npx --yes --package ~/expx-cli/v0.10.0/expxdev-0.10.0.tgz expx init --skills bui
 - O preflight recusa divergência entre `package.json`, `package-lock.json` e metadata do tarball,
   bem como tag ou release já existente. O pacote é gerado duas vezes e os hashes devem coincidir.
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.10.0 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.11.0 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -540,8 +540,11 @@ npx --yes --package ~/expx-cli/v0.10.0/expxdev-0.10.0.tgz expx init --skills bui
 - `0.7.0` é a versão interna histórica das releases AxisGov `cli-<sha7>`, que permanecem
   imutáveis — inclusive `cli-54520c5`.
 - `expxdev@0.9.0` no npm pertence à distribuição anterior.
-- `0.10.0` inicia a linha AxisGov pós-otimização e correção de proveniência. Consulte
-  [`CHANGELOG.md`](CHANGELOG.md).
+- `0.10.0` inicia a linha AxisGov pós-otimização e correção de proveniência.
+- `0.11.0` incorpora o grafo operacional e sincroniza os fontes finais dos forks com os
+  repositórios de Thulio, preservando as diferenças AxisGov.
+
+Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 

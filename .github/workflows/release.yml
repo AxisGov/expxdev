@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       version:
-        description: Versão SemVer exata do package.json (por exemplo, 0.10.0)
+        description: Versão SemVer exata do package.json (por exemplo, 0.11.0)
         required: true
         type: string
 
