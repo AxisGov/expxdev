@@ -26,6 +26,27 @@ function projeto(): string {
  * instalação quebrada fica indistinguível de "projeto sem artefatos" (D-15).
  */
 describe("instalação dos hooks pelo init", () => {
+  it("integração: instala o wrapper e os dois módulos do lembrete como uma unidade", async () => {
+    const repo = criarRepoSkill({
+      nome: "memox",
+      tags: [],
+      hooks: ["memox-injetar.sh"],
+      assets: { "memox.py": "print('memox')\n" },
+    });
+    criados.push(repo);
+    const raiz = projeto();
+    const resultado = await executarInit({
+      raiz,
+      skills: ["memox"],
+      harness: ["claude"],
+      origens: { memox: repo },
+    });
+    expect.soft(resultado.instaladas).toContain("memox");
+    for (const nome of ["expx-lembrete.sh", "expx-lembrete.mjs", "expx-lembrete-estado.mjs"]) {
+      expect.soft(existsSync(join(raiz, ".claude", "hooks", nome)), nome).toBe(true);
+    }
+  });
+
   it("integração: depois do init, hook e motor existem como irmãos", async () => {
     const repo = criarRepoSkill({
       nome: "memox",
