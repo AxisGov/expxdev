@@ -4,6 +4,7 @@ import { executarInit } from "../cli/init.js";
 import { compararComRemoto, type ItemComparacao } from "./comparar.js";
 import { verificarModificacaoLocal } from "./modificacao.js";
 import { escreverArquivoAtomico } from "../plugin/atomico.js";
+import { adquirirBloqueioOperacao } from "../nucleo/bloqueio-operacao.js";
 
 /**
  * O `update`: descobre, mostra, confirma e aplica — nessa ordem.
@@ -181,15 +182,39 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
     if (migracao.migradas.length === 0) {
       return { ok: true, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens };
     }
-    escreverArquivoAtomico(
-      caminhoDoLock(op.raiz),
-      `${JSON.stringify(migracao.lock, null, 2)}\n`,
-    );
+    const bloqueio = adquirirBloqueioOperacao(op.raiz);
+    if (!bloqueio.ok) {
+      return { ok: false, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens: [...mensagens, bloqueio.erro] };
+    }
+    let migracaoAtual: ReturnType<typeof migrarProveniencias>;
+    try {
+      const atual = lerLock(op.raiz);
+      if (!atual.ok) {
+        return { ok: false, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens: [...mensagens, atual.erro] };
+      }
+      migracaoAtual = migrarProveniencias(atual.lock, op.skills);
+      if (migracaoAtual.migradas.length === 0) {
+        return {
+          ok: true,
+          aplicou: false,
+          atualizadas: [],
+          emDia,
+          bloqueadas,
+          mensagens: mensagens.filter((m) => !m.startsWith("proveniencia canonica pendente:")),
+        };
+      }
+      escreverArquivoAtomico(
+        caminhoDoLock(op.raiz),
+        `${JSON.stringify(migracaoAtual.lock, null, 2)}\n`,
+      );
+    } finally {
+      bloqueio.liberar();
+    }
     mensagens.push(AVISO_ROLLBACK);
     return {
       ok: true,
       aplicou: true,
-      atualizadas: migracao.migradas,
+      atualizadas: migracaoAtual.migradas,
       emDia,
       bloqueadas,
       mensagens,
@@ -217,11 +242,11 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   // de ser reescritos. Engoli-los aqui esconderia o defeito justamente no
   // comando que traz artefato novo.
   mensagens.push(...init.avisos);
-  mensagens.push(AVISO_ROLLBACK);
+  if (init.ok) mensagens.push(AVISO_ROLLBACK);
   return {
     ok: init.ok,
-    aplicou: true,
-    atualizadas: [...new Set([...candidatas.map((c) => c.nome), ...migracao.migradas])],
+    aplicou: init.ok,
+    atualizadas: init.ok ? [...new Set([...candidatas.map((c) => c.nome), ...migracao.migradas])] : [],
     emDia,
     bloqueadas,
     mensagens,

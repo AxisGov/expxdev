@@ -44,6 +44,7 @@ import { comporModos, consolidarModos, lerModosDaSkill, type ModosPublicados } f
 import { ORIGEM_DO_PLUGIN } from "../plugin/manifestos.js";
 import { materializarCodex } from "../harness/codex.js";
 import { lerOverridesDoProjeto, planejarAgentes, planejarLimpeza } from "../harness/agentes.js";
+import { adquirirBloqueioOperacao } from "../nucleo/bloqueio-operacao.js";
 
 /**
  * O fluxo do `init`: busca, PLANEJA, VALIDA, aplica e trava.
@@ -322,12 +323,23 @@ function dataDaResolucao(
   // manter um valor inválido o perpetuaria em todo `init` seguinte
   if (
     anterior !== undefined &&
-    /^\d{4}-\d{2}-\d{2}$/.test(anterior.resolvido_em) &&
+    dataIsoValida(anterior.resolvido_em) &&
     mesmaResolucao(nome, nova, anterior)
   ) {
     return anterior.resolvido_em;
   }
   return new Date().toISOString().slice(0, 10);
+}
+
+function dataIsoValida(valor: string): boolean {
+  const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(valor);
+  if (partes === null) return false;
+  const ano = Number(partes[1]);
+  const mes = Number(partes[2]);
+  const dia = Number(partes[3]);
+  const data = new Date("2000-01-01T00:00:00.000Z");
+  data.setUTCFullYear(ano, mes - 1, dia);
+  return data.getUTCFullYear() === ano && data.getUTCMonth() === mes - 1 && data.getUTCDate() === dia;
 }
 
 export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
@@ -450,29 +462,37 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     skills: travadas,
     instalacao: instalacaoTravada(p.plano),
   };
-  const troca = prepararTroca(join(op.raiz, ".expx", "marketplace"), (tmp) => {
-    montarMarketplace(tmp, montaveis, versaoDoCli());
-  });
-  try {
-    aplicarArtefatos(op.raiz, p.plano.projeto);
-    for (const rel of p.plano.remover) rmSync(join(op.raiz, ...rel.split("/")), { force: true });
-    if (p.plano.settings !== undefined) gravarSettings(p.plano.settings);
-    if (op.harness.includes("codex")) {
-      try {
-        const aviso = materializarCodex(op.raiz);
-        if (aviso !== undefined) avisos.push(aviso);
-      } catch (erro) {
-        avisos.push(`Codex: nao foi possivel materializar os hooks: ${erro instanceof Error ? erro.message : "falha de filesystem"}`);
-      }
-    }
-    if (p.plano.modos !== undefined) escreverArquivoAtomico(join(op.raiz, ".expx", "hooks.json"), p.plano.modos.texto);
-    troca.publicar();
-  } catch (e: unknown) {
-    troca.descartar();
-    throw e;
+  const bloqueio = adquirirBloqueioOperacao(op.raiz);
+  if (!bloqueio.ok) {
+    return { ok: false, instaladas: [], falhas, erros: [bloqueio.erro], naoTravadas, avisos };
   }
-  // O lock por último: ele é a afirmação de que a instalação está completa.
-  escreverArquivoAtomico(caminhoDoLock(op.raiz), `${JSON.stringify(lock, null, 2)}\n`);
+  try {
+    const troca = prepararTroca(join(op.raiz, ".expx", "marketplace"), (tmp) => {
+      montarMarketplace(tmp, montaveis, versaoDoCli());
+    });
+    try {
+      aplicarArtefatos(op.raiz, p.plano.projeto);
+      for (const rel of p.plano.remover) rmSync(join(op.raiz, ...rel.split("/")), { force: true });
+      if (p.plano.settings !== undefined) gravarSettings(p.plano.settings);
+      if (op.harness.includes("codex")) {
+        try {
+          const aviso = materializarCodex(op.raiz);
+          if (aviso !== undefined) avisos.push(aviso);
+        } catch (erro) {
+          avisos.push(`Codex: nao foi possivel materializar os hooks: ${erro instanceof Error ? erro.message : "falha de filesystem"}`);
+        }
+      }
+      if (p.plano.modos !== undefined) escreverArquivoAtomico(join(op.raiz, ".expx", "hooks.json"), p.plano.modos.texto);
+      troca.publicar();
+    } catch (e: unknown) {
+      troca.descartar();
+      throw e;
+    }
+    // O lock por último: ele é a afirmação de que a instalação está completa.
+    escreverArquivoAtomico(caminhoDoLock(op.raiz), `${JSON.stringify(lock, null, 2)}\n`);
+  } finally {
+    bloqueio.liberar();
+  }
 
   // O bit de execução foi gravado em disco, mas num repositório com
   // `core.filemode=false` o git NÃO vai versioná-lo — e o próximo clone ou

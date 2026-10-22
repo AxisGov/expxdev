@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { executarUpdate } from "./flags.js";
 import { escreverLock, versaoDoCli, VERSAO_LOCK, type Lock } from "../nucleo/lock.js";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
+import { caminhoDoBloqueioOperacao } from "../nucleo/bloqueio-operacao.js";
 
 const SKILLS_AXISGOV = [
   ["runx", "https://github.com/AxisGov/runx", "https://github.com/bittencourtthulio/runx"],
@@ -72,6 +73,31 @@ afterEach(() => {
 });
 
 describe("migracao idempotente de proveniencia", () => {
+  it("funcional: operacao concorrente bloqueia migracao antes de sobrescrever o lock", async () => {
+    const [nome, canonica, legada] = SKILLS_AXISGOV[0];
+    const repo = criarRepoSkill({ nome, tags: ["v1.0.0"] });
+    temporarios.push(repo);
+    const commit = execFileSync("git", ["rev-list", "-n", "1", "v1.0.0"], {
+      cwd: repo,
+      encoding: "utf8",
+    }).trim();
+    redirecionarGit(canonica, repo);
+    projeto = projetoTemporario("fixtures/cli/projeto-limpo");
+    const anterior = lockLegado(nome, legada, commit);
+    escreverLock(projeto.raiz, anterior);
+    const caminho = join(projeto.raiz, ".expx", "expx-lock.json");
+    const bloqueio = caminhoDoBloqueioOperacao(projeto.raiz);
+    writeFileSync(bloqueio, "outra operacao\n");
+
+    const resultado = await executarUpdate({ raiz: projeto.raiz, sim: true });
+
+    expect(resultado.ok).toBe(false);
+    expect(resultado.aplicou).toBe(false);
+    expect(resultado.atualizadas).toEqual([]);
+    expect(resultado.mensagens.join(" ")).toContain("outra operacao");
+    expect(JSON.parse(readFileSync(caminho, "utf8"))).toEqual(anterior);
+  });
+
   it.each(SKILLS_AXISGOV)(
     "integracao: update de %s usa AxisGov, altera so a proveniencia e a segunda execucao nao muda",
     async (nome, canonica, legada) => {

@@ -10,7 +10,7 @@
   <a href="https://github.com/AxisGov/expxdev/releases"><img alt="releases: expxdev" src="https://img.shields.io/github/v/release/AxisGov/expxdev?display_name=tag&amp;label=release"></a>
   <img alt="harness: Claude Code" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/badge-claude.svg">
   <img alt="harness: OpenCode" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/badge-opencode.svg">
-  <img alt="testes: 231 passed" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/badge-testes.svg">
+  <a href="https://github.com/AxisGov/expxdev/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/AxisGov/expxdev/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <img alt="schema expx v1" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/badge-schema.svg">
   <img alt="node >=20.19" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/badge-node.svg">
   <img alt="licenca MIT" src="https://raw.githubusercontent.com/AxisGov/expxdev/main/.github/assets/badge-license.svg">
