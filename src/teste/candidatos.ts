@@ -252,6 +252,17 @@ function git(cwd: string, ...args: string[]): string {
   });
 }
 
+/**
+ * Repositórios descartáveis não podem iniciar manutenção em segundo plano:
+ * além de mudar a árvore enquanto a bancada a compara, o processo destacado
+ * pode manter `.git` ocupado durante o descarte. As duas chaves cobrem o
+ * `git maintenance run --auto` atual e o `git gc --auto` legado.
+ */
+function desativarManutencaoAutomatica(cwd: string): void {
+  git(cwd, "config", "maintenance.auto", "false");
+  git(cwd, "config", "gc.auto", "0");
+}
+
 export function gitEm(cwd: string, ...args: string[]): string {
   return git(cwd, ...args);
 }
@@ -269,6 +280,7 @@ export function fontesCandidatas(): string {
     cpSync(snapshot(nome), destino, { recursive: true });
     git(destino, "init", "-q", "-b", "main");
     git(destino, "config", "core.autocrlf", "false");
+    desativarManutencaoAutomatica(destino);
     git(destino, "add", "-A");
     git(destino, "commit", "-q", "-m", `${nome} @ ${CANDIDATOS[nome].sha}`);
   }
@@ -280,6 +292,7 @@ export function novoProduto(prefixo = "expx-produto-"): string {
   const raiz = temporarios.novo(prefixo);
   git(raiz, "init", "-q", "-b", "main");
   git(raiz, "config", "core.autocrlf", "false");
+  desativarManutencaoAutomatica(raiz);
   git(raiz, "config", "user.email", "produto@example.invalid");
   git(raiz, "config", "user.name", "Produto");
   git(raiz, "commit", "-q", "--allow-empty", "-m", "produto: inicio");

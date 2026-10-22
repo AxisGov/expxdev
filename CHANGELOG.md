@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.0 — grafo operacional e sincronização final
+
+- Incorpora o estado final publicado por Thulio em ExpxDev, BuildX e SprintX, preservando as extensões e a proveniência da linha AxisGov.
+- Adiciona o comando `expx grafo` para gerar e exportar o grafo de dependências das tasks, com ordenação topológica, caminho crítico e diagnóstico de ciclos.
+- Adiciona o grafo vivo ao painel, atualizado a partir do plano e do estado observados pelo servidor.
+- Mantém como funcionalidade separada qualquer escolha de LLM: este grafo descreve dependências e execução do trabalho.
+
 ## 0.10.0 — linha AxisGov pós-otimização
 
 - Consolida a otimização P1 e a proveniência canônica de RunX, MergeX, SprintX e BuildX.

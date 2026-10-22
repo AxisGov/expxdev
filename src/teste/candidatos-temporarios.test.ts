@@ -7,6 +7,7 @@ import {
   arvore,
   estritamenteDentro,
   fontesCandidatas,
+  gitEm,
   larIsolado,
   noPath,
   novoProduto,
@@ -101,6 +102,8 @@ describe("temporários da bancada de candidatas — o ciclo recolhe o que os hel
       expect(temporarios.lista(), c).toContain(c);
       expect(existsSync(c), c).toBe(true);
     }
+    expect(gitEm(produto, "config", "--get", "maintenance.auto").trim()).toBe("false");
+    expect(gitEm(produto, "config", "--get", "gc.auto").trim()).toBe("0");
 
     temporarios.descartar();
 
