@@ -468,25 +468,31 @@ só lê o artefato que cada uma produz e chama o comando de verdade.
 ## Instalar a partir da release
 
 O `expxdev` publicado no npm é de outro autor: `npx expxdev` instala o CLI dele, não o deste
-repositório. E o `dist/` não é versionado, então um clone daqui não roda sem compilar. Para
-instalar este CLI em outra máquina ou outro projeto, use o pacote que o CI publica a cada commit
-da main, como release `cli-<sha7>`:
+repositório. A linha AxisGov não executa `npm publish`. Como o `dist/` não é versionado, use o
+pacote certificado de uma GitHub Release SemVer explícita:
 
 ```bash
-gh release download cli-<sha7> -R AxisGov/expxdev -D ~/expx-cli/cli-<sha7>
-(cd ~/expx-cli/cli-<sha7> && sha256sum -c expxdev-*.tgz.sha256)
-npx --yes --package ~/expx-cli/cli-<sha7>/expxdev-0.7.0.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+gh release download v0.10.0 -R AxisGov/expxdev -D ~/expx-cli/v0.10.0
+(cd ~/expx-cli/v0.10.0 && sha256sum -c expxdev-0.10.0.tgz.sha256)
+npx --yes --package ~/expx-cli/v0.10.0/expxdev-0.10.0.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
-- A tag é sempre `cli-` seguido dos 7 primeiros caracteres do commit da main. O nome do `.tgz`
-  segue a versão do `package.json` (hoje `0.7.0`).
-- Um commit da main sem release (por exemplo, quando dois pushes seguidos cancelam o CI do
-  primeiro) se publica por **Actions → CI → Run workflow**, com o commit no campo `ref`.
-- Uma tag existente nunca é sobrescrita: o mesmo `cli-<sha7>` tem os mesmos bytes em toda
-  máquina.
-- Para liberar uma versão, rode `bash scripts/liberar-versao.sh [commit]` (sem argumento, o HEAD
-  da main). Ele espera o CI, dispara o `ref` se a release não saiu, confere a release e a
-  instalação, e imprime estes comandos já com a tag.
+- Merge ou push comum em `main` apenas valida testes e build; não publica.
+- A release exige **Actions → Release CLI → Run workflow**, versão SemVer e SHA completo da
+  `main` cujos workflows `CI` e `proveniencia` estejam verdes.
+- O preflight recusa divergência entre `package.json`, `package-lock.json` e metadata do tarball,
+  bem como tag ou release já existente. O pacote é gerado duas vezes e os hashes devem coincidir.
+- Para disparar o workflow explícito pela CLI, rode
+  `bash scripts/liberar-versao.sh 0.10.0 <sha-completo>`. O script não cria tag local e não
+  publica no npm.
+
+### Histórico de versões
+
+- `0.7.0` é a versão interna histórica das releases AxisGov `cli-<sha7>`, que permanecem
+  imutáveis — inclusive `cli-54520c5`.
+- `expxdev@0.9.0` no npm pertence à distribuição anterior.
+- `0.10.0` inicia a linha AxisGov pós-otimização e correção de proveniência. Consulte
+  [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
