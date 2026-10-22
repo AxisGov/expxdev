@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Documentação do método Expx</title>
-<meta name="description" content="Referência completa do CLI expxdev e das oito skills do método Expx: instalação, contratos, painel, watch e a arquitetura interna.">
+<meta name="description" content="Referência da linha AxisGov v0.11.0 do CLI expxdev e das nove skills do método Expx: instalação, contratos, grafo, painel, watch e arquitetura interna.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -24,7 +24,7 @@
       <path d="M7.6 7.4 L16.4 16.6 M16.4 7.4 L7.6 16.6" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/>
     </svg>
     <span class="marca__nome">expx<b>dev</b></span>
-    <span class="marca__versao" id="versao">v0.5.1</span>
+    <span class="marca__versao" id="versao">v0.11.0</span>
   </a>
 
   <div class="busca">
@@ -56,7 +56,7 @@
   </div>
 
   <div class="nav__grupo">
-    <p class="nav__titulo">As oito skills</p>
+    <p class="nav__titulo">As nove skills</p>
     <ul class="nav__lista">
       <li><a class="nav__link" href="#sprintx" data-secao="sprintx"><span class="nav__ponto" style="background:var(--accent)"></span>sprintx</a></li>
       <li><a class="nav__link" href="#runx" data-secao="runx"><span class="nav__ponto" style="background:var(--accent)"></span>runx</a></li>
@@ -66,6 +66,7 @@
       <li><a class="nav__link" href="#memox" data-secao="memox"><span class="nav__ponto" style="background:var(--layer)"></span>memox</a></li>
       <li><a class="nav__link" href="#prodx" data-secao="prodx"><span class="nav__ponto" style="background:var(--layer)"></span>prodx</a></li>
       <li><a class="nav__link" href="#buildx" data-secao="buildx"><span class="nav__ponto" style="background:var(--accent)"></span>buildx</a></li>
+      <li><a class="nav__link" href="#designx" data-secao="designx"><span class="nav__ponto" style="background:var(--layer)"></span>designx</a></li>
     </ul>
   </div>
 
@@ -114,19 +115,20 @@
     o bastante para o agente decidir sozinho no meio da implementação, e ele decide: escolhe um padrão
     que não é o do projeto, escreve o teste na pasta que o runner não olha, refatora três arquivos que
     ninguém pediu. O método Expx é o conjunto das restrições que evitam isso, escrito. Este site é a
-    referência completa do <code>expxdev</code> — o CLI que instala e mantém as oito skills — e de cada
-    uma delas.
+    referência da linha <strong>AxisGov v0.11.0</strong> do <code>expxdev</code> — o CLI que instala e
+    mantém as nove skills — e de cada contrato que permite a elas cooperarem.
   </p>
 
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
-    <pre><code><span class="tok-cmd">npx</span> expxdev init</code></pre>
+    <pre><code><span class="tok-cmd">gh</span> release download v0.11.0 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
+<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.11.0.tgz expx <span class="tok-flag">--version</span></code></pre>
   </div>
 
   <div class="cartoes">
-    <div class="cartao"><div class="cartao__num">7</div><div class="cartao__rot">skills no catálogo</div></div>
-    <div class="cartao"><div class="cartao__num">7</div><div class="cartao__rot">subcomandos do CLI</div></div>
-    <div class="cartao"><div class="cartao__num">795</div><div class="cartao__rot">testes, sem rede</div></div>
+    <div class="cartao"><div class="cartao__num">9</div><div class="cartao__rot">skills no catálogo</div></div>
+    <div class="cartao"><div class="cartao__num">8</div><div class="cartao__rot">subcomandos do CLI</div></div>
+    <div class="cartao"><div class="cartao__num">1461</div><div class="cartao__rot">testes aprovados</div></div>
     <div class="cartao"><div class="cartao__num">30</div><div class="cartao__rot">verificações do doctor</div></div>
   </div>
 
@@ -201,11 +203,14 @@
     máquina — repositório privado funciona sem nenhum token.</p></div>
   </div>
 
-  <h2 id="modo-rapido">O caminho declarativo</h2>
-  <p>A seleção é feita por flag, o que faz a mesma linha servir ao seu terminal e ao CI:</p>
+  <h2 id="modo-rapido">Instale a release certificada</h2>
+  <p>O pacote público chamado <code>expxdev</code> no npm pertence a outra distribuição. A linha AxisGov
+  não executa <code>npm publish</code>: baixe o tarball e o checksum da GitHub Release explícita.</p>
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
-    <pre><code><span class="tok-cmd">npx</span> expxdev init <span class="tok-flag">--skills</span> sprintx,runx,mergex <span class="tok-flag">--harness</span> claude,opencode <span class="tok-flag">--yes</span></code></pre>
+    <pre><code><span class="tok-cmd">gh</span> release download v0.11.0 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
+(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.11.0.tgz.sha256)
+<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.11.0.tgz expx init <span class="tok-flag">--skills</span> sprintx,runx,mergex <span class="tok-flag">--harness</span> claude,opencode <span class="tok-flag">--yes</span></code></pre>
   </div>
 
   <div class="tabela-caixa"><table>
@@ -225,12 +230,12 @@
   </div>
 
   <h2 id="modo-interativo">O caminho interativo</h2>
-  <p>Rodando <code>npx expxdev init</code> sem <code>--skills</code> num terminal completo (stdin e stdout
-  precisam ser TTY), o CLI abre um assistente:</p>
+  <p>Rodando <code>expx init</code> a partir do pacote da release, sem <code>--skills</code>, num terminal
+  completo (stdin e stdout precisam ser TTY), o CLI abre um assistente:</p>
   <div class="terminal">
     <div class="terminal__barra"><span class="terminal__bolha" style="background:#ff5f57"></span><span class="terminal__bolha" style="background:#febc2e"></span><span class="terminal__bolha" style="background:#28c840"></span><span class="terminal__titulo">expx init</span></div>
     <pre><code><span class="t-ciano">  ███████ ██   ██ ██████  ██   ██</span>   <span class="t-cinza">dev</span>
-<span class="t-cinza">  o CLI do metodo Expx · v0.5.0</span>
+<span class="t-cinza">  o CLI do metodo Expx · v0.11.0</span>
 
 <span class="t-verde">?</span> <span class="t-azul">Quais skills instalar?</span> <span class="t-cinza">(espaço marca, enter confirma)</span>
  <span class="t-verde">◉</span> sprintx   <span class="t-cinza">planeja e executa features novas</span>
@@ -240,6 +245,7 @@
  <span class="t-verde">◉</span> mergex    <span class="t-cinza">versionamento, entrega e revisao de pull requests</span>
  <span class="t-cinza">◯ memox     memoria do projeto, indexa os artefatos ja fechados</span>
  <span class="t-cinza">◯ prodx     camada de produto, decide se o pedido vira trabalho</span>
+ <span class="t-cinza">◯ designx   camada de design, cartografa e audita o design system</span>
 
 <span class="t-verde">?</span> <span class="t-azul">Qual harness?</span> <span class="t-verde">◉</span> claude  <span class="t-cinza">◯ opencode</span>
 
@@ -285,8 +291,8 @@
 <section class="secao" id="ecossistema">
   <p class="eyebrow">Começar</p>
   <h1>O ecossistema</h1>
-  <p class="lede">Oito skills que não se conhecem por código: elas se encontram em contratos escritos.
-  É isso que permite instalar três delas e não as outras cinco, ou atualizar uma sem tocar nas demais.</p>
+  <p class="lede">Nove skills que não se conhecem por código: elas se encontram em contratos escritos.
+  É isso que permite instalar três delas e não as outras seis, ou atualizar uma sem tocar nas demais.</p>
 
   <figure class="figura">
     <div class="figura__tela" data-diagrama="ecossistema"></div>
@@ -296,7 +302,7 @@
     <code>mergex</code> ela não tem o que orquestrar.</figcaption>
   </figure>
 
-  <h2 id="as-oito">As oito skills</h2>
+  <h2 id="as-nove">As nove skills</h2>
   <div class="cartoes">
     <a class="cartao" href="#sprintx"><div class="cartao__topo"><span class="cartao__nome">sprintx</span><span class="selo selo--base">base</span></div><p class="cartao__texto">Planeja e executa features novas em seis fases. Construir algo que não existe.</p></a>
     <a class="cartao" href="#runx"><div class="cartao__topo"><span class="cartao__nome">runx</span><span class="selo selo--base">base</span></div><p class="cartao__texto">Ocorrências de manutenção em produção, em cinco estágios. Corrigir o que já está no ar.</p></a>
@@ -306,12 +312,13 @@
     <a class="cartao" href="#memox"><div class="cartao__topo"><span class="cartao__nome">memox</span><span class="selo selo--camada">camada</span></div><p class="cartao__texto">Indexa os artefatos fechados e responde o que já se sabe sobre um arquivo.</p></a>
     <a class="cartao" href="#prodx"><div class="cartao__topo"><span class="cartao__nome">prodx</span><span class="selo selo--camada">camada</span></div><p class="cartao__texto">Recebe o pedido cru e emite um veredito com evidência. Decide se vale fazer.</p></a>
     <a class="cartao" href="#buildx"><div class="cartao__topo"><span class="cartao__nome">buildx</span><span class="selo selo--base">orquestra</span></div><p class="cartao__texto">Conduz um projeto inteiro, da descrição ao sistema pronto. Chama as outras na ordem certa.</p></a>
+    <a class="cartao" href="#designx"><div class="cartao__topo"><span class="cartao__nome">designx</span><span class="selo selo--camada">camada</span></div><p class="cartao__texto">Cartografa o design system e audita consistência visual quando o projeto tem UI.</p></a>
   </div>
 
   <div class="nota nota--info">
     <svg class="nota__icone" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6.4"/><path d="M8 7.2v4M8 4.9v.1" stroke-linecap="round"/></svg>
     <div><p><strong>Camadas sozinhas não fazem nada.</strong> <code>legadox</code>, <code>stackx</code>,
-    <code>memox</code> e <code>prodx</code> modificam o comportamento de <code>sprintx</code> e <code>runx</code>
+    <code>memox</code>, <code>prodx</code> e <code>designx</code> modificam o comportamento de <code>sprintx</code> e <code>runx</code>
     em vez de agir por conta própria. O CLI avisa se você selecionar uma camada sem base, mas nunca impede.</p>
     <p>A <code>buildx</code> é o caso oposto e a única exceção do método: ela não modifica ninguém — <strong>invoca</strong>.
     Sem <code>prodx</code>, <code>sprintx</code> e <code>mergex</code> instaladas ela não roda, e diz o que falta.
@@ -346,6 +353,11 @@
         <td>a F1 recebe o <code>BRIEFING.md</code> como entrada, e o plano referencia o <code>PD-ID</code> de origem</td>
         <td>o <code>BRIEFING.md</code> vira o <code>00-OCORRENCIA.md</code>, com o tipo já classificado</td>
       </tr>
+      <tr>
+        <td><code>docs/design-system/DESIGN-SYSTEM.md</code><br><span class="selo selo--camada">designx</span></td>
+        <td>tasks de UI referenciam padrões e passam por auditoria visual adicional</td>
+        <td>ocorrências visuais consultam o design system na investigação, no fix e no QA</td>
+      </tr>
     </tbody>
   </table></div>
 
@@ -377,6 +389,7 @@
       <tr><td><code>memox</code></td><td class="num">5</td><td class="num">5</td><td class="num">0</td><td class="num">2</td><td><code>.expx/memoria/</code></td></tr>
       <tr><td><code>prodx</code></td><td class="num">6</td><td class="num">6</td><td class="num">0</td><td class="num">0</td><td><code>docs/produto/</code></td></tr>
       <tr><td><code>buildx</code></td><td class="num">6</td><td class="num">4</td><td class="num">0</td><td class="num">0</td><td><code>docs/projeto/</code></td></tr>
+      <tr><td><code>designx</code></td><td class="num">—</td><td class="num">—</td><td class="num">2</td><td class="num">—</td><td><code>docs/design-system/</code></td></tr>
     </tbody>
   </table></div>
   <p>A <code>memox</code> é a única que não grava nada em <code>docs/</code>: o índice dela é derivado,
@@ -1292,12 +1305,44 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
   </ol>
 </section>
 
+<!-- ============================ DESIGNX ============================ -->
+<section class="secao" id="designx">
+  <p class="eyebrow">Skill · camada</p>
+  <h1>designx</h1>
+  <p class="lede">Cartografa o design system de projetos com interface e audita se o trabalho novo preserva
+  os padrões visuais existentes. Sozinha não cria feature: acrescenta contexto e um portão visual à
+  <code>sprintx</code> e à <code>runx</code>.</p>
+
+  <h2 id="designx-fluxo">Detecção e cartografia</h2>
+  <p>Primeiro procura <code>docs/design-system/DESIGN-SYSTEM.md</code>; depois uma skill de design system
+  instalada. Se não houver referência e o projeto tiver UI, o cartógrafo visual levanta tokens, cores,
+  tipografia, espaçamento, componentes, layouts e dark mode. O que não foi encontrado não é inventado,
+  e drift é listado com evidência em vez de corrigido silenciosamente.</p>
+
+  <h2 id="designx-integracao">Como entra no trabalho</h2>
+  <div class="tabela-caixa"><table>
+    <thead><tr><th>Fluxo</th><th>Efeito da camada</th></tr></thead>
+    <tbody>
+      <tr><td><code>sprintx</code></td><td>o plano referencia componentes e padrões; um auditor de design
+      somente leitura confere a proposta antes da execução</td></tr>
+      <tr><td><code>runx</code></td><td>ocorrências de UI/UX confrontam o comportamento atual com o design
+      system e acrescentam critérios visuais ao QA</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="nota nota--info">
+    <svg class="nota__icone" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6.4"/><path d="M8 7.2v4M8 4.9v.1" stroke-linecap="round"/></svg>
+    <div><p><strong>Não escolhe a LLM.</strong> Assim como o grafo do ExpxDev, a designx descreve e verifica
+    o trabalho. A escolha de modelo continua sendo configuração do agente/harness, fora desse contrato.</p></div>
+  </div>
+</section>
+
 <!-- ============================ COMANDOS ============================ -->
 <section class="secao" id="comandos">
   <p class="eyebrow">Referência do CLI</p>
   <h1>Subcomandos</h1>
-  <p class="lede">Sete subcomandos. O <code>panel</code> e o <code>watch</code> funcionam <strong>sem</strong>
-  <code>init</code>: nenhum dos dois escreve no projeto.</p>
+  <p class="lede">Oito subcomandos. O <code>panel</code> e o <code>watch</code> funcionam <strong>sem</strong>
+  <code>init</code> e não escrevem no projeto; <code>grafo</code> só escreve o SVG sem <code>--conferir</code>.</p>
 
   <div class="tabela-caixa"><table>
     <thead><tr><th>Comando</th><th>O que faz</th></tr></thead>
@@ -1305,6 +1350,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
       <tr><td><code>expx init</code></td><td>Instala as skills escolhidas neste projeto</td></tr>
       <tr><td><code>expx panel</code></td><td>Sobe o painel de operação lendo o <code>docs/</code> do projeto</td></tr>
       <tr><td><code>expx watch</code></td><td>Acompanha um trabalho no terminal, ao vivo</td></tr>
+      <tr><td><code>expx grafo [trabalho]</code></td><td>Grava o <code>GRAFO.svg</code> das dependências do plano</td></tr>
       <tr><td><code>expx add &lt;skill…&gt;</code></td><td>Acrescenta skills à seleção e remonta o plugin</td></tr>
       <tr><td><code>expx remove &lt;skill…&gt;</code></td><td>Remove skills da seleção e remonta o plugin</td></tr>
       <tr><td><code>expx update [skill…]</code></td><td>Atualiza as skills instaladas</td></tr>
@@ -1346,6 +1392,23 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
     </tbody>
   </table></div>
 
+  <h2 id="cmd-grafo">grafo</h2>
+  <div class="codigo" data-copiar>
+    <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
+    <pre><code><span class="tok-cmd">expx</span> grafo                 <span class="tok-com"># todos os trabalhos em docs/</span>
+<span class="tok-cmd">expx</span> grafo memox-painel    <span class="tok-com"># somente um trabalho</span>
+<span class="tok-cmd">expx</span> grafo <span class="tok-flag">--conferir</span>     <span class="tok-com"># valida sem escrever</span></code></pre>
+  </div>
+  <p>O comando calcula a topologia real de <code>depende_de</code>, distribui as tasks por nível de
+  dependência e destaca o caminho crítico, ciclos, referências inexistentes e paralelismo incompatível.
+  O SVG autocontido fica em <code>docs/&lt;trabalho_id&gt;/GRAFO.svg</code>. Com <code>--conferir</code>,
+  nenhum arquivo é criado e o processo sai com código <code>1</code> ao encontrar ciclo ou dependência quebrada.</p>
+  <div class="nota nota--info">
+    <svg class="nota__icone" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6.4"/><path d="M8 7.2v4M8 4.9v.1" stroke-linecap="round"/></svg>
+    <div><p><strong>Este não é o grafo de escolha de LLM.</strong> Ele representa ordem, dependências,
+    paralelismo e caminho crítico das tasks. A seleção de modelo/agente é outra camada do sistema.</p></div>
+  </div>
+
   <h2 id="cmd-doctor">doctor</h2>
   <p>Não aceita flags. Sai com <code>0</code> quando não há nenhum achado de severidade <code>erro</code> —
   ou seja, só avisos ainda sai <code>0</code>, mas a lista é impressa.</p>
@@ -1372,7 +1435,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
     e <code>--check</code> no <code>init</code>, e <code>--latest</code> no <code>update</code>, mas nenhuma
     delas altera o comportamento nesta versão. O dry-run efetivo do <code>init</code> é a ausência de
     <code>--yes</code> fora de um terminal interativo; a resolução do <code>update</code> já é sempre a maior
-    tag. Não existe <code>expx --version</code>: a versão aparece no cabeçalho do <code>init</code> interativo.</p></div>
+    tag. Para conferir a distribuição instalada, use <code>expx --version</code> ou <code>expx -v</code>.</p></div>
   </div>
 </section>
 
@@ -1577,7 +1640,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
     <div class="codigo__topo"><span class="codigo__rotulo">.expx/expx-lock.json</span><button class="codigo__copiar">Copiar</button></div>
     <pre><code>{
   <span class="tok-key">"lock_version"</span>: <span class="tok-num">1</span>,
-  <span class="tok-key">"cli_version"</span>: <span class="tok-str">"0.5.0"</span>,
+  <span class="tok-key">"cli_version"</span>: <span class="tok-str">"0.11.0"</span>,
   <span class="tok-key">"harness"</span>: [<span class="tok-str">"claude"</span>],
   <span class="tok-key">"skills"</span>: {
     <span class="tok-key">"sprintx"</span>: {
@@ -1642,7 +1705,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
 
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
-    <pre><code><span class="tok-cmd">npx</span> expxdev doctor</code></pre>
+    <pre><code><span class="tok-cmd">expx</span> doctor</code></pre>
   </div>
 
   <div class="tabela-caixa"><table>
@@ -1724,7 +1787,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
 
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
-    <pre><code><span class="tok-cmd">npx</span> expxdev panel</code></pre>
+    <pre><code><span class="tok-cmd">expx</span> panel</code></pre>
   </div>
 
   <div class="nota nota--ok">
@@ -1809,6 +1872,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
       <tr><td><code>GET /api/historico</code></td><td>as entregas já fechadas</td></tr>
       <tr><td><code>GET /api/memoria</code></td><td>o índice da memox, ou <code>null</code> — que é estado legítimo, não erro</td></tr>
       <tr><td><code>GET /api/saude</code></td><td><code>{ ok, raiz, lido_em }</code></td></tr>
+      <tr><td><code>GET /grafo.svg?trabalho=&lt;id&gt;</code></td><td>o grafo SVG renderizado na hora a partir do estado em memória</td></tr>
       <tr><td><code>GET /relatorio?oc=&lt;id&gt;&amp;tipo=tecnico|uso</code></td><td>o relatório como página HTML autocontida</td></tr>
       <tr><td><code>GET /relatorio.md?oc=…</code></td><td>o mesmo relatório como download em Markdown</td></tr>
       <tr><td><code>WS /ws</code></td><td>o estado inteiro a cada mudança</td></tr>
@@ -1825,13 +1889,16 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
     <tbody>
       <tr><td><strong>Dashboard</strong></td><td>seis cartões, quatro distribuições e os trabalhos recentes. A separação entre planejamento e execução vem do <em>estágio</em>, não do status</td></tr>
       <tr><td><strong>Trabalhos</strong></td><td>tabela filtrável por ferramenta, tipo e status, ordenável por atualização, progresso ou título</td></tr>
-      <tr><td><strong>Detalhe</strong></td><td>sprint por sprint, fase por fase, task por task, com dependências, critérios de saída e caminho crítico</td></tr>
+      <tr><td><strong>Detalhe</strong></td><td>grafo interativo e vivo, seguido de sprint, fase e task, com dependências, critérios de saída e caminho crítico</td></tr>
       <tr><td><strong>Conformidade</strong></td><td>as violações agrupadas por tipo, com arquivo e linha</td></tr>
       <tr><td><strong>Histórico</strong></td><td>as entregas, com link para os relatórios técnico e de uso</td></tr>
       <tr><td><strong>Memória</strong></td><td>arquivos de risco, regressões, coincidências e artefatos contaminados</td></tr>
       <tr><td><strong>Fora do schema</strong></td><td>as rejeições, em duas abas: erros de leitura e arquivos anteriores ao contrato</td></tr>
     </tbody>
   </table></div>
+  <p>No detalhe, o grafo é redesenhado a cada atualização recebida por websocket. Mouse destaca vizinhos,
+  clique leva à task correspondente, zoom e arraste ajudam em planos grandes, e os filtros isolam pendências
+  ou o caminho crítico. Planos com ciclo ou dependência inexistente abrem o bloco automaticamente.</p>
   <p>Toda tela exporta CSV. Um filtro de período global — <code>7d</code>, <code>30d</code>, <code>90d</code>,
   mês, ano ou intervalo — recorta trabalhos, histórico, bloqueios e violações; data ausente nunca é filtrada
   para fora.</p>
@@ -2310,9 +2377,10 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
   parser/     <span class="tok-com">leitura do expx-schema e do índice da memox, com falha aberta</span>
   servidor/   <span class="tok-com">o painel: HTTP, websocket e o observador de arquivos</span>
   watch/      <span class="tok-com">o watch: fontes, visão, desenho puro e terminal</span>
+  grafo/      <span class="tok-com">topologia, caminho crítico e renderização SVG do plano</span>
   cli/        <span class="tok-com">roteamento de subcomando, flags e seleção interativa</span>
 ui/           <span class="tok-com">a interface do painel (React + Vite)</span>
-docs/contrato/  <span class="tok-com">os contratos compartilhados pelas oito skills</span></code></pre>
+docs/contrato/  <span class="tok-com">os contratos compartilhados pelas nove skills</span></code></pre>
   </div>
 
   <h2 id="arq-decisoes">Padrões que atravessam o código</h2>
@@ -2407,15 +2475,15 @@ docs/contrato/  <span class="tok-com">os contratos compartilhados pelas oito ski
 
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
-    <pre><code><span class="tok-cmd">npm</span> install
+    <pre><code><span class="tok-cmd">npm</span> ci
 <span class="tok-cmd">npm</span> test          <span class="tok-com"># sem acesso à rede, em nenhum teste</span>
 <span class="tok-cmd">npm</span> run typecheck
 <span class="tok-cmd">npm</span> run build</code></pre>
   </div>
 
   <div class="cartoes">
-    <div class="cartao"><div class="cartao__num">795</div><div class="cartao__rot">testes, sem rede</div></div>
-    <div class="cartao"><div class="cartao__num">121</div><div class="cartao__rot">arquivos de teste</div></div>
+    <div class="cartao"><div class="cartao__num">1461</div><div class="cartao__rot">testes aprovados</div></div>
+    <div class="cartao"><div class="cartao__num">140</div><div class="cartao__rot">arquivos aprovados</div></div>
     <div class="cartao"><div class="cartao__num">4</div><div class="cartao__rot">projetos no runner</div></div>
     <div class="cartao"><div class="cartao__num">0</div><div class="cartao__rot">testes que dependem de rede</div></div>
   </div>
@@ -2454,7 +2522,8 @@ docs/contrato/  <span class="tok-com">os contratos compartilhados pelas oito ski
 
 <footer class="rodape">
   <p>Documentação do método <strong>Expx</strong> · gerada a partir do código-fonte do
-  <a href="https://github.com/AxisGov/expxdev">expxdev</a> v0.5.0.</p>
+  <a href="https://github.com/AxisGov/expxdev">expxdev</a>
+  <a href="https://github.com/AxisGov/expxdev/releases/tag/v0.11.0">v0.11.0</a>.</p>
   <p>
     <a href="https://github.com/AxisGov/sprintx">sprintx</a> ·
     <a href="https://github.com/AxisGov/runx">runx</a> ·
@@ -2462,7 +2531,9 @@ docs/contrato/  <span class="tok-com">os contratos compartilhados pelas oito ski
     <a href="https://github.com/bittencourtthulio/stackx">stackx</a> ·
     <a href="https://github.com/AxisGov/mergex">mergex</a> ·
     <a href="https://github.com/bittencourtthulio/MemoX">memox</a> ·
-    <a href="https://github.com/bittencourtthulio/prodx">prodx</a>
+    <a href="https://github.com/bittencourtthulio/prodx">prodx</a> ·
+    <a href="https://github.com/AxisGov/buildx">buildx</a> ·
+    <a href="https://github.com/bittencourtthulio/designx">designx</a>
   </p>
 </footer>
 
