@@ -7,6 +7,8 @@ import {
   EventoNome,
 } from "../parser/esquema/evento.js";
 import { ROTULO_EVENTO } from "../watch/logica/atividade.js";
+import { SUBCOMANDOS } from "../cli/subcomandos.js";
+import { CATALOGO } from "./catalogo.js";
 
 /**
  * A contagem de skills está escrita em prosa em vários lugares, e prosa
@@ -78,6 +80,44 @@ describe("contagem de skills na documentação", () => {
     expect(readme).toContain("nove skills");
     // os estágios da runx continuam sendo cinco: E1 a E5
     expect(readme).toContain("cinco estágios");
+  });
+});
+
+describe("identidade da release no docs-site", () => {
+  const pacote = JSON.parse(readFileSync("package.json", "utf8")) as { version: string };
+  const site = readFileSync("docs-site/index.html", "utf8");
+  const apresentacao = readFileSync("docs-site/apresentacao.html", "utf8");
+
+  it("funcional: site e apresentação publicam a versão do package", () => {
+    expect(site).toContain(`id="versao">v${pacote.version}</span>`);
+    expect(site).toContain(`releases/tag/v${pacote.version}`);
+    expect(apresentacao).toContain(`expxdev v${pacote.version}`);
+  });
+
+  it("funcional: cartões usam as contagens das fontes de verdade", () => {
+    expect(site).toContain(
+      `<div class="cartao__num">${String(CATALOGO.length)}</div><div class="cartao__rot">skills no catálogo</div>`,
+    );
+    expect(site).toContain(
+      `<div class="cartao__num">${String(SUBCOMANDOS.length)}</div><div class="cartao__rot">subcomandos do CLI</div>`,
+    );
+    expect(apresentacao).toMatch(
+      new RegExp(
+        `<div class="stat-value">${String(CATALOGO.length)}</div>\\r?\\n\\s*<div class="stat-label mono">SKILLS NO CATÁLOGO</div>`,
+      ),
+    );
+    expect(apresentacao).toMatch(
+      new RegExp(
+        `<div class="stat-value">${String(SUBCOMANDOS.length)}</div>\\r?\\n\\s*<div class="stat-label mono">SUBCOMANDOS DO CLI</div>`,
+      ),
+    );
+  });
+
+  it("funcional: documenta o grafo de tarefas sem tratá-lo como seletor de LLM", () => {
+    expect(site).toContain("<code>expx grafo [trabalho]</code>");
+    expect(site).toContain("Este não é o grafo de escolha de LLM.");
+    expect(apresentacao).toContain("grafo de tasks, não de escolha de LLM");
+    expect(apresentacao).toContain("expx grafo");
   });
 });
 

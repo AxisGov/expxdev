@@ -694,7 +694,7 @@
 
         <div class="divider-content">
           <div class="eyebrow mono animate delay-1">SEÇÃO 02</div>
-          <h2 class="animate delay-2">O ecossistema: oito skills, um contrato</h2>
+          <h2 class="animate delay-2">O ecossistema: nove skills, um contrato</h2>
           <p class="subtitle animate delay-3">O que cada peça faz e como elas se encontram sem se conhecer.</p>
         </div>
       </div>
@@ -800,8 +800,13 @@
             <h3>prodx</h3>
             <p>Recebe o pedido cru e emite veredito com evidência.</p>
           </article>
+          <article class="feature-card animate delay-3">
+            <div class="feature-tag mono">CAMADA</div>
+            <h3>designx</h3>
+            <p>Cartografa e audita o design system quando o projeto tem UI.</p>
+          </article>
         </div>
-        <p class="subtitle animate delay-3">buildx orquestra as três acima — não é camada, é a única exceção do método: ela não modifica, invoca.</p>
+        <p class="subtitle animate delay-4">buildx orquestra as skills base — não é camada: ela não modifica, invoca.</p>
       </div>
     </section>
 
@@ -821,7 +826,7 @@
             <h3>Como elas se encontram</h3>
             <ul>
               <li>Não se conhecem por código — só por contrato</li>
-              <li>Dá para instalar três e não as outras cinco</li>
+              <li>Dá para instalar três e não as outras seis</li>
               <li>Dá para atualizar uma sem tocar nas demais</li>
             </ul>
           </div>
@@ -1344,7 +1349,7 @@
         <div class="divider-content">
           <div class="eyebrow mono animate delay-1">SEÇÃO 04</div>
           <h2 class="animate delay-2">O CLI: o que instala e o que observa</h2>
-          <p class="subtitle animate delay-3">expxdev — sete subcomandos, três binários, um plugin local.</p>
+          <p class="subtitle animate delay-3">expxdev v0.11.0 — oito subcomandos, três binários, um plugin local.</p>
         </div>
       </div>
     </section>
@@ -1365,16 +1370,16 @@
             <div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div>
           </div>
           <pre><span class="tok-comment"># seleciona skills e harness, sem terminal interativo</span>
-<span class="tok-cmd">npx</span> expxdev init <span class="tok-flag">--skills</span> sprintx,runx,mergex <span class="tok-flag">--harness</span> claude,opencode <span class="tok-flag">--yes</span>
+<span class="tok-cmd">expx</span> init <span class="tok-flag">--skills</span> sprintx,runx,mergex <span class="tok-flag">--harness</span> claude,opencode <span class="tok-flag">--yes</span>
 
 <span class="tok-comment"># sem --skills e sem TTY: só mostra o que faria, não escreve nada</span>
-<span class="tok-cmd">npx</span> expxdev init</pre>
+<span class="tok-cmd">expx</span> init</pre>
         </div>
-        <p class="screenshot-caption mono animate delay-4">git clone --depth 1 — usa a credencial já configurada, sem token extra.</p>
+        <p class="screenshot-caption mono animate delay-4">Binário do tarball certificado da release v0.11.0; não do pacote homônimo no npm.</p>
       </div>
     </section>
 
-    <!-- 18 · Grid: sete subcomandos -->
+    <!-- 18 · Grid: oito subcomandos -->
     <section class="slide grid-slide">
       <div class="slide-inner">
         <div class="brand-mark">MÉTODO EXPX</div>
@@ -1382,7 +1387,7 @@
 
         <div class="section-heading">
           <div class="eyebrow mono animate delay-1">REFERÊNCIA</div>
-          <h2 class="animate delay-2">Sete subcomandos — panel e watch não escrevem no projeto</h2>
+          <h2 class="animate delay-2">Oito subcomandos — grafo de tasks, não de escolha de LLM</h2>
         </div>
 
         <div class="card-grid cols-3">
@@ -1416,6 +1421,11 @@
             <h3>expx watch</h3>
             <p>Acompanha um trabalho ao vivo, no terminal, sem sair do lugar.</p>
           </article>
+          <article class="card animate delay-3">
+            <div class="card-label mono">DEPENDÊNCIAS</div>
+            <h3>expx grafo</h3>
+            <p>Mostra níveis, caminho crítico, ciclos e paralelismo real do plano.</p>
+          </article>
         </div>
       </div>
     </section>
@@ -1433,16 +1443,16 @@
 
         <div class="stats-grid cols-4">
           <div class="stat-card animate delay-1">
-            <div class="stat-value">7</div>
+            <div class="stat-value">9</div>
             <div class="stat-label mono">SKILLS NO CATÁLOGO</div>
           </div>
           <div class="stat-card animate delay-2">
-            <div class="stat-value">7</div>
+            <div class="stat-value">8</div>
             <div class="stat-label mono">SUBCOMANDOS DO CLI</div>
           </div>
           <div class="stat-card animate delay-3">
-            <div class="stat-value">795</div>
-            <div class="stat-label mono">TESTES, SEM REDE</div>
+            <div class="stat-value">1461</div>
+            <div class="stat-label mono">TESTES APROVADOS</div>
           </div>
           <div class="stat-card animate delay-4">
             <div class="stat-value">30</div>

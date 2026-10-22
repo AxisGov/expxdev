@@ -10,7 +10,7 @@ const D = {};
 
 /* O ecossistema: repositorios -> CLI -> plugin -> harnesses. */
 D.ecossistema = `
-<svg viewBox="0 0 900 380" role="img" aria-label="O CLI busca as oito skills nos repositorios, empacota como plugin local e configura os dois harnesses">
+<svg viewBox="0 0 900 380" role="img" aria-label="O CLI busca as nove skills nos repositorios, empacota como plugin local e configura os dois harnesses">
   <defs>
     <marker id="sf" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
       <path d="M0 0 L10 5 L0 10 z" fill="var(--ink-faint)"/>
@@ -36,21 +36,21 @@ D.ecossistema = `
       <text x="780" y="50" text-anchor="middle" fill="var(--ink)">buildx</text>
       <text x="780" y="63" text-anchor="middle" font-size="9.5" fill="var(--accent)" font-family="var(--sans)">orquestra as outras</text>
 
-      <rect x="14"  y="78" width="212" height="38" rx="6" fill="var(--layer-wash)" stroke="var(--layer)" stroke-opacity=".5"/>
-      <text x="120" y="96" text-anchor="middle" fill="var(--ink)">legadox</text>
-      <text x="120" y="109" text-anchor="middle" font-size="9.5" fill="var(--layer)" font-family="var(--sans)">camada</text>
-
-      <rect x="234" y="78" width="212" height="38" rx="6" fill="var(--layer-wash)" stroke="var(--layer)" stroke-opacity=".5"/>
-      <text x="340" y="96" text-anchor="middle" fill="var(--ink)">stackx</text>
-      <text x="340" y="109" text-anchor="middle" font-size="9.5" fill="var(--layer)" font-family="var(--sans)">camada</text>
-
-      <rect x="454" y="78" width="212" height="38" rx="6" fill="var(--layer-wash)" stroke="var(--layer)" stroke-opacity=".5"/>
-      <text x="560" y="96" text-anchor="middle" fill="var(--ink)">memox</text>
-      <text x="560" y="109" text-anchor="middle" font-size="9.5" fill="var(--layer)" font-family="var(--sans)">camada</text>
-
-      <rect x="674" y="78" width="212" height="38" rx="6" fill="var(--layer-wash)" stroke="var(--layer)" stroke-opacity=".5"/>
-      <text x="780" y="96" text-anchor="middle" fill="var(--ink)">prodx</text>
-      <text x="780" y="109" text-anchor="middle" font-size="9.5" fill="var(--layer)" font-family="var(--sans)">camada</text>
+      <rect x="14" y="78" width="160" height="38" rx="6" fill="var(--layer-wash)" stroke="var(--layer)" stroke-opacity=".5"/>
+      <text x="94" y="96" text-anchor="middle" fill="var(--ink)">legadox</text>
+      <text x="94" y="109" text-anchor="middle" font-size="9.5" fill="var(--layer)" font-family="var(--sans)">camada</text>
+      <rect x="184" y="78" width="160" height="38" rx="6" fill="var(--layer-wash)" stroke="var(--layer)" stroke-opacity=".5"/>
+      <text x="264" y="96" text-anchor="middle" fill="var(--ink)">stackx</text>
+      <text x="264" y="109" text-anchor="middle" font-size="9.5" fill="var(--layer)" font-family="var(--sans)">camada</text>
+      <rect x="354" y="78" width="160" height="38" rx="6" fill="var(--layer-wash)" stroke="var(--layer)" stroke-opacity=".5"/>
+      <text x="434" y="96" text-anchor="middle" fill="var(--ink)">memox</text>
+      <text x="434" y="109" text-anchor="middle" font-size="9.5" fill="var(--layer)" font-family="var(--sans)">camada</text>
+      <rect x="524" y="78" width="160" height="38" rx="6" fill="var(--layer-wash)" stroke="var(--layer)" stroke-opacity=".5"/>
+      <text x="604" y="96" text-anchor="middle" fill="var(--ink)">prodx</text>
+      <text x="604" y="109" text-anchor="middle" font-size="9.5" fill="var(--layer)" font-family="var(--sans)">camada</text>
+      <rect x="694" y="78" width="192" height="38" rx="6" fill="var(--layer-wash)" stroke="var(--layer)" stroke-opacity=".5"/>
+      <text x="790" y="96" text-anchor="middle" fill="var(--ink)">designx</text>
+      <text x="790" y="109" text-anchor="middle" font-size="9.5" fill="var(--layer)" font-family="var(--sans)">camada</text>
     </g>
 
     <path d="M450 122 L450 150" stroke="var(--ink-faint)" stroke-width="1.2" marker-end="url(#sf)"/>
@@ -58,7 +58,7 @@ D.ecossistema = `
 
     <text x="14" y="174" font-size="10.5" fill="var(--ink-faint)" letter-spacing="1.1">2 · O CLI</text>
     <rect x="14" y="184" width="872" height="52" rx="7" fill="var(--accent-wash)" stroke="var(--accent)" stroke-opacity=".45"/>
-    <text x="30" y="206" font-family="var(--mono)" font-size="13.5" fill="var(--accent)" font-weight="600">npx expxdev init</text>
+    <text x="30" y="206" font-family="var(--mono)" font-size="13.5" fill="var(--accent)" font-weight="600">expx init · release v0.11.0</text>
     <text x="30" y="223" font-size="11" fill="var(--ink-muted)">resolve a versao · detecta o layout · verifica caminhos · calcula o hash de cada arquivo · monta atomicamente</text>
 
     <path d="M450 238 L450 266" stroke="var(--ink-faint)" stroke-width="1.2" marker-end="url(#sf)"/>
