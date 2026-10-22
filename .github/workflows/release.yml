@@ -1,0 +1,93 @@
+name: Release CLI
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: SHA completo de um commit já validado na main
+        required: true
+        type: string
+      version:
+        description: Versão SemVer exata do package.json (por exemplo, 0.10.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: release-expxdev-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: release explícita v${{ inputs.version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Checkout selected SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch main without tags
+        run: git fetch --no-tags origin main
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Production build
+        run: npm run build
+
+      - name: Validate and pack twice
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SELECTED_SHA: ${{ inputs.ref }}
+          SELECTED_VERSION: ${{ inputs.version }}
+        run: >-
+          node scripts/ci/preparar-release.mjs
+          --repo .
+          --github-repo "${{ github.repository }}"
+          --version "$SELECTED_VERSION"
+          --sha "$SELECTED_SHA"
+          --output "$RUNNER_TEMP/expxdev-release-$SELECTED_VERSION"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.release.outputs.tag }}
+          SHA: ${{ steps.release.outputs.sha }}
+          TGZ: ${{ steps.release.outputs.tgz }}
+          CHECKSUM: ${{ steps.release.outputs.checksum }}
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          gh release create "$TAG" "$TGZ" "$CHECKSUM" \
+            --target "$SHA" \
+            --title "ExpxDev $VERSION" \
+            --latest=false \
+            --notes "Distribuição AxisGov do ExpxDev $VERSION no commit $SHA. Não publicada no npm."
+
+          dono="$(gh api "repos/$GH_REPO/commits/$TAG" --jq .sha)"
+          [ "$dono" = "$SHA" ] || { echo "::error::$TAG aponta para $dono, não para $SHA"; exit 1; }
+          esperado="$(basename "$TGZ"),$(basename "$CHECKSUM")"
+          atual="$(gh release view "$TAG" --json isDraft,assets --jq 'select(.isDraft == false) | [.assets[].name] | sort | join(",")')"
+          [ "$atual" = "$esperado" ] || { echo "::error::$TAG saiu com assets inesperados: $atual"; exit 1; }

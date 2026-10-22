@@ -7,12 +7,6 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
-    inputs:
-      ref:
-        description: Commit da main a publicar como release cli-<sha7> (vazio, só valida)
-        required: false
-        default: ''
 
 permissions:
   contents: read
@@ -35,12 +29,8 @@ jobs:
           - windows-latest
 
     steps:
-      # No dispatch com `ref`, valida o commit que vai virar release, não o HEAD da
-      # main: uma main vermelha não pode barrar a release de um commit anterior.
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.ref }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -59,6 +49,10 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+      - name: Release contract
+        if: matrix.os == 'ubuntu-latest'
+        run: bash scripts/ci/test-release.sh
 
   fatiamento:
     name: fatiamento (CONTRATO-expx-fatiamento)
@@ -79,96 +73,3 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: bash scripts/verificar-fatiamento.sh --excluir-da-revisao '^fixtures/candidatos/' "origin/$BASE_REF" "$HEAD_SHA"
-
-  # Pacote do CLI por commit da main, como release `cli-<sha7>`. O dist/ não é
-  # versionado e o `expxdev` do npm é de outro autor, então é daqui que outro
-  # projeto instala, sem compilar e com os mesmos bytes em toda máquina. Pelo
-  # workflow_dispatch com `ref`, publica um commit que ficou sem release.
-  # O concurrency acima cancela por ref: dois pushes seguidos na main cancelam a
-  # release do primeiro, e quem cobre esse commit é o dispatch com `ref`.
-  release:
-    name: release do CLI (cli-<sha7>)
-    if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && inputs.ref != '')
-    needs: validate
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.ref || github.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Resolve commit and tag
-        id: alvo
-        shell: bash
-        run: |
-          sha="$(git rev-parse HEAD)"
-          git merge-base --is-ancestor "$sha" origin/main || { echo "::error::$sha nao esta na main"; exit 1; }
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "tag=cli-${sha::7}" >> "$GITHUB_OUTPUT"
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20.19.0
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Tests
-        run: npm test
-
-      - name: Production build
-        run: npm run build
-
-      - name: Pack
-        id: pacote
-        shell: bash
-        run: |
-          tgz="$(npm pack --silent)"
-          sha256sum "$tgz" > "$tgz.sha256"
-          cat "$tgz.sha256"
-          echo "tgz=$tgz" >> "$GITHUB_OUTPUT"
-
-      # Uma release publicada e completa nunca é sobrescrita. Draft ou release com
-      # arquivos faltando (create interrompido) não contam: o job para, em vez de
-      # pular para sempre um pacote que ninguém consegue baixar.
-      - name: Publish release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          SHA: ${{ steps.alvo.outputs.sha }}
-          TAG: ${{ steps.alvo.outputs.tag }}
-          TGZ: ${{ steps.pacote.outputs.tgz }}
-        run: |
-          # isDraft e os nomes dos arquivos numa linha; completa = publicada com os dois.
-          completa="false $TGZ,$TGZ.sha256"
-          estado() { gh release view "$TAG" --json isDraft,assets --jq '"\(.isDraft) \([.assets[].name] | sort | join(","))"'; }
-          if atual="$(estado 2>/dev/null)"; then
-            if [ "$atual" = "$completa" ]; then
-              # Outro commit com os mesmos 7 primeiros caracteres cairia nesta tag.
-              dono="$(gh api "repos/$GH_REPO/commits/$TAG" --jq .sha)"
-              [ "$dono" = "$SHA" ] || { echo "::error::$TAG ja e de $dono, nao de $SHA"; exit 1; }
-              echo "$TAG ja publicada; nao sobrescreve"
-              exit 0
-            fi
-            echo "::error::$TAG existe incompleta ($atual); remova (gh release delete $TAG --cleanup-tag) e rode de novo"
-            exit 1
-          fi
-          gh release create "$TAG" "$TGZ" "$TGZ.sha256" \
-            --target "$SHA" --title "CLI ${SHA::7}" --latest=false \
-            --notes "Pacote do CLI no commit $SHA (npm pack, Node 20.19). Instalação: README, seção \"Instalar a partir da release\"."
-          atual="$(estado)"
-          [ "$atual" = "$completa" ] || { echo "::error::$TAG saiu incompleta ($atual)"; exit 1; }

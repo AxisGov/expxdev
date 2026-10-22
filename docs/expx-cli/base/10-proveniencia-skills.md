@@ -60,6 +60,14 @@ A origem resolvida fica em
 
 Os metadados do pacote apontam para `AxisGov/expxdev`. A distribuição
 certificada deste repositório é o artefato produzido por `npm pack` e
-publicado em GitHub Releases. O pacote `expxdev@0.9.0` observado no registro
-público npm pertence a uma linha de publicação anterior e não é tratado como
-artefato canônico AxisGov.
+publicado em GitHub Releases por acionamento manual e versão SemVer explícita.
+
+- `0.7.0` foi a versão interna histórica dos pacotes AxisGov publicados sob
+  tags `cli-<sha7>`; essas releases permanecem imutáveis.
+- O pacote `expxdev@0.9.0` observado no registro público npm pertence a uma
+  linha de publicação anterior e não é tratado como artefato canônico AxisGov.
+- `0.10.0` inicia a linha AxisGov pós-otimização e correção de proveniência.
+
+Um push ou merge comum em `main` executa testes e build, mas nunca cria tag ou
+release. A publicação exige o workflow `Release CLI`, um SHA completo já verde
+na `main` e a versão exata presente em `package.json` e `package-lock.json`.
