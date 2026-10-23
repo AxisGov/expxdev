@@ -162,7 +162,7 @@ describe("fase e task", () => {
     expect(sem).toMatchObject({ fase: null, task: null });
   });
 
-  it("integração: grava model/effort sem inventar o principal nem atribuir configuração Claude ao OpenCode", () => {
+  it("integração: grava model/effort sem atribuir configuração Claude a outro harness", () => {
     const raiz = temp();
     mkdirSync(join(raiz, ".git"));
     mkdirSync(join(raiz, ".claude", "agents"), { recursive: true });
@@ -174,6 +174,7 @@ describe("fase e task", () => {
     roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok derivado', {
       EXPX_TRABALHO_ID: "t",
       EXPX_AGENTE: "runx-investigador",
+      EXPX_HARNESS: "claude",
     });
     roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok explicito', {
       EXPX_TRABALHO_ID: "t",
@@ -187,16 +188,31 @@ describe("fase e task", () => {
       EXPX_AGENTE: "runx-investigador",
       EXPX_HARNESS: "opencode",
     });
+    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok codex-explicito', {
+      EXPX_TRABALHO_ID: "t",
+      EXPX_AGENTE: "runx-investigador",
+      EXPX_MODEL: "openai/gpt-5.4-codex",
+      EXPX_EFFORT: "xhigh",
+      EXPX_HARNESS: "codex",
+    });
+    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok codex-sem-metadado', {
+      EXPX_TRABALHO_ID: "t",
+      EXPX_AGENTE: "runx-investigador",
+      EXPX_HARNESS: "codex",
+    });
     roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok principal', {
       EXPX_TRABALHO_ID: "t",
     });
 
-    const [derivado, explicito, opencodeSemMetadado, principal] = (eventos(raiz)["t.jsonl"] ?? [])
-      .map((l) => JSON.parse(l) as { model: unknown; effort: unknown });
+    const [derivado, explicito, opencodeSemMetadado, codexExplicito, codexSemMetadado, principal] =
+      (eventos(raiz)["t.jsonl"] ?? [])
+        .map((l) => JSON.parse(l) as { model: unknown; effort: unknown });
     expect(derivado).toMatchObject({ model: "sonnet", effort: "medium" });
     expect(explicito).toMatchObject({ model: "openai/gpt-5.4", effort: "xhigh" });
-    expect(principal).toMatchObject({ model: null, effort: null });
     expect(opencodeSemMetadado).toMatchObject({ model: null, effort: null });
+    expect(codexExplicito).toMatchObject({ model: "openai/gpt-5.4-codex", effort: "xhigh" });
+    expect(codexSemMetadado).toMatchObject({ model: null, effort: null });
+    expect(principal).toMatchObject({ model: null, effort: null });
   });
 });
 

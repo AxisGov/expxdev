@@ -342,9 +342,9 @@ expx_modo() {
 # Snapshot da configuracao efetiva do subagente instalado.
 #
 # O valor explicito do runtime (EXPX_MODEL/EXPX_EFFORT) vence esta leitura.
-# O arquivo e apenas o fallback para harnesses que conhecem o agente, mas nao
-# expoem modelo e esforco no payload do hook. O OpenCode nao usa a configuracao
-# do agente Claude, entao nunca a atribuimos a ele como historico. principal nao
+# O arquivo e apenas o fallback do contexto Claude quando o runtime nao expoe
+# modelo e esforco no payload do hook. Harnesses nao Claude nunca herdam essa
+# configuracao como historico. principal nao
 # tem arquivo proprio: sem dado do runtime, fica null em vez de inventar.
 expx_config_agente() {
   local raiz="$1" agente="$2" campo="$3"
@@ -407,10 +407,12 @@ expx_rastro_grava() {
 
     local agente="${EXPX_AGENTE:-principal}"
     local model="${EXPX_MODEL:-}" effort="${EXPX_EFFORT:-}"
-    if [ "${EXPX_HARNESS:-}" != "opencode" ]; then
-      [ -n "$model" ] || model="$(expx_config_agente "$raiz" "$agente" model)"
-      [ -n "$effort" ] || effort="$(expx_config_agente "$raiz" "$agente" effort)"
-    fi
+    case "${EXPX_HARNESS:-}" in
+      ""|claude|claude-code)
+        [ -n "$model" ] || model="$(expx_config_agente "$raiz" "$agente" model)"
+        [ -n "$effort" ] || effort="$(expx_config_agente "$raiz" "$agente" effort)"
+        ;;
+    esac
     local model_json=null effort_json=null
     [ -n "$model" ] && model_json="\"$(expx_json_escape "$model")\""
     [ -n "$effort" ] && effort_json="\"$(expx_json_escape "$effort")\""

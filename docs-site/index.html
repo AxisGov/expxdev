@@ -2240,9 +2240,10 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
   <code>sessao</code> · <code>harness</code> (a identidade da sessão) e <code>model</code> · <code>effort</code>
   (o snapshot daquela execução). O gravador comum inclui <code>model</code>/<code>effort</code> nas linhas que
   ele escreve; os escritores próprios da SprintX ainda os omitem e, por isso, aparecem como <strong>sem
-  snapshot</strong>. O runtime explícito tem prioridade. Fora do OpenCode, o gravador comum pode usar como
-  fallback o frontmatter instalado; no OpenCode sem metadado explícito, grava <code>null</code> em vez de
-  atribuir uma configuração Claude. Uma chave presente com <code>null</code> registra dado não informado;
+  snapshot</strong>. O runtime explícito tem prioridade para qualquer harness. Somente no contexto Claude
+  (<code>claude</code>, <code>claude-code</code> ou evento legado sem harness) o gravador comum pode usar
+  como fallback o frontmatter instalado. Codex, OpenCode e qualquer outro harness sem metadado explícito
+  gravam <code>null</code>, em vez de receber uma configuração Claude. Uma chave presente com <code>null</code> registra dado não informado;
   uma chave <strong>ausente</strong> significa sem snapshot. Permitidas, mas não indiferentes:
   <code>sessao</code> e <code>harness</code> são <strong>obrigatórias</strong> somente quando a ferramenta é
   SprintX e o evento é <code>task_iniciada</code>, <code>task_concluida</code> ou <code>task_bloqueada</code>.

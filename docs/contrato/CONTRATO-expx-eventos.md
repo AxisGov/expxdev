@@ -114,7 +114,7 @@ Por R6, nenhuma delas é omitida: sem valor, escreva `null` (ou `[]` em `arquivo
 
 Escritores próprios das skills não passam automaticamente pelo gravador comum. Hoje `scripts/rastro.sh`, `scripts/planejamento.sh` e `scripts/bloqueios.sh` da SprintX ainda omitem `model`/`effort`; essas linhas são válidas e aparecem como **sem snapshot** até o escritor ser atualizado no fork de origem.
 
-Fora do OpenCode, o fallback para subagentes é o frontmatter instalado em `.claude/agents/<agente>.md`. No OpenCode esse arquivo não determina a execução: sem metadado explícito do runtime, as duas chaves saem `null`, em vez de atribuir ao evento uma configuração Claude que ele pode não ter usado.
+O contrato é igual para qualquer harness: `EXPX_MODEL` e `EXPX_EFFORT` registram a configuração efetivamente escolhida. O frontmatter instalado em `.claude/agents/<agente>.md` é fallback somente no contexto Claude (`EXPX_HARNESS` vazio, `claude` ou `claude-code`). Codex, OpenCode e qualquer outro harness sem metadado explícito gravam as duas chaves como `null`, em vez de receber uma configuração Claude que podem não ter usado.
 
 Uma chave presente com `null` registra que o escritor tentou capturar o dado e o runtime não o informou — caso normal de `principal` sem metadado explícito. A ausência identifica uma linha **sem snapshot**, seja antiga ou emitida por outro escritor. O leitor só pode usar a configuração atual como fallback quando o evento não identifica outro harness; caso contrário, informa histórico indisponível.
 

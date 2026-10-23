@@ -162,8 +162,9 @@ describe("detalhe do trabalho", () => {
           task: "T-01.01",
           agente: "sprintx-investigador",
           resultado: "ok",
-          detalhe: "evento sem snapshot e sem harness explícito",
+          detalhe: "execução Claude sem snapshot",
           arquivos: [],
+          harness: "claude",
         }, {
           ts: "2026-08-29T14:30:00Z",
           expx_eventos: 1,

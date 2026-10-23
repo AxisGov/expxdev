@@ -34,7 +34,9 @@ export function execucaoDoEvento(
   const harnessDaSessao = evento.sessao?.split("@", 1)[0];
   const harnessDoEvento = evento.harness ?? harnessDaSessao;
   const identificaOutroHarness =
-    harnessDoEvento !== undefined && harnessDoEvento !== "claude-code";
+    harnessDoEvento !== undefined &&
+    harnessDoEvento !== "claude" &&
+    harnessDoEvento !== "claude-code";
   if (identificaOutroHarness) {
     return {
       texto: `${evento.agente} · modelo/esforço não informados`,
