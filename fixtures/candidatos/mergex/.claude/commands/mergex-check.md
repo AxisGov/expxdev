@@ -1,5 +1,5 @@
 ---
-description: Verifica se o trabalho está realmente pronto para entregar — etapa E2 da mergex, o portão de prontidão, isolada. Roda as onze verificações (tasks concluídas, registro de suíte por task e suíte inteira no fechamento da sprint, dois testes por task, teste de regressão, QA, auditoria, bloqueios, modo legado, arquivos fora do escopo, segredos no diff, commit do E1 por task concluída) e devolve PRONTO ou BLOQUEADO com o que falta. Use antes de entregar, ao perguntar se está pronto para PR, ou para conferir a entrega.
+description: Verifica se o trabalho está realmente pronto para entregar — etapa E2 da mergex, o portão de prontidão, isolada. Roda as doze verificações (tasks concluídas, registro de suíte por task e suíte inteira no fechamento da sprint, dois testes por task, teste de regressão, QA, auditoria, bloqueios, modo legado, arquivos fora do escopo, segredos no diff, commit do E1 por task concluída, revisão por task aprovada) e devolve PRONTO ou BLOQUEADO com o que falta. Use antes de entregar, ao perguntar se está pronto para PR, ou para conferir a entrega.
 ---
 
 Acione a skill `mergex` e execute **apenas a etapa E2 (portão de prontidão)**, seguindo `references/02-prontidao.md` — começando pela prova funcional do `pre-push` (`ativacao-pre-push.sh --provar`) e gravando o resultado só por `registrar-portao.sh`.
@@ -39,9 +39,9 @@ bash .claude/skills/mergex/scripts/reconciliacao-base.sh --verificar \
 
 Sem `ok=true`, o portão não emite `PRONTO`; relate os `motivo` (`references/11-reconciliacao-base.md`).
 
-Em trabalho SprintX, a V9 também lê o manifesto exato `00-PREDECESSORES.md` por `predecessores-sprintx.sh`. Valide conteúdo e código de saída juntos: `resultado=v9_sem_prova`, resultado ausente ou duplicado, saída truncada ou texto divergente do código falham fechado. Se a entrega já terminou sem publicação e foi bloqueada exclusivamente por `[v9]`/`arquivo_fora_do_plano`, não edite o terminal: use somente `retomar-v9-predecessores.sh --verificar --entrega docs/entregas/<trabalho>/ENTREGA.md --origem sprintx --trabalho <trabalho>` e, com `ok=true`, os mesmos argumentos com `--aplicar`, conforme `references/13-predecessores-sprintx.md`; depois rode novamente todas as V1–V11.
+Em trabalho SprintX, a V9 também lê o manifesto exato `00-PREDECESSORES.md` por `predecessores-sprintx.sh`. Valide conteúdo e código de saída juntos: `resultado=v9_sem_prova`, resultado ausente ou duplicado, saída truncada ou texto divergente do código falham fechado. Se a entrega já terminou sem publicação e foi bloqueada exclusivamente por `[v9]`/`arquivo_fora_do_plano`, não edite o terminal: use somente `retomar-v9-predecessores.sh --verificar --entrega docs/entregas/<trabalho>/ENTREGA.md --origem sprintx --trabalho <trabalho>` e, com `ok=true`, os mesmos argumentos com `--aplicar`, conforme `references/13-predecessores-sprintx.md`; depois rode novamente todas as V1–V12.
 
-Rode **todas as onze verificações**, mesmo depois de a primeira falhar — o usuário precisa da lista completa do que falta, não do primeiro erro. Verificação que não se aplica é marcada `n/a`, nunca omitida.
+Rode **todas as doze verificações**, mesmo depois de a primeira falhar — o usuário precisa da lista completa do que falta, não do primeiro erro. Verificação que não se aplica é marcada `n/a`, nunca omitida.
 
 | # | Verificação |
 |---|---|
@@ -56,12 +56,15 @@ Rode **todas as onze verificações**, mesmo depois de a primeira falhar — o u
 | V9 | Arquivo alterado fora da lista declarada no plano |
 | V10 | Segredo, credencial ou dado real de cliente no diff |
 | V11 | Task concluída sem commit do E1 correspondente em `ENTREGA.commits` |
+| V12 | Task concluída sem revisão por task aprovada no commit dela |
 
 **V9 é o resultado do script**, sobre a base validada por SHA (nunca o nome da ref) e com os caminhos `coberto` da reconciliação: `scripts/portao-v9.sh --verificar --entrega <ENTREGA.md> --origem <sprintx|runx> --trabalho <trabalho_id>`. Código `1` é `FALHA` com as linhas `fora_do_plano`; código `3` é `FALHA` registrada como `v9_sem_prova`.
 
 **V10 roda sempre, mesmo quando todo o resto passou.**
 
 **V11 responde uma pergunta só:** cada task `concluida` tem pelo menos um item em `ENTREGA.commits` com `task` igual ao id dela e `commit` válido? Task não concluída não é alvo dela — isso é da V1. Rode com `scripts/prova-de-commit.sh --verificar <ENTREGA.md> <tasks.md>...`.
+
+**V12 é o resultado do script**, que só traduz o `conferir` do núcleo do expx, com o commit do último item de cada task `concluida` em `ENTREGA.commits`: `scripts/portao-v12.sh --verificar --entrega <ENTREGA.md> --trabalho <trabalho_id> -- <tasks.md>...`. `V12=OK` é `OK`; `V12=AVISO` é `AVISO`; `V12=n/a` (sem `.expx/fatiamento.json`, modo `desligada`, entrega de planejamento, `versionado: false`, nenhuma task concluída com commit) é `n/a`; `V12=FALHA` (código `1`; `incompleta` é FALHA nos dois modos) é `FALHA`; `V12=SEM_PROVA` (código `2`) é `FALHA` registrada como `v12_sem_prova`. A V12 não lê a evidência nem `revisao:` de `ENTREGA.commits` (`references/02-prontidao.md`, V12).
 
 Use `assets/TEMPLATE-prontidao.md`. A saída é binária: `PRONTO` ou `BLOQUEADO`, com o que falta e onde corrigir.
 

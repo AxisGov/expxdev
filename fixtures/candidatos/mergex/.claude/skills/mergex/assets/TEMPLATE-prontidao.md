@@ -1,7 +1,7 @@
 # TEMPLATE — saída do portão de prontidão (E2)
 
 A saída do portão é para a tela e para o campo `portao` do `ENTREGA.md`.
-Substitua todos os marcadores `{{assim}}`. As onze linhas da tabela aparecem
+Substitua todos os marcadores `{{assim}}`. As doze linhas da tabela aparecem
 SEMPRE, mesmo as `n/a`. Apague este cabeçalho ao usar.
 
 ---
@@ -26,6 +26,7 @@ RESULTADO: {{PRONTO | BLOQUEADO}}
 | V9 | Arquivo alterado fora da lista declarada | {{...}} |
 | V10 | Segredo, credencial ou dado real de cliente | {{...}} |
 | V11 | Commit do E1 por task concluída | {{...}} |
+| V12 | Revisão por task aprovada | {{...}} |
 
 ## O que falta
 
@@ -46,6 +47,6 @@ divergente, bloqueio fora do escopo entregue}}
 ---
 
 **PRONTO** → `portao: pronto` e `falhas_portao: []` no ENTREGA.md, segue para o E3.
-**BLOQUEADO** → `portao: bloqueado` e `falhas_portao: [{{v1..v11 das linhas FALHA; vN_sem_prova
+**BLOQUEADO** → `portao: bloqueado` e `falhas_portao: [{{v1..v12 das linhas FALHA; vN_sem_prova
 quando não pôde rodar}}]`; as etapas de entrega encerram e o E8 fecha o bloqueio. Nada é
 desfeito, nada é descartado, nada é maquiado.

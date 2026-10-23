@@ -1,29 +1,29 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/bittencourtthulio/mergex/main/.github/assets/banner-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/bittencourtthulio/mergex/main/.github/assets/banner-light.svg">
-  <img alt="mergex — a camada de entrega do metodo Expx" src="https://raw.githubusercontent.com/bittencourtthulio/mergex/main/.github/assets/banner-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AxisGov/mergex/main/.github/assets/banner-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/AxisGov/mergex/main/.github/assets/banner-light.svg">
+  <img alt="mergex — a camada de entrega do metodo Expx" src="https://raw.githubusercontent.com/AxisGov/mergex/main/.github/assets/banner-light.svg" width="100%">
 </picture>
 
 <p>
-  <img alt="harness: Claude Code" src="https://raw.githubusercontent.com/bittencourtthulio/mergex/main/.github/assets/badge-claude.svg">
-  <img alt="harness: OpenCode" src="https://raw.githubusercontent.com/bittencourtthulio/mergex/main/.github/assets/badge-opencode.svg">
-  <img alt="atencao humana: 3 faixas" src="https://raw.githubusercontent.com/bittencourtthulio/mergex/main/.github/assets/badge-faixas.svg">
-  <img alt="portao: 11 verificacoes" src="https://raw.githubusercontent.com/bittencourtthulio/mergex/main/.github/assets/badge-portao.svg">
-  <img alt="schema expx v1" src="https://raw.githubusercontent.com/bittencourtthulio/mergex/main/.github/assets/badge-schema.svg">
-  <img alt="docs pt-BR" src="https://raw.githubusercontent.com/bittencourtthulio/mergex/main/.github/assets/badge-lang.svg">
-  <img alt="licenca MIT" src="https://raw.githubusercontent.com/bittencourtthulio/mergex/main/.github/assets/badge-license.svg">
+  <img alt="harness: Claude Code" src="https://raw.githubusercontent.com/AxisGov/mergex/main/.github/assets/badge-claude.svg">
+  <img alt="harness: OpenCode" src="https://raw.githubusercontent.com/AxisGov/mergex/main/.github/assets/badge-opencode.svg">
+  <img alt="atencao humana: 3 faixas" src="https://raw.githubusercontent.com/AxisGov/mergex/main/.github/assets/badge-faixas.svg">
+  <img alt="portao: 12 verificacoes" src="https://raw.githubusercontent.com/AxisGov/mergex/main/.github/assets/badge-portao.svg">
+  <img alt="schema expx v1" src="https://raw.githubusercontent.com/AxisGov/mergex/main/.github/assets/badge-schema.svg">
+  <img alt="docs pt-BR" src="https://raw.githubusercontent.com/AxisGov/mergex/main/.github/assets/badge-lang.svg">
+  <img alt="licenca MIT" src="https://raw.githubusercontent.com/AxisGov/mergex/main/.github/assets/badge-license.svg">
 </p>
 
 <p>
-  <a href="https://bittencourtthulio.github.io/expxdev/#mergex"><strong>📘 Documentação do método</strong></a>
+  <a href="https://github.com/AxisGov/mergex#readme"><strong>📘 Documentação do método</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://bittencourtthulio.github.io/expxdev/#mergex">Faixas de atenção</a>
+  <a href="#as-três-faixas-de-atenção-humana">Faixas de atenção</a>
   &nbsp;·&nbsp;
-  <a href="https://bittencourtthulio.github.io/expxdev/#ecossistema">O ecossistema</a>
+  <a href="https://github.com/AxisGov/expxdev#o-ecossistema">O ecossistema</a>
   &nbsp;·&nbsp;
-  <a href="https://bittencourtthulio.github.io/expxdev/#schema">Contratos</a>
+  <a href="https://github.com/AxisGov/expxdev#os-dois-contratos-compartilhados">Contratos</a>
 </p>
 
 <strong>A camada de entrega do método Expx</strong> — leva o trabalho feito até o repositório<br>
@@ -40,23 +40,23 @@ e até o revisor humano, para <a href="https://claude.com/claude-code">Claude Co
 
 ## O ecossistema Expx
 
-O método Expx é um conjunto de skills que se compõem, instaladas e mantidas pelo CLI [`expxdev`](https://github.com/bittencourtthulio/expxdev).
+O método Expx é um conjunto de skills que se compõem, instaladas e mantidas pelo CLI [`expxdev`](https://github.com/AxisGov/expxdev).
 
 | Peça | Papel | Relação com a `mergex` |
 |---|---|---|
-| **[expxdev](https://github.com/bittencourtthulio/expxdev)** | o CLI: instala, atualiza e diagnostica o ecossistema, e sobe o painel de operação | é quem instala esta skill (`npx expxdev init`) |
-| **[sprintx](https://github.com/bittencourtthulio/sprintx)** | **Build** — feature nova, F1…F6 | E0 no início da F6, E1 a cada task, E2–E8 ao fim |
-| **[runx](https://github.com/bittencourtthulio/runx)** | **Run** — ocorrência em produção, E1…E5 | E0 no início do fix, E1 a cada task, E2–E8 entre o QA e o relatório |
+| **[expxdev](https://github.com/AxisGov/expxdev)** | o CLI: instala, atualiza e diagnostica o ecossistema, e sobe o painel de operação | é quem instala esta skill (`npx expxdev init`) |
+| **[sprintx](https://github.com/AxisGov/sprintx)** | **Build** — feature nova, F1…F6 | E0 no início da F6, E1 a cada task, E2–E8 ao fim |
+| **[runx](https://github.com/AxisGov/runx)** | **Run** — ocorrência em produção, E1…E5 | E0 no início do fix, E1 a cada task, E2–E8 entre o QA e o relatório |
 | **[legadox](https://github.com/bittencourtthulio/legadox)** | **camada** de segurança para código legado | raio, caracterização, reversão e dívida alimentam o portão, a classificação e o PR |
 | **[stackx](https://github.com/bittencourtthulio/stackx)** | **camada** de convenções do repositório | convenções de branch, commit e teste vêm do `CONVENCOES.md` |
 | **[memox](https://github.com/bittencourtthulio/MemoX)** | **camada** de memória do projeto | arquivo com histórico de regressão sobe de faixa de atenção |
 | **[prodx](https://github.com/bittencourtthulio/prodx)** | **camada** de produto: decide **se** há trabalho | a montante: o `PD-ID` de origem acompanha o trabalho até a descrição do PR |
-| **[buildx](https://github.com/bittencourtthulio/buildx)** | orquestra um projeto inteiro, da descrição ao sistema pronto | não chama a mergex diretamente: quem a aciona é a **F6 da sprintx**, dona de E0, E1 e E2→E8 em cada feature do mapa. A buildx **consome o resultado** (entrega registrada ou bloqueio persistido) e **nunca invoca `mergex-revisar`** — merge continua decisão humana |
+| **[buildx](https://github.com/AxisGov/buildx)** | orquestra um projeto inteiro, da descrição ao sistema pronto | não chama a mergex diretamente: quem a aciona é a **F6 da sprintx**, dona de E0, E1 e E2→E8 em cada feature do mapa. A buildx **consome o resultado** (entrega registrada ou bloqueio persistido) e **nunca invoca `mergex-revisar`** — merge continua decisão humana |
 | **mergex** *(este repositório)* | entrega: o último metro, E0…E9 | — |
 
 A `mergex` é a **última peça do fluxo** — assim como a `prodx` é a primeira: uma decide se o trabalho existe, a outra o entrega. As irmãs produzem os artefatos, a `mergex` os costura na entrega. **A ausência da `mergex` nunca quebra o fluxo das outras skills**, e a ausência de qualquer irmã nunca quebra o fluxo da `mergex`. A `buildx` é a única exceção do método: por ficar acima de todas, ela é a única peça que **depende** de outras — e a `mergex` é uma delas.
 
-Detalhes do ecossistema inteiro no [README do expxdev](https://github.com/bittencourtthulio/expxdev).
+Detalhes do ecossistema inteiro no [README do expxdev](https://github.com/AxisGov/expxdev).
 
 ---
 
@@ -99,23 +99,26 @@ O `init` busca a `mergex` na versão publicada, empacota como plugin local e con
 
 ### Claude Code
 
+Os hooks precisam do registro em `.claude/settings.json`. Se o arquivo não
+existe, o bloco abaixo copia o modelo; se já existe, **junte** manualmente o
+bloco `hooks` — não sobrescreva, porque ele pode ter configuração sua.
+
 ```bash
-git clone https://github.com/bittencourtthulio/mergex.git /tmp/mergex
+mergex_tmp="$(mktemp -d)"
+trap 'rm -rf "$mergex_tmp"' EXIT
+git clone https://github.com/AxisGov/mergex.git "$mergex_tmp/mergex"
 mkdir -p .claude/skills .claude/commands .claude/hooks .claude/agents .expx
-cp -r /tmp/mergex/.claude/skills/mergex .claude/skills/
-cp /tmp/mergex/.claude/commands/mergex*.md .claude/commands/
-cp -r /tmp/mergex/.claude/hooks/. .claude/hooks/
-cp /tmp/mergex/.claude/agents/*.md .claude/agents/
-cp /tmp/mergex/.expx/hooks.json .expx/
-cp /tmp/mergex/AGENTS.md .
-```
-
-Os hooks precisam do registro em `.claude/settings.json`. Se o arquivo ainda
-não existe, copie o do repositório; se já existe, **junte** o bloco `hooks` ao
-seu — não sobrescreva, porque ele pode ter configuração sua:
-
-```bash
-cp /tmp/mergex/.claude/settings.json .claude/settings.json   # só se não existir
+cp -r "$mergex_tmp/mergex/.claude/skills/mergex" .claude/skills/
+cp "$mergex_tmp"/mergex/.claude/commands/mergex*.md .claude/commands/
+cp -r "$mergex_tmp/mergex/.claude/hooks/." .claude/hooks/
+cp "$mergex_tmp"/mergex/.claude/agents/*.md .claude/agents/
+cp "$mergex_tmp/mergex/.expx/hooks.json" .expx/
+cp "$mergex_tmp/mergex/AGENTS.md" .
+if [ ! -e .claude/settings.json ]; then
+  cp "$mergex_tmp/mergex/.claude/settings.json" .claude/settings.json
+fi
+rm -rf "$mergex_tmp"
+trap - EXIT
 ```
 
 Para usar em todos os projetos, troque `.claude/` por `~/.claude/`.
@@ -125,15 +128,19 @@ Para usar em todos os projetos, troque `.claude/` por `~/.claude/`.
 A skill vai no mesmo lugar; muda só a pasta dos comandos:
 
 ```bash
-git clone https://github.com/bittencourtthulio/mergex.git /tmp/mergex
+mergex_tmp="$(mktemp -d)"
+trap 'rm -rf "$mergex_tmp"' EXIT
+git clone https://github.com/AxisGov/mergex.git "$mergex_tmp/mergex"
 mkdir -p .claude/skills .claude/hooks .opencode/commands .opencode/plugin .opencode/agent .expx
-cp -r /tmp/mergex/.claude/skills/mergex .claude/skills/
-cp /tmp/mergex/.opencode/commands/mergex*.md .opencode/commands/
-cp -r /tmp/mergex/.claude/hooks/. .claude/hooks/
-cp /tmp/mergex/.opencode/plugin/mergex.ts .opencode/plugin/
-cp /tmp/mergex/.opencode/agent/*.md .opencode/agent/
-cp /tmp/mergex/.expx/hooks.json .expx/
-cp /tmp/mergex/AGENTS.md .
+cp -r "$mergex_tmp/mergex/.claude/skills/mergex" .claude/skills/
+cp "$mergex_tmp"/mergex/.opencode/commands/mergex*.md .opencode/commands/
+cp -r "$mergex_tmp/mergex/.claude/hooks/." .claude/hooks/
+cp "$mergex_tmp/mergex/.opencode/plugin/mergex.ts" .opencode/plugin/
+cp "$mergex_tmp"/mergex/.opencode/agent/*.md .opencode/agent/
+cp "$mergex_tmp/mergex/.expx/hooks.json" .expx/
+cp "$mergex_tmp/mergex/AGENTS.md" .
+rm -rf "$mergex_tmp"
+trap - EXIT
 ```
 
 Os scripts dos hooks ficam em `.claude/hooks/` mesmo no OpenCode: o plugin em
@@ -196,7 +203,7 @@ As nove primeiras são automáticas; a décima só roda quando você a chama.
 |---|---|---|
 | **E0** Abertura | No início do trabalho | Garante a branch antes da primeira linha de código. Adota a branch e a árvore de trabalho que a skill de origem já abriu; só cria branch quando não existe nenhuma, e aí árvore suja: para e avisa |
 | **E1** Commit por task | A cada task que fecha | Um commit por task, com a intenção na mensagem. Varredura de segredo antes de cada um |
-| **E2** Portão de prontidão | Ao fim da execução | Onze verificações. `PRONTO` ou `BLOQUEADO` com o que falta. Nunca maquia |
+| **E2** Portão de prontidão | Ao fim da execução | Doze verificações. `PRONTO` ou `BLOQUEADO` com o que falta. Nunca maquia |
 | **E3** Atenção humana | Depois do portão | Classifica o diff nas três faixas, arquivo por arquivo, com a evidência de cada um |
 | **E4** Descrição do PR | Depois da classificação | Monta a descrição a partir dos artefatos. Cabe em uma tela |
 | **E5** Pacote de QA | Antes do push | Documento executável por quem não programa |
@@ -304,8 +311,8 @@ Os dois agentes fixam `model: opus` e `effort: high` no frontmatter, em vez de h
 
 | Skill | Como se integra |
 |---|---|
-| [`sprintx`](https://github.com/bittencourtthulio/sprintx) | E0 no início da F6, E1 a cada task, E2–E8 ao fim — [patch](docs/integracao/patch-sprintx.md) |
-| [`runx`](https://github.com/bittencourtthulio/runx) | E0 no início do fix, E1 a cada task, E2–E8 entre o QA e o relatório — [patch](docs/integracao/patch-runx.md) |
+| [`sprintx`](https://github.com/AxisGov/sprintx) | E0 no início da F6, E1 a cada task, E2–E8 ao fim — [patch](docs/integracao/patch-sprintx.md) |
+| [`runx`](https://github.com/AxisGov/runx) | E0 no início do fix, E1 a cada task, E2–E8 entre o QA e o relatório — [patch](docs/integracao/patch-runx.md) |
 | [`legadox`](https://github.com/bittencourtthulio/legadox) | Sem acionamento próprio: raio, caracterização, reversão e dívida alimentam o portão, a classificação e o PR — [patch](docs/integracao/patch-legadox.md) |
 | [`stackx`](https://github.com/bittencourtthulio/stackx) | Convenções de branch, commit e teste vêm do `CONVENCOES.md` — [patch](docs/integracao/patch-stackx.md) |
 
@@ -380,10 +387,10 @@ Contribuições que preservam as regras invioláveis da skill são bem-vindas. A
 
 <div align="center">
 <sub>Parte do método <strong>Expx</strong> ·
-<a href="https://github.com/bittencourtthulio/expxdev">expxdev</a> ·
-<a href="https://github.com/bittencourtthulio/buildx">buildx</a> ·
-<a href="https://github.com/bittencourtthulio/sprintx">sprintx</a> ·
-<a href="https://github.com/bittencourtthulio/runx">runx</a> ·
+<a href="https://github.com/AxisGov/expxdev">expxdev</a> ·
+<a href="https://github.com/AxisGov/buildx">buildx</a> ·
+<a href="https://github.com/AxisGov/sprintx">sprintx</a> ·
+<a href="https://github.com/AxisGov/runx">runx</a> ·
 <a href="https://github.com/bittencourtthulio/legadox">legadox</a> ·
 <a href="https://github.com/bittencourtthulio/stackx">stackx</a> ·
 mergex</sub>

@@ -11,7 +11,9 @@
 #
 #   1. Cada verificação tem UMA causa (tabela CAUSAS). Nenhum outro valor existe.
 #   2. Várias falhas: vence a primeira da ORDEM — V10; depois V6..V9; depois
-#      V1..V5 e V11, cada grupo na numeração do portão.
+#      V1..V5, V11 e V12, cada grupo na numeração do portão. A V12 vem por
+#      último: ela só confere tasks concluídas e com commit, e enquanto a V1
+#      ou a V11 falham o commit que a revisão cobre ainda pode mudar (DM-239).
 #   3. `vN_sem_prova` é a verificação que não pôde rodar (FALHA por ausência de
 #      prova). Se ela aparece antes de qualquer falha provada, a causa é
 #      `indeterminada`: a mergex não sabe, e não inventa.
@@ -31,7 +33,7 @@
 
 set -uo pipefail
 
-ORDEM='v10 v6 v7 v8 v9 v1 v2 v3 v4 v5 v11'
+ORDEM='v10 v6 v7 v8 v9 v1 v2 v3 v4 v5 v11 v12'
 
 # verificação|causa
 CAUSAS='v1|tarefa_nao_concluida
@@ -44,7 +46,8 @@ v7|bloqueio_aberto
 v8|legado_incompleto
 v9|arquivo_fora_do_plano
 v10|segredo_no_diff
-v11|commit_nao_registrado'
+v11|commit_nao_registrado
+v12|revisao_reprovada'
 
 INDETERMINADA='indeterminada'
 
@@ -54,8 +57,8 @@ causa_de() { # <vN> — a causa da verificação
 
 numero() { # <token> — o número da verificação, ou vazio se o token não é válido
   case "$1" in
-    v[1-9]|v10|v11) printf '%s\n' "${1#v}" ;;
-    v[1-9]_sem_prova|v10_sem_prova|v11_sem_prova) local t="${1%_sem_prova}"; printf '%s\n' "${t#v}" ;;
+    v[1-9]|v10|v11|v12) printf '%s\n' "${1#v}" ;;
+    v[1-9]_sem_prova|v10_sem_prova|v11_sem_prova|v12_sem_prova) local t="${1%_sem_prova}"; printf '%s\n' "${t#v}" ;;
     *) printf '\n' ;;
   esac
 }

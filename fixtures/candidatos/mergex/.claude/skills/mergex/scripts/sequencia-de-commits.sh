@@ -39,9 +39,17 @@
 #   sequencia-de-commits.sh --proximo <ENTREGA.md|->
 #       o próximo `seq` (maior efetivo + 1). Valida antes: lista inválida não
 #       devolve número.
-#   sequencia-de-commits.sh --acrescentar <ENTREGA.md> <task> <commit>
-#       acrescenta `{seq, task, commit}` ao FIM da lista e imprime `seq=<n>`.
+#   sequencia-de-commits.sh --acrescentar <ENTREGA.md> <task> <commit> [<revisao>]
+#       acrescenta `{seq, task, commit, revisao}` ao FIM da lista e imprime `seq=<n>`.
 #       Não reordena, não reescreve item nenhum e não toca o resto do arquivo.
+#       `revisao` (DM-241) é o que o `conferir` do núcleo disse da task: `ok`,
+#       `achados`, `indisponivel:<classe>`, `incompleta:<classe>`, `invalida`, ou
+#       `null` (o padrão, sem o quarto argumento). A classe é o texto do motivo
+#       antes do segundo `:` (`incompleta:L1:41` grava `incompleta:L1`): o que vem
+#       depois, como um caminho, nunca entra no YAML. Valor fora disso: não grava (1).
+#       A leitura (`--ler`, `--validar`, `prova-de-commit.sh`) ignora a chave.
+#   sequencia-de-commits.sh --revisao <valor>
+#       o valor como `--acrescentar` o gravaria, ou 1 quando está fora da gramática.
 #
 # Códigos: 0 ok; 1 contrato inválido ou arquivo ilegível; 64 opção inválida.
 #
@@ -287,8 +295,34 @@ proximo() {
 # sempre leva `seq`. `atualizado_em` continua sendo do E1 — este helper mexe
 # só na lista `commits`.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# revisao_do_item <valor> — o valor de `revisao:` como ele vai ao YAML (DM-241).
+#
+# A classe é o texto do motivo antes do segundo `:`, como veio do `conferir`
+# (maiúsculas inclusive: `incompleta:L1`), com `[A-Za-z0-9][A-Za-z0-9-]*`. As
+# letras vão listadas, e não em faixa, para que nenhum locale aceite acento.
+# ---------------------------------------------------------------------------
+CLASSE_OK='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+revisao_do_item() { # <valor>
+  local v="$1" tipo classe
+  case "$v" in
+    ok|achados|invalida|null) printf '%s\n' "$v"; return 0 ;;
+    indisponivel:*|incompleta:*) ;;
+    *) ERRO="revisao fora da gramática: ${v:-<vazio>}"; return 1 ;;
+  esac
+  tipo="${v%%:*}"; classe="${v#*:}"; classe="${classe%%:*}"
+  case "$classe" in
+    ''|[!$CLASSE_OK]*|*[!$CLASSE_OK-]*)
+      ERRO="revisao fora da gramática: $v"; return 1 ;;
+  esac
+  printf '%s:%s\n' "$tipo" "$classe"
+}
+
 acrescentar() {
-  local arq="$1" task="$2" commit="$3" seq tmp
+  local arq="$1" task="$2" commit="$3" revisao seq tmp
+  # fora de subshell primeiro, para o ERRO chegar a quem chamou
+  revisao_do_item "${4-null}" >/dev/null || return 1
+  revisao="$(revisao_do_item "${4-null}")"
   [ "$arq" != - ] || { ERRO="--acrescentar precisa de um arquivo, não de stdin"; return 1; }
   legivel "$arq" || return 1
   [ -w "$arq" ] || { ERRO="arquivo sem permissão de escrita: $arq"; return 1; }
@@ -300,9 +334,10 @@ acrescentar() {
   seq="$(proximo "$arq")" || return 1
 
   tmp="$arq.seq.$$"
-  awk -v seq="$seq" -v task="$task" -v commit="$commit" '
+  awk -v seq="$seq" -v task="$task" -v commit="$commit" -v revisao="$revisao" '
     function novo(cr) {
-      printf "  - seq: %s%s\n    task: %s%s\n    commit: %s%s\n", seq, cr, task, cr, commit, cr
+      printf "  - seq: %s%s\n    task: %s%s\n    commit: %s%s\n    revisao: %s%s\n", \
+        seq, cr, task, cr, commit, cr, revisao, cr
     }
     { linha = $0; nu = linha; sub(/\r$/, "", nu); cr = (linha == nu) ? "" : "\r" }
     NR == 1 { print; fm = 1; next }
@@ -348,8 +383,13 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       proximo "$2" && exit 0
       printf 'sequencia-de-commits: %s\n' "$ERRO" >&2; exit 1 ;;
     --acrescentar)
-      [ "$#" -eq 4 ] || { printf 'sequencia-de-commits: --acrescentar <ENTREGA.md> <task> <commit>\n' >&2; exit 64; }
-      acrescentar "$2" "$3" "$4" && exit 0
+      { [ "$#" -eq 4 ] || [ "$#" -eq 5 ]; } \
+        || { printf 'sequencia-de-commits: --acrescentar <ENTREGA.md> <task> <commit> [<revisao>]\n' >&2; exit 64; }
+      acrescentar "$2" "$3" "$4" "${5-null}" && exit 0
+      printf 'sequencia-de-commits: %s\n' "$ERRO" >&2; exit 1 ;;
+    --revisao)
+      [ "$#" -eq 2 ] || { printf 'sequencia-de-commits: --revisao <valor>\n' >&2; exit 64; }
+      revisao_do_item "$2" && exit 0
       printf 'sequencia-de-commits: %s\n' "$ERRO" >&2; exit 1 ;;
     *) printf 'sequencia-de-commits: opção desconhecida: %s\n' "${1:-}" >&2; exit 64 ;;
   esac

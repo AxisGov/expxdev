@@ -13,7 +13,7 @@
 // EXPX_REVISAO_TESTE_PAUSA é só para teste: um diretório em que o `revisar` cria `pronto` e espera
 // `continuar` entre a releitura e a gravação.
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { closeSync, existsSync, fstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, statSync,
   writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -105,34 +105,63 @@ function medirArquivo(f) {
 const caminho = (f) => (process.platform === "win32" ? f.replace(/\\/g, "/") : f).replace(/^\.\//, "");
 const pausa = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 const velha = (d) => { try { return Date.now() - statSync(d).mtimeMs > 120000; } catch { return false; /* sumiu */ } };
-/** Remove a trava velha conferindo de novo sob `<trava>.quebra` (`mkdir` exclusivo): sem isso, quem a viu
- *  velha antes de outro removê-la e criar a sua removeria a trava nova. A `.quebra` nunca é removida por
- *  idade (isso traria a mesma corrida de volta): se um processo morreu com ela, a saída 75 a nomeia. */
+const caminhoDono = (trava) => join(trava, "dono.json");
+function donoDaTrava(trava) {
+  try {
+    const d = JSON.parse(readFileSync(caminhoDono(trava), "utf8"));
+    return Number.isSafeInteger(d.pid) && d.pid > 0 && typeof d.token === "string" ? d : undefined;
+  } catch { return undefined; }
+}
+function processoVivo(pid) {
+  try { process.kill(pid, 0); return true; } catch (e) { return e?.code !== "ESRCH"; }
+}
+/** Só uma trava velha com dono identificável e comprovadamente morto pode ser quebrada.
+ *  Trava sem dono legível pode ser de um processo entre mkdir e a gravação: falha fechado. */
+function abandonada(trava) {
+  if (!velha(trava)) return undefined;
+  const dono = donoDaTrava(trava);
+  return dono && !processoVivo(dono.pid) ? dono : undefined;
+}
+/** Serializa a quebra e relê dono+token sob a trava auxiliar. Nunca remove uma trava viva ou substituída. */
 function quebra(trava) {
+  const antes = abandonada(trava);
+  if (!antes) return;
   const q = `${trava}.quebra`;
   try { mkdirSync(q); } catch (e) {
     if (e.code !== "EEXIST") throw e;
     return;
   }
-  try { if (velha(trava)) rmSync(trava, { recursive: true, force: true }); } catch { /* sumiu */ } finally { rmSync(q, { recursive: true, force: true }); }
+  try {
+    const depois = abandonada(trava);
+    if (depois?.token === antes.token) rmSync(trava, { recursive: true, force: true });
+  } finally {
+    rmSync(q, { recursive: true, force: true });
+  }
 }
-/** Trava por evidência (`mkdir` é exclusivo): quem relê e regrava a evidência o faz dentro dela. */
+/** Trava por evidência (`mkdir` é exclusivo): dono vivo nunca é removido por idade. */
 function comTrava(task, fn) {
   mkdirSync(pasta, { recursive: true });
   const trava = `${caminhoEv(task)}.trava`;
+  const meuDono = { pid: process.pid, token: randomUUID(), iniciado_em: new Date().toISOString() };
   for (const ate = Date.now() + 30000; ; pausa(50)) {
-    try { mkdirSync(trava); break; } catch (e) {
+    try {
+      mkdirSync(trava);
+      try { writeFileSync(caminhoDono(trava), JSON.stringify(meuDono)); }
+      catch (e) { rmSync(trava, { recursive: true, force: true }); throw e; }
+      break;
+    } catch (e) {
       if (e.code !== "EEXIST") throw e;
-      // trava de processo que morreu: mais velha que 2 min é abandonada
-      if (velha(trava)) quebra(trava);
+      if (abandonada(trava)) quebra(trava);
       if (Date.now() > ate) {
-        const q = velha(`${trava}.quebra`) ? ` (remova a mao, se nenhum processo esta rodando: ${trava}.quebra)` : "";
-        process.stderr.write(`expx-revisao: evidencia travada por outro processo: ${trava}${q}\n`);
+        const detalhe = existsSync(`${trava}.quebra`) ? `${trava}.quebra` : trava;
+        process.stderr.write(`expx-revisao: evidencia travada por outro processo: ${detalhe} (remova a mao somente se nenhum processo estiver rodando)\n`);
         process.exit(75);
       }
     }
   }
-  try { return fn(); } finally { rmSync(trava, { recursive: true, force: true }); }
+  try { return fn(); } finally {
+    if (donoDaTrava(trava)?.token === meuDono.token) rmSync(trava, { recursive: true, force: true });
+  }
 }
 // Só para teste (cabeçalho): nada do ambiente é executado; valor que não é diretório é ignorado.
 function pausaDeTeste() {
@@ -148,7 +177,50 @@ function grava(task, ev) {
   renameSync(tmp, caminhoEv(task));
 }
 /** A CLI: o arquivo do pacote conferido, pelo `node`; nunca o `codeant` do PATH depois da conferência. */
-const codeant = (bin, a) => spawnSync(process.execPath, [bin, ...a], { cwd: op.raiz, maxBuffer: 64 << 20 });
+const codeant = (bin, a, cwd = op.raiz) => spawnSync(process.execPath, [bin, ...a], { cwd, maxBuffer: 64 << 20 });
+/** Materializa o HEAD capturado em worktree descartável e sobrepõe os blobs medidos.
+ *  A CLI nunca lê o checkout mutável que o usuário pode editar e restaurar durante a revisão. */
+function snapshotDaRevisao(head, blobs) {
+  const base = mkdtempSync(join(tmpdir(), "expx-revisao-snapshot-"));
+  const raiz = join(base, "checkout");
+  let vinculado = false;
+  const limpar = () => {
+    if (vinculado) git("worktree", "remove", "--force", raiz);
+    rmSync(base, { recursive: true, force: true });
+    git("worktree", "prune");
+  };
+  if (head) {
+    const add = git("worktree", "add", "--detach", raiz, head);
+    if (add.status !== 0) {
+      process.stderr.write(`expx-revisao: snapshot do HEAD não criado: ${add.stderr ?? ""}`);
+      limpar();
+      return undefined;
+    }
+    vinculado = true;
+  } else {
+    const init = spawnSync("git", ["init", "-q", raiz], { cwd: base, encoding: "utf8" });
+    if (init.status !== 0) {
+      process.stderr.write(`expx-revisao: snapshot sem HEAD não criado: ${init.stderr ?? ""}`);
+      limpar();
+      return undefined;
+    }
+  }
+  try {
+    for (const [f, oid] of blobs) {
+      const conteudo = blobGit(oid);
+      if (conteudo === undefined) throw new Error(`blob ilegível: ${f}`);
+      const destino = join(raiz, f);
+      rmSync(destino, { recursive: true, force: true });
+      mkdirSync(dirname(destino), { recursive: true });
+      writeFileSync(destino, conteudo);
+    }
+    return { raiz, limpar };
+  } catch (e) {
+    process.stderr.write(`expx-revisao: snapshot incompleto: ${e?.message ?? e}\n`);
+    limpar();
+    return undefined;
+  }
+}
 const ORIENTACAO = "instale a homologada (npm i -g codeant-cli@0.5.14)";
 /** O pacote do `codeant` do PATH, homologado e íntegro (`{bin, versao, perfil}`), ou o motivo de `indisponivel`. */
 function cliConferida() {
@@ -303,9 +375,11 @@ function revisar() {
     ev.arquivos[f] = { blob: m?.blob ?? null, bytes: m?.bytes ?? null, linhas: m?.linhas ?? null,
       revisao: fora ? "excluido" : revisavel(f, perfil) ? "enviado" : "nao-revisavel" };
   }
+  let raizRevisao = op.raiz;
+  let limparSnapshot = () => {};
   const enviados = presentes.filter((f) => ev.arquivos[f].revisao === "enviado");
   const naoCommitado = (f) => (presentes.includes(f) ? medidas[f]?.disco !== idDe("rev-parse", "--verify", "-q", `HEAD:./${f}`) : head.has(f));
-  (() => {
+  try { (() => {
     // 1. o pedido não se revisa como está
     if (virgula) return fim("indisponivel", "caminho-com-virgula");
     const inexistente = removidos.find((f) => !existe(f));
@@ -331,7 +405,11 @@ function revisar() {
     }
     ev.cli = { versao: cli.versao, integridade: "conferida" };
     // 5. uma chamada só, sem lotes
-    const r = codeant(cli.bin, ["review", "--headless", ...(base ? ["--base-commit", base] : ["--uncommitted"]), "--include", enviados.join(",")]);
+    const snapshot = snapshotDaRevisao(headDaRevisao, enviados.map((f) => [f, medidas[f].blob]));
+    if (!snapshot) return fim("indisponivel", "snapshot");
+    raizRevisao = snapshot.raiz;
+    limparSnapshot = snapshot.limpar;
+    const r = codeant(cli.bin, ["review", "--headless", ...(base ? ["--base-commit", base] : ["--uncommitted"]), "--include", enviados.join(",")], raizRevisao);
     const stdout = r.stdout ?? Buffer.alloc(0);
     const j = json(stdout.toString("utf8"));
     const falhas = String(r.stderr ?? "").split(/\r?\n/).filter((l) => l.startsWith("[error] Failed to review "));
@@ -349,12 +427,12 @@ function revisar() {
       if (!m || ["blob", "bytes", "linhas", "disco"].some((k) => m[k] !== medidas[f][k])) return fim("indisponivel", "arquivo-mudou-durante-revisao");
     }
     const rejeitadas = new Set([...ev.rejeicoes.map((r) => r?.identidade), ...rejeitadasDoTrabalho()]);
-    const lido = (f) => { try { return readFileSync(join(op.raiz, f), "utf8"); } catch { return ""; } };
+    const lido = (f) => { try { return readFileSync(join(raizRevisao, f), "utf8"); } catch { return ""; } };
     ev.achados = derivar(j.issues, ev.arquivos, ev.cli.versao, (f) => alteradas(f, base ?? headDaRevisao, base ? headDaRevisao : undefined), lido)
       .map((a) => ({ ...a, estado: rejeitadas.has(a.identidade) ? "rejeitado" : a.estado }));
     if (ev.achados.some((a) => a.estado === "aberto")) ev.resultado = "achados";
     return undefined;
-  })();
+  })(); } finally { limparSnapshot(); }
   // rejeição gravada (rejeitar) enquanto a CLI rodava não se perde: releitura e gravação sob a trava;
   // as de outras tasks do trabalho também são relidas aqui, não só antes da espera pela trava
   const abertos = comTrava(op.task, () => {
@@ -537,7 +615,9 @@ function rejeicoesNoCommit(ev, sha) {
   };
   poe(ev.task, ev.rejeicoes);
   const dir = `docs/entregas/${op.trabalho}/revisao/`;
-  for (const n of git("ls-tree", "-z", "--name-only", sha, "--", dir).stdout.split("\0").filter((x) => x.endsWith(".json"))) {
+  const evidenciaDeTask = (n) =>
+    /^T-(?:\d+|\d{2}\.\d{2})\.json$/.test(n.slice(dir.length));
+  for (const n of git("ls-tree", "-z", "--name-only", sha, "--", dir).stdout.split("\0").filter(evidenciaDeTask)) {
     try {
       const outra = n.slice(dir.length, -".json".length);
       const lista = JSON.parse(git("show", `${sha}:./${n}`).stdout.replace(/^\uFEFF/, "")).rejeicoes;

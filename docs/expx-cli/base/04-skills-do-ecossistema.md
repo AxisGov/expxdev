@@ -13,15 +13,13 @@ As nove skills e seus repositórios atuais:
 | `legadox` | `https://github.com/AxisGov/legadox` | camada para projetos legados |
 | `stackx` | `https://github.com/AxisGov/stackx` | descobre o dialeto técnico do repositório |
 | `mergex` | `https://github.com/AxisGov/mergex` | versionamento, entrega e revisão de PRs |
-| `memox` | `https://github.com/bittencourtthulio/MemoX` | memória dos artefatos já fechados |
-| `prodx` | `https://github.com/bittencourtthulio/prodx` | camada de produto |
+| `memox` | `https://github.com/AxisGov/MemoX` | memória dos artefatos já fechados |
+| `prodx` | `https://github.com/AxisGov/prodx` | camada de produto |
 | `buildx` | `https://github.com/AxisGov/buildx` | orquestra um projeto inteiro |
 | `designx` | `https://github.com/AxisGov/designx` | cartografa e audita o design system |
 
-RunX, MergeX, SprintX e BuildX têm propriedade canônica confirmada na
-organização AxisGov. LegadoX, StackX, MemoX, ProdX e DesignX permanecem com a
-origem observada no catálogo; sua propriedade canônica ainda não foi decidida.
-O inventário completo e os testes de origem estão em
+As nove skills têm origem canônica na organização AxisGov. As origens anteriores
+permanecem reconhecidas somente para migrar locks existentes. O inventário completo e os testes de origem estão em
 [`10-proveniencia-skills.md`](10-proveniencia-skills.md).
 
 Estrutura real observada em `sprintx` e `runx` (as duas que existem em disco):
