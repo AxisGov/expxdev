@@ -537,7 +537,7 @@ function rejeicoesNoCommit(ev, sha) {
   };
   poe(ev.task, ev.rejeicoes);
   const dir = `docs/entregas/${op.trabalho}/revisao/`;
-  for (const n of git("ls-tree", "-z", "--name-only", sha, "--", dir).stdout.split("\0").filter((x) => x.endsWith(".json"))) {
+  for (const n of git("ls-tree", "-r", "-z", "--name-only", sha, "--", dir).stdout.split("\0").filter((x) => x.endsWith(".json"))) {
     try {
       const outra = n.slice(dir.length, -".json".length);
       const lista = JSON.parse(git("show", `${sha}:./${n}`).stdout.replace(/^\uFEFF/, "")).rejeicoes;
