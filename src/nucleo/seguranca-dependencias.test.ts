@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 
 type Pacote = {
   devDependencies: Record<string, string>;
@@ -32,6 +33,26 @@ function versoesInstaladas(em: Lock, nome: string): string[] {
     .filter(([caminho]) => caminho === sufixo || caminho.endsWith(`/${sufixo}`))
     .map(([, instalado]) => instalado.version)
     .filter((versao): versao is string => versao !== undefined);
+}
+
+function imagensLinuxConfiguradas(conteudo: string): string[] {
+  const documento = parse(conteudo) as {
+    jobs?: Record<string, {
+      "runs-on"?: unknown;
+      strategy?: { matrix?: { os?: unknown } };
+    }>;
+  };
+  const imagens: string[] = [];
+  for (const job of Object.values(documento.jobs ?? {})) {
+    const runsOn = job["runs-on"];
+    if (typeof runsOn === "string" && runsOn.startsWith("ubuntu-")) imagens.push(runsOn);
+    const sistemas = job.strategy?.matrix?.os;
+    if (!Array.isArray(sistemas)) continue;
+    for (const sistema of sistemas) {
+      if (typeof sistema === "string" && sistema.startsWith("ubuntu-")) imagens.push(sistema);
+    }
+  }
+  return imagens;
 }
 
 describe("pisos corrigidos das dependências auditadas", () => {
@@ -86,6 +107,13 @@ describe("Actions oficiais sem runtime Node.js 20", () => {
 
   it.each(arquivos)("%s usa majors baseados em Node.js 24", (arquivo) => {
     const yaml = readFileSync(arquivo, "utf8");
+    expect(yaml, arquivo + " nao pode depender do rotulo movel ubuntu-latest").not.toContain("ubuntu-latest");
+    const imagensLinux = imagensLinuxConfiguradas(yaml);
+    expect(imagensLinux.length, arquivo + " precisa declarar ao menos um runner Linux").toBeGreaterThan(0);
+    expect(
+      [...new Set(imagensLinux)],
+      arquivo + " precisa executar somente na imagem Linux homologada",
+    ).toEqual(["ubuntu-24.04"]);
     const referencias = [...yaml.matchAll(/uses:\s+actions\/([a-z-]+)@v(\d+)/g)];
     expect(referencias.length, `${arquivo} não contém Action oficial`).toBeGreaterThan(0);
     for (const referencia of referencias) {

@@ -111,6 +111,21 @@ describe("identidade da release no docs-site", () => {
         `<div class="stat-value">${String(SUBCOMANDOS.length)}</div>\\r?\\n\\s*<div class="stat-label mono">SUBCOMANDOS DO CLI</div>`,
       ),
     );
+    const testesNoSite = [...site.matchAll(/<div class="cartao__num">(\d+)<\/div><div class="cartao__rot">testes aprovados<\/div>/g)]
+      .map((m) => m[1]);
+    const testesNaApresentacao = [...apresentacao.matchAll(
+      /<div class="stat-value">(\d+)<\/div>\r?\n\s*<div class="stat-label mono">TESTES APROVADOS<\/div>/g,
+    )].map((m) => m[1]);
+    expect(testesNoSite.length, "o site perdeu o cartao da contagem de testes").toBeGreaterThan(0);
+    expect(
+      testesNaApresentacao.length,
+      "a apresentacao perdeu o cartao da contagem de testes",
+    ).toBeGreaterThan(0);
+    const contagensDeTestes = [...testesNoSite, ...testesNaApresentacao];
+    expect(
+      new Set(contagensDeTestes).size,
+      "contagens de testes divergentes: " + contagensDeTestes.join(", "),
+    ).toBe(1);
   });
 
   it("funcional: documenta o grafo de tarefas sem tratá-lo como seletor de LLM", () => {
