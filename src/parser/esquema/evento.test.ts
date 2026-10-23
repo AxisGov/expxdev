@@ -37,6 +37,12 @@ describe("as doze chaves", () => {
     const r = validarRastro(j(linha()));
     expect(r.defeitos).toEqual([]);
     expect(r.linhas).toBe(1);
+
+    const historica = validarRastro(j(linha({ model: "openai/gpt-5.4", effort: "xhigh" })));
+    expect(historica.defeitos).toEqual([]);
+    expect(historica.desconhecidas).toEqual([]);
+    const semDadosDoRuntime = validarRastro(j(linha({ model: null, effort: null })));
+    expect(semDadosDoRuntime.defeitos).toEqual([]);
   });
 
   it("funcional: chave omitida é apontada pelo nome, com o número da linha", () => {
@@ -149,7 +155,7 @@ describe("as funcoes de chave", () => {
   });
 
   it("unitário: chavesDesconhecidas ignora as doze e as extras declaradas", () => {
-    expect(chavesDesconhecidas(linha({ hook: "x", faixa: "alta" }))).toEqual([]);
+    expect(chavesDesconhecidas(linha({ hook: "x", faixa: "alta", model: "sonnet", effort: "medium" }))).toEqual([]);
   });
 
   it("unitário: o contrato tem exatamente doze chaves obrigatórias", () => {

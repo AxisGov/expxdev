@@ -30,12 +30,18 @@ describe("eventos recentes", () => {
 
   it("funcional: a mais recente vem no topo, e cada linha traz o agente", () => {
     const v = projetarVisao(raiz("com-estado"));
-    const linhas = desenharEventos(v, 80, sem);
+    const comSnapshot = {
+      ...v,
+      eventos: v.eventos.map((evento, i) => i === 0 ? { ...evento, model: "openai/gpt-5.4", effort: "high" } : evento),
+    };
+    const linhas = desenharEventos(comSnapshot, 80, sem);
     const doEvento = linhas.slice(1);
 
     // o rastro da fixture termina em task_iniciada de T-01.02
     expect(doEvento[0]).toContain("task_iniciada");
     expect(doEvento[0]).toContain("T-01.02");
+    expect(doEvento[0]).toContain("openai/gpt-5.4");
+    expect(doEvento[0]).toContain("high");
 
     // agente em toda linha: no contrato ele nunca é null
     for (const l of doEvento) expect(l).toContain("principal");

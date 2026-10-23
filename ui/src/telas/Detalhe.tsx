@@ -5,6 +5,7 @@ import { Barra, Etiqueta, Vazio, PageHeader } from "../comuns.js";
 import { GrafoVivo } from "./GrafoVivo.js";
 import { motivosDoAlerta, rotuloDoMotivo } from "./alerta-grafo.js";
 import { rotuloEvento } from "../../../src/watch/logica/atividade.js";
+import { execucaoDoEvento } from "../modelos.js";
 
 const ROTULO_STATUS: Record<string, string> = {
   pendente: "pendente", em_andamento: "em andamento", concluida: "concluída", bloqueada: "bloqueada",
@@ -138,13 +139,6 @@ function GrafoDoPlano({
   );
 }
 
-function configuracaoDe(
-  nome: string,
-  agentes: readonly ConfiguracaoAgente[],
-): ConfiguracaoAgente | undefined {
-  return agentes.find((agente) => agente.nome === nome);
-}
-
 function instante(ts: string): string {
   return ts.replace("T", " ").replace(/Z$/, " UTC");
 }
@@ -185,13 +179,14 @@ function LinhaDoTempo({
       ) : (
         <>
           <div className="dep" style={{ marginTop: 9, marginBottom: 7 }}>
-            Agente vem do evento. Modelo e esforço refletem a configuração instalada atual;
-            o contrato v1 ainda não registra qual modelo executou historicamente.
+            Modelo e esforço vêm do snapshot quando o evento o registra. Sem snapshot, a
+            configuração atual só é usada quando o evento não identifica outro harness; nos
+            demais casos, o histórico aparece como indisponível.
           </div>
           <div>
             {recentes.map((evento, i) => {
-              const cfg = configuracaoDe(evento.agente, agentes);
-              const executor = [evento.agente, cfg?.model, cfg?.effort].filter(Boolean).join(" · ");
+              const execucao = execucaoDoEvento(evento, agentes);
+              const executor = `${execucao.texto} · ${execucao.fonte}`;
               const contexto = [evento.fase, evento.task].filter(Boolean).join(" · ");
               return (
                 <div className="linha-rastro" key={`${evento.ts}-${evento.evento}-${String(i)}`}>

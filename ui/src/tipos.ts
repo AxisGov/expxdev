@@ -210,6 +210,8 @@ export type Evento = {
   faixa?: string | null;
   sessao?: string | null;
   harness?: string | null;
+  model?: string | null;
+  effort?: string | null;
 };
 
 /** Configuração efetiva lida do agente instalado pelo `init`. */

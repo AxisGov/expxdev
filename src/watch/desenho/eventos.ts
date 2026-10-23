@@ -33,7 +33,8 @@ export function desenharEventos(v: Visao, colunas: number, pintar: Pintor): stri
   for (const e of v.eventos) {
     const alvo = e.task ?? e.fase ?? "";
     const detalhe = e.detalhe !== "" ? ` · ${e.detalhe}` : "";
-    const texto = `  ${hora(e.ts)} ${e.evento} ${alvo} [${e.agente}]${detalhe}`;
+    const execucao = [e.agente, e.model, e.effort].filter((item): item is string => typeof item === "string").join(" · ");
+    const texto = `  ${hora(e.ts)} ${e.evento} ${alvo} [${execucao}]${detalhe}`;
     linhas.push(pintar(cortar(texto, colunas), papelDe(e)));
   }
 
