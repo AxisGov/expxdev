@@ -407,8 +407,13 @@ expx_rastro_grava() {
 
     local agente="${EXPX_AGENTE:-principal}"
     local model="${EXPX_MODEL:-}" effort="${EXPX_EFFORT:-}"
-    case "${EXPX_HARNESS:-}" in
-      ""|claude|claude-code)
+    # Contexto Claude: o harness declarado, ou, sem ele, a CLAUDECODE que o
+    # Claude Code exporta. Sem nenhum sinal o runtime e desconhecido e nao
+    # herda o frontmatter de .claude/agents.
+    local harness="${EXPX_HARNESS:-}"
+    [ -z "$harness" ] && [ -n "${CLAUDECODE:-}" ] && harness=claude-code
+    case "$harness" in
+      claude|claude-code)
         [ -n "$model" ] || model="$(expx_config_agente "$raiz" "$agente" model)"
         [ -n "$effort" ] || effort="$(expx_config_agente "$raiz" "$agente" effort)"
         ;;

@@ -49,6 +49,8 @@ Variáveis que o rastro lê, todas opcionais:
 | `EXPX_TRABALHO_ID` | vence a detecção automática |
 | `EXPX_FASE` / `EXPX_TASK` | preenchem `fase` e `task` (JSON: com aspas) |
 | `EXPX_AGENTE` | o subagente; sem ela, `principal` |
+| `EXPX_MODEL` / `EXPX_EFFORT` | o modelo e o esforço efetivos informados pelo runtime; vencem qualquer fallback |
+| `EXPX_HARNESS` | o harness; só `claude`/`claude-code` (ou, sem ela, `CLAUDECODE`) permitem o fallback de `.claude/agents/` |
 
 ## `scripts/`
 
