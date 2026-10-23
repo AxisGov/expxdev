@@ -126,13 +126,13 @@ painel que lê o que elas gravam.
 |---|---|---|
 | **[sprintx](https://github.com/AxisGov/sprintx)** | Planeja e executa **features novas** em seis fases: ingestão → descoberta → plano → orquestrador → auditoria → execução. Todo o esforço vai para o planejamento, e a execução é autônoma porque a ambiguidade já foi eliminada. | Construir algo que não existe |
 | **[runx](https://github.com/AxisGov/runx)** | A metade **Run**: ocorrências de manutenção em produção, em cinco estágios — investigação com causa raiz comprovada, plano, fix sob TDD, QA independente e relatórios de fechamento. | Corrigir, ajustar ou investigar o que já está no ar |
-| **[legadox](https://github.com/bittencourtthulio/legadox)** | **Camada** que endurece o trabalho em projetos legados. Não acrescenta fase: muda o *rigor* de cada uma, proporcional ao raio de impacto da mudança. | Mexer em código sem testes ou sem dono |
-| **[stackx](https://github.com/bittencourtthulio/stackx)** | **Camada** que descobre o dialeto técnico do repositório — convenções, padrões e aderência — para o código novo parecer com o que já existe. | Entrar em base desconhecida |
+| **[legadox](https://github.com/AxisGov/legadox)** | **Camada** que endurece o trabalho em projetos legados. Não acrescenta fase: muda o *rigor* de cada uma, proporcional ao raio de impacto da mudança. | Mexer em código sem testes ou sem dono |
+| **[stackx](https://github.com/AxisGov/stackx)** | **Camada** que descobre o dialeto técnico do repositório — convenções, padrões e aderência — para o código novo parecer com o que já existe. | Entrar em base desconhecida |
 | **[mergex](https://github.com/AxisGov/mergex)** | Versionamento, entrega e revisão: branch, um commit por task, portão de prontidão, descrição de PR, pacote de QA e abertura do pull request. | Levar o trabalho pronto até o merge |
 | **[memox](https://github.com/bittencourtthulio/MemoX)** | **Camada** de memória: indexa os artefatos já fechados — relatórios, causas raiz, decisões, QA, entregas — e responde o que já se sabe sobre um arquivo antes de alguém mexer nele. | Saber se este arquivo já quebrou antes |
 | **[prodx](https://github.com/bittencourtthulio/prodx)** | **Camada** de produto: recebe o pedido cru, tria, verifica se o que foi pedido já existe e emite um veredito com evidência para assinatura humana. Três dos quatro vereditos encerram o pedido sem gerar código. | Decidir se vale fazer, antes de planejar |
 | **[buildx](https://github.com/AxisGov/buildx)** | Orquestra um **projeto inteiro**, da descrição ao sistema pronto: mapeia o escopo completo, decide a stack e conduz `prodx` → `stackx` → `sprintx` → `mergex` feature a feature, recursivamente, até o fim. | Construir um sistema do zero, não uma feature isolada |
-| **[designx](https://github.com/bittencourtthulio/designx)** | **Camada** de design: cartografa o design system do projeto e audita conformidade visual contra ele. | Garantir consistência visual quando o projeto tem UI |
+| **[designx](https://github.com/AxisGov/designx)** | **Camada** de design: cartografa o design system do projeto e audita conformidade visual contra ele. | Garantir consistência visual quando o projeto tem UI |
 
 **Camadas** (`legadox`, `stackx`, `memox`, `prodx`, `designx`) sozinhas não fazem nada — elas
 modificam o comportamento de `sprintx` e `runx`. O CLI avisa se você selecionar uma camada sem
@@ -236,12 +236,21 @@ hook vive em `.expx/hooks.json`, e cada skill traz um `doctor` que mostra o esta
 | Agente | Usado por | Ferramentas | Papel |
 |---|---|---|---|
 | `auditor-plano` | sprintx F5 | **leitura apenas** | Fura o plano antes de ele virar código |
-| `revisor-testes` | sprintx, runx | **leitura apenas** | Responde: esse teste passaria com a implementação errada? |
+| `sprintx-revisor-testes` | sprintx F5/F6 | **leitura apenas** | Verifica se o teste discrimina a implementação errada |
+| `sprintx-investigador` | sprintx F1 | leitura + busca web | Condensa bases grandes para o planejamento |
+| `runx-revisor-testes` | runx E3 | leitura + rodar teste | Verifica se o teste discrimina a implementação errada |
+| `runx-investigador` | runx E1 | leitura + busca + comandos | Prova causa raiz ou dimensiona o impacto |
 | `qa` | runx E4 | leitura + rodar suíte | Valida contra os critérios; não corrige |
-| `investigador` | runx E1, legadox | leitura + busca | Monta a base e prova a causa raiz |
-| `cartografo` | stackx, legadox | leitura + histórico | Varre o repositório e extrai convenção ou perfil |
+| `legadox-cartografo` | legadox | leitura + comandos + escrita | Monta o perfil legado e prova que o código está vivo |
+| `avaliador-de-raio` | legadox | leitura + comandos + escrita | Calcula o raio de impacto por evidência |
+| `stackx-cartografo` | stackx | leitura + histórico + comandos | Extrai convenções sem escrever o `CONVENCOES.md` |
+| `revisor-diff` | mergex E3 | leitura + comandos | Classifica o diff por atenção humana |
+| `analista-de-conflito` | mergex manual | **leitura apenas** | Explica a intenção de cada lado; não resolve |
+| `auditor-design` | designx | **leitura apenas** | Audita conformidade visual; não corrige |
+| `cartografo-visual` | designx | **leitura apenas** | Extrai do código o vocabulário visual em uso |
 
-> Os agentes de veredito — `auditor-plano`, `revisor-testes`, `qa` — têm acesso **somente de
+> Os agentes de veredito sem execução de suíte — `auditor-plano`, `sprintx-revisor-testes`,
+> `analista-de-conflito` e `auditor-design` — têm acesso **somente de
 > leitura**. Um agente sem restrição declarada **herda todas as ferramentas** no Claude Code,
 > o que destruiria exatamente a garantia que justifica o agente existir.
 
@@ -544,7 +553,8 @@ npx --yes --package ~/expx-cli/v0.11.1/expxdev-0.11.1.tgz expx init --skills bui
 - `0.11.0` incorpora o grafo operacional e sincroniza os fontes finais dos forks com os
   repositórios de Thulio, preservando as diferenças AxisGov.
 - `0.11.1` corrige as dependências vulneráveis e migra o runtime das GitHub Actions oficiais
-  para Node.js 24, mantendo Node.js 20.19 como piso suportado pelo produto.
+  para Node.js 24, mantém Node.js 20.19 como piso suportado pelo produto e elimina as colisões
+  de agentes na instalação simultânea das nove skills.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -864,11 +874,11 @@ MIT
 expxdev ·
 <a href="https://github.com/AxisGov/sprintx">sprintx</a> ·
 <a href="https://github.com/AxisGov/runx">runx</a> ·
-<a href="https://github.com/bittencourtthulio/legadox">legadox</a> ·
-<a href="https://github.com/bittencourtthulio/stackx">stackx</a> ·
+<a href="https://github.com/AxisGov/legadox">legadox</a> ·
+<a href="https://github.com/AxisGov/stackx">stackx</a> ·
 <a href="https://github.com/AxisGov/mergex">mergex</a> ·
 <a href="https://github.com/bittencourtthulio/MemoX">memox</a> ·
 <a href="https://github.com/bittencourtthulio/prodx">prodx</a> ·
 <a href="https://github.com/AxisGov/buildx">buildx</a> ·
-<a href="https://github.com/bittencourtthulio/designx">designx</a></sub>
+<a href="https://github.com/AxisGov/designx">designx</a></sub>
 </div>

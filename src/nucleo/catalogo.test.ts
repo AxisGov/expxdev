@@ -9,14 +9,14 @@ const SKILLS_AXISGOV = [
   ["mergex", "https://github.com/AxisGov/mergex", "https://github.com/bittencourtthulio/mergex"],
   ["sprintx", "https://github.com/AxisGov/sprintx", "https://github.com/bittencourtthulio/sprintx"],
   ["buildx", "https://github.com/AxisGov/buildx", "https://github.com/bittencourtthulio/buildx"],
+  ["legadox", "https://github.com/AxisGov/legadox", "https://github.com/bittencourtthulio/legadox"],
+  ["stackx", "https://github.com/AxisGov/stackx", "https://github.com/bittencourtthulio/stackx"],
+  ["designx", "https://github.com/AxisGov/designx", "https://github.com/bittencourtthulio/designx"],
 ] as const;
 
 const SKILLS_PROPRIEDADE_PENDENTE = [
-  ["legadox", "https://github.com/bittencourtthulio/legadox"],
-  ["stackx", "https://github.com/bittencourtthulio/stackx"],
   ["memox", "https://github.com/bittencourtthulio/MemoX"],
   ["prodx", "https://github.com/bittencourtthulio/prodx"],
-  ["designx", "https://github.com/bittencourtthulio/designx"],
 ] as const;
 
 describe("catálogo das skills", () => {
@@ -45,7 +45,7 @@ describe("catálogo das skills", () => {
 
   it("funcional: dado o nome legadox, devolve a URL do repositório correspondente", () => {
     const s = buscarNoCatalogo("legadox");
-    expect(s?.repositorio).toBe("https://github.com/bittencourtthulio/legadox");
+    expect(s?.repositorio).toBe("https://github.com/AxisGov/legadox");
     expect(buscarNoCatalogo("inexistente")).toBeUndefined();
   });
 
@@ -110,7 +110,7 @@ describe("catálogo das skills", () => {
     // o designx cartografa e audita o design system: modifica o comportamento
     // da sprintx/runx quando o projeto tem UI, não age por conta própria.
     expect(buscarNoCatalogo("designx")?.repositorio).toBe(
-      "https://github.com/bittencourtthulio/designx",
+      "https://github.com/AxisGov/designx",
     );
     expect(ehCamada("designx")).toBe(true);
   });

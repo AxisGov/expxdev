@@ -197,8 +197,8 @@ Ambos são **opcionais**: sem eles a skill funciona igual, apenas sem a rede de 
 
 | Agente | Estágio | Ferramentas | Papel |
 |---|---|---|---|
-| `investigador` | E1 | leitura e busca | Monta a base e prova a causa raiz |
-| `revisor-testes` | E3 | leitura + rodar teste | Responde: esse teste passaria com a implementação errada? |
+| `runx-investigador` | E1 | leitura e busca | Monta a base e prova a causa raiz |
+| `runx-revisor-testes` | E3 | leitura + rodar teste | Responde: esse teste passaria com a implementação errada? |
 | `qa` | E4 | leitura + rodar suíte | Valida contra o plano e o escopo; não corrige |
 
 **Os três têm acesso somente de leitura.** É isso que transforma "aponta, não corrige" de instrução em impossibilidade técnica. Nenhum deles grava arquivo: cada um devolve o conteúdo, e quem grava é a sessão principal, com o frontmatter do `references/00-schema.md`.

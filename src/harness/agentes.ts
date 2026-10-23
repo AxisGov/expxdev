@@ -16,7 +16,7 @@ import { artefato, artefatoComConteudo, emOrdemCanonica, hashDeBytes, type Artef
  * `.expx/agentes.json`:
  *
  *   { "expx_agentes": 1,
- *     "agentes": { "investigador": { "model": "haiku", "effort": "low" } } }
+ *     "agentes": { "runx-investigador": { "model": "haiku", "effort": "low" } } }
  *
  * O Claude Code só lê o frontmatter do arquivo, então o override é aplicado na
  * INSTALAÇÃO: a cópia em `.claude/agents/` sai com os valores do projeto. O

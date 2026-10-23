@@ -14,6 +14,9 @@ const SKILLS_AXISGOV = [
   ["mergex", "https://github.com/AxisGov/mergex", "https://github.com/bittencourtthulio/mergex"],
   ["sprintx", "https://github.com/AxisGov/sprintx", "https://github.com/bittencourtthulio/sprintx"],
   ["buildx", "https://github.com/AxisGov/buildx", "https://github.com/bittencourtthulio/buildx"],
+  ["legadox", "https://github.com/AxisGov/legadox", "https://github.com/bittencourtthulio/legadox"],
+  ["stackx", "https://github.com/AxisGov/stackx", "https://github.com/bittencourtthulio/stackx"],
+  ["designx", "https://github.com/AxisGov/designx", "https://github.com/bittencourtthulio/designx"],
 ] as const;
 
 let projeto: ProjetoTemporario | undefined;

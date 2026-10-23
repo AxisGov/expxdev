@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -97,6 +97,64 @@ describe("init com agentes", () => {
     expect(r.ok, r.erros.join("\n")).toBe(true);
     expect(lerAgente(p, "auditor")).toBe(AGENTE("auditor"));
     expect(r.avisos).toEqual([]);
+  });
+
+  it("integração: instala as nove skills oficiais sem colisão entre os treze agentes", async () => {
+    const p = produto();
+    const o = {
+      sprintx: skill("sprintx", {
+        ".claude/agents/auditor-plano.md": AGENTE("auditor-plano"),
+        ".claude/agents/sprintx-revisor-testes.md": AGENTE("sprintx-revisor-testes"),
+        ".claude/agents/sprintx-investigador.md": AGENTE("sprintx-investigador"),
+      }),
+      runx: skill("runx", {
+        ".claude/agents/runx-revisor-testes.md": AGENTE("runx-revisor-testes"),
+        ".claude/agents/runx-investigador.md": AGENTE("runx-investigador"),
+        ".claude/agents/qa.md": AGENTE("qa"),
+      }),
+      legadox: skill("legadox", {
+        ".claude/agents/legadox-cartografo.md": AGENTE("legadox-cartografo"),
+        ".claude/agents/avaliador-de-raio.md": AGENTE("avaliador-de-raio"),
+      }),
+      stackx: skill("stackx", {
+        ".claude/agents/stackx-cartografo.md": AGENTE("stackx-cartografo"),
+      }),
+      mergex: skill("mergex", {
+        ".claude/agents/revisor-diff.md": AGENTE("revisor-diff"),
+        ".claude/agents/analista-de-conflito.md": AGENTE("analista-de-conflito"),
+      }),
+      memox: skill("memox", {}),
+      prodx: skill("prodx", {}),
+      buildx: skill("buildx", {}),
+      designx: skill("designx", {
+        ".claude/agents/auditor-design.md": AGENTE("auditor-design"),
+        ".claude/agents/cartografo-visual.md": AGENTE("cartografo-visual"),
+      }),
+    };
+
+    const r = await executarInit({
+      raiz: p,
+      skills: Object.keys(o),
+      harness: ["claude"],
+      origens: o,
+    });
+
+    expect(r.ok, r.erros.join("\n")).toBe(true);
+    expect(readdirSync(join(p, ".claude/agents")).sort()).toEqual([
+      "analista-de-conflito.md",
+      "auditor-design.md",
+      "auditor-plano.md",
+      "avaliador-de-raio.md",
+      "cartografo-visual.md",
+      "legadox-cartografo.md",
+      "qa.md",
+      "revisor-diff.md",
+      "runx-investigador.md",
+      "runx-revisor-testes.md",
+      "sprintx-investigador.md",
+      "sprintx-revisor-testes.md",
+      "stackx-cartografo.md",
+    ]);
   });
 
   it("aplica o override do projeto e o preserva na reinstalação", async () => {
@@ -224,8 +282,8 @@ describe("candidatas fixadas", () => {
   const raiz = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "fixtures", "candidatos");
   const esperado: Array<[string, string, string, string]> = [
     ["sprintx", "auditor-plano", "opus", "high"],
-    ["sprintx", "revisor-testes", "opus", "high"],
-    ["sprintx", "investigador", "sonnet", "medium"],
+    ["sprintx", "sprintx-revisor-testes", "opus", "high"],
+    ["sprintx", "sprintx-investigador", "sonnet", "medium"],
     ["mergex", "revisor-diff", "opus", "high"],
     ["mergex", "analista-de-conflito", "opus", "high"],
   ];

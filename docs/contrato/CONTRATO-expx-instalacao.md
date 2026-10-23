@@ -140,7 +140,7 @@ que precisa de outro custo sobrepõe de forma consciente e versionada:
 {
   "expx_agentes": 1,
   "agentes": {
-    "investigador": { "model": "haiku", "effort": "low" }
+    "runx-investigador": { "model": "haiku", "effort": "low" }
   }
 }
 ```

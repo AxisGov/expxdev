@@ -97,8 +97,22 @@ describe("ferramenta e agente", () => {
     expect(r.defeitos[0]?.motivo).toContain("ferramenta");
   });
 
-  it("funcional: os agentes que a mergex e a legadox gravam são válidos", () => {
-    for (const a of ["revisor-diff", "analista-de-conflito", "avaliador-de-raio"]) {
+  it("integração: os treze agentes oficiais do ecossistema são válidos", () => {
+    for (const a of [
+      "auditor-plano",
+      "sprintx-revisor-testes",
+      "sprintx-investigador",
+      "runx-revisor-testes",
+      "runx-investigador",
+      "qa",
+      "legadox-cartografo",
+      "avaliador-de-raio",
+      "stackx-cartografo",
+      "revisor-diff",
+      "analista-de-conflito",
+      "auditor-design",
+      "cartografo-visual",
+    ]) {
       const r = validarRastro(j(linha({ agente: a })));
       expect(r.defeitos, `agente ${a}`).toEqual([]);
     }

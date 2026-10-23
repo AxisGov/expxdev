@@ -128,7 +128,7 @@
   <div class="cartoes">
     <div class="cartao"><div class="cartao__num">9</div><div class="cartao__rot">skills no catálogo</div></div>
     <div class="cartao"><div class="cartao__num">8</div><div class="cartao__rot">subcomandos do CLI</div></div>
-    <div class="cartao"><div class="cartao__num">1461</div><div class="cartao__rot">testes aprovados</div></div>
+    <div class="cartao"><div class="cartao__num">1490</div><div class="cartao__rot">testes aprovados</div></div>
     <div class="cartao"><div class="cartao__num">30</div><div class="cartao__rot">verificações do doctor</div></div>
   </div>
 
@@ -441,13 +441,18 @@
     <thead><tr><th>Agente</th><th>Usado por</th><th>Ferramentas</th><th>Papel</th></tr></thead>
     <tbody>
       <tr><td><code>auditor-plano</code></td><td>sprintx F5</td><td><span class="selo selo--ok">leitura apenas</span></td><td>Fura o plano antes de ele virar código</td></tr>
-      <tr><td><code>revisor-testes</code></td><td>sprintx, runx</td><td><span class="selo selo--ok">leitura apenas</span></td><td>Responde: esse teste passaria com a implementação errada?</td></tr>
+      <tr><td><code>sprintx-revisor-testes</code></td><td>sprintx F5/F6</td><td><span class="selo selo--ok">leitura apenas</span></td><td>Verifica se o teste discrimina a implementação errada</td></tr>
+      <tr><td><code>sprintx-investigador</code></td><td>sprintx F1</td><td>leitura + busca web</td><td>Condensa bases grandes para o planejamento</td></tr>
+      <tr><td><code>runx-revisor-testes</code></td><td>runx E3</td><td>leitura + rodar teste</td><td>Verifica se o teste discrimina a implementação errada</td></tr>
+      <tr><td><code>runx-investigador</code></td><td>runx E1</td><td>leitura + busca + comandos</td><td>Prova causa raiz ou dimensiona o impacto</td></tr>
       <tr><td><code>qa</code></td><td>runx E4</td><td>leitura + rodar suíte</td><td>Valida contra os critérios; não corrige</td></tr>
-      <tr><td><code>investigador</code></td><td>runx E1, sprintx F1</td><td>leitura + busca</td><td>Monta a base e prova a causa raiz</td></tr>
-      <tr><td><code>cartografo</code></td><td>stackx, legadox</td><td>leitura + histórico</td><td>Varre o repositório e extrai convenção ou perfil</td></tr>
-      <tr><td><code>avaliador-de-raio</code></td><td>legadox C2</td><td>leitura + escrita em <code>docs/legado/raio/</code></td><td>Coleta os oito sinais e classifica a faixa</td></tr>
-      <tr><td><code>revisor-diff</code></td><td>mergex E3</td><td>leitura + suíte</td><td>Classifica o diff nas três faixas de atenção</td></tr>
+      <tr><td><code>legadox-cartografo</code></td><td>legadox</td><td>leitura + comandos + escrita</td><td>Monta o perfil legado e prova que o código está vivo</td></tr>
+      <tr><td><code>avaliador-de-raio</code></td><td>legadox</td><td>leitura + comandos + escrita</td><td>Calcula o raio de impacto por evidência</td></tr>
+      <tr><td><code>stackx-cartografo</code></td><td>stackx</td><td>leitura + histórico + comandos</td><td>Extrai convenções sem escrever o <code>CONVENCOES.md</code></td></tr>
+      <tr><td><code>revisor-diff</code></td><td>mergex E3</td><td>leitura + comandos</td><td>Classifica o diff nas três faixas de atenção</td></tr>
       <tr><td><code>analista-de-conflito</code></td><td>mergex E9</td><td><span class="selo selo--ok">leitura apenas</span></td><td>Explica o que cada lado pretendia; nunca resolve</td></tr>
+      <tr><td><code>auditor-design</code></td><td>designx</td><td><span class="selo selo--ok">leitura apenas</span></td><td>Audita conformidade visual; não corrige</td></tr>
+      <tr><td><code>cartografo-visual</code></td><td>designx</td><td><span class="selo selo--ok">leitura apenas</span></td><td>Extrai do código o vocabulário visual em uso</td></tr>
     </tbody>
   </table></div>
 
@@ -869,7 +874,7 @@ docs/legado/comparacao/&lt;trabalho_id&gt;.md  <span class="tok-com"># C9</span>
   <div class="tabela-caixa"><table>
     <thead><tr><th>Etapa</th><th>Nome</th><th>O que produz</th></tr></thead>
     <tbody>
-      <tr><td><code>1</code></td><td>Detecção</td><td>inventário <code>FATO / EVIDÊNCIA / FORÇA</code> em memória — roda no agente <code>cartografo</code></td></tr>
+      <tr><td><code>1</code></td><td>Detecção</td><td>inventário <code>FATO / EVIDÊNCIA / FORÇA</code> em memória — roda no agente <code>stackx-cartografo</code></td></tr>
       <tr><td><code>2</code></td><td>O CONVENCOES.md</td><td><code>docs/stack/CONVENCOES.md</code></td></tr>
       <tr><td><code>3</code></td><td>Conflito e lacuna</td><td><code>docs/stack/LACUNAS.md</code></td></tr>
       <tr><td><code>4</code></td><td>Verificação de aderência</td><td>tabela severidade / arquivo / convenção violada / correção sugerida</td></tr>
@@ -2482,7 +2487,7 @@ docs/contrato/  <span class="tok-com">os contratos compartilhados pelas nove ski
   </div>
 
   <div class="cartoes">
-    <div class="cartao"><div class="cartao__num">1461</div><div class="cartao__rot">testes aprovados</div></div>
+    <div class="cartao"><div class="cartao__num">1490</div><div class="cartao__rot">testes aprovados</div></div>
     <div class="cartao"><div class="cartao__num">140</div><div class="cartao__rot">arquivos aprovados</div></div>
     <div class="cartao"><div class="cartao__num">4</div><div class="cartao__rot">projetos no runner</div></div>
     <div class="cartao"><div class="cartao__num">0</div><div class="cartao__rot">testes que dependem de rede</div></div>
@@ -2527,13 +2532,13 @@ docs/contrato/  <span class="tok-com">os contratos compartilhados pelas nove ski
   <p>
     <a href="https://github.com/AxisGov/sprintx">sprintx</a> ·
     <a href="https://github.com/AxisGov/runx">runx</a> ·
-    <a href="https://github.com/bittencourtthulio/legadox">legadox</a> ·
-    <a href="https://github.com/bittencourtthulio/stackx">stackx</a> ·
+    <a href="https://github.com/AxisGov/legadox">legadox</a> ·
+    <a href="https://github.com/AxisGov/stackx">stackx</a> ·
     <a href="https://github.com/AxisGov/mergex">mergex</a> ·
     <a href="https://github.com/bittencourtthulio/MemoX">memox</a> ·
     <a href="https://github.com/bittencourtthulio/prodx">prodx</a> ·
     <a href="https://github.com/AxisGov/buildx">buildx</a> ·
-    <a href="https://github.com/bittencourtthulio/designx">designx</a>
+    <a href="https://github.com/AxisGov/designx">designx</a>
   </p>
 </footer>
 

@@ -1,11 +1,14 @@
 # Changelog
 
-## 0.11.1 — correções de segurança e Actions Node 24
+## 0.11.1 — segurança, Actions Node 24 e instalação completa
 
 - Atualiza Vite para 8.3.5, Vitest e `@vitest/mocker` para 4.1.12 e `source-map-js` para 1.2.2.
 - Elimina as quatro vulnerabilidades reportadas pelo `npm audit`.
 - Migra as Actions oficiais para versões com runtime Node.js 24, mantendo Node.js 20.19 como piso suportado pelo produto.
 - Adiciona regressão que verifica todas as cópias das dependências auditadas no lockfile, inclusive instalações aninhadas.
+- Elimina as colisões de agentes entre SprintX/RunX e LegadoX/StackX com identidades exclusivas por skill, preservando prompts, responsabilidades e permissões.
+- Permite instalar simultaneamente as nove skills oficiais e valida os treze agentes resultantes em teste de integração.
+- Torna LegadoX, StackX e DesignX canônicos nos forks AxisGov, mantendo os repositórios anteriores somente como origens legadas migráveis.
 
 ## 0.11.0 — grafo operacional e sincronização final
 

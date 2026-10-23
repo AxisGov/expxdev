@@ -117,13 +117,18 @@ export const EventoNome = z.enum([
 export const Agente = z.enum([
   "principal",
   "auditor-plano",
-  "revisor-testes",
+  "sprintx-revisor-testes",
+  "sprintx-investigador",
+  "runx-revisor-testes",
+  "runx-investigador",
   "qa",
-  "investigador",
-  "cartografo",
+  "legadox-cartografo",
+  "avaliador-de-raio",
+  "stackx-cartografo",
   "revisor-diff",
   "analista-de-conflito",
-  "avaliador-de-raio",
+  "auditor-design",
+  "cartografo-visual",
 ]);
 
 /** Timestamp do rastro: ISO-8601 em UTC, com `Z` (R4). */

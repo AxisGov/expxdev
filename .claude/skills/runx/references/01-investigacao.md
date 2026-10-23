@@ -2,7 +2,7 @@
 
 Você está no E1. Este estágio tem duas metades, nesta ordem: **E1.a base de conhecimento**, depois **E1.b causa raiz ou análise de impacto**. Você não planeja nada e não escreve nenhum código de implementação neste estágio.
 
-## Delegue ao agente `investigador`, quando ele existir
+## Delegue ao agente `runx-investigador`, quando ele existir
 
 A investigação lê muito — código, chamadores, migrações, testes existentes. Em contexto próprio, essa leitura não consome o contexto que depois vai implementar.
 
@@ -12,12 +12,12 @@ O corte é mecânico, e sai de um dado que o próprio E1 já produz — **quanto
 
 | Arquivos candidatos | O que fazer |
 |---|---|
-| **3 ou mais** | delegue ao agente `investigador`, quando ele existir |
+| **3 ou mais** | delegue ao agente `runx-investigador`, quando ele existir |
 | 1 ou 2 | **leia direto**, você mesmo, na sessão principal — o método é idêntico |
 
 Faça a busca primeiro, conte, e só então decida. Decidir antes de buscar é palpite, e é justamente o que este corte existe para evitar. Na dúvida entre os dois lados — arquivos grandes, cadeia de chamadores que já se mostrou longa —, delegue: o custo de delegar demais é uma leitura repetida, e o de delegar de menos é o contexto da implementação gasto antes de implementar.
 
-Este corte vale **só para o `investigador`**. Os outros dois agentes não têm corte por tamanho: o `qa` é a única verificação independente do método, e o `revisor-testes` responde uma pergunta só e é barato mesmo em ocorrência mínima.
+Este corte vale **só para o `runx-investigador`**. Os outros dois agentes não têm corte por tamanho: o `qa` é a única verificação independente do método, e o `runx-revisor-testes` responde uma pergunta só e é barato mesmo em ocorrência mínima.
 
 **Ao delegar, passe:** o caminho da pasta da ocorrência, o `00-OCORRENCIA.md` já preenchido (Passo 0 é sempre seu, não dele), o tipo classificado e os arquivos candidatos que o grep devolveu. Ele devolve o conteúdo dos arquivos da `base/`, do `00-INDICE.md`, do `00-LACUNAS.md` e do `01-CAUSA-RAIZ.md` — prontos, mas **não gravados**: ele não tem ferramenta de escrita. Quem grava é você, com o frontmatter de `references/00-schema.md`.
 
@@ -32,8 +32,8 @@ Se o agente devolver `comprovada: false`, **respeite**: grave assim, com `STATUS
 Registre no rastro ao delegar e ao receber:
 
 ```
-python3 .claude/runx-hooks/comum/rastro.py --evento agente_iniciado  --agente investigador --fase e1
-python3 .claude/runx-hooks/comum/rastro.py --evento agente_concluido --agente investigador --fase e1 \
+python3 .claude/runx-hooks/comum/rastro.py --evento agente_iniciado  --agente runx-investigador --fase e1
+python3 .claude/runx-hooks/comum/rastro.py --evento agente_concluido --agente runx-investigador --fase e1 \
   --resultado <comprovada|nao_comprovada|impacto_mapeado> --detalhe "N arquivos de base, M lacunas"
 ```
 

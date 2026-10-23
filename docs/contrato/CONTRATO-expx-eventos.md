@@ -146,7 +146,7 @@ nesta tabela, na tabela publicada do `docs-site` e no rótulo do painel
 
 ### Valores de `agente`
 
-`principal` · `auditor-plano` · `revisor-testes` · `qa` · `investigador` · `cartografo` · `revisor-diff` · `analista-de-conflito` · `avaliador-de-raio`
+`principal` · `auditor-plano` · `sprintx-revisor-testes` · `sprintx-investigador` · `runx-revisor-testes` · `runx-investigador` · `qa` · `legadox-cartografo` · `avaliador-de-raio` · `stackx-cartografo` · `revisor-diff` · `analista-de-conflito` · `auditor-design` · `cartografo-visual`
 
 `principal` é o valor quando não há subagente — o modelo principal executando. Nunca `null`: por R6 a chave está sempre lá, e "foi o principal" é informação, não ausência.
 
@@ -188,12 +188,20 @@ A linha "se omitir, herda todas" é a mais perigosa da tabela: um agente de vere
 | Agente | Usado por | Ferramentas | Papel |
 |---|---|---|---|
 | `auditor-plano` | sprintx F5 | leitura apenas | Fura o plano antes de virar código |
-| `revisor-testes` | sprintx, runx | leitura apenas | Responde: esse teste passaria com a implementação errada? |
+| `sprintx-revisor-testes` | sprintx F5/F6 | leitura apenas | Verifica se o teste discrimina a implementação errada |
+| `sprintx-investigador` | sprintx F1 | leitura + busca web | Condensa bases grandes para o planejamento |
+| `runx-revisor-testes` | runx E3 | leitura + rodar teste | Verifica se o teste discrimina a implementação errada |
+| `runx-investigador` | runx E1 | leitura + busca + comandos | Prova causa raiz ou dimensiona o impacto |
 | `qa` | runx E4 | leitura + rodar suíte | Valida contra os critérios, não corrige |
-| `investigador` | runx E1, legadox | leitura + busca | Monta a base e prova a causa raiz |
-| `cartografo` | stackx, legadox | leitura + histórico | Varre o repositório e extrai convenção ou perfil |
+| `legadox-cartografo` | legadox | leitura + comandos + escrita | Monta o perfil legado e prova que o código está vivo |
+| `avaliador-de-raio` | legadox | leitura + comandos + escrita | Calcula o raio de impacto por evidência |
+| `stackx-cartografo` | stackx | leitura + histórico + comandos | Extrai convenções sem escrever o `CONVENCOES.md` |
+| `revisor-diff` | mergex E3 | leitura + comandos | Classifica o diff por atenção humana |
+| `analista-de-conflito` | mergex manual | leitura apenas | Explica a intenção de cada lado; não resolve |
+| `auditor-design` | designx | leitura apenas | Audita conformidade visual; não corrige |
+| `cartografo-visual` | designx | leitura apenas | Extrai do código o vocabulário visual em uso |
 
-**Regra que dá sentido a tudo:** os agentes de veredito — `auditor-plano`, `revisor-testes`, `qa` — têm acesso **somente de leitura**. Isso transforma "aponta, não corrige" de instrução em impossibilidade técnica.
+**Regra que dá sentido a tudo:** agentes que apenas emitem veredito não recebem ferramentas de escrita. Alguns agentes precisam executar testes ou comandos, e os dois agentes do legadox preservam escrita porque produzem os artefatos do próprio método. As permissões permanecem declaradas em cada arquivo de agente.
 
 ## Estrutura no plugin
 
@@ -209,10 +217,18 @@ plugin/
 │   └── mergex/
 ├── agents/
 │   ├── auditor-plano.md
-│   ├── revisor-testes.md
+│   ├── sprintx-revisor-testes.md
+│   ├── sprintx-investigador.md
+│   ├── runx-revisor-testes.md
+│   ├── runx-investigador.md
 │   ├── qa.md
-│   ├── investigador.md
-│   └── cartografo.md
+│   ├── legadox-cartografo.md
+│   ├── avaliador-de-raio.md
+│   ├── stackx-cartografo.md
+│   ├── revisor-diff.md
+│   ├── analista-de-conflito.md
+│   ├── auditor-design.md
+│   └── cartografo-visual.md
 └── skills/
 ```
 

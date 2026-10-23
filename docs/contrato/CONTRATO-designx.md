@@ -57,7 +57,7 @@ Designx procura um design system nesta ordem de prioridade:
 Quando nenhum design system é encontrado, o agente `cartografo-visual`
 analisa o projeto existente e gera um `DESIGN-SYSTEM.md` candidato.
 
-### O que o cartografo analisa
+### O que o `cartografo-visual` analisa
 
 | Área | O que procura | Comando de detecção |
 |---|---|---|
@@ -192,7 +192,7 @@ possível, não reescreva do zero."
 
 ### E1 — Investigação
 
-Se `tipo_ocorrencia` é `melhoria-ui` ou `melhoria-ux`, o investigador
+Se `tipo_ocorrencia` é `melhoria-ui` ou `melhoria-ux`, o `runx-investigador`
 consulta o DS para verificar se o comportamento atual é uma violação do
 padrão. O achado entra na causa raiz como evidência.
 
@@ -249,7 +249,7 @@ bloqueio porque sem DS a auditoria de design não tem referência, e
 auditar sem referência é violação falsa (a pior coisa que um hook pode
 fazer).
 
-**Falha aberta:** se o cartografo não conseguir rodar, o hook registra o
+**Falha aberta:** se o `cartografo-visual` não conseguir rodar, o hook registra o
 erro no rastro e sai com 0. O trabalho continua sem DS, com aviso.
 
 ### `designx-audit` — Auditoria contínua
@@ -352,7 +352,7 @@ tools: Read, Glob, Grep
 ```
 
 **Ferramentas:** somente leitura. Mesmo padrão do `auditor-plano` e
-`revisor-testes` — quem audita não corrige.
+`sprintx-revisor-testes` — quem audita não corrige.
 
 **Prompt:**
 
@@ -645,7 +645,7 @@ mudanças grandes no projeto.
 | Não escolhe o design system | Quem escolhe é o time |
 | Não força upgrade de DS | Versão é declarada, não imposta |
 | Impede trabalho sem DS | Sem DS = inerte, nunca trava (exceto cartografia) |
-| Substitui auditoria de código | `revisor-testes` e `qa` continuam existindo |
+| Substitui auditoria de código | `sprintx-revisor-testes`, `runx-revisor-testes` e `qa` continuam existindo |
 | Gera screenshots ou mockups | É uma camada de método, não de ferramenta visual |
 
 ---
