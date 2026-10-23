@@ -219,7 +219,8 @@ describe("expx-revisao.mjs revisar", () => {
   it("funcional: rejeição gravada (rejeitar) enquanto a CLI roda não se perde", () => {
     const id = identidade("security", "src/a.js", ["l2", "novo3", "l4"]);
     const durante = JSON.stringify({ expx_revisao: 1, achados: [], rejeicoes: [{ identidade: id, motivo: "fp", em: "x" }] });
-    const c = cenario({ issues: [achado("src/a.js", 3)], durante: [EV, durante] });
+    const c = cenario();
+    configurarFalsa(c.falsa, { issues: [achado("src/a.js", 3)], durante: [join(c.raiz, EV), durante] });
     altera3(c.raiz);
     rejeita(c.raiz, "T-00", []);
     expect(revisar(c, "src/a.js")).toMatchObject({ rc: 0, ev: { resultado: "ok", rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] } });
@@ -274,10 +275,27 @@ describe("expx-revisao.mjs revisar", () => {
     expect(r.ev.arquivos[f]?.blob).toMatch(/^[0-9a-f]{40}$/);
   });
 
-  it("funcional: arquivo alterado durante a chamada da CLI → indisponivel", () => {
-    const c = cenario({ reescreve: "src/a.js" }); // a falsa reescreve o arquivo antes de responder
+  it("funcional: a CLI só consegue reescrever o snapshot descartável, não o checkout", () => {
+    const c = cenario({ reescreve: "src/a.js" });
     altera3(c.raiz);
-    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "arquivo-mudou-durante-revisao" } });
+    const original = readFileSync(join(c.raiz, "src/a.js"), "utf8");
+    const r = revisar(c, "src/a.js");
+    expect(r).toMatchObject({ rc: 0, ev: { resultado: "ok" } });
+    expect(readFileSync(join(c.raiz, "src/a.js"), "utf8")).toBe(original);
+    expect(r.registro.find((x) => x.args[0] === "review")).toMatchObject({ conteudos: { "src/a.js": original } });
+  });
+
+  it("funcional: editar e restaurar o checkout durante a CLI não muda os bytes revisados", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    const original = readFileSync(join(c.raiz, "src/a.js"), "utf8");
+    configurarFalsa(c.falsa, { oscilaOrigem: [join(c.raiz, "src/a.js"), "conteudo transitorio\n", original] });
+    const r = revisar(c, "src/a.js");
+    const chamada = r.registro.find((x) => x.args[0] === "review");
+    expect(r).toMatchObject({ rc: 0, ev: { resultado: "ok" } });
+    expect(readFileSync(join(c.raiz, "src/a.js"), "utf8")).toBe(original);
+    expect(chamada?.cwd).not.toBe(c.raiz);
+    expect(chamada?.conteudos["src/a.js"]).toBe(original);
   });
 
   it.each([
@@ -289,8 +307,8 @@ describe("expx-revisao.mjs revisar", () => {
     // o openSync do script apaga o arquivo antes de abri-lo na n-ésima vez: a troca entre a conferência e a leitura
     const pre = join(temp("expx-open-"), "pre.mjs");
     writeFileSync(pre, `import fs from "node:fs"; import { syncBuiltinESMExports } from "node:module";
-const open = fs.openSync; let n = 0;
-fs.openSync = (...a) => { if (String(a[0]).split(String.fromCharCode(92)).join("/").endsWith("/src/a.js") && ++n === ${n}) fs.rmSync(a[0]); return open(...a); };
+const alvo = ${JSON.stringify(join(c.raiz, "src/a.js"))}, open = fs.openSync; let n = 0;
+fs.openSync = (...a) => { if (String(a[0]) === alvo && ++n === ${n}) fs.rmSync(a[0]); return open(...a); };
 syncBuiltinESMExports();
 `);
     const r = spawnSync(process.execPath, ["--import", pathToFileURL(pre).href, c.script, "revisar", "--trabalho", "w", "--task", "T-01", "--arquivos", "src/a.js",
@@ -777,37 +795,35 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     expect(evidencia(c.raiz)).toMatchObject({ resultado: "ok", rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] });
   });
 
-  it("funcional: trava velha: quem a julgou abandonada não remove a trava nova de outro processo", async () => {
+  it("funcional: trava velha de processo vivo não é removida por idade", async () => {
     const c = cenario({ issues: [achado("src/a.js", 3)] });
     altera3(c.raiz);
     const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
     const trava = join(c.raiz, `${EV}.trava`);
     mkdirSync(trava);
-    utimesSync(trava, new Date(0), new Date(0)); // de processo que morreu
-    const [pb, pa] = [temp("expx-pausa-"), temp("expx-pausa-")];
-    // o rejeitar para logo depois do primeiro stat que acha a trava velha, antes de removê-la
-    writeFileSync(join(pb, "pre.mjs"), `import fs from "node:fs"; import { syncBuiltinESMExports } from "node:module";
-const dir = ${JSON.stringify(pb)}, stat = fs.statSync; let uma = false;
-fs.statSync = (...a) => { const r = stat(...a);
-  if (!uma && String(a[0]).endsWith(".trava") && Date.now() - r.mtimeMs > 120000) { uma = true; fs.writeFileSync(dir + "/pronto", "");
-    for (const ate = Date.now() + 20000; Date.now() < ate && !fs.existsSync(dir + "/continuar");) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50); }
-  return r; };
-syncBuiltinESMExports();
-`);
-    const filho = (a: string[], env?: NodeJS.ProcessEnv) => new Promise<number | null>((ok) =>
-      spawn(process.execPath, [...a, "--trabalho", "w", "--raiz", c.raiz], { env, stdio: "ignore" }).on("close", ok));
+    writeFileSync(join(trava, "dono.json"), JSON.stringify({ pid: process.pid, token: "viva" }));
+    utimesSync(trava, new Date(0), new Date(0));
     const espera = async (ms: number) => new Promise((ok) => setTimeout(ok, ms));
-    const pronto = async (d: string) => { for (const ate = Date.now() + 20000; !existsSync(join(d, "pronto")) && Date.now() < ate;) await espera(50); };
-    const rej = filho(["--import", pathToFileURL(join(pb, "pre.mjs")).href, SCRIPT, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp"]);
-    await pronto(pb);
-    // o revisar remove a trava velha, toma a sua e para entre a releitura e a gravação
-    const rev = filho([c.script, "revisar", "--task", "T-01", "--arquivos", "src/a.js"], ambienteCom(`${c.falsa.path}${delimiter}${PATH}`, { EXPX_REVISAO_TESTE_PAUSA: pa }));
-    await pronto(pa);
-    writeFileSync(join(pb, "continuar"), "");
-    await espera(1500); // sem a correção, o rejeitar remove aqui a trava do revisar, grava, e o revisar o apaga
-    writeFileSync(join(pa, "continuar"), "");
-    expect([await rev, await rej]).toEqual([1, 0]);
-    expect(evidencia(c.raiz)).toMatchObject({ resultado: "ok", rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] });
+    let fechou = false;
+    const rej = new Promise<number | null>((ok) => spawn(process.execPath,
+      [c.script, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp", "--trabalho", "w", "--raiz", c.raiz],
+      { stdio: "ignore" }).on("close", (rc) => { fechou = true; ok(rc); }));
+    await espera(1200);
+    expect([existsSync(trava), fechou]).toEqual([true, false]);
+    rmSync(trava, { recursive: true });
+    expect(await rej).toBe(0);
+  });
+
+  it("funcional: trava velha com dono comprovadamente morto é recuperada", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
+    const trava = join(c.raiz, `${EV}.trava`);
+    mkdirSync(trava);
+    writeFileSync(join(trava, "dono.json"), JSON.stringify({ pid: 2147483647, token: "morta" }));
+    utimesSync(trava, new Date(0), new Date(0));
+    expect(roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp").rc).toBe(0);
+    expect(existsSync(trava)).toBe(false);
   });
 
   it("funcional: .quebra velha nunca é removida sozinha: sai 75 nomeando-a, e a trava fica", () => {

@@ -24,6 +24,8 @@ export interface CfgFalsa {
   durante?: [string, string];
   /** Reescreve o arquivo durante a chamada. */
   reescreve?: string;
+  /** Altera e restaura um caminho absoluto do checkout original enquanto a revisão lê o snapshot. */
+  oscilaOrigem?: [string, string, string];
   /** Texto antes do JSON no stdout (avisos do npm). */
   avisos?: string;
   /** Código de saída; sem ele, 1 se `error` não é nulo e 0 senão. */
@@ -48,6 +50,8 @@ export interface Chamada {
   args: string[];
   arquivo: string;
   shim: boolean;
+  cwd: string;
+  conteudos: Record<string, string>;
 }
 
 const sha256 = (b: Buffer): string => createHash("sha256").update(b).digest("hex");
@@ -58,10 +62,13 @@ const fs = require("node:fs");
 const dir = ${JSON.stringify(dir)};
 const a = process.argv.slice(2);
 const cfg = JSON.parse(fs.readFileSync(dir + "/cfg.json", "utf8"));
-fs.appendFileSync(dir + "/chamadas.jsonl", JSON.stringify({ args: a, arquivo: process.argv[1], shim: process.env.EXPX_FALSA_PELO_SHIM === "1" }) + "\\n");
-if (a[0] === "--version") { process.stdout.write(cfg.versao + "\\n"); process.exit(0); }
 const i = a.indexOf("--include");
 const inc = i >= 0 ? a[i + 1].split(",") : [];
+if (a[0] === "review" && cfg.oscilaOrigem) fs.writeFileSync(cfg.oscilaOrigem[0], cfg.oscilaOrigem[1]);
+const conteudos = Object.fromEntries(inc.map((f) => [f, fs.readFileSync(f, "utf8")]));
+fs.appendFileSync(dir + "/chamadas.jsonl", JSON.stringify({ args: a, arquivo: process.argv[1], shim: process.env.EXPX_FALSA_PELO_SHIM === "1", cwd: process.cwd(), conteudos }) + "\\n");
+if (a[0] === "review" && cfg.oscilaOrigem) fs.writeFileSync(cfg.oscilaOrigem[0], cfg.oscilaOrigem[2]);
+if (a[0] === "--version") { process.stdout.write(cfg.versao + "\\n"); process.exit(0); }
 if (cfg.durante) fs.writeFileSync(cfg.durante[0], cfg.durante[1]);
 if (cfg.reescreve) fs.writeFileSync(cfg.reescreve, "mudou\\n");
 if (cfg.stderr) process.stderr.write(cfg.stderr);
