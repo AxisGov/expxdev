@@ -25,7 +25,7 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-latest
+          - ubuntu-24.04
           - windows-latest
 
     steps:
@@ -51,13 +51,13 @@ jobs:
         run: npm run build
 
       - name: Release contract
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-24.04'
         run: bash scripts/ci/test-release.sh
 
   fatiamento:
     name: fatiamento (CONTRATO-expx-fatiamento)
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
