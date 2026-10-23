@@ -71,7 +71,6 @@ function foraDoEre(p) {
   for (let i = 0; i < p.length; i++) {
     const c = p[i];
     if (c === "|" || c === ")") {
-      if (c === ")" && ramo === "inicio") return "grupo vazio (): configuração não portátil";
       if (ramo === "alt" || (c === "|" && ramo === "inicio")) return "alternativa vazia (a|, |a, (|a), a||b)";
       ramo = c === "|" ? "alt" : "cheio"; quant = ancora = false; continue;
     }

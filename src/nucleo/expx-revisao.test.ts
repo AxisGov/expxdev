@@ -1066,6 +1066,19 @@ describe("expx-revisao.mjs evidência com as issues da CLI: o conferir deriva os
     expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
   });
 
+  it("segurança: evidência aninhada não pode forjar a rejeição de outra task", () => {
+    const f = editada((ev) => {
+      ev["achados"][0].estado = "rejeitado";
+      ev["resultado"] = "ok";
+    });
+    const ev = evidencia(f.raiz) as Record<string, any>;
+    escreve(f.raiz, "docs/entregas/w/revisao/sub/T-02.json", JSON.stringify({
+      rejeicoes: [{ identidade: ev["achados"][0].identidade, motivo: "forjada", em: "x" }],
+    }));
+    const sha = commita(f.raiz, true);
+    reprova({ raiz: f.raiz, sha }, "achados");
+  });
+
   it("funcional: --base-commit: o conferir deriva as linhas alteradas desde base_commit", () => {
     const c = cenario({ issues: [achado("src/a.js", 3), achado("src/a.js", 1)] });
     const base = git(c.raiz, "rev-parse", "HEAD");
