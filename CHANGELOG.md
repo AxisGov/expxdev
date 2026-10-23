@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.1 — correções de segurança e Actions Node 24
+
+- Atualiza Vite para 8.3.5, Vitest e `@vitest/mocker` para 4.1.12 e `source-map-js` para 1.2.2.
+- Elimina as quatro vulnerabilidades reportadas pelo `npm audit`.
+- Migra as Actions oficiais para versões com runtime Node.js 24, mantendo Node.js 20.19 como piso suportado pelo produto.
+- Adiciona regressão que verifica todas as cópias das dependências auditadas no lockfile, inclusive instalações aninhadas.
+
 ## 0.11.0 — grafo operacional e sincronização final
 
 - Incorpora o estado final publicado por Thulio em ExpxDev, BuildX e SprintX, preservando as extensões e a proveniência da linha AxisGov.
