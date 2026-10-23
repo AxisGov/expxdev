@@ -131,7 +131,7 @@ describe("detalhe do trabalho", () => {
     expect(screen.getAllByText("T-01.01").length).toBeGreaterThan(0);
     expect(screen.getAllByText("T-01.03").length).toBeGreaterThan(0);
   });
-  it("integração: prefere o retrato histórico da LLM e rotula o fallback das linhas antigas", () => {
+  it("integração: distingue snapshot, fallback compatível e histórico indisponível", () => {
     const comRastro: Estado = {
       ...ok,
       eventos: {
@@ -162,7 +162,34 @@ describe("detalhe do trabalho", () => {
           task: "T-01.01",
           agente: "sprintx-investigador",
           resultado: "ok",
-          detalhe: "linha antiga",
+          detalhe: "evento sem snapshot e sem harness explícito",
+          arquivos: [],
+        }, {
+          ts: "2026-08-29T14:30:00Z",
+          expx_eventos: 1,
+          trabalho_id: "exportacao-csv",
+          ferramenta: "sprintx",
+          origem: "agente",
+          evento: "agente_concluido",
+          fase: "f6",
+          task: "T-01.03",
+          agente: "sprintx-investigador",
+          resultado: "ok",
+          detalhe: "execução OpenCode sem snapshot",
+          arquivos: [],
+          harness: "opencode",
+        }, {
+          ts: "2026-08-29T14:29:00Z",
+          expx_eventos: 1,
+          trabalho_id: "exportacao-csv",
+          ferramenta: "runx",
+          origem: "skill",
+          evento: "fase_iniciada",
+          fase: "e1",
+          task: null,
+          agente: "principal",
+          resultado: "ok",
+          detalhe: "principal sem configuração",
           arquivos: [],
         }],
       },
@@ -180,10 +207,13 @@ describe("detalhe do trabalho", () => {
     expect(screen.getByText("agente iniciado")).toBeDefined();
     expect(screen.getByText("sprintx-investigador · openai/gpt-5.4 · high · histórico")).toBeDefined();
     expect(screen.getByText("sprintx-investigador · sonnet · medium · configuração atual")).toBeDefined();
-    expect(screen.getByText(/Linhas antigas sem esse retrato/)).toBeDefined();
+    expect(screen.getByText("sprintx-investigador · modelo/esforço não informados · histórico indisponível")).toBeDefined();
+    expect(screen.getByText("principal · modelo/esforço não informados · histórico indisponível")).toBeDefined();
+    expect(screen.getByText(/Sem snapshot/)).toBeDefined();
     const titulos = [...container.querySelectorAll("svg title")].map((item) => item.textContent ?? "");
     expect(titulos.some((item) => item.includes("openai/gpt-5.4") && item.includes("histórico"))).toBe(true);
     expect(titulos.some((item) => item.includes("sonnet") && item.includes("configuração atual"))).toBe(true);
+    expect(titulos.some((item) => item.includes("T-01.03") && item.includes("histórico indisponível"))).toBe(true);
   });
 
   it("funcional: a barra de uma fase 1 de 2 mostra 50 por cento", () => {

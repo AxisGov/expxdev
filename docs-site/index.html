@@ -1898,7 +1898,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
     <tbody>
       <tr><td><strong>Dashboard</strong></td><td>seis cartões, quatro distribuições e os trabalhos recentes. A separação entre planejamento e execução vem do <em>estágio</em>, não do status</td></tr>
       <tr><td><strong>Trabalhos</strong></td><td>tabela filtrável por ferramenta, tipo e status, ordenável por atualização, progresso ou título</td></tr>
-      <tr><td><strong>Detalhe</strong></td><td>grafo interativo e vivo, linha do tempo do rastro e plano completo; agente, modelo e esforço aparecem como histórico quando o evento os registra, com fallback atual rotulado para linhas legadas</td></tr>
+      <tr><td><strong>Detalhe</strong></td><td>grafo interativo e vivo, linha do tempo do rastro e plano completo; snapshots aparecem como histórico, e eventos sem snapshot usam a configuração atual somente quando não identificam outro harness, ou informam histórico indisponível</td></tr>
       <tr><td><strong>Conformidade</strong></td><td>as violações agrupadas por tipo, com arquivo e linha</td></tr>
       <tr><td><strong>Histórico</strong></td><td>as entregas, com link para os relatórios técnico e de uso</td></tr>
       <tr><td><strong>Memória</strong></td><td>arquivos de risco, regressões, coincidências e artefatos contaminados</td></tr>
@@ -1910,10 +1910,10 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
   ou o caminho crítico. Planos com ciclo ou dependência inexistente abrem o bloco automaticamente.</p>
   <div class="nota nota--info">
     <svg class="nota__icone" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6.4"/><path d="M8 7.2v4M8 4.9v.1" stroke-linecap="round"/></svg>
-    <div><p><strong>Histórico quando existe; fallback quando é legado.</strong> Eventos novos do contrato
-    <code>expx-eventos</code> v1 registram <code>model</code> e <code>effort</code> daquela execução. Linhas
-    anteriores continuam válidas; nelas o painel lê a configuração instalada hoje e a rotula como
-    configuração atual, sem convertê-la em prova retroativa.</p></div>
+    <div><p><strong>Snapshot quando existe; sem atribuição quando não existe.</strong> Se o evento traz
+    <code>model</code>/<code>effort</code>, o painel os mostra como histórico. Sem snapshot, só usa a
+    configuração atual quando o evento não identifica outro harness; em eventos de outro harness ou sem
+    agente compatível, mostra histórico indisponível.</p></div>
   </div>
   <p>Toda tela exporta CSV. Um filtro de período global — <code>7d</code>, <code>30d</code>, <code>90d</code>,
   mês, ano ou intervalo — recorta trabalhos, histórico, bloqueios e violações; data ausente nunca é filtrada
@@ -2238,15 +2238,17 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
   <p>Seis chaves extras são permitidas depois das doze: <code>hook</code> (o nome do hook que decidiu, quando
   a origem é <code>hook</code>), <code>faixa</code> (a faixa de atenção do arquivo tocado), o par
   <code>sessao</code> · <code>harness</code> (a identidade da sessão) e <code>model</code> · <code>effort</code>
-  (o retrato da configuração usada naquela execução). O runtime explícito tem prioridade. Fora do OpenCode, o
-  escritor comum usa como fallback o frontmatter instalado; no OpenCode sem metadado explícito, grava
-  <code>null</code> em vez de atribuir uma configuração Claude. Uma chave presente com <code>null</code> registra
-  que o dado não foi informado; uma chave <strong>ausente</strong> identifica uma linha legada.
-  Permitidas, mas não indiferentes: <code>sessao</code> e <code>harness</code> são
-  <strong>obrigatórias</strong> em <code>task_iniciada</code>, <code>task_concluida</code> e
-  <code>task_bloqueada</code>, que são a reivindicação que os hooks leem — sem identidade o escritor não grava a
-  linha, e uma reivindicação sem dono bloqueia a primeira edição da task; valem <code>null</code> em evento que
-  não depende delas; e ficam <strong>ausentes</strong> na linha gravada por hook, que não as leva.</p>
+  (o snapshot daquela execução). O gravador comum inclui <code>model</code>/<code>effort</code> nas linhas que
+  ele escreve; os escritores próprios da SprintX ainda os omitem e, por isso, aparecem como <strong>sem
+  snapshot</strong>. O runtime explícito tem prioridade. Fora do OpenCode, o gravador comum pode usar como
+  fallback o frontmatter instalado; no OpenCode sem metadado explícito, grava <code>null</code> em vez de
+  atribuir uma configuração Claude. Uma chave presente com <code>null</code> registra dado não informado;
+  uma chave <strong>ausente</strong> significa sem snapshot. Permitidas, mas não indiferentes:
+  <code>sessao</code> e <code>harness</code> são <strong>obrigatórias</strong> somente quando a ferramenta é
+  SprintX e o evento é <code>task_iniciada</code>, <code>task_concluida</code> ou <code>task_bloqueada</code>.
+  Nesses três eventos, sem identidade o escritor não grava a linha. Nos demais eventos da SprintX,
+  <code>scripts/rastro.sh</code> pode gravar <code>null</code>; planejamento, bloqueios e hooks deixam as chaves
+  <strong>ausentes</strong>.</p>
 
   <div class="nota nota--info">
     <svg class="nota__icone" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6.4"/><path d="M8 7.2v4M8 4.9v.1" stroke-linecap="round"/></svg>

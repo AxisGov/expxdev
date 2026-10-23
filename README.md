@@ -272,9 +272,10 @@ ou escrever uma sexta amanhã.
 | **[`expx-eventos` v1](docs/contrato/CONTRATO-expx-eventos.md)** | o rastro append-only `docs/eventos/<trabalho_id>.jsonl`, e o comportamento de hooks e agentes | as skills e os hooks | as próprias skills, o `doctor` e **o painel** |
 
 > O painel lê os dois sem escrever em nenhum: usa o `expx-schema` para o estado e o
-> `expx-eventos` para a linha do tempo e o retrato histórico de modelo/esforço. Para linhas
-> legadas sem esse retrato, o fallback atual vem do frontmatter dos agentes que o `init`
-> efetivamente instalou.
+> `expx-eventos` para a linha do tempo e, quando existe, o snapshot histórico de
+> modelo/esforço. Sem snapshot, o frontmatter que o `init` instalou só é fallback quando o
+> evento não identifica outro harness; sem correspondência confiável, o painel informa que o histórico
+> está indisponível.
 
 **O estado responde "onde está"; o rastro responde "o que aconteceu e quando".**
 
@@ -696,9 +697,10 @@ npx expxdev panel
 Lê a pasta `docs/` do projeto, descobre os trabalhos gravados pelas skills e mostra no
 navegador o que foi planejado, o que aconteceu, o que está em execução, o que travou e o
 histórico do que já foi entregue. O estado vem do frontmatter YAML sob o `expx-schema`;
-a atividade e o retrato histórico de modelo/esforço vêm do JSONL append-only sob o
-`expx-eventos`; em linhas legadas, o fallback atual vem dos agentes instalados em
-`.claude/agents/`.
+a atividade e, quando presentes, os snapshots de modelo/esforço vêm do JSONL append-only sob
+o `expx-eventos`. Sem snapshot, o fallback atual vem dos agentes instalados em
+`.claude/agents/` somente quando o evento não identifica outro harness; sem correspondência confiável, o histórico
+é exibido como indisponível.
 
 **Somente leitura, e não só por convenção.** Qualquer requisição que não seja `GET` recebe
 `405` com a mensagem `o painel e somente leitura`. O servidor escuta exclusivamente em
@@ -714,8 +716,9 @@ O painel é uma **projeção descartável**, não outro motor do método:
 
 - dependência e paralelismo pertencem ao plano escrito por `sprintx` ou `runx`;
 - início, conclusão, bloqueio e agente pertencem ao rastro escrito pelas skills e hooks;
-- modelo e esforço históricos pertencem ao evento; para linhas legadas, o fallback atual pertence
-  ao agente materializado pelo `init`, já com o override do projeto.
+- modelo e esforço históricos pertencem ao evento; sem snapshot, o fallback atual só vale quando
+  o evento não identifica outro harness e pertence ao agente materializado pelo `init`, já com o override do projeto;
+  sem uma configuração compatível, o painel mostra o histórico como indisponível.
 
 Se o painel for removido, nada da execução muda. Ele não reimplementa o orquestrador, não
 escolhe qual agente roda e não acrescenta campos ao contrato dos nove projetos.
@@ -736,10 +739,11 @@ Ele **não** observa `.expx/`: é lá que o índice é gravado, e observá-lo fa
 realimentar a recarga da tela sem dado novo nenhum.
 
 No detalhe há também uma linha do tempo dos eventos válidos, incluindo fase, task, agente,
-resultado e detalhe. Eventos novos registram `model` e `effort` como retrato daquela execução;
-o painel mostra esse histórico ao lado da atividade e no nó da task. Linhas antigas, sem essas
-chaves, permanecem válidas e usam a configuração instalada atual apenas como fallback
-explicitamente rotulado — nunca como evidência retroativa.
+resultado e detalhe. Quando um evento registra `model` e `effort`, o painel mostra esse snapshot
+ao lado da atividade e no nó da task. O gravador comum já emite as duas chaves; escritores próprios
+das skills podem omiti-las e aparecem como **sem snapshot**. Nesse caso, a configuração instalada
+atual só é fallback quando o evento não identifica outro harness; nos demais, o painel
+informa **histórico indisponível**, sem atribuir a execução a outro runtime.
 
 No detalhe de cada trabalho há o [grafo do plano](#o-grafo-do-plano), desenhado na própria
 tela. Ele é **interativo**: passar o mouse num nó apaga tudo que não é vizinho dele, clicar

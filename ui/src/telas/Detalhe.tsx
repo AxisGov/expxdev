@@ -179,8 +179,9 @@ function LinhaDoTempo({
       ) : (
         <>
           <div className="dep" style={{ marginTop: 9, marginBottom: 7 }}>
-            Modelo e esforço vêm do retrato histórico do evento. Linhas antigas sem esse
-            retrato usam a configuração instalada atual, sempre identificada como fallback.
+            Modelo e esforço vêm do snapshot quando o evento o registra. Sem snapshot, a
+            configuração atual só é usada quando o evento não identifica outro harness; nos
+            demais casos, o histórico aparece como indisponível.
           </div>
           <div>
             {recentes.map((evento, i) => {

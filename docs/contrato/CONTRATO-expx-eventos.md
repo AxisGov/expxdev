@@ -107,14 +107,16 @@ Por R6, nenhuma delas é omitida: sem valor, escreva `null` (ou `[]` em `arquivo
 |---|---|---|
 | `hook` | mergex, legadox | nome do hook que decidiu, quando `origem: hook` |
 | `faixa` | legadox | faixa de atenção do arquivo tocado |
-| `sessao` · `harness` | sprintx, pelo escritor `scripts/rastro.sh` | identidade da sessão (`<harness>@<id>`), **derivada** do harness — nunca preenchida por quem chama. Obrigatória em `task_iniciada`/`task_concluida`/`task_bloqueada`, que são a reivindicação que os hooks leem; `null` num evento que não depende dela; ausente na linha gravada por hook |
+| `sessao` · `harness` | sprintx, pelo escritor `scripts/rastro.sh` | identidade da sessão (`<harness>@<id>`), **derivada** do harness — nunca preenchida por quem chama. Obrigatória somente quando `ferramenta: sprintx` e o evento é `task_iniciada`/`task_concluida`/`task_bloqueada`; nos demais eventos da SprintX, `scripts/rastro.sh` pode gravar `null`, enquanto planejamento, bloqueios e hooks omitem as chaves |
 | `model` · `effort` | escritor comum `nucleo/hooks/expx-rastro.sh` | retrato da configuração usada naquela execução; identificadores de modelo são livres para suportar Claude, Codex, Gemini, Grok e outros provedores |
 
-`model` e `effort` são uma extensão aditiva do v1: continuam opcionais para que todo rastro anterior permaneça válido, mas o escritor comum inclui as duas chaves em cada linha nova. `EXPX_MODEL` e `EXPX_EFFORT`, quando fornecidos pelo runtime, têm prioridade.
+`model` e `effort` são uma extensão aditiva do v1: continuam opcionais para que todo rastro anterior permaneça válido. O escritor comum inclui as duas chaves em cada linha que ele próprio grava; `EXPX_MODEL` e `EXPX_EFFORT`, quando fornecidos pelo runtime, têm prioridade.
+
+Escritores próprios das skills não passam automaticamente pelo gravador comum. Hoje `scripts/rastro.sh`, `scripts/planejamento.sh` e `scripts/bloqueios.sh` da SprintX ainda omitem `model`/`effort`; essas linhas são válidas e aparecem como **sem snapshot** até o escritor ser atualizado no fork de origem.
 
 Fora do OpenCode, o fallback para subagentes é o frontmatter instalado em `.claude/agents/<agente>.md`. No OpenCode esse arquivo não determina a execução: sem metadado explícito do runtime, as duas chaves saem `null`, em vez de atribuir ao evento uma configuração Claude que ele pode não ter usado.
 
-Uma chave presente com `null` registra que o escritor tentou capturar o dado e o runtime não o informou — caso normal de `principal` sem metadado explícito. A ausência da chave identifica uma linha legada; leitores podem consultar a configuração instalada atual, desde que a rotulem como fallback e nunca como evidência histórica.
+Uma chave presente com `null` registra que o escritor tentou capturar o dado e o runtime não o informou — caso normal de `principal` sem metadado explícito. A ausência identifica uma linha **sem snapshot**, seja antiga ou emitida por outro escritor. O leitor só pode usar a configuração atual como fallback quando o evento não identifica outro harness; caso contrário, informa histórico indisponível.
 
 Quem valida uma linha verifica que as doze estão **contidas** nela — nunca igualdade exata de conjunto. Um validador de igualdade estrita reprova as skills que usam extras legítimas, e foi assim que a verificação da `runx` passou a reprovar toda linha da `mergex` e da `legadox`.
 
@@ -171,7 +173,7 @@ Rotação: acima de 5 MB, o arquivo vira `<trabalho_id>.1.jsonl` e um novo come�
 
 - Linha do tempo do trabalho: cada fase, cada task, quanto tempo levou
 - **Quem fez o quê**: filtro por agente, com o que cada um tocou e que veredito emitiu
-- **Com qual configuração**: `model` e `effort` do evento como histórico; configuração instalada atual apenas como fallback rotulado para linhas legadas
+- **Com qual configuração**: `model` e `effort` do evento como histórico; sem snapshot, configuração atual apenas quando o evento não identifica outro harness, ou histórico indisponível
 - Violações de regra em modo aviso, que é a lista que decide quais hooks promover a bloqueio
 - Ações bloqueadas, para ver se algum hook está atrapalhando mais que ajudando
 - Duração real por task, que alimenta a calibração de estimativa do `sprintx`

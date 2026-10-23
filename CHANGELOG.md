@@ -2,8 +2,8 @@
 
 ## Próxima versão — histórico de modelo e esforço
 
-- Registra `model` e `effort` em cada evento novo, com prioridade para metadados explícitos do runtime e fallback para o agente instalado.
-- Mantém rastros anteriores válidos e rotula a configuração instalada atual como fallback, sem convertê-la em evidência histórica.
+- Faz o gravador comum registrar `model` e `effort` em cada evento que emite, com prioridade para metadados explícitos do runtime e fallback para o agente instalado.
+- Mantém eventos sem snapshot válidos; a configuração atual só vira fallback quando o evento não identifica outro harness, e nos demais casos o painel informa que o histórico está indisponível.
 - Aceita identificadores de modelos de qualquer provedor, preparando o rastro para a futura orquestração multimodelo sem acoplá-lo à seleção.
 
 ## 0.12.0 — rastro e configuração de agentes no painel
