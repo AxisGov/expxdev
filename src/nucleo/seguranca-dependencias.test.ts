@@ -26,6 +26,14 @@ function peloMenos(atual: string, piso: string): boolean {
   return true;
 }
 
+function versoesInstaladas(em: Lock, nome: string): string[] {
+  const sufixo = `node_modules/${nome}`;
+  return Object.entries(em.packages)
+    .filter(([caminho]) => caminho === sufixo || caminho.endsWith(`/${sufixo}`))
+    .map(([, instalado]) => instalado.version)
+    .filter((versao): versao is string => versao !== undefined);
+}
+
 describe("pisos corrigidos das dependências auditadas", () => {
   const pisos = [
     ["vite", "8.2.4"],
@@ -35,9 +43,22 @@ describe("pisos corrigidos das dependências auditadas", () => {
   ] as const;
 
   it.each(pisos)("%s fica fora das faixas vulneráveis", (nome, piso) => {
-    const instalado = lock.packages[`node_modules/${nome}`]?.version;
-    expect(instalado, `${nome} precisa constar no lockfile`).toBeDefined();
-    expect(peloMenos(instalado as string, piso), `${nome}@${instalado} < ${piso}`).toBe(true);
+    const instaladas = versoesInstaladas(lock, nome);
+    expect(instaladas.length, `${nome} precisa constar no lockfile`).toBeGreaterThan(0);
+    for (const instalada of instaladas) {
+      expect(peloMenos(instalada, piso), `${nome}@${instalada} < ${piso}`).toBe(true);
+    }
+  });
+
+  it("varre também cópias aninhadas no lockfile", () => {
+    const artificial = {
+      packages: {
+        "node_modules/vite": { version: "8.3.5" },
+        "node_modules/ferramenta/node_modules/vite": { version: "8.2.3" },
+      },
+    } satisfies Lock;
+    const vulneraveis = versoesInstaladas(artificial, "vite").filter((versao) => !peloMenos(versao, "8.2.4"));
+    expect(vulneraveis).toEqual(["8.2.3"]);
   });
 
   it("os intervalos diretos também começam nas versões corrigidas", () => {
