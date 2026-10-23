@@ -19,11 +19,26 @@ import { lerCauda } from "./cauda.js";
 /** Quantas linhas o watch exibe por padrão (decisão D-09). */
 export const LINHAS_PADRAO = 10;
 
+/**
+ * O id vem de frontmatter e acaba compondo um nome de arquivo. Ele pode ter
+ * pontuação legítima, mas nunca pode escolher outro diretório — nem no POSIX,
+ * nem no Windows.
+ */
+function idDeArquivoSeguro(trabalhoId: string): boolean {
+  return trabalhoId.length > 0
+    && trabalhoId !== "."
+    && trabalhoId !== ".."
+    && !/[\\/]/.test(trabalhoId)
+    && !trabalhoId.includes("\0");
+}
+
 export function lerRastro(
   raizProjeto: string,
   trabalhoId: string,
   limite: number = LINHAS_PADRAO,
 ): LinhaEvento[] {
+  if (!idDeArquivoSeguro(trabalhoId)) return [];
+
   const dir = join(raizProjeto, "docs", "eventos");
 
   // corrente primeiro, rotacionado depois: os dois já vêm em ordem

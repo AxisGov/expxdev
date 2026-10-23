@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { lerRastro } from "./rastro.js";
 
 /**
@@ -52,5 +55,21 @@ describe("leitor do rastro", () => {
 
   it("funcional: respeita o limite de linhas pedido", () => {
     expect(lerRastro(RAIZ + "/com-estado", "exportacao-csv", 3).length).toBe(3);
+  });
+
+  it("segurança: o id do trabalho não pode sair de docs/eventos", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-rastro-limite-"));
+    try {
+      mkdirSync(join(raiz, "docs", "eventos"), { recursive: true });
+      writeFileSync(
+        join(raiz, "docs", "segredo.jsonl"),
+        '{"ts":"2026-08-29T14:32:00Z","expx_eventos":1,"trabalho_id":"segredo","ferramenta":"sprintx","origem":"agente","evento":"task_iniciada","fase":"f6","task":"T-01.01","agente":"principal","resultado":"ok","detalhe":"não expor","arquivos":[]}\n',
+      );
+
+      expect(lerRastro(raiz, "../segredo")).toEqual([]);
+      expect(lerRastro(raiz, "..\\segredo")).toEqual([]);
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
   });
 });

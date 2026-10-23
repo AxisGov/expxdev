@@ -160,12 +160,18 @@ function LinhaDoTempo({
 }): JSX.Element {
   const recentes = eventos.slice(0, 30);
   return (
-    <details className="painel-det" open={eventos.length > 0}>
+    <details className="painel-det" open={branch !== null || eventos.length > 0}>
       <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 560 }}>
         Rastro de execução
         <span className="dep">
-          {" "}· {eventos.length} evento(s)
-          {eventos.length > recentes.length ? ` · últimos ${recentes.length}` : ""}
+          {branch !== null ? (
+            " · histórico fora do checkout ativo"
+          ) : (
+            <>
+              {" "}· {eventos.length} evento(s)
+              {eventos.length > recentes.length ? ` · últimos ${recentes.length}` : ""}
+            </>
+          )}
         </span>
       </summary>
       {branch !== null ? (

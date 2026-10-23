@@ -199,19 +199,56 @@ describe("detalhe do trabalho", () => {
   });
 
   it("funcional: plano com defeito estrutural abre expandido e diz o motivo", () => {
-    // `projeto-ruim` tem violacoes de dependencia no plano; o bloco do grafo
-    // nao pode ficar recolhido justo no caso em que o grafo e a resposta.
+    const original = ok.trabalhos.find((item) => item.trabalho_id === "exportacao-csv");
+    expect(original).toBeDefined();
+    const defeituoso = {
+      ...original!,
+      sprints: original!.sprints.map((sprint, indiceSprint) => ({
+        ...sprint,
+        tasks: sprint.tasks.map((task, indiceTask) =>
+          indiceSprint === 0 && indiceTask === 0
+            ? { ...task, depende_de: ["T-INEXISTENTE"] }
+            : task,
+        ),
+      })),
+    };
+    const estado: Estado = {
+      ...ok,
+      trabalhos: ok.trabalhos.map((item) =>
+        item.trabalho_id === defeituoso.trabalho_id ? defeituoso : item,
+      ),
+    };
     const { container } = render(
-      <Detalhe estado={ruim} id="violacoes" aoVoltar={() => undefined} />,
+      <Detalhe estado={estado} id="exportacao-csv" aoVoltar={() => undefined} />,
     );
     const bloco = [...container.querySelectorAll("details")].find((item) =>
       item.querySelector("summary")?.textContent?.includes("Grafo de dependências"),
     ) ?? null;
-    if (bloco === null) return; // trabalho sem task: nao ha grafo, nada a afirmar
-    expect(bloco.hasAttribute("open")).toBe(true);
-    expect(bloco.querySelector("summary")?.textContent ?? "").toMatch(
+    expect(bloco).not.toBeNull();
+    expect(bloco?.hasAttribute("open")).toBe(true);
+    expect(bloco?.querySelector("summary")?.textContent ?? "").toMatch(
       /ciclo|inexistente|paralelismo/,
     );
+  });
+
+  it("funcional: trabalho de outra branch abre o aviso em vez de anunciar zero eventos", () => {
+    const estado: Estado = {
+      ...ok,
+      trabalhos: ok.trabalhos.map((item) =>
+        item.trabalho_id === "exportacao-csv" ? { ...item, branch: "feature/x" } : item,
+      ),
+    };
+    const { container } = render(
+      <Detalhe estado={estado} id="exportacao-csv" aoVoltar={() => undefined} />,
+    );
+    const bloco = [...container.querySelectorAll("details")].find((item) =>
+      item.querySelector("summary")?.textContent?.includes("Rastro de execução"),
+    ) ?? null;
+
+    expect(bloco).not.toBeNull();
+    expect(bloco?.hasAttribute("open")).toBe(true);
+    expect(bloco?.querySelector("summary")?.textContent).toContain("histórico fora do checkout ativo");
+    expect(screen.getByText(/não está no checkout ativo/)).toBeDefined();
   });
 
   it("funcional: plano sem defeito vem recolhido, para não empurrar o plano para baixo", () => {

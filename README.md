@@ -531,9 +531,19 @@ O `expxdev` publicado no npm é de outro autor: `npx expxdev` instala o CLI dele
 repositório. A linha AxisGov não executa `npm publish`. Como o `dist/` não é versionado, use o
 pacote certificado de uma GitHub Release SemVer explícita:
 
+Requisitos para os comandos abaixo: Node ≥ 20.19.0, `git`, GitHub CLI (`gh`) autenticado e
+`sha256sum` (Linux) ou `shasum` (macOS) para conferir o pacote antes de executá-lo.
+
 ```bash
 gh release download v0.12.0 -R AxisGov/expxdev -D ~/expx-cli/v0.12.0
-(cd ~/expx-cli/v0.12.0 && sha256sum -c expxdev-0.12.0.tgz.sha256)
+(
+  cd ~/expx-cli/v0.12.0
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum -c expxdev-0.12.0.tgz.sha256
+  else
+    shasum -a 256 -c expxdev-0.12.0.tgz.sha256
+  fi
+)
 npx --yes --package ~/expx-cli/v0.12.0/expxdev-0.12.0.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
