@@ -269,10 +269,11 @@ ou escrever uma sexta amanhã.
 | Contrato | O que padroniza | Quem escreve | Quem lê hoje |
 |---|---|---|---|
 | **[`expx-schema` v1](docs/contrato/CONTRATO-expx-schema-v1.md)** | o frontmatter YAML de todo arquivo de estado — plano, tasks, bloqueios, QA, relatórios | as skills | **o painel** |
-| **[`expx-eventos` v1](docs/contrato/CONTRATO-expx-eventos.md)** | o rastro append-only `docs/eventos/<trabalho_id>.jsonl`, e o comportamento de hooks e agentes | as skills e os hooks | as próprias skills e o `doctor` de cada uma |
+| **[`expx-eventos` v1](docs/contrato/CONTRATO-expx-eventos.md)** | o rastro append-only `docs/eventos/<trabalho_id>.jsonl`, e o comportamento de hooks e agentes | as skills e os hooks | as próprias skills, o `doctor` e **o painel** |
 
-> O painel desta versão lê **apenas o `expx-schema`** — o estado. A leitura do rastro de
-> eventos está especificada no contrato e ainda não implementada no painel.
+> O painel lê os dois sem escrever em nenhum: usa o `expx-schema` para o estado e o
+> `expx-eventos` para a linha do tempo. A configuração atual de modelo/esforço vem do
+> frontmatter dos agentes que o `init` efetivamente instalou.
 
 **O estado responde "onde está"; o rastro responde "o que aconteceu e quando".**
 
@@ -400,12 +401,13 @@ npx expxdev init --skills sprintx,runx,mergex --harness claude,opencode --yes
 
 Todas aceitam também a forma `--flag=valor`.
 
-**Sem terminal interativo e sem `--yes`**, o `init` imprime o que instalaria e sai **sem
-escrever nada** — é o modo de simulação, e é o que protege um CI de escrever por engano.
+**Num terminal**, `init` sem `--skills` abre a seleção interativa: skills, harness,
+instalação do painel e confirmação final. Flags já informadas pulam apenas a pergunta
+correspondente.
 
-> A seleção interativa — escolher as skills numa lista, em vez de digitá-las — está planejada
-> e ainda não implementada; o plano vive em [`docs/selecao-interativa-init/`](docs/selecao-interativa-init/).
-> Hoje o `init` não faz nenhuma pergunta: com `--yes` ou com TTY, ele aplica direto.
+**Sem terminal**, as skills precisam vir em `--skills`. Com a seleção por flags e sem
+`--yes`, o `init` imprime o que instalaria e sai **sem escrever nada** — é o modo de
+simulação que protege o CI de uma instalação acidental.
 
 ---
 
@@ -529,10 +531,20 @@ O `expxdev` publicado no npm é de outro autor: `npx expxdev` instala o CLI dele
 repositório. A linha AxisGov não executa `npm publish`. Como o `dist/` não é versionado, use o
 pacote certificado de uma GitHub Release SemVer explícita:
 
+Requisitos para os comandos abaixo: Node ≥ 20.19.0, `git`, GitHub CLI (`gh`) autenticado e
+`sha256sum` (Linux) ou `shasum` (macOS) para conferir o pacote antes de executá-lo.
+
 ```bash
-gh release download v0.11.1 -R AxisGov/expxdev -D ~/expx-cli/v0.11.1
-(cd ~/expx-cli/v0.11.1 && sha256sum -c expxdev-0.11.1.tgz.sha256)
-npx --yes --package ~/expx-cli/v0.11.1/expxdev-0.11.1.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+gh release download v0.12.0 -R AxisGov/expxdev -D ~/expx-cli/v0.12.0
+(
+  cd ~/expx-cli/v0.12.0
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum -c expxdev-0.12.0.tgz.sha256
+  else
+    shasum -a 256 -c expxdev-0.12.0.tgz.sha256
+  fi
+)
+npx --yes --package ~/expx-cli/v0.12.0/expxdev-0.12.0.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -541,7 +553,7 @@ npx --yes --package ~/expx-cli/v0.11.1/expxdev-0.11.1.tgz expx init --skills bui
 - O preflight recusa divergência entre `package.json`, `package-lock.json` e metadata do tarball,
   bem como tag ou release já existente. O pacote é gerado duas vezes e os hashes devem coincidir.
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.11.1 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.12.0 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -555,6 +567,8 @@ npx --yes --package ~/expx-cli/v0.11.1/expxdev-0.11.1.tgz expx init --skills bui
 - `0.11.1` corrige as dependências vulneráveis e migra o runtime das GitHub Actions oficiais
   para Node.js 24, mantém Node.js 20.19 como piso suportado pelo produto e elimina as colisões
   de agentes na instalação simultânea das nove skills.
+- `0.12.0` acrescenta ao painel a linha do tempo do rastro e mostra, sem assumir valor
+  histórico, a configuração atual de modelo e esforço dos agentes instalados.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -679,19 +693,29 @@ npx expxdev panel
 ```
 
 Lê a pasta `docs/` do projeto, descobre os trabalhos gravados pelas skills e mostra no
-navegador o que foi planejado, o que está em execução, o que travou e o histórico do que já foi
-entregue. Ele lê o **estado** gravado sob o contrato `expx-schema`: o frontmatter YAML de cada
-arquivo de plano, task, bloqueio, QA e relatório.
+navegador o que foi planejado, o que aconteceu, o que está em execução, o que travou e o
+histórico do que já foi entregue. O estado vem do frontmatter YAML sob o `expx-schema`;
+a atividade vem do JSONL append-only sob o `expx-eventos`; modelo e esforço atuais vêm dos
+agentes instalados em `.claude/agents/`.
 
 **Somente leitura, e não só por convenção.** Qualquer requisição que não seja `GET` recebe
 `405` com a mensagem `o painel e somente leitura`. O servidor escuta exclusivamente em
 `127.0.0.1` — o host é constante no código, sem flag, opção ou variável de ambiente que mude
 isso.
 
-Ele observa o `docs/` e atualiza sozinho: quando um arquivo muda, o navegador recebe o estado
+Ele observa os arquivos relevantes e atualiza sozinho: quando um deles muda, o navegador recebe
 novo por websocket, sem recarregar a página. A cada mudança o projeto é **relido inteiro**, não
 em pedaços — as regras de conformidade cruzam referências entre arquivos, e uma leitura parcial
 produziria violação falsa.
+
+O painel é uma **projeção descartável**, não outro motor do método:
+
+- dependência e paralelismo pertencem ao plano escrito por `sprintx` ou `runx`;
+- início, conclusão, bloqueio e agente pertencem ao rastro escrito pelas skills e hooks;
+- modelo e esforço pertencem ao agente materializado pelo `init`, já com o override do projeto.
+
+Se o painel for removido, nada da execução muda. Ele não reimplementa o orquestrador, não
+escolhe qual agente roda e não acrescenta campos ao contrato dos nove projetos.
 
 ### O que ele reconhece
 
@@ -707,6 +731,13 @@ Além do estado, o painel lê o índice da [`memox`](#a-memória-do-projeto), qu
 o mostra na seção **Memória** — o que já se sabe sobre cada arquivo antes de alguém mexer nele.
 Ele **não** observa `.expx/`: é lá que o índice é gravado, e observá-lo faria a reindexação
 realimentar a recarga da tela sem dado novo nenhum.
+
+No detalhe há também uma linha do tempo dos eventos válidos, incluindo fase, task, agente,
+resultado e detalhe. Quando o agente instalado declara `model` e `effort`, o painel mostra
+essa configuração ao lado da atividade e no nó da task. Esse valor é rotulado como
+**configuração atual**: o `expx-eventos` v1 registra o agente, mas não registra qual modelo
+executou aquela linha no passado. O painel não transforma configuração presente em evidência
+histórica.
 
 No detalhe de cada trabalho há o [grafo do plano](#o-grafo-do-plano), desenhado na própria
 tela. Ele é **interativo**: passar o mouse num nó apaga tudo que não é vizinho dele, clicar
@@ -849,9 +880,10 @@ src/
   harness/    configuração de Claude Code e OpenCode, merge de settings, backup
   doctor/     os verificadores e o efeito de cada achado
   update/     comparação com o lock, detecção de modificação local, compatibilidade de schema
-  parser/     leitura do expx-schema — frontmatter, kinds, enums, descoberta e conformidade
-              e a leitura do índice da memox (memoria/), com falha aberta
-  servidor/   o painel: HTTP, websocket e o observador de arquivos (somente leitura)
+  parser/     leitura do expx-schema e expx-eventos — frontmatter, JSONL, descoberta,
+              conformidade e índice da memox, sempre com falha aberta
+  servidor/   projeções do painel: HTTP, websocket, rastro e configuração instalada
+              dos agentes (somente leitura)
   cli/        linha de comando: roteamento de subcomando, flags e seleção interativa
 ui/           a interface do painel (React + Vite)
 docs/contrato/  os dois contratos compartilhados pelas nove skills

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.0 — rastro e configuração de agentes no painel
+
+- Projeta no detalhe do trabalho a linha do tempo do contrato `expx-eventos`, reutilizando o leitor do terminal.
+- Anota o grafo vivo com o agente observado e a configuração atual de modelo/esforço instalada pelo `init`.
+- Mantém plano, eventos e agentes como fontes de verdade externas ao painel: nenhuma decisão de execução é duplicada.
+- Corrige no README a documentação da seleção interativa já implementada.
+
 ## 0.11.1 — segurança, Actions Node 24 e instalação completa
 
 - Atualiza Vite para 8.3.5, Vitest e `@vitest/mocker` para 4.1.12 e `source-map-js` para 1.2.2.

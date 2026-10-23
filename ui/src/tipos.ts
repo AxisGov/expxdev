@@ -192,6 +192,34 @@ export type Memoria = {
   modulos: ModuloMemoria[];
 };
 
+/** Linha já validada do contrato expx-eventos v1. */
+export type Evento = {
+  ts: string;
+  expx_eventos: 1;
+  trabalho_id: string;
+  ferramenta: string;
+  origem: "hook" | "skill" | "agente";
+  evento: string;
+  fase: string | null;
+  task: string | null;
+  agente: string;
+  resultado: string;
+  detalhe: string;
+  arquivos: string[];
+  hook?: string | null;
+  faixa?: string | null;
+  sessao?: string | null;
+  harness?: string | null;
+};
+
+/** Configuração efetiva lida do agente instalado pelo `init`. */
+export type ConfiguracaoAgente = {
+  nome: string;
+  model: string | null;
+  effort: string | null;
+  arquivo: string;
+};
+
 export type Estado = {
   raiz: string;
   trabalhos: Trabalho[];
@@ -199,6 +227,8 @@ export type Estado = {
   historico: EntradaHistorico[];
   rejeicoes: Rejeicao[];
   violacoes: Violacao[];
+  eventos: Record<string, Evento[]>;
+  agentes: ConfiguracaoAgente[];
   /** `null` quando não há índice de memória — o caso comum num clone (D-02). */
   memoria: Memoria | null;
   lido_em: string;

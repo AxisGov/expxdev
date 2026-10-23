@@ -33,6 +33,16 @@ grep -Fq 'node scripts/ci/preparar-release.mjs' "$release" || falha 'workflow n�
 grep -Fq 'gh release create' "$release" || falha 'workflow não publica a GitHub Release validada'
 ! grep -R -E -n 'npm[[:space:]]+publish' "$raiz/.github/workflows" \
   || falha 'workflow não pode publicar no npm'
+grep -Fq 'GitHub CLI (`gh`) autenticado' "$raiz/README.md" \
+  || falha 'README não declara o GitHub CLI como requisito da instalação'
+grep -Fq 'shasum -a 256 -c' "$raiz/README.md" \
+  || falha 'README não oferece verificação de checksum no macOS'
+grep -Fq 'GitHub CLI' "$raiz/docs-site/index.html" \
+  || falha 'site não declara o GitHub CLI como requisito da instalação'
+[ "$(grep -Fc 'tgz.sha256' "$raiz/docs-site/index.html")" -ge 2 ] \
+  || falha 'algum exemplo do site executa o tarball sem checksum'
+grep -Fq 'shasum</span>' "$raiz/docs-site/index.html" \
+  || falha 'site não oferece verificação de checksum no macOS'
 
 prepare_block="$(sed -n '/^  prepare:/,/^  publish:/p' "$release")"
 publish_block="$(sed -n '/^  publish:/,$p' "$release")"

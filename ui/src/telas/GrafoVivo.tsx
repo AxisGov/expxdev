@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type JSX, type PointerEvent, type WheelEvent } from "react";
-import type { Trabalho } from "../tipos.js";
+import type { ConfiguracaoAgente, Evento, Trabalho } from "../tipos.js";
 import { topologiaDeTasks, type No, type Topologia } from "../../../src/grafo/topologia.js";
 
 /**
@@ -19,7 +19,7 @@ import { topologiaDeTasks, type No, type Topologia } from "../../../src/grafo/to
  */
 
 const CAIXA_L = 190;
-const CAIXA_A = 52;
+const CAIXA_A = 66;
 const ESPACO_X = 38;
 const ESPACO_Y = 44;
 const MARGEM = 20;
@@ -72,11 +72,35 @@ function corDoNo(no: No, apagado: boolean): string {
   return "var(--vscode-panel-border)";
 }
 
+function configuracao(
+  agente: string,
+  agentes: readonly ConfiguracaoAgente[],
+): ConfiguracaoAgente | undefined {
+  return agentes.find((item) => item.nome === agente);
+}
+
+/** O evento delegado mais recente por task; na ausência dele, o evento mais recente. */
+function eventosPorTask(eventos: readonly Evento[]): Map<string, Evento> {
+  const mapa = new Map<string, Evento>();
+  for (const evento of eventos) {
+    if (evento.task === null) continue;
+    const atual = mapa.get(evento.task);
+    if (atual === undefined || (atual.agente === "principal" && evento.agente !== "principal")) {
+      mapa.set(evento.task, evento);
+    }
+  }
+  return mapa;
+}
+
 export function GrafoVivo({
   trabalho,
+  eventos = [],
+  agentes = [],
   aoEscolherTask,
 }: {
   trabalho: Trabalho;
+  eventos?: readonly Evento[];
+  agentes?: readonly ConfiguracaoAgente[];
   /** Chamado ao clicar num nó — a tela rola até a task no plano abaixo. */
   aoEscolherTask?: (id: string) => void;
 }): JSX.Element | null {
@@ -87,6 +111,7 @@ export function GrafoVivo({
   const arraste = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
 
   const tasks = useMemo(() => trabalho.sprints.flatMap((s) => s.tasks), [trabalho]);
+  const atividadePorTask = useMemo(() => eventosPorTask(eventos), [eventos]);
 
   // A topologia é recalculada quando as tasks mudam — e elas mudam sozinhas,
   // porque o websocket substitui o estado inteiro a cada gravação da skill.
@@ -292,6 +317,13 @@ export function GrafoVivo({
                 no.paralela_suspeita ? "paralela?" : null,
               ].filter((x): x is string => x !== null);
 
+              const atividade = atividadePorTask.get(no.id);
+              const agente = atividade?.agente;
+              const cfg = agente === undefined ? undefined : configuracao(agente, agentes);
+              const execucao = agente === undefined
+                ? null
+                : [agente, cfg?.model, cfg?.effort].filter(Boolean).join(" · ");
+
               return (
                 <g
                   key={no.id}
@@ -304,6 +336,7 @@ export function GrafoVivo({
                   <title>
                     {no.id} — {no.titulo}
                     {marcas.length > 0 ? ` (${marcas.join(", ")})` : ""}
+                    {execucao ? ` — ${execucao} (configuração atual)` : ""}
                   </title>
                   <rect
                     x={p.x}
@@ -342,6 +375,16 @@ export function GrafoVivo({
                   >
                     {[no.fase, ...marcas].join(" · ")}
                   </text>
+                  {execucao ? (
+                    <text
+                      x={p.x + 11}
+                      y={p.y + 58}
+                      fill="var(--vscode-charts-blue)"
+                      style={{ font: "400 9px var(--mono)" }}
+                    >
+                      {encurtar(execucao, 31)}
+                    </text>
+                  ) : null}
                 </g>
               );
             })}
