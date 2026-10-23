@@ -1,6 +1,6 @@
 # Changelog
 
-## Próxima versão — rastro e configuração de agentes no painel
+## 0.12.0 — rastro e configuração de agentes no painel
 
 - Projeta no detalhe do trabalho a linha do tempo do contrato `expx-eventos`, reutilizando o leitor do terminal.
 - Anota o grafo vivo com o agente observado e a configuração atual de modelo/esforço instalada pelo `init`.
