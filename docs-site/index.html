@@ -129,7 +129,7 @@
   <div class="cartoes">
     <div class="cartao"><div class="cartao__num">9</div><div class="cartao__rot">skills no catálogo</div></div>
     <div class="cartao"><div class="cartao__num">8</div><div class="cartao__rot">subcomandos do CLI</div></div>
-    <div class="cartao"><div class="cartao__num">1498</div><div class="cartao__rot">testes aprovados</div></div>
+    <div class="cartao"><div class="cartao__num">1510</div><div class="cartao__rot">testes aprovados</div></div>
     <div class="cartao"><div class="cartao__num">30</div><div class="cartao__rot">verificações do doctor</div></div>
   </div>
 
@@ -2241,9 +2241,9 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
   (o snapshot daquela execução). O gravador comum inclui <code>model</code>/<code>effort</code> nas linhas que
   ele escreve; os escritores próprios da SprintX ainda os omitem e, por isso, aparecem como <strong>sem
   snapshot</strong>. O runtime explícito tem prioridade para qualquer harness. Somente no contexto Claude
-  (<code>claude</code>, <code>claude-code</code> ou evento legado sem harness) o gravador comum pode usar
-  como fallback o frontmatter instalado. Codex, OpenCode e qualquer outro harness sem metadado explícito
-  gravam <code>null</code>, em vez de receber uma configuração Claude. Uma chave presente com <code>null</code> registra dado não informado;
+  (<code>EXPX_HARNESS</code> igual a <code>claude</code> ou <code>claude-code</code> ou, sem ele,
+  <code>CLAUDECODE</code> presente) o gravador comum pode usar como fallback o frontmatter instalado. Codex,
+  OpenCode, runtime sem nenhum desses sinais e qualquer outro harness sem metadado explícito gravam <code>null</code>, em vez de receber uma configuração Claude. Uma chave presente com <code>null</code> registra dado não informado;
   uma chave <strong>ausente</strong> significa sem snapshot. Permitidas, mas não indiferentes:
   <code>sessao</code> e <code>harness</code> são <strong>obrigatórias</strong> somente quando a ferramenta é
   SprintX e o evento é <code>task_iniciada</code>, <code>task_concluida</code> ou <code>task_bloqueada</code>.
@@ -2506,8 +2506,8 @@ docs/contrato/  <span class="tok-com">os contratos compartilhados pelas nove ski
   </div>
 
   <div class="cartoes">
-    <div class="cartao"><div class="cartao__num">1498</div><div class="cartao__rot">testes aprovados</div></div>
-    <div class="cartao"><div class="cartao__num">140</div><div class="cartao__rot">arquivos aprovados</div></div>
+    <div class="cartao"><div class="cartao__num">1510</div><div class="cartao__rot">testes aprovados</div></div>
+    <div class="cartao"><div class="cartao__num">143</div><div class="cartao__rot">arquivos aprovados</div></div>
     <div class="cartao"><div class="cartao__num">4</div><div class="cartao__rot">projetos no runner</div></div>
     <div class="cartao"><div class="cartao__num">0</div><div class="cartao__rot">testes que dependem de rede</div></div>
   </div>
