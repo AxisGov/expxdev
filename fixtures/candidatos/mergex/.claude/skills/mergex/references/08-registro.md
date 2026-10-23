@@ -15,6 +15,7 @@ Ao longo do trabalho, sempre no mesmo arquivo — e **nunca recriado do zero**:
 | Abertura da branch | E0 | `aberto` |
 | A cada task commitada | E1 | `aberto`, com a lista `commits` crescendo |
 | Retomada depois de replanejamento | E0 | volta a `aberto`, **preservando** `commits` e `criado_em` (`00-abertura.md`) |
+| Abertura da sprint seguinte | E0 `--sprint <NN>` | fixa `sprint_atual`, acrescenta o item em `prs`, reancora a base e volta o PR de topo a `null`; só depois do merge registrado da anterior |
 | Fim do fluxo | E8 | `entregue` ou `bloqueado` — os dois são persistidos por commit |
 | Base integrada depois do E8 | `reconciliacao-base.sh --registrar` (`references/11-reconciliacao-base.md`) | volta a `aberto`, com `portao: null` e `portao_sha: null`; `base_validada_sha` passa ao `b1_sha` registrado e `reconciliacoes` ganha o item; **preserva** `commits`, `criado_em`, `pr_url`, `pr_estado` e `desvios`. Persistido pelo checkpoint `reconciliacao-base` |
 
@@ -45,8 +46,9 @@ o que segue é o que você precisa para gravar. As regras universais valem todas
 | `estado` | `aberto` \| `entregue` \| `bloqueado` |
 | `portao` | `pronto` \| `bloqueado` \| `null` (ainda não rodou) |
 | `pr_estado` | `rascunho` \| `aberto` \| `merged` \| `fechado` \| `null` |
-| `origem_base` | `registrada_e0` \| `inferida_legado` \| `null` (sem versionador) |
+| `origem_base` | `registrada_e0` \| `registrada_sprint` (DM-261) \| `inferida_legado` \| `null` (sem versionador) |
 | `tipo_trabalho` | `feature` \| `ocorrencia` |
+| `entrega` | `por_trabalho` \| `por_sprint` |
 | `raio` | `baixo` \| `medio` \| `alto` \| `null` (sem modo legado) |
 | `causa` | as dez causas de `references/00-schema.md` \| `indeterminada` \| `null` |
 
@@ -64,6 +66,7 @@ entregue_por: mergex
 titulo: Corrigir base de calculo do ICMS-ST com desconto incondicional
 tipo_trabalho: ocorrencia
 tipo_ocorrencia: regra-de-calculo
+entrega: por_trabalho
 estado: entregue
 versionado: true
 branch: fix/OC-2026-0184-icms-st-base-desconto
@@ -113,6 +116,7 @@ entregue_em: 2026-08-29
 | `trabalho_id` | O slug da sprintx ou o `<OC-ID>-<slug>` da runx. O mesmo da pasta de origem |
 | `entregue_por` | Sempre `mergex` |
 | `tipo_ocorrencia` | O tipo da runx; `null` quando `tipo_trabalho: feature` |
+| `entrega` | O modo efetivo que o E0 registrou; entrega antiga sem a chave é `por_trabalho`. O E8 preserva e nunca relê o plano |
 | `estado` | `aberto` no E0; `entregue` quando o fluxo completou; `bloqueado` quando o portão barrou |
 | `versionado` | `false` em repositório sem versionador |
 | `branch`, `branch_base` | `null` quando `versionado: false`. `branch_base` é a **base efetiva** determinada no E0 — inclusive quando informada pelo chamador; é ela que os diffs do E2, do E3 e do E4 usam |
@@ -121,8 +125,8 @@ entregue_em: 2026-08-29
 | `portao_sha` | O `HEAD` que o E2 avaliou, gravado com `portao` por `registrar-portao.sh`; o E8 o preserva. O commit `e8` é método de um pai no catálogo, e por isso não vence o portão |
 | `commits` | Um item por **fechamento de task em cada execução**, na ordem em que fecharam, cada um com a chave de ordem `seq` (`references/00-schema.md`, "A ordem de registro"); `[]` sem versionador. É histórico de execução: na retomada depois de replanejamento a lista é **preservada**, e um `task` id pode reaparecer com outro SHA (`01-commits.md`). O commit de artefatos de método não é task e **não entra aqui** — ele vai na prosa |
 | `modulo_afetado` | Os módulos que a entrega toca; copiado da skill de origem quando ela o declara |
-| `arquivos_alterados` | **O diff real** (`git diff --name-only <branch_base>...HEAD`), não a previsão do plano |
-| `faixa_atencao` | A faixa por arquivo do E3, no vocabulário do índice (`alta`/`media`/`baixa`); `[]` antes do E3 |
+| `arquivos_alterados` | **O diff real**, não a previsão do plano. Em `por_trabalho`, `git diff --name-only <branch_base>...HEAD`; em `por_sprint`, a união acumulada, sem repetição, desse diff em cada sprint |
+| `faixa_atencao` | A faixa por arquivo do E3, no vocabulário do índice (`alta`/`media`/`baixa`); `[]` antes do E3. Em `por_sprint`, acumula por caminho e a classificação da sprint atual substitui a anterior do mesmo arquivo |
 | `raio` | A faixa da legadox; `null` sem modo legado — **nunca invente uma faixa** |
 | `atencao` | As três contagens do E3; zeros quando o E3 não rodou |
 | `portao` | O resultado do E2 |
@@ -132,7 +136,43 @@ entregue_em: 2026-08-29
 | `push_feito` | Durante o E6, `true` afirma que a publicação executada até ali está sincronizada. **Ao encerrar o E8, `true` afirma que o HEAD final — o commit que carrega este registro — está em `origin/<branch>`**, e o E8 revalida isso; falhou a publicação final, vira `false` (ver "O que `push_feito` afirma") |
 | `pr_url` | A URL devolvida pelo E7; `null` quando o PR não foi aberto — **não é falha** |
 | `pr_estado` | `rascunho` na abertura normal; `aberto` quando o QA já aprovou; `merged`/`fechado` quando o E9 ou uma pessoa atualizarem |
+| `sprint_atual`, `prs` | Ver abaixo, "O PR da entrega atual". O E8 preserva a sprint fixada pelo E0 e registra URL/estado no item dela pelo escritor único |
 | `entregue_em` | A data em que o fluxo completou; `null` enquanto `estado` não for `entregue` |
+
+### O PR da entrega atual — planejamento ou sprint
+
+Leia a entrega com `entrega-de-planejamento.sh`. Quando ele disser
+`sprint_atual=planejamento` ou `sprint_atual=<NN>`, o E8 grava o PR no item que o E0 já registrou,
+**nunca numa sprint relida do plano**:
+
+```bash
+bash .claude/skills/mergex/scripts/entrega-de-planejamento.sh --registrar-pr \
+  --entrega docs/entregas/<trabalho_id>/ENTREGA.md \
+  --url "<pr_url do E7 | null>" \
+  --estado "<rascunho | aberto | aguardando_merge | null>"
+```
+
+O `url` é o `pr_url` do E7 (`null` quando o PR não abriu ou foi recusado). O estado é o estado
+real do PR; `aguardando_merge` vale quando ele está pronto e só espera o merge. O helper atualiza
+somente `url` e `estado` do item atual e recusa `merged`/`fechado`: quem registra o merge é só o
+E9 (`09-revisao.md`, DM-260 e DM-264). `sprint`, `merge_sha`, `merge`, `base_sha` e
+`sprint_atual` não mudam no E8. Depois de gravar, leia de novo: `sprint_atual` e `atual_estado`
+têm de ser os registrados; saída 2 é gravação errada, corrija antes do commit final.
+
+### O fato acumulado da entrega por sprint (DM-268)
+
+Antes de gravar o PR de uma entrega `por_sprint`, o E8 preserva o fato observado nas sprints
+anteriores. `arquivos_alterados` passa a ser a união ordenada, sem repetição, do valor existente
+com os caminhos do diff real da sprint atual. `faixa_atencao` é mesclada por `arquivo`: entradas
+que não reapareceram continuam; a classificação observada nesta sprint substitui a anterior do
+mesmo caminho. As contagens de `atencao` continuam descrevendo somente o PR atual.
+
+Isso não antecipa o fechamento: nas sprints intermediárias o memox e os artefatos finais continuam
+ausentes. Apenas conserva no `ENTREGA.md` os fatos necessários para que a última sprint indexe o
+trabalho inteiro, sem confundir mudanças alheias que chegaram pela main com arquivos do trabalho.
+
+Na entrega `por_trabalho` já retomada depois do planejamento, `sprint_atual: null`: o E8 mantém
+apenas `pr_url`/`pr_estado` de topo e não acrescenta item de sprint em `prs`.
 
 ## A prosa
 
@@ -147,6 +187,11 @@ Abaixo do frontmatter, use `assets/TEMPLATE-ENTREGA.md`. A prosa é para quem ab
 **O YAML e a prosa andam juntos.** Nunca atualize um sem o outro.
 
 ## Reindexação do memox — depois de gravar
+
+Na entrega `por_sprint`, esta seção roda **somente no E8 da última sprint**. Nas sprints
+intermediárias, não dispare o memox e não transforme isso em aviso: o trabalho ainda não fechou.
+Quem informa qual é a última sprint é o plano da sprintx que governa a F6; o E8 não a infere de
+`prs` nem relê `sprint_atual` do plano.
 
 O `ENTREGA.md` que você acabou de gravar é **fonte indexada** pelo memox: é dele que saem o
 histórico de faixa de atenção por arquivo e a lista do que a entrega de fato tocou. Um índice
@@ -175,8 +220,9 @@ Quatro regras:
 2. **Falha não bloqueia.** Código de saída diferente de zero, motor quebrado, `python3`
    ausente: registre o aviso ("reindexação do memox não concluída") e siga. O índice inteiro é
    derivado e reconstruível a qualquer momento com `/memox-indexar`; a entrega não depende dele.
-3. **Uma vez por entrega, no E8.** Não reindexe no E0, no E1 nem no E3 — o índice não muda a
-   cada commit, e reconstruí-lo a cada task seria custo sem informação nova.
+3. **Uma vez por trabalho, no E8 final.** Em `por_sprint`, só na última sprint. Não reindexe no
+   E0, no E1, no E3 nem nos E8 intermediários — o índice não muda a cada commit, e reconstruí-lo
+   a cada task ou sprint seria custo sem informação final nova.
 4. **A mergex não edita nada do memox.** Ela dispara a reconstrução e lê o resultado; o índice
    e a `config.json` são do projeto, e a `config.json` nunca é sobrescrita pela reconstrução.
 
@@ -186,6 +232,12 @@ milissegundos, e a entrega pode fechar muito antes de a sessão acabar — inclu
 que nunca chega ao `Stop`.
 
 ## O fechamento final — a entrega precisa sobreviver ao worktree
+
+Em `por_sprint`, cada E8 persiste o registro e os artefatos de método da sprint atual, mas os
+**artefatos de fim de trabalho** — `FECHAMENTO.md`, `HISTORICO.md`, `arquivos_alterados` do
+`ORQUESTRADOR.md` e o `kind: entrega` que o memox indexa — só existem e entram no PR da **última
+sprint** (DM-265). Uma sprint intermediária não os cria, não os reindexa e não os inclui por
+antecipação.
 
 O `ENTREGA.md` que você acabou de gravar só serve a quem vem depois se estiver **no histórico**.
 Quem integra a branch — a buildx num fast-forward, o E9, uma pessoa — integra **commits**, nunca
@@ -412,6 +464,7 @@ Terminado o E8, apresente na tela, curto:
 mergex — entrega concluída
 
 Trabalho: <trabalho_id>
+Sprint: <NN> | trabalho inteiro
 Branch: <branch> → <branch_base>
 Commits: <n> (um por task)
 Portão: PRONTO
@@ -437,7 +490,8 @@ Avisos: <lista, ou "nenhum">
 - [ ] Os avisos acumulados estão listados.
 - [ ] Nada foi sugerido sobre merge ou revisão.
 - [ ] `arquivos_alterados` veio do diff real; `faixa_atencao` bate com o `ATENCAO.md`.
-- [ ] Com o memox instalado, a reindexação foi disparada **depois** de gravar o `ENTREGA.md`.
+- [ ] Com o memox instalado, a reindexação foi disparada **depois** de gravar o `ENTREGA.md`,
+      somente na última sprint quando `entrega: por_sprint`.
 - [ ] Sem o memox instalado, nenhuma menção a ele — nem na saída, nem nos avisos.
 - [ ] `branch` e `pr_estado` voltaram a `null` no `.expx/estado.json`, e os campos das outras skills sobreviveram intactos. Este item nunca reprova o E8.
 - [ ] O fechamento final commitou os artefatos de método deste trabalho que ainda estavam sujos; `git status --porcelain` não lista nenhum artefato deste trabalho.

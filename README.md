@@ -129,8 +129,8 @@ painel que lê o que elas gravam.
 | **[legadox](https://github.com/AxisGov/legadox)** | **Camada** que endurece o trabalho em projetos legados. Não acrescenta fase: muda o *rigor* de cada uma, proporcional ao raio de impacto da mudança. | Mexer em código sem testes ou sem dono |
 | **[stackx](https://github.com/AxisGov/stackx)** | **Camada** que descobre o dialeto técnico do repositório — convenções, padrões e aderência — para o código novo parecer com o que já existe. | Entrar em base desconhecida |
 | **[mergex](https://github.com/AxisGov/mergex)** | Versionamento, entrega e revisão: branch, um commit por task, portão de prontidão, descrição de PR, pacote de QA e abertura do pull request. | Levar o trabalho pronto até o merge |
-| **[memox](https://github.com/bittencourtthulio/MemoX)** | **Camada** de memória: indexa os artefatos já fechados — relatórios, causas raiz, decisões, QA, entregas — e responde o que já se sabe sobre um arquivo antes de alguém mexer nele. | Saber se este arquivo já quebrou antes |
-| **[prodx](https://github.com/bittencourtthulio/prodx)** | **Camada** de produto: recebe o pedido cru, tria, verifica se o que foi pedido já existe e emite um veredito com evidência para assinatura humana. Três dos quatro vereditos encerram o pedido sem gerar código. | Decidir se vale fazer, antes de planejar |
+| **[memox](https://github.com/AxisGov/MemoX)** | **Camada** de memória: indexa os artefatos já fechados — relatórios, causas raiz, decisões, QA, entregas — e responde o que já se sabe sobre um arquivo antes de alguém mexer nele. | Saber se este arquivo já quebrou antes |
+| **[prodx](https://github.com/AxisGov/prodx)** | **Camada** de produto: recebe o pedido cru, tria, verifica se o que foi pedido já existe e emite um veredito com evidência para assinatura humana. Três dos quatro vereditos encerram o pedido sem gerar código. | Decidir se vale fazer, antes de planejar |
 | **[buildx](https://github.com/AxisGov/buildx)** | Orquestra um **projeto inteiro**, da descrição ao sistema pronto: mapeia o escopo completo, decide a stack e conduz `prodx` → `stackx` → `sprintx` → `mergex` feature a feature, recursivamente, até o fim. | Construir um sistema do zero, não uma feature isolada |
 | **[designx](https://github.com/AxisGov/designx)** | **Camada** de design: cartografa o design system do projeto e audita conformidade visual contra ele. | Garantir consistência visual quando o projeto tem UI |
 
@@ -796,7 +796,7 @@ Uma software house resolve o mesmo tipo de problema repetidamente. Bug de arredo
 faixa de peso hoje; bug parecido no cálculo de comissão em três meses. Quem lembra do primeiro
 resolve o segundo em vinte minutos — e quem não lembra não sabe que deveria perguntar.
 
-A [`memox`](https://github.com/bittencourtthulio/MemoX) resolve isso indexando o que as outras
+A [`memox`](https://github.com/AxisGov/MemoX) resolve isso indexando o que as outras
 skills já gravaram. Ela é um **índice invertido**, não uma busca semântica: a pergunta real não
 é "o que é parecido com isto", é "quem já mexeu neste arquivo e por quê" — e isso é uma string
 exata. Resposta de índice aponta artefato e data, então dá para abrir e conferir; recuperação
@@ -909,8 +909,8 @@ expxdev ·
 <a href="https://github.com/AxisGov/legadox">legadox</a> ·
 <a href="https://github.com/AxisGov/stackx">stackx</a> ·
 <a href="https://github.com/AxisGov/mergex">mergex</a> ·
-<a href="https://github.com/bittencourtthulio/MemoX">memox</a> ·
-<a href="https://github.com/bittencourtthulio/prodx">prodx</a> ·
+<a href="https://github.com/AxisGov/MemoX">memox</a> ·
+<a href="https://github.com/AxisGov/prodx">prodx</a> ·
 <a href="https://github.com/AxisGov/buildx">buildx</a> ·
 <a href="https://github.com/AxisGov/designx">designx</a></sub>
 </div>

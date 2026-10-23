@@ -28,9 +28,10 @@ A mergex procura **o canônico primeiro e o antigo como fallback**, em todas as 
 
 | Momento na sprintx | Etapa da mergex | O que acontece |
 |---|---|---|
-| Início da F6, **antes da primeira task** | **E0 ABERTURA** | Adota `feature/<slug>` e o worktree da F1 (ou cria a branch, se ela não existir), registra no `ORQUESTRADOR.md` e cria `docs/entregas/<slug>/ENTREGA.md` |
+| Fim da F5, com o plano aprovado e **commitado** | **E0–E8 com `--planejamento`** | O PR de planejamento: só os artefatos de método (`^docs/(sprintx\|entregas\|eventos)/`), merge do desenvolvedor. A F6 espera o merge ("PR de planejamento — no fim da F5") |
+| Início da F6, **antes da primeira task de cada sprint** | **E0 ABERTURA** | Adota `feature/<slug>` e o worktree da F1 (ou cria a branch, se ela não existir). Em `por_sprint`, a F6 passa `--sprint <NN>`; o E0 fixa a sprint e só abre a seguinte depois do merge registrado da anterior |
 | Ao fechar **cada** task (status `concluida`, `suite: parcial` ou `verde`) | **E1 COMMIT** | Um commit por task, com a mensagem no formato da mergex |
-| Fim da F6, com todas as tasks executadas | **pre-e2 → E2 → E8** | `persistir-metodo pre-e2`, portão, classificação, descrição do PR, pacote de QA, `pre-e6`, push, abertura do PR e `e8` |
+| Fim da F6, com todas as tasks executadas | **pre-e2 → E2 → E8** | Em `por_sprint`, roda ao fim de cada sprint e fecha o PR dela; o E9 continua manual, registra o merge, e só então a sprintx atualiza a branch a partir da main e começa a seguinte |
 | Fim da F6, com o portão **bloqueado** | **E2 → E8 (fechamento bloqueado)** | E3 a E7 **não executam**. O E8 grava `estado: bloqueado`, persiste o registro por commit e **não publica a branch**; o controle volta à sprintx com o que falta |
 
 Depois do E8, a mergex devolve o controle. **Ela não sugere o E9** (regra 16).
@@ -100,16 +101,42 @@ sprintx com o que falta. Se a feature for replanejada e a F6 rodar de novo, o E0
 `ENTREGA.md` que já existe em vez de recriá-lo, preservando `commits` e `criado_em`
 (`references/00-abertura.md`).
 
+### PR de planejamento — no fim da F5
+
+Vale em `por_sprint` e em `por_trabalho` (DM-259). Com o plano aprovado na F5:
+
+1. A sprintx **commita o planejamento** (a pasta `docs/sprintx/features/<slug>/`) antes de chamar
+   o E0: o E0 `--planejamento` recusa com artefato do planejamento sujo ou fora do índice, e a
+   mergex não amplia o catálogo de método para isso.
+2. A sprintx chama E0–E8 com `--planejamento`. O E2 marca V1, V2, V3, V11 e V12 `n/a` e roda a V9 com
+   `--planejamento`; o E7 recusa qualquer arquivo fora de `^docs/(sprintx|entregas|eventos)/` e não
+   mede L3 (`references/07-abertura-pr.md`); o E8 grava o PR no item de planejamento de `prs`.
+3. A sprintx registra o bloqueio `aguardando_merge` até o desenvolvedor mergear. **Nunca há merge
+   automático do PR de planejamento.** Se ele passar de 100 arquivos, o app de revisão pula a
+   revisão, e isso não é pendência.
+4. Depois do merge, o E9 registra o merge (`estado: merged`, `merge_sha`, `merge: humano`),
+   inclusive o feito pelo botão do serviço.
+5. A F6 da primeira sprint só começa depois disso, com a branch **atualizada a partir da main**, e
+   chama o E0 **sem** `--planejamento`, mas com `--sprint 01` quando o modo efetivo é
+   `por_sprint`: ele confere o merge registrado e a base e abre a 01. Em `por_trabalho`, faz a
+   retomada que volta `sprint_atual` a `null` (`references/00-abertura.md`, "Retomada depois do PR
+   de planejamento"). Nada de código entra antes disso.
+
 ### E0 — no início da F6
 
-A F6 começa lendo o `ORQUESTRADOR.md` e retomando o estado das tasks. A mergex roda **depois dessa leitura e antes da primeira task**, porque a branch precisa existir antes do primeiro commit.
+A F6 começa lendo o `ORQUESTRADOR.md` e retomando o estado das tasks. A mergex roda **depois dessa
+leitura e antes da primeira task**, porque a branch precisa existir antes do primeiro commit. Em
+`por_sprint`, a F6 passa o id fixo da sprint ao E0 (`--sprint 01`, `--sprint 02`, ...); nenhuma
+etapa posterior tenta descobrir de novo qual sprint está em execução.
 
 Dois casos, e os dois são normais:
 
 - **A F1 já abriu a branch e a sessão está dentro do worktree dela.** O E0 adota: não troca de branch, não cria outra e **não exige árvore limpa** — os artefatos de F1 a F5 estão ali, ainda não commitados, que é exatamente onde deveriam estar.
 - **Não há branch para este trabalho** (sem git na F1, "sem worktree" explícito, ou fluxo que não passou pela F1). O E0 cria `feature/<slug>` a partir da base, e aí sim a árvore precisa estar limpa.
 
-Sessão interrompida e retomada: o E0 encontra a branch existente e **adota ou retoma nela**, sem criar outra. A F6 continua de onde parou pelo `status` das tasks.
+Sessão interrompida e retomada: o E0 encontra a branch existente e **adota ou retoma nela**, sem
+criar outra. A F6 continua de onde parou pelo `status` das tasks e repassa a mesma `--sprint`; o E0
+trata isso como retomada, não acrescenta outro item em `prs`.
 
 Se a branch do trabalho estiver em uso por **outro** worktree, o E0 informa o caminho e encerra sem mexer em nada: o trabalho continua de dentro daquele diretório.
 
@@ -129,7 +156,16 @@ Os **artefatos de método do próprio trabalho** — a pasta `docs/sprintx/featu
 
 ### E2 a E8 — ao fim da F6
 
-Rodam quando a F6 termina: todas as tasks executadas, ou nada mais executável.
+Rodam quando a F6 termina: todas as tasks executadas, ou nada mais executável. Em `por_sprint`,
+"termina" aqui significa o fim da sprint atual: E2–E8 usam a `sprint_atual` que o E0 registrou.
+Depois do E8, o PR aguarda o comando manual E9; quando o desenvolvedor o mergeia, o E9 registra
+esse merge no item da sprint. A sprintx então **atualiza a branch a partir da main** e só depois
+chama o E0 com a sprint seguinte. PR ainda aberto, merge sem registro ou branch sem a main faz o E0
+recusar sem escrever.
+
+Os artefatos de fim de trabalho (`FECHAMENTO.md`, `HISTORICO.md`, `arquivos_alterados` do
+`ORQUESTRADOR.md` e a reindexação do `kind: entrega` pelo memox) ficam para a **última sprint**.
+Nos E8 intermediários entram apenas o registro e os artefatos da sprint atual.
 
 Antes do E2, a sprintx entrega explicitamente id/origem/`ENTREGA.md` à ação `persistir-metodo pre-e2`. A branch apenas confere `ENTREGA.branch`; nunca escolhe o trabalho. O E2 só verifica a barreira. Depois de E3–E5 o fluxo executa `persistir-metodo pre-e6`, e o E6 só verifica. O E8 grava o terminal e executa `persistir-metodo e8`.
 

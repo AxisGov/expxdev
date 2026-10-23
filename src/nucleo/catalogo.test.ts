@@ -12,11 +12,8 @@ const SKILLS_AXISGOV = [
   ["legadox", "https://github.com/AxisGov/legadox", "https://github.com/bittencourtthulio/legadox"],
   ["stackx", "https://github.com/AxisGov/stackx", "https://github.com/bittencourtthulio/stackx"],
   ["designx", "https://github.com/AxisGov/designx", "https://github.com/bittencourtthulio/designx"],
-] as const;
-
-const SKILLS_PROPRIEDADE_PENDENTE = [
-  ["memox", "https://github.com/bittencourtthulio/MemoX"],
-  ["prodx", "https://github.com/bittencourtthulio/prodx"],
+  ["memox", "https://github.com/AxisGov/MemoX", "https://github.com/bittencourtthulio/MemoX"],
+  ["prodx", "https://github.com/AxisGov/prodx", "https://github.com/bittencourtthulio/prodx"],
 ] as const;
 
 describe("catálogo das skills", () => {
@@ -39,7 +36,7 @@ describe("catálogo das skills", () => {
 
   it("funcional: memox aponta para o repositório do MemoX e é camada", () => {
     // o memox não tem fluxo próprio: só produz o índice que as outras consultam
-    expect(buscarNoCatalogo("memox")?.repositorio).toBe("https://github.com/bittencourtthulio/MemoX");
+    expect(buscarNoCatalogo("memox")?.repositorio).toBe("https://github.com/AxisGov/MemoX");
     expect(ehCamada("memox")).toBe(true);
   });
 
@@ -51,7 +48,7 @@ describe("catálogo das skills", () => {
 
   it("funcional: prodx aponta para o repositório do prodx e é camada", () => {
     // o prodx roda ANTES do plano: ele decide se existe trabalho, não como fazê-lo
-    expect(buscarNoCatalogo("prodx")?.repositorio).toBe("https://github.com/bittencourtthulio/prodx");
+    expect(buscarNoCatalogo("prodx")?.repositorio).toBe("https://github.com/AxisGov/prodx");
     expect(ehCamada("prodx")).toBe(true);
   });
 
@@ -76,12 +73,6 @@ describe("catálogo das skills", () => {
     expect(buscarNoCatalogo(nome)?.repositorio).toBe(canonica);
   });
 
-  it.each(SKILLS_PROPRIEDADE_PENDENTE)(
-    "funcional: %s preserva a origem observada enquanto a propriedade esta pendente",
-    (nome, observada) => {
-      expect(buscarNoCatalogo(nome)?.repositorio).toBe(observada);
-    },
-  );
 
   it.each(SKILLS_AXISGOV)(
     "funcional: origem legada de %s, com ou sem .git, migra para AxisGov",

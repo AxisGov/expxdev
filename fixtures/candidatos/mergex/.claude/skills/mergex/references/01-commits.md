@@ -175,6 +175,14 @@ O `--preparar` vincula `origem`, `trabalho_id` e `task` ao dono da seção. O
 plano corrente antes do commit. O token sozinho não autoriza trocar de trabalho
 nem aproveitar um id de task repetido em outra feature.
 
+O `--preparar` também grava no dono da seção a árvore do índice que ele montou
+(`git write-tree`), e o `--concluir` só commita se o índice ainda for exatamente
+essa árvore (DM-262). A varredura de segredo é sobre o stage do `--preparar`:
+qualquer reestágio entre os dois tempos — outro arquivo, o mesmo arquivo com
+outro conteúdo, a evidência revisada de novo — para com
+`PARADO — o stage mudou depois do --preparar` (código 4), sem commit e com o stage
+preservado. Rode o E1 de novo.
+
 Achou segredo entre os dois tempos: **não conclua**. Aborte como manda o passo 2, e libere a seção (`trava-do-e1.sh --liberar <token>`) — a task fica sem commit e a V11 do E2 a nomeia.
 
 | Código | Desfecho |
@@ -322,6 +330,7 @@ Nem tudo que muda durante o trabalho é produto. A skill de origem grava o plano
 | `docs/<trabalho_id>/` | sprintx (formato antigo) | feature-local |
 | `docs/manutencao/<trabalho_id>/` | runx | trabalho |
 | `docs/entregas/<trabalho_id>/` | mergex | entrega |
+| `docs/entregas/<trabalho_id>/revisao/<T-NN.MM>.json` | núcleo do expx (`revisar`) | **task** — a da task atual entra no commit dela (abaixo) |
 | `docs/sprintx/estimativas/HISTORICO.md` | sprintx | **global** — só quando a origem é a sprintx |
 
 ### O artefato global de método da sprintx
@@ -343,7 +352,16 @@ invasão real de escopo.
 
 Entre a pasta canônica e a legada do mesmo trabalho, **a canônica vence**: quando `docs/sprintx/features/<trabalho_id>/` existe, é ela a pasta do trabalho, e a legada não é isenta. É o mesmo desempate que o E0 usa para localizar o trabalho.
 
-Eles **nunca contam como desvio** e **não entram no commit de uma task**: o inventário do E1 os separa do produto, e eles entram nos commits de método do lifecycle (abaixo). Três limites, e nenhum é flexível:
+Eles **nunca contam como desvio** e, salvo a evidência de revisão abaixo, **não entram no commit de uma task**: o inventário do E1 os separa do produto, e eles entram nos commits de método do lifecycle (abaixo).
+
+**A evidência de revisão da task atual é a exceção** (DM-240). `docs/entregas/<trabalho_id>/revisao/<T-NN.MM>.json`, gravada pelo `revisar` do núcleo do expx antes do E1, entra **no commit da task que ela revisa**, sem precisar estar na lista do chamador: é no commit da task que o `conferir` a lê (V12). A exceção é exata:
+
+- **Só a da task atual**, com o nome do contrato (`<id>.json`, o id da task) e como arquivo comum. A de **outra** task fica na árvore: não entra e não para o E1.
+- **Qualquer outro nome sob `revisao/`** — temporário (`T-01.01.json.123.tmp`), trava, link simbólico — é produto e segue a regra de desvio (o E1 para).
+- **Ela nunca entra sozinha**: sem produto da task em stage, o E1 para como antes.
+- **A mergex não lê o conteúdo.** Só o caminho e se ele está no commit; o que a evidência diz, só o `conferir` responde (Passo 4).
+
+Três limites valem para os artefatos de método, e nenhum é flexível:
 
 - **Só a pasta deste trabalho.** `docs/` inteiro não é isento: a pasta de **outro** trabalho continua sendo desvio — é assim que se percebe uma feature que invadiu o território de outra.
 - **A varredura de segredo (passo 2) roda sobre eles igual.** Plano e decisão também carregam credencial por acidente.
@@ -579,22 +597,25 @@ Acrescente à lista `commits` do `ENTREGA.md` e reescreva `atualizado_em`. Um it
 
 ### O item leva `seq` — a chave de ordem
 
-O item novo tem **três** chaves, e `seq` vem primeiro:
+O item novo tem **quatro** chaves, e `seq` vem primeiro:
 
 ```yaml
 commits:
   - seq: 15
     task: T-04.03
     commit: 9f3c1aa
+    revisao: ok
 ```
 
 `seq` é a **ordem de registro do E1**: inteiro positivo, monotônico, **global à ENTREGA**. Não é número de task, de sprint, de rodada da F5, nem timestamp, nem quantidade de commits da branch. O contrato inteiro — progressão, prefixo legado, invariante — está em `references/00-schema.md`, "A ordem de registro".
+
+`revisao` é o que o `conferir` do núcleo do expx diz da task **no commit dela**, depois do `git commit` (`--modo obrigatoria --task <T>=<SHA do commit>`): `ok`; `achados` (`FALHA achados-abertos:<n>`); `incompleta:<classe>` e `indisponivel:<classe>` (a classe é o motivo antes do segundo `:`, sem caminho); `null` sem evidência no commit (sem chamar node); `invalida` para qualquer outra resposta, núcleo ou node ausente inclusive. É registro, nunca prova: a V12 pergunta de novo ao `conferir`, e o E1 nunca para por causa dela — o commit já existe. A tabela completa está em `references/00-schema.md`, "A chave `revisao` do item" (DM-241). O `conferir` tem limite de tempo (`MERGEX_E1_CONFERIR_LIMITE`, em segundos, 120 por padrão; DM-262): estourou, o valor é `invalida`, como em qualquer outra falha, e o E1 segue.
 
 **Não escreva o item à mão.** O escritor canônico é o `scripts/sequencia-de-commits.sh`: ele lê a lista, valida a sequência, calcula o próximo número e acrescenta o item no fim.
 
 ```
 bash .claude/skills/mergex/scripts/sequencia-de-commits.sh --acrescentar \
-  docs/entregas/<trabalho_id>/ENTREGA.md <id da task> <identificador curto>
+  docs/entregas/<trabalho_id>/ENTREGA.md <id da task> <identificador curto> [<revisao>]
 ```
 
 Ele imprime `seq=<n>` e **só** mexe na lista `commits` — `atualizado_em` continua sendo desta etapa.
