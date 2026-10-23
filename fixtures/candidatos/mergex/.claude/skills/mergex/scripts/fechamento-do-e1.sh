@@ -98,6 +98,14 @@
 #      autoriza inclusão automática; nenhum `git add` ocorreu
 #   64 uso inválido
 #
+# A evidência de revisão por task (DM-240). `docs/entregas/<trabalho>/revisao/<task>.json`
+# é gravada pelo `revisar` do núcleo do expx antes do E1. A da task atual entra no commit
+# da task sem precisar estar na lista do chamador; a de outra task fica na árvore, não
+# entra e não para; qualquer outro nome sob `revisao/` (temporário, trava, link) é produto
+# e segue a regra de desvio. Depois do commit, o `conferir` do núcleo diz como a revisão
+# terminou, e o valor vai para o item (`revisao:`, DM-241). A mergex nunca lê o conteúdo
+# da evidência: só sabe o caminho, e se ele está no commit.
+#
 # Bash 3.2 (macOS): nada de mapfile, arrays associativos ou ${v,,}.
 
 set -uo pipefail
@@ -112,6 +120,8 @@ OWNERSHIP_SH="$AQUI/ownership-da-task.sh"
 # CATALOGO_SH separa método de produto no inventário da árvore (M4). Mesma
 # regra: ausente em trabalho task-based, o E1 para antes do staging.
 CATALOGO_SH="$AQUI/catalogo-de-metodo.sh"
+# O núcleo do expx instalado no projeto: o `conferir` dele diz a revisão da task.
+NUCLEO_REL='.expx/marketplace/plugins/expx/nucleo/scripts'
 
 for f in "$TRAVA_SH" "$SEQ_SH" "$CONTRATO_COMMIT_SH"; do
   [ -f "$f" ] || { printf 'fechamento-do-e1: falta %s\n' "$f" >&2; exit 1; }
@@ -214,6 +224,31 @@ confere_contexto_preparado() {
     'O stage preparado foi preservado e nenhum commit foi criado.'
 }
 
+# A janela entre o --preparar e o --concluir (DM-262). A varredura de segredo é sobre
+# o stage do --preparar; a árvore dele (`git write-tree`) fica no dono da seção, e o
+# --concluir só commita se o índice ainda for exatamente essa árvore.
+registra_indice_preparado() {
+  local trava arvore
+  arvore="$(git write-tree 2>/dev/null)" || arvore=""
+  trava="$(caminho_da_trava 2>/dev/null)"
+  [ -n "$arvore" ] && printf 'arvore_preparada=%s\n' "$arvore" >> "$trava/dono" \
+    || para 4 'PARADO — a árvore do índice preparado não pôde ser registrada' \
+      'Nenhum commit foi criado e nada foi limpo: o stage ficou para diagnóstico.'
+}
+
+confere_indice_preparado() {
+  local trava preparada atual
+  trava="$(caminho_da_trava 2>/dev/null)"
+  preparada="$(campo_do_dono "$trava" arvore_preparada)"
+  atual="$(git write-tree 2>/dev/null)" || atual=""
+  [ -n "$preparada" ] && [ "$preparada" = "$atual" ] && return 0
+  para 4 'PARADO — o stage mudou depois do --preparar' \
+    "Preparado: árvore ${preparada:-ausente}" \
+    "Agora:     árvore ${atual:-ilegível}" \
+    'A varredura de segredo foi feita sobre o stage do --preparar, não sobre este.' \
+    'O stage atual foi preservado e nenhum commit foi criado; rode o E1 de novo.'
+}
+
 valida_mensagem() {
   local saida
   saida="$(bash "$CONTRATO_COMMIT_SH" --validar-e1 \
@@ -286,6 +321,15 @@ registra_existente() { # <entrega> <origem> <trabalho> <task> <sha completo>
         caminhos+=("$origem_nome" "$destino_nome") ;;
       *)
         IFS= read -r -d '' caminho <&3 || para 4 'PARADO — entrada de diff sem path'
+        # a evidência de revisão da task, criada ou alterada como arquivo comum
+        # (nunca link: modo 100644/100755 no commit), não é produto (DM-240)
+        case "$status" in
+          A|M) if [ "$caminho" = "$(pasta_de_revisao)$task.json" ] && nome_de_evidencia "$task.json"; then
+                 case "$(GIT_LITERAL_PATHSPECS=1 git ls-tree "$sha" -- "$caminho" 2>/dev/null)" in
+                   100644\ *|100755\ *) continue ;;
+                 esac
+               fi ;;
+        esac
         caminhos+=("$caminho") ;;
     esac
   done 3< "$RECOVERY_DIFF"
@@ -315,7 +359,7 @@ registra_existente() { # <entrega> <origem> <trabalho> <task> <sha completo>
 $(bash "$SEQ_SH" --ler "$entrega")
 EOF
 
-  saida="$(bash "$SEQ_SH" --acrescentar "$entrega" "$task" "$sha" 2>&1)" \
+  saida="$(bash "$SEQ_SH" --acrescentar "$entrega" "$task" "$sha" "$(revisao_da_task "$task" "$sha")" 2>&1)" \
     || para 6 'PARADO — commit Git existe; registro E1 não foi concluído' \
       "commit=$sha" "$saida"
   bash "$SEQ_SH" --validar "$entrega" >/dev/null 2>&1 \
@@ -545,6 +589,125 @@ $DIRTY
 EOF
 }
 
+# ---------------------------------------------------------------------------
+# A evidência de revisão por task (DM-240), separada do produto logo depois do
+# método. Só o nome e o tipo do arquivo decidem; o conteúdo é do núcleo.
+# ---------------------------------------------------------------------------
+pasta_de_revisao() { printf 'docs/entregas/%s/revisao/\n' "$TRABALHO"; }
+
+# nome_de_evidencia <nome> — `<T-NN.MM>.json` ou o legado `<T-N>.json`, o id do
+# contrato `expx-revisao`; nada de barra, sufixo ou outro nome.
+nome_de_evidencia() {
+  local id="${1%.json}"
+  [ "$id.json" = "$1" ] || return 1
+  case "$id" in
+    T-[0123456789][0123456789].[0123456789][0123456789]) return 0 ;;
+    T-*) id="${id#T-}"
+         case "$id" in ''|*[!0123456789]*) return 1 ;; esac
+         return 0 ;;
+  esac
+  return 1
+}
+
+# evidencia_de_revisao <caminho> — a evidência de alguma task deste trabalho, como
+# arquivo comum na árvore (link simbólico não é evidência: é produto).
+evidencia_de_revisao() {
+  local pasta
+  pasta="$(pasta_de_revisao)"
+  case "$1" in "$pasta"*) ;; *) return 1 ;; esac
+  nome_de_evidencia "${1#"$pasta"}" && [ -f "$1" ] && [ ! -L "$1" ]
+}
+
+# evidencia_no_indice <caminho> — a entrada do índice é arquivo comum (100644/100755)
+evidencia_no_indice() {
+  case "$(GIT_LITERAL_PATHSPECS=1 git ls-files -s -- "$1" 2>/dev/null)" in
+    100644\ *|100755\ *) return 0 ;;
+  esac
+  return 1
+}
+
+# separa_evidencia <task> — tira de PRODUTO as evidências deste trabalho; a da task
+# atual vai para EVIDENCIA (entra no commit), as das outras ficam na árvore.
+EVIDENCIA=""
+separa_evidencia() {
+  local caminho atual resto=""
+  atual="$(pasta_de_revisao)$1.json"
+  EVIDENCIA=""
+  while IFS= read -r caminho; do
+    [ -n "$caminho" ] || continue
+    if evidencia_de_revisao "$caminho"; then
+      [ "$caminho" != "$atual" ] || EVIDENCIA="$caminho"
+      continue
+    fi
+    resto="$resto$caminho"$'\n'
+  done <<EOF
+$PRODUTO
+EOF
+  PRODUTO="$resto"
+}
+
+# revisao_da_task <task> <sha completo> — o valor de `revisao:` do item (DM-241),
+# pelo `conferir` do núcleo no commit da task, nunca pela evidência do disco. Sem
+# evidência no commit: `null`, sem node. Com ela, qualquer resposta que não seja
+# uma linha `<task> ok|FALHA …` coerente com o código (núcleo ou node ausente,
+# saída 64, linha fora da forma) é `invalida`. Nunca para o E1: o commit já existe.
+# com_limite <segundos> <saída> <comando...> — roda o comando com a saída num arquivo e
+# o mata no limite (DM-262). Usa `timeout` quando ele funciona (o do Windows, em
+# System32, é outro programa, e o macOS pode não ter); senão, um vigia em bash puro. A
+# saída vai para arquivo, nunca para um pipe: um filho órfão do comando não segura o E1.
+com_limite() {
+  local limite="$1" saida="$2" pid vigia rc
+  shift 2
+  if timeout -k 5 1 true >/dev/null 2>&1; then
+    timeout -k 5 "$limite" "$@" > "$saida" 2>/dev/null
+    return
+  fi
+  "$@" > "$saida" 2>/dev/null &
+  pid=$!
+  (
+    i=0
+    while [ "$i" -lt "$limite" ]; do
+      sleep 1
+      kill -0 "$pid" 2>/dev/null || exit 0
+      i=$((i + 1))
+    done
+    kill -KILL "$pid" 2>/dev/null
+  ) >/dev/null 2>&1 &
+  vigia=$!
+  wait "$pid"; rc=$?
+  wait "$vigia" 2>/dev/null
+  return "$rc"
+}
+
+revisao_da_task() {
+  local task="$1" sha="$2" mjs raiz_node out rc cru limite tmp
+  git cat-file -e "$sha:$(pasta_de_revisao)$task.json" 2>/dev/null || { printf 'null\n'; return 0; }
+  mjs="$RAIZ/$NUCLEO_REL/expx-revisao.mjs"
+  { [ -f "$mjs" ] && command -v node >/dev/null 2>&1; } || { printf 'invalida\n'; return 0; }
+  raiz_node="$RAIZ"
+  # node nativo no Windows não entende o caminho do MSYS
+  if command -v cygpath >/dev/null 2>&1; then mjs="$(cygpath -w "$mjs")"; raiz_node="$(cygpath -w "$RAIZ")"; fi
+  # com limite (DM-262): estourou, o código não é 0 nem 1, e o valor é `invalida`
+  limite="${MERGEX_E1_CONFERIR_LIMITE:-120}"
+  case "$limite" in *[!0123456789]*) limite=120 ;; esac
+  limite="${limite#"${limite%%[!0]*}"}"   # sem zeros à esquerda: `00` é zero, `010` é 10
+  [ -n "$limite" ] || limite=120
+  tmp="$(mktemp 2>/dev/null)" || { printf 'invalida\n'; return 0; }
+  com_limite "$limite" "$tmp" node "$mjs" conferir --trabalho "$TRABALHO" --modo obrigatoria \
+    --raiz "$raiz_node" --task "$task=$sha"; rc=$?
+  out="$(cat "$tmp" 2>/dev/null)"
+  rm -f "$tmp"
+  case "$out" in *$'\n'*|*$'\r'*) out="" ;; esac
+  case "$rc:$out" in
+    "0:$task ok") cru=ok ;;
+    "1:$task FALHA achados-abertos:"*) cru=achados ;;
+    "1:$task FALHA incompleta:"*|"1:$task FALHA indisponivel:"*) cru="${out#"$task FALHA "}" ;;
+    "1:$task FALHA evidencia-ausente") cru=null ;;
+    *) cru=invalida ;;
+  esac
+  bash "$SEQ_SH" --revisao "$cru" 2>/dev/null || printf 'invalida\n'
+}
+
 # Os caminhos dados MAIS todo produto dirty passam pelo classificador — a
 # lista do chamador não limita a DETECÇÃO. Ela também não é ampliada: o
 # ownership não autoriza INCLUSÃO. Em STAGING fica só o que o chamador listou;
@@ -556,10 +719,14 @@ classifica_arvore() { # <task> <caminho listado>...
   confere_instalacao
   inventaria_arvore
   separa_metodo
+  separa_evidencia "$task"
   local -a entrada
   entrada=()
+  # A evidência que o chamador listou também não é produto: a da task atual já está
+  # em EVIDENCIA, e a de outra task não entra.
   while IFS= read -r caminho; do
-    [ -n "$caminho" ] && entrada+=("$caminho")
+    [ -n "$caminho" ] || continue
+    evidencia_de_revisao "$caminho" || entrada+=("$caminho")
   done <<EOF
 $( { [ "$#" -eq 0 ] || printf '%s\n' "$@"; printf '%s' "$PRODUTO"; } | LC_ALL=C sort -u)
 EOF
@@ -604,9 +771,17 @@ EOF
   [ "${#alvos[@]}" -gt 0 ] \
     || para 4 'PARADO — nada entrou em stage' \
       'Nenhum caminho alterado é da task atual.'
+  # a evidência de revisão da task atual vai junto (DM-240), nunca sozinha
+  [ -z "$EVIDENCIA" ] || alvos+=("$EVIDENCIA")
   git add -- "${alvos[@]}" \
     || para 4 'PARADO — o staging da task falhou' \
       'Nenhum commit foi criado. O índice ficou como o versionador o deixou.'
+  # o que entrou no índice é o que vai ao commit: a evidência trocada por um link
+  # depois da conferência da árvore para aqui
+  [ -z "$EVIDENCIA" ] || evidencia_no_indice "$EVIDENCIA" \
+    || para 4 'PARADO — a evidência de revisão entrou no índice como algo que não é arquivo comum' \
+      "Caminho: $EVIDENCIA" \
+      'Nenhum commit foi criado e nada foi limpo: o stage ficou para diagnóstico.'
   [ -n "$(stage_atual)" ] \
     || para 4 'PARADO — nada entrou em stage' \
       'Os caminhos declarados não têm alteração a commitar.'
@@ -625,7 +800,7 @@ verifica() { # <comando>
 # D a G — commit, identificador, append e validação final. Ainda sob a trava.
 # ---------------------------------------------------------------------------
 conclui() { # <entrega> <task> <mensagem>
-  local entrega="$1" task="$2" mensagem="$3" sha saida seq
+  local entrega="$1" task="$2" mensagem="$3" sha saida seq revisao
 
   # A lista é conferida ANTES do commit, e aqui — não no `prepara` —, para que
   # a conferência aconteça também quando a seção foi aberta pelo `--preparar`.
@@ -652,7 +827,10 @@ conclui() { # <entrega> <task> <mensagem>
       'O identificador do commit não pôde ser lido. Nenhum segundo commit foi' \
       'criado. A V11 do portão (E2) vai cobrar a prova que falta.'
 
-  saida="$(bash "$SEQ_SH" --acrescentar "$entrega" "$task" "$sha" 2>&1)" \
+  # o `conferir` no commit inteiro (o SHA completo), depois do commit da task
+  revisao="$(revisao_da_task "$task" "$(git rev-parse HEAD 2>/dev/null)")"
+
+  saida="$(bash "$SEQ_SH" --acrescentar "$entrega" "$task" "$sha" "$revisao" 2>&1)" \
     || para 6 'PARADO — commit Git existe; registro E1 não foi concluído' \
       "commit=$sha" \
       "$saida" \
@@ -762,6 +940,7 @@ case "$ACAO" in
     registra_contexto_preparado
     classifica_arvore "$TASK" "$@"
     prepara
+    registra_indice_preparado
     # A seção continua aberta: quem preparou tem a trava até `--concluir`.
     LIBERAR_NA_SAIDA=0
     printf 'token=%s\n' "$TOKEN"
@@ -786,8 +965,31 @@ case "$ACAO" in
     carrega_contexto "$ENTREGA"
     valida_mensagem
     confere_contexto_preparado
+    confere_indice_preparado
     NOTA_INDICE='O stage preparado foi preservado e nenhum commit foi criado.'
-    verifica_ownership "$TASK"         # o stage, sem isenção de método
+    # o stage, sem isenção de método; só a evidência de revisão da task atual,
+    # que o --preparar pôs junto (DM-240), não é produto
+    ESTAGIO_PRODUTO=()
+    while IFS= read -r caminho_preparado; do
+      [ -n "$caminho_preparado" ] || continue
+      if [ "$caminho_preparado" = "$(pasta_de_revisao)$TASK.json" ] \
+        && nome_de_evidencia "$TASK.json" && evidencia_no_indice "$caminho_preparado"; then
+        # revisada de novo desde o --preparar: o stage tem a versão velha, e
+        # restagiar pularia a varredura de segredo feita sobre ele
+        GIT_LITERAL_PATHSPECS=1 git diff --quiet -- "$caminho_preparado" 2>/dev/null \
+          || para 4 'PARADO — a evidência de revisão mudou depois do --preparar' \
+            "Caminho: $caminho_preparado" \
+            'O stage tem a versão anterior. Nada foi commitado; rode o E1 de novo.'
+        continue
+      fi
+      ESTAGIO_PRODUTO+=("$caminho_preparado")
+    done <<EOF
+$(stage_atual)
+EOF
+    [ "${#ESTAGIO_PRODUTO[@]}" -gt 0 ] \
+      || para 4 'PARADO — nada em stage para concluir' \
+        'Só a evidência de revisão da task está no índice, e ela não é uma task.'
+    verifica_ownership "$TASK" "${ESTAGIO_PRODUTO[@]}"
     # M4: a lista do --concluir é o stage que o --preparar montou; o que ficou
     # dirty fora dele desde então é classificado e barra do mesmo jeito.
     LISTA_PREPARADA=()

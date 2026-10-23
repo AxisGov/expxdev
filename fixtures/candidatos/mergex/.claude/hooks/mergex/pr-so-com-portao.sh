@@ -444,9 +444,10 @@ O hook leu este push sem ambiguidade e aplicou a mesma regra do pre-push
 (portao-regras.sh -> validade-do-portao.sh --rev sobre o SHA enviado). O
 pre-push barraria o mesmo push.
 
-O portão roda as onze verificações (V1..V11): tasks concluídas, suíte verde,
+O portão roda as doze verificações (V1..V12): tasks concluídas, suíte verde,
 dois testes por task, teste de regressão, QA, auditoria, bloqueios, modo legado,
-arquivos fora do escopo, segredo no diff e commit do E1 por task concluída.
+arquivos fora do escopo, segredo no diff, commit do E1 por task concluída e
+revisão por task aprovada.
 
 O que fazer:
   - Rode o E2 de novo:  /mergex-check
@@ -463,7 +464,7 @@ Comando: $CMD
 $AVISA
 
 O push segue (modo aviso de pr-so-com-portao). Rode o E2 (/mergex-check)
-antes do PR: o portão roda as onze verificações (V1..V11)."
+antes do PR: o portão roda as doze verificações (V1..V12)."
 fi
 
 exit 0

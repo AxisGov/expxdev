@@ -4,7 +4,7 @@ set -euo pipefail
 raiz="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$raiz"
 
-legada_base='((github[.]com[/:]|raw[.]githubusercontent[.]com/)bittencourtthulio/(runx|legadox|stackx|mergex|sprintx|buildx|designx|expxdev)([.]git)?|bittencourtthulio[.]github[.]io/expxdev)'
+legada_base='((github[.]com[/:]|raw[.]githubusercontent[.]com/)bittencourtthulio/(runx|legadox|stackx|mergex|sprintx|buildx|designx|memox|prodx|expxdev)([.]git)?|bittencourtthulio[.]github[.]io/expxdev)'
 legada="$legada_base([^[:alnum:]_.-]|$)"
 allowlist='scripts/ci/proveniencia-allowlist.tsv'
 separador=$'\x1f'
@@ -181,7 +181,7 @@ done
 [ "$violacoes" -eq 0 ] || exit 1
 
 if [ -f src/nucleo/catalogo.ts ]; then
-  for repo in runx mergex sprintx buildx; do
+  for repo in runx mergex sprintx buildx legadox stackx designx MemoX prodx; do
     grep -q "https://github.com/AxisGov/$repo" src/nucleo/catalogo.ts || {
       printf 'catalogo sem origem canonica AxisGov/%s\n' "$repo" >&2
       exit 1
@@ -189,7 +189,7 @@ if [ -f src/nucleo/catalogo.ts ]; then
   done
   grep -q 'https://github.com/AxisGov/expxdev' package.json
 else
-  for repo in runx mergex sprintx buildx expxdev; do
+  for repo in runx mergex sprintx buildx legadox stackx designx MemoX prodx expxdev; do
     grep -q "https://github.com/AxisGov/$repo" README.md || {
       printf 'README sem origem canonica AxisGov/%s\n' "$repo" >&2
       exit 1

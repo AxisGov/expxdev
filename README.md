@@ -129,8 +129,8 @@ painel que lê o que elas gravam.
 | **[legadox](https://github.com/AxisGov/legadox)** | **Camada** que endurece o trabalho em projetos legados. Não acrescenta fase: muda o *rigor* de cada uma, proporcional ao raio de impacto da mudança. | Mexer em código sem testes ou sem dono |
 | **[stackx](https://github.com/AxisGov/stackx)** | **Camada** que descobre o dialeto técnico do repositório — convenções, padrões e aderência — para o código novo parecer com o que já existe. | Entrar em base desconhecida |
 | **[mergex](https://github.com/AxisGov/mergex)** | Versionamento, entrega e revisão: branch, um commit por task, portão de prontidão, descrição de PR, pacote de QA e abertura do pull request. | Levar o trabalho pronto até o merge |
-| **[memox](https://github.com/bittencourtthulio/MemoX)** | **Camada** de memória: indexa os artefatos já fechados — relatórios, causas raiz, decisões, QA, entregas — e responde o que já se sabe sobre um arquivo antes de alguém mexer nele. | Saber se este arquivo já quebrou antes |
-| **[prodx](https://github.com/bittencourtthulio/prodx)** | **Camada** de produto: recebe o pedido cru, tria, verifica se o que foi pedido já existe e emite um veredito com evidência para assinatura humana. Três dos quatro vereditos encerram o pedido sem gerar código. | Decidir se vale fazer, antes de planejar |
+| **[memox](https://github.com/AxisGov/MemoX)** | **Camada** de memória: indexa os artefatos já fechados — relatórios, causas raiz, decisões, QA, entregas — e responde o que já se sabe sobre um arquivo antes de alguém mexer nele. | Saber se este arquivo já quebrou antes |
+| **[prodx](https://github.com/AxisGov/prodx)** | **Camada** de produto: recebe o pedido cru, tria, verifica se o que foi pedido já existe e emite um veredito com evidência para assinatura humana. Três dos quatro vereditos encerram o pedido sem gerar código. | Decidir se vale fazer, antes de planejar |
 | **[buildx](https://github.com/AxisGov/buildx)** | Orquestra um **projeto inteiro**, da descrição ao sistema pronto: mapeia o escopo completo, decide a stack e conduz `prodx` → `stackx` → `sprintx` → `mergex` feature a feature, recursivamente, até o fim. | Construir um sistema do zero, não uma feature isolada |
 | **[designx](https://github.com/AxisGov/designx)** | **Camada** de design: cartografa o design system do projeto e audita conformidade visual contra ele. | Garantir consistência visual quando o projeto tem UI |
 
@@ -537,16 +537,16 @@ Requisitos para os comandos abaixo: Node ≥ 20.19.0, `git`, GitHub CLI (`gh`) a
 `sha256sum` (Linux) ou `shasum` (macOS) para conferir o pacote antes de executá-lo.
 
 ```bash
-gh release download v0.12.0 -R AxisGov/expxdev -D ~/expx-cli/v0.12.0
+gh release download v0.12.1 -R AxisGov/expxdev -D ~/expx-cli/v0.12.1
 (
-  cd ~/expx-cli/v0.12.0
+  cd ~/expx-cli/v0.12.1
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.12.0.tgz.sha256
+    sha256sum -c expxdev-0.12.1.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.12.0.tgz.sha256
+    shasum -a 256 -c expxdev-0.12.1.tgz.sha256
   fi
 )
-npx --yes --package ~/expx-cli/v0.12.0/expxdev-0.12.0.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.12.1/expxdev-0.12.1.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -555,7 +555,7 @@ npx --yes --package ~/expx-cli/v0.12.0/expxdev-0.12.0.tgz expx init --skills bui
 - O preflight recusa divergência entre `package.json`, `package-lock.json` e metadata do tarball,
   bem como tag ou release já existente. O pacote é gerado duas vezes e os hashes devem coincidir.
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.12.0 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.12.1 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -569,6 +569,9 @@ npx --yes --package ~/expx-cli/v0.12.0/expxdev-0.12.0.tgz expx init --skills bui
 - `0.11.1` corrige as dependências vulneráveis e migra o runtime das GitHub Actions oficiais
   para Node.js 24, mantém Node.js 20.19 como piso suportado pelo produto e elimina as colisões
   de agentes na instalação simultânea das nove skills.
+- `0.12.1` corrige o portão de revisão, isola snapshots e travas operacionais e consolida
+  MemoX e ProdX nos forks AxisGov, com os candidatos certificados de SprintX e MergeX
+  atualizados para os commits revisados.
 - `0.12.0` acrescenta ao painel a linha do tempo do rastro e mostra, sem assumir valor
   histórico, a configuração atual de modelo e esforço dos agentes instalados.
 
@@ -802,7 +805,7 @@ Uma software house resolve o mesmo tipo de problema repetidamente. Bug de arredo
 faixa de peso hoje; bug parecido no cálculo de comissão em três meses. Quem lembra do primeiro
 resolve o segundo em vinte minutos — e quem não lembra não sabe que deveria perguntar.
 
-A [`memox`](https://github.com/bittencourtthulio/MemoX) resolve isso indexando o que as outras
+A [`memox`](https://github.com/AxisGov/MemoX) resolve isso indexando o que as outras
 skills já gravaram. Ela é um **índice invertido**, não uma busca semântica: a pergunta real não
 é "o que é parecido com isto", é "quem já mexeu neste arquivo e por quê" — e isso é uma string
 exata. Resposta de índice aponta artefato e data, então dá para abrir e conferir; recuperação
@@ -915,8 +918,8 @@ expxdev ·
 <a href="https://github.com/AxisGov/legadox">legadox</a> ·
 <a href="https://github.com/AxisGov/stackx">stackx</a> ·
 <a href="https://github.com/AxisGov/mergex">mergex</a> ·
-<a href="https://github.com/bittencourtthulio/MemoX">memox</a> ·
-<a href="https://github.com/bittencourtthulio/prodx">prodx</a> ·
+<a href="https://github.com/AxisGov/MemoX">memox</a> ·
+<a href="https://github.com/AxisGov/prodx">prodx</a> ·
 <a href="https://github.com/AxisGov/buildx">buildx</a> ·
 <a href="https://github.com/AxisGov/designx">designx</a></sub>
 </div>

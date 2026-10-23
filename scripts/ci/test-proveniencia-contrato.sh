@@ -25,6 +25,8 @@ printf '%s\n' \
   "https://$github_host/AxisGov/sprintx" \
   "https://$github_host/AxisGov/buildx" \
   "https://$github_host/AxisGov/designx" \
+  "https://$github_host/AxisGov/MemoX" \
+  "https://$github_host/AxisGov/prodx" \
   "https://$github_host/AxisGov/expxdev" \
   > "$base/README.md"
 printf '%s\n' \
@@ -125,6 +127,10 @@ caso_bloqueado filename_spaces 'docs/instalador legado.md' \
   "git clone https://$github_host/$proprietario/buildx.git"
 caso_bloqueado arbitrary_case bootstrap.sh \
   "https://$github_host/BiTtEnCoUrTtHuLiO/BuIlDx"
+caso_bloqueado memox_legacy bootstrap.sh \
+  "https://$github_host/$proprietario/MemoX"
+caso_bloqueado prodx_legacy bootstrap.sh \
+  "https://$github_host/$proprietario/prodx"
 
 repo_atributo="$(nova_fixture atributo_binary)"
 rastrear_texto "$repo_atributo" bootstrap.sh \

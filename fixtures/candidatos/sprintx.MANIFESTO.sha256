@@ -26,10 +26,10 @@ bb39be8b5db41a03f521f9491bdcda33c110f0eb4101834fcde544f340fe0aae  .claude/hooks/
 09effa021957841565cb8098a9b85551a6ab669dcb5733f56eedbd574f4cd278  .claude/hooks/testes/bancada-base-encadeada.sh
 2b5fb46419d66fdcdb57bf072f77fbe7e36c3e2a32663378ca8b213f8da00225  .claude/hooks/testes/bancada-bloqueio-replanejamento.sh
 3d219b78bb2559cec6b988c376222a8b44acfaf1829da242fcb987ff070473ec  .claude/hooks/testes/bancada-desvio-estimativa.sh
-c1ab8c8ddbf8a840acc2b4011d5495e4192c4baa16f6bf11460421bb7d7cba68  .claude/hooks/testes/bancada-escopo-e-hooks.sh
+b68c4b26101fb20070847445281a8ff5d260051f234b78a8300219e7b9d69b15  .claude/hooks/testes/bancada-escopo-e-hooks.sh
 c42a3abff806d5251464d747ec486f5433c7337ed11936286096cb9c04f619d8  .claude/hooks/testes/bancada-escopo-links.sh
-8b3a8279114459564ed63849fd4c480d016248fb7f8bfc5e233b863e03dfd4af  .claude/hooks/testes/bancada-historico-calibracao.sh
-e8b9d088ef5adf0744535f1e39acbc1040f9f9f3a62930b2cc780377926a9e1b  .claude/hooks/testes/bancada-rastro-suite.sh
+e4da72a4083f93ffe672bf7b447f2e7b66872433910a67a91e741d1a36e32e70  .claude/hooks/testes/bancada-historico-calibracao.sh
+44e16ced87d6af5c67a62c64a4225f69f1feca242d49223d885aeff4f84d5fe7  .claude/hooks/testes/bancada-rastro-suite.sh
 ca4230d73742ae1a8112a8197f89fb53bcc2324c5ae1b6e2ac4454cbdf498713  .claude/hooks/testes/bancada-segredo-limite.sh
 f7174dee86fb586fc35fa09a029ba2438d25095351309c14a64b060961d085f6  .claude/hooks/testes/bancada-segredo-sem-git.sh
 9240a19145e506b99798e72279c0dd61131f2176d7d49ee0c1e6ea03b8132dc5  .claude/hooks/testes/bancada.sh

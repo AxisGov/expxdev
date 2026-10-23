@@ -13,6 +13,14 @@ obrigatória, gate completo e novo portão.
 A base que avança depois do E8 é **evento da entrega, não defeito de plano**: o registro é da
 MergeX e nunca altera task (DM-178).
 
+Sincronizar uma **feature redirecionada** com a base nova (a predecessora foi mergeada e o PR
+foi redirecionado para a base dela; `references/09-revisao.md`, "Feature redirecionada",
+DM-245) é uma integração de base depois do E8 e segue este reference: merge registrado da base
+nova, E2 e push, com o portão provado. Nunca pelo botão de atualizar a branch do serviço, que
+faz o merge sem o registro e deixa o portão vencido para o `pre-push` e para o CI, e nunca com
+um commit vazio, que invalida o portão. O HEAD novo precisa de CI e, com `revisor_bot`
+declarado na base, de revisão do bot, ambos depois do redirecionamento.
+
 ## Invariantes
 
 1. **Tasks concluídas permanecem congeladas.** Nada aqui grava ou propõe gravar `tasks.md`,
@@ -291,6 +299,10 @@ preserva `commits`, `criado_em`, `pr_url`, `pr_estado`, `desvios`. `base_validad
 
 - **Execução nova:** o E0 grava `base_validada_sha = git merge-base HEAD <branch_base>` e
   `origem_base: registrada_e0` (`references/00-abertura.md`).
+- **Primeira sprint depois do PR de planejamento:** a retomada do E0 reancora a base com
+  `origem_base: registrada_sprint` (DM-261). Uma reconciliação sobre ela abre a cadeia como sobre
+  qualquer base registrada: o `001` grava `origem_base: registrada_e0`. O E0 não reancora uma
+  entrega que já tem `reconciliacoes`.
 - **Entrega anterior a esta versão** (sem `base_validada_sha`): na primeira reconciliação, e só
   nela, o `--registrar` infere `B0 = git merge-base P1 B1` e grava `origem_base: inferida_legado`
   no `ENTREGA.md` e no artefato `001`. A inferência falha fechada (código `6`) quando:
@@ -313,7 +325,7 @@ preserva `commits`, `criado_em`, `pr_url`, `pr_estado`, `desvios`. `base_validad
 3. Gate completo do repositório (o do `ORQUESTRADOR.md`) sobre `HEAD`.
 4. `reconciliacao-base.sh --registrar` com os caminhos ajustados.
 5. Checkpoint `reconciliacao-base`.
-6. E2 completo: barreira `reconciliacao-base` + V1–V11 com a V9 executável + `pre-push` da MergeX
+6. E2 completo: barreira `reconciliacao-base` + V1–V12 com a V9 executável + `pre-push` da MergeX
    comprovadamente ativo; grava `portao` e `portao_sha`. `BLOQUEADO` encerra como sempre (E8
    bloqueado, sem push).
 7. E3 sobre o delta, com O10 para os reconciliados.

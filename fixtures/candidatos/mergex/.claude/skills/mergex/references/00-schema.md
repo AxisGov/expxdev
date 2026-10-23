@@ -11,8 +11,8 @@ O painel apenas LÊ. Esta skill continua sendo a única a escrever `docs/entrega
 
 ## Contrato irmão — sprintx e runx
 
-O `expx-schema v1` é compartilhado com a [`sprintx`](https://github.com/bittencourtthulio/sprintx)
-(Build, F1–F6) e a [`runx`](https://github.com/bittencourtthulio/runx) (Run, E1–E5). A mergex
+O `expx-schema v1` é compartilhado com a [`sprintx`](https://github.com/AxisGov/sprintx)
+(Build, F1–F6) e a [`runx`](https://github.com/AxisGov/runx) (Run, E1–E5). A mergex
 não tem kind compartilhado: ela produz dois kinds, exclusivos dela — o `entrega` e o
 `reconciliacao_base` (DM-178, ver "O kind da reconciliação de base").
 
@@ -62,14 +62,18 @@ Valem para todo arquivo que leva frontmatter:
 | `expx_tool` | `sprintx` \| `runx` |
 | `entregue_por` | `mergex` |
 | `tipo_trabalho` | `feature` \| `ocorrencia` |
+| `entrega` | `por_trabalho` \| `por_sprint` |
 | `estado` | `aberto` \| `entregue` \| `bloqueado` |
 | `portao` | `pronto` \| `bloqueado` \| `null` (ainda não rodou) |
-| `falhas_portao` (por item) | `v1` … `v11` \| `v1_sem_prova` … `v11_sem_prova` |
+| `falhas_portao` (por item) | `v1` … `v12` \| `v1_sem_prova` … `v12_sem_prova` |
 | `causa` | ver "A causa do bloqueio" \| `null` (não bloqueado) |
 | `pr_estado` | `rascunho` \| `aberto` \| `merged` \| `fechado` \| `null` |
+| `sprint_atual` | `planejamento` \| `NN` (dois dígitos, `01`, `02`, ...) \| `null` |
+| `estado` (por item de `prs`) | `aberto` \| `rascunho` \| `aguardando_merge` \| `merged` \| `fechado` \| `null` |
+| `merge` (por item de `prs`) | `humano` \| `automatico` \| `null` |
 | `raio` | `baixo` \| `medio` \| `alto` \| `null` (sem modo legado) |
 | `faixa` (por arquivo) | `alta` \| `media` \| `baixa` |
-| `origem_base` (no `entrega`) | `registrada_e0` \| `inferida_legado` \| `null` (sem versionador) |
+| `origem_base` (no `entrega`) | `registrada_e0` \| `registrada_sprint` \| `inferida_legado` \| `null` (sem versionador) |
 
 `expx_tool` fica como a skill de **origem** do trabalho (`sprintx` ou `runx`) — é ela que
 governa o trabalho. O campo `entregue_por: mergex` diz quem gravou este arquivo. Mudar o enum
@@ -103,6 +107,7 @@ entregue_por: mergex
 titulo: Corrigir base de calculo do ICMS-ST com desconto incondicional
 tipo_trabalho: ocorrencia
 tipo_ocorrencia: regra-de-calculo
+entrega: por_trabalho
 estado: entregue
 versionado: true
 branch: fix/OC-2026-0184-icms-st-base-desconto
@@ -139,6 +144,8 @@ desvios: []
 push_feito: true
 pr_url: https://github.com/<org>/<repo>/pull/482
 pr_estado: rascunho
+sprint_atual: null
+prs: []
 criado_em: 2026-08-27
 atualizado_em: 2026-08-29
 entregue_em: 2026-08-29
@@ -152,14 +159,15 @@ entregue_em: 2026-08-29
 | `trabalho_id` | O slug da sprintx ou o `<OC-ID>-<slug>` da runx. O mesmo da pasta de origem |
 | `entregue_por` | Sempre `mergex` |
 | `tipo_ocorrencia` | O tipo da runx; `null` quando `tipo_trabalho: feature` |
+| `entrega` | O modo efetivo fixado pelo E0: `por_trabalho` ou `por_sprint`. O valor do plano sobrescreve o do projeto apenas antes do primeiro registro; ausente em entrega antiga é lido como `por_trabalho` |
 | `estado` | `aberto` no E0; `entregue` quando o fluxo completou; `bloqueado` quando o portão barrou |
 | `versionado` | `false` em repositório sem versionador |
 | `branch`, `branch_base` | `null` quando `versionado: false` |
 | `base_validada_sha` | SHA de 40 hex da base em que o trabalho foi validado; gravado no E0 (`git merge-base HEAD <branch_base>`); atualizado pelo `reconciliacao-base.sh --registrar` para o `b1_sha` registrado. Nunca nome de ref. `null` sem versionador |
-| `origem_base` | `registrada_e0` \| `inferida_legado` (gravado uma única vez, pela primeira reconciliação de uma entrega anterior a esta chave — DM-183) |
+| `origem_base` | `registrada_e0` \| `registrada_sprint` (a base reancorada pelo E0 na primeira retomada depois do PR de planejamento `merged`, sobre a main que contém o `merge_sha` — DM-261) \| `inferida_legado` (gravado uma única vez, pela primeira reconciliação de uma entrega anterior a esta chave — DM-183). Uma reconciliação aberta sobre uma base `registrada_sprint` grava no `RECONCILIACAO-BASE-001.md` `origem_base: registrada_e0`, como sobre qualquer base registrada |
 | `reconciliacoes` | Lista `{numero, arquivo, b1_sha, m_sha}`, na ordem da cadeia; `[]` sem reconciliação. Escrita só pelo `--registrar` |
 | `portao_sha` | SHA de 40 hex do `HEAD` que o E2 avaliou, gravado com `portao` só por `registrar-portao.sh`; `null` antes do E2 e depois de um `--registrar`. O `--resultado bloqueado` também grava `portao_sha` = `HEAD` avaliado, sem efeito na validade (`portao_nao_pronto` vem antes do SHA). O portão vale só para ele e para os commits de método `pre-e6`/`e8` de um pai que o seguem (DM-181) |
-| `commits` | Um item por task commitada, na ordem em que fecharam, cada um com a chave de ordem `seq`; `[]` sem versionador. Ver "A ordem de registro" |
+| `commits` | Um item por task commitada, na ordem em que fecharam, cada um com a chave de ordem `seq` e, no item novo, a `revisao` da task; `[]` sem versionador. Ver "A ordem de registro" |
 | `modulo_afetado` | Os módulos que a entrega toca (ver abaixo) |
 | `arquivos_alterados` | **O diff real** — ver abaixo. É o campo mais importante deste kind |
 | `faixa_atencao` | A faixa de atenção por arquivo (ver abaixo) |
@@ -172,7 +180,82 @@ entregue_em: 2026-08-29
 | `push_feito` | `true` só quando o E6 confirmou que o remoto tem o mesmo commit |
 | `pr_url` | A URL devolvida pelo E7; `null` quando o PR não foi aberto — **não é falha** |
 | `pr_estado` | `rascunho` na abertura normal; `aberto` quando o QA já aprovou; `merged`/`fechado` quando o E9 ou uma pessoa atualizarem |
+| `sprint_atual` | `planejamento` no PR de planejamento, `NN` na sprint que o E0 abriu, ou `null` fora dessas entregas. Nunca é relido do plano depois de registrado |
+| `prs` | Os PRs do trabalho, um item `{sprint, url, estado, merge_sha, merge, base_sha}` por PR, em YAML de bloco e em sequência. O de planejamento é sempre o primeiro; numa entrega `por_sprint`, seguem `01`, `02`, ... . `pr_url`/`pr_estado` de topo são os da entrega atual |
 | `entregue_em` | A data em que o fluxo completou; `null` enquanto `estado` não for `entregue` |
+
+## A entrega por sprint — `entrega`, `sprint_atual` e `prs`
+
+O PR de planejamento (DM-259) leva só os artefatos de método do planejamento (tudo sob
+`^docs/(sprintx|entregas|eventos)/`), abre no fim da F5 e tem merge do desenvolvedor, nunca
+automático. A entrega dele é marcada por **duas** chaves coerentes, gravadas pelo E0
+`--planejamento`:
+
+```yaml
+sprint_atual: planejamento
+prs:
+  - sprint: planejamento
+    url: null
+    estado: null
+    merge_sha: null
+    merge: null
+    base_sha: null
+```
+
+Depois do merge do planejamento, uma entrega `por_sprint` abre uma sprint por vez. O E0 recebe
+`--sprint <NN>`, fixa o modo efetivo e acrescenta o item da sprint; por exemplo, durante a 02:
+
+```yaml
+entrega: por_sprint
+sprint_atual: 02
+prs:
+  - sprint: planejamento
+    url: https://github.com/<org>/<repo>/pull/480
+    estado: merged
+    merge_sha: 1111111111111111111111111111111111111111
+    merge: humano
+    base_sha: 0000000000000000000000000000000000000000
+  - sprint: 01
+    url: https://github.com/<org>/<repo>/pull/481
+    estado: merged
+    merge_sha: 3333333333333333333333333333333333333333
+    merge: humano
+    base_sha: 2222222222222222222222222222222222222222
+  - sprint: 02
+    url: null
+    estado: null
+    merge_sha: null
+    merge: null
+    base_sha: null
+```
+
+| Campo do item | Regra |
+|---|---|
+| `sprint` | `planejamento` só no **primeiro** item; depois, `01`, `02`, ... sem lacuna |
+| `url` | A URL do PR, gravada pelo E8; `null` antes do E7 |
+| `estado` | O enum da tabela; o E8 grava o do E7, o E9 grava `merged` |
+| `merge_sha` | O commit de merge, só com `estado: merged`; `null` antes |
+| `merge` | `humano` quando o E9 registra o merge; `automatico` só quando o modo automático fizer o merge de uma sprint; **nunca** `automatico` no planejamento |
+| `base_sha` | A ponta comprovada da base quando o PR foi integrado: primeiro pai do commit de merge ou squash; num resultado linear, pai único somente quando o serviço prova que o PR/MR tinha um commit. Histórico linear com múltiplos commits falha fechado. Gravada pelo E9 com o merge (DM-269 e DM-267); `null` antes. `diff_refs.start_sha` não serve: é da versão do diff, não do instante do merge. Item sem a chave lê como `null`. A V9 exige `base_sha == merge_sha^1` antes de conferir `base_sha..merge_sha` |
+
+- `prs` é sempre YAML de bloco; a forma em fluxo (`prs: [{...}]`) é ilegível. Lista vazia é `prs: []`.
+- Uma chave sem a outra é incoerente: `sprint_atual: planejamento` ou `NN` sem o item
+  correspondente em `prs`, ou item de sprint com `sprint_atual: null`. A exceção é a retomada do
+  E0 depois do merge do planejamento: `sprint_atual: null` com aquele item `merged`.
+- Numa entrega `por_sprint`, cada item anterior ao atual está `merged`; só o último pode estar
+  aberto. O E0 só acrescenta a sprint seguinte depois de o E9 registrar o merge da anterior.
+- Entrega anterior às três chaves é lida como `entrega: por_trabalho`, `sprint_atual: null` e
+  `prs: []`.
+- **Ninguém relê estas chaves por conta própria.** O leitor único é
+  `scripts/entrega-de-planejamento.sh --entrega <ENTREGA.md> [--rev <commit>]`, que imprime
+  `planejamento=sim|nao`, `entrega=`, `sprint_atual=`, o estado do item atual e os itens de `prs`
+  (com `sim`, também `estado=`, `merge_sha=` e `base_sha=`; depois da retomada, também
+  `planejamento_merge_sha=` e `planejamento_base_sha=`; com o item, `planejamento_url=`, DM-261,
+  DM-269 e DM-267) e sai 2 com a entrega
+  ilegível ou incoerente. E0, E2, E7, E8 e E9 o consomem.
+- `--completar-base <planejamento|NN> --merge-sha <sha> --base-sha <sha>` é a migração
+  idempotente de um item histórico `merged` com `base_sha: null`: exige o mesmo `merge_sha`,
+  recusa base diferente e não toca `sprint_atual`, `pr_url`, `pr_estado` nem outro item.
 
 ## A ordem de registro — a chave `seq`
 
@@ -274,7 +357,8 @@ Uma interpretação mecânica só, num script só — `scripts/sequencia-de-comm
 sequencia-de-commits.sh --ler <ENTREGA.md>     # ordem_efetiva, seq, task, commit por item
 sequencia-de-commits.sh --validar <ENTREGA.md> # a invariante acima; PARA quando quebra
 sequencia-de-commits.sh --proximo <ENTREGA.md> # o maior seq efetivo + 1
-sequencia-de-commits.sh --acrescentar <ENTREGA.md> <task> <commit>
+sequencia-de-commits.sh --acrescentar <ENTREGA.md> <task> <commit> [<revisao>]
+sequencia-de-commits.sh --revisao <valor>      # o valor de revisao como seria gravado
 ```
 
 - **`--acrescentar` é o escritor do E1** (e do E1 tardio). Ele acrescenta no **fim**, com `seq`,
@@ -282,6 +366,38 @@ sequencia-de-commits.sh --acrescentar <ENTREGA.md> <task> <commit>
 - **Gravação nova nunca cria item legado.** Leitura histórica aceita o prefixo; escrita, não.
 - A V11 usa a **leitura crua** desse mesmo script (`references/02-prontidao.md`). Ela pergunta se
   existe prova de E1 para a task, e **não** depende de ordem, `seq` ou sequência.
+
+### A chave `revisao` do item (DM-241)
+
+O item novo leva uma quarta chave, `revisao`, com o que o `conferir` do núcleo do expx disse da
+task no commit dela (o E1 o chama depois do `git commit`; `references/01-commits.md`, Passo 4):
+
+```yaml
+commits:
+  - seq: 16
+    task: T-04.04
+    commit: 1a2b3c4
+    revisao: incompleta:L1
+```
+
+| Valor | Quando |
+|---|---|
+| `ok` | `T ok` |
+| `achados` | `T FALHA achados-abertos:<n>` |
+| `incompleta:<classe>` | `T FALHA incompleta:<motivo>` |
+| `indisponivel:<classe>` | `T FALHA indisponivel:<motivo>` |
+| `null` | sem evidência no commit da task (`evidencia-ausente`, ou o projeto sem revisão por task) |
+| `invalida` | qualquer outra resposta: `evidencia-invalida…`, `evidencia-nao-bate…`, `commit-inexistente…`, saída 64, linha fora da forma, núcleo ou node ausente |
+
+- A **classe** é o texto do motivo antes do segundo `:`, como veio, com
+  `[A-Za-z0-9][A-Za-z0-9-]*` (`incompleta:L1:41` → `incompleta:L1`;
+  `indisponivel:arquivo-inexistente:src/a.ts` → `indisponivel:arquivo-inexistente`). O resto do
+  motivo — um caminho, um número — nunca entra no YAML.
+- Valor fora dessa gramática: o `--acrescentar` não grava nada (código 1). O E1 passa o valor
+  pelo `--revisao` antes e grava `invalida` no lugar de um que não cabe.
+- É **registro**, não prova: a V12 nunca lê esta chave (DM-239) e pergunta de novo ao `conferir`.
+  A leitura (`--ler`, `--validar`, `prova-de-commit.sh`) a ignora, e o item legado sem ela
+  continua válido.
 
 ### Sequência inválida é contrato inválido — e PARA
 
@@ -315,7 +431,10 @@ mergex é a única camada do método que conhece o **diff real**: o que de fato 
 o que ninguém previu e excluindo o que foi previsto e não foi necessário. Um índice alimentado
 pela previsão do plano indexa a intenção; alimentado pelo diff, indexa o fato.
 
-- Fonte: `git diff --name-only <branch_base>...HEAD`, a mesma base do E3 (três pontos).
+- Em `por_trabalho`, a fonte é `git diff --name-only <branch_base>...HEAD`, a mesma base do E3
+  (três pontos). Em `por_sprint`, cada E3 acumula em `arquivos_alterados` a união, sem repetição,
+  do valor já gravado pelas sprints anteriores com o diff real da sprint atual. Assim a main já
+  atualizada não apaga do registro final um caminho entregue antes.
 - Caminhos **relativos à raiz do repositório**, na forma exata em que o versionador os devolve.
 - Sem repetição, ordenados alfabeticamente.
 - Inclui arquivo removido (`D`) e as duas pontas de um renomeado (`R`): o caminho antigo
@@ -368,8 +487,10 @@ Este campo é a contraparte **por arquivo** do campo `atencao`, que traz só as 
 contagens dizem quanto de olho humano a entrega pediu; a lista diz **onde**. Sem ela, o
 histórico de faixa de um arquivo não existe — e é ele que fecha o ciclo com o memox.
 
-`faixa_atencao` é `[]` enquanto o E3 não rodou (no E0 e durante o E1), e é gravado inteiro no
-E3, junto com as contagens.
+`faixa_atencao` é `[]` enquanto o E3 não rodou (no E0 e durante o E1). Em `por_trabalho`, o E3 a
+grava inteira, junto com as contagens. Em `por_sprint`, preserva as entradas das sprints anteriores
+e mescla as da sprint atual por caminho; a classificação observada na sprint atual substitui a
+anterior quando o mesmo arquivo reaparece. `atencao` continua sendo a contagem do PR atual.
 
 **Por que dois campos e não um.** `atencao` é lido pelo painel para mostrar quanto de revisão
 cada PR está pedindo; `faixa_atencao` é lido pelo índice para saber o passado de um caminho.
@@ -440,6 +561,7 @@ interpreta a narrativa de quem executou e não conhece as classes de pendência 
 | 9 | `v4` | `regressao_nao_declarada` |
 | 10 | `v5` | `qa_nao_aprovado` |
 | 11 | `v11` | `commit_nao_registrado` |
+| 12 | `v12` | `revisao_reprovada` |
 
 E um valor a mais, que não é causa de trabalho nenhum: **`indeterminada`** — a mergex não
 conseguiu provar a causa. Nenhum outro valor existe. `falha_tecnica`, `decisao_humana` ou qualquer
@@ -457,23 +579,33 @@ falha consequência da outra:
 - `v6` a `v9` em seguida, na numeração: são **fatos que existem independentemente de a execução
   ter terminado** — o veredito da auditoria (que devolve o plano à F3 e invalida as verificações
   medidas contra ele), o `B-NN` registrado, as pré-condições do modo legado, o arquivo no diff.
-- `v1` a `v5` e `v11` por último, na numeração: leem o **registro da execução**, que fica
+- `v1` a `v5`, `v11` e `v12` por último, na numeração: leem o **registro da execução**, que fica
   incompleto justamente quando um daqueles fatos parou o trabalho. O próprio contrato do E2 diz
   isso: task `bloqueada` aponta o `B-NN` (V1 é sintoma da V7), e o QA da runx ausente é o fluxo
-  que não chegou ao E4 da runx (V5 é sintoma da V1). A `v11` fecha esse grupo porque a prova de
+  que não chegou ao E4 da runx (V5 é sintoma da V1). A `v11` vem depois das cinco porque a prova de
   E1 que falta é a **última** coisa que a execução registra sobre uma task: com a execução
   interrompida antes (V1), ou com o commit abortado por segredo (V10), a ausência da prova é
-  consequência, não causa.
+  consequência, não causa. A `v12` vem depois dela: ela só confere tasks concluídas e com commit
+  registrado, e a evidência de revisão é do commit da task; enquanto a execução não terminou
+  (V1) ou o registro do E1 falta (V11), o commit que a revisão tem de cobrir ainda pode mudar, e a
+  correção começa por elas (DM-239).
 
 Exemplo: `falhas_portao: [v1, v7]` → `causa: bloqueio_aberto`. `[v1, v2]` →
 `tarefa_nao_concluida`. `[v7, v10_sem_prova]` → `indeterminada`. `[v11]` →
-`commit_nao_registrado`.
+`commit_nao_registrado`. `[v11, v12]` → `commit_nao_registrado`. `[v12]` → `revisao_reprovada`.
+`[v12_sem_prova]` → `indeterminada`.
 
 **`commit_nao_registrado` não é `tarefa_nao_concluida`.** A task da V11 **está** `concluida` —
 o que falta é a prova de E1 dela em `commits`. Quem lê `tarefa_nao_concluida` vai ao `tasks.md`
 procurar status; quem lê `commit_nao_registrado` vai à lista `commits` deste mesmo arquivo
 procurar o item que falta. Duas evidências diferentes, dois lugares diferentes de correção:
 uma causa só para as duas apagaria a diferença justamente onde ela é acionável.
+
+**`revisao_reprovada` não é `commit_nao_registrado`.** A task da V12 está `concluida` e tem o
+commit registrado; o que falta é a revisão por task aprovada **no commit dela**, conferida pelo
+`conferir` do núcleo (`references/02-prontidao.md`, V12). Quem lê `revisao_reprovada` vai à
+evidência de revisão da task (revisar de novo, dividir a task, resolver o achado), não à lista
+`commits`.
 
 ### Por estado
 

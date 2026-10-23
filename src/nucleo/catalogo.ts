@@ -62,13 +62,15 @@ export const CATALOGO: readonly Skill[] = [
   },
   {
     nome: "memox",
-    repositorio: "https://github.com/bittencourtthulio/MemoX",
+    repositorio: "https://github.com/AxisGov/MemoX",
+    origensLegadas: ["https://github.com/bittencourtthulio/MemoX"],
     papel: "memoria do projeto, indexa os artefatos ja fechados",
     camada: true,
   },
   {
     nome: "prodx",
-    repositorio: "https://github.com/bittencourtthulio/prodx",
+    repositorio: "https://github.com/AxisGov/prodx",
+    origensLegadas: ["https://github.com/bittencourtthulio/prodx"],
     papel: "camada de produto, decide se o pedido vira trabalho",
     camada: true,
   },

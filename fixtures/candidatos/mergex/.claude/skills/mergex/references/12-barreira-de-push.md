@@ -316,7 +316,8 @@ deliberado (spec, seção 15.1, itens 1 e 9 a 12):
 ### Handoff: esta branch não ativa o CI
 
 Esta branch não ativa CI em nenhum produto: ela entrega o executável, o template e os testes, e nenhum
-arquivo vive em `.github/workflows/`. Ativar é handoff posterior e separado, feito no repositório do
+workflow versionado roda o `portao-ci.sh` nem é o template `mergex-portao` (DM-263: o
+`.github/workflows/` da própria mergex só roda os testes dela). Ativar é handoff posterior e separado, feito no repositório do
 produto: copiar o template para `.github/workflows/`, configurar a proteção de merge da branch
 principal exigindo o check `mergex-portao` e exigir `CODEOWNERS` com revisão obrigatória para
 `.expx/**`, `.claude/**` e `.github/**`. Sem a proteção de merge exigindo o check, ele não barra
