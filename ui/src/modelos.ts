@@ -45,14 +45,15 @@ export function execucaoDoEvento(
   }
 
   const atual = agentes.find((agente) => agente.nome === evento.agente);
-  if (atual === undefined || (atual.model === undefined && atual.effort === undefined)) {
+  // o servidor serve null para frontmatter sem a chave
+  if (atual === undefined || (atual.model == null && atual.effort == null)) {
     return {
       texto: `${evento.agente} · modelo/esforço não informados`,
       fonte: "histórico indisponível",
     };
   }
   return {
-    texto: [evento.agente, atual?.model, atual?.effort].filter(Boolean).join(" · "),
+    texto: [evento.agente, atual.model, atual.effort].filter(Boolean).join(" · "),
     fonte: "configuração atual",
   };
 }
