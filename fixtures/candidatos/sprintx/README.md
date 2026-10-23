@@ -1,29 +1,24 @@
 <div align="center">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/bittencourtthulio/sprintx/main/.github/assets/banner-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/bittencourtthulio/sprintx/main/.github/assets/banner-light.svg">
-  <img alt="sprintx — a metade Build do metodo Expx" src="https://raw.githubusercontent.com/bittencourtthulio/sprintx/main/.github/assets/banner-light.svg" width="100%">
-</picture>
-
+<img alt="sprintx — a metade Build do método Expx: seis fases, da ingestão à execução autônoma" src=".github/assets/anim/hero.svg" width="100%">
 <p>
-  <img alt="harness: Claude Code" src="https://raw.githubusercontent.com/bittencourtthulio/sprintx/main/.github/assets/badge-claude.svg">
-  <img alt="harness: OpenCode" src="https://raw.githubusercontent.com/bittencourtthulio/sprintx/main/.github/assets/badge-opencode.svg">
-  <img alt="fases F1 a F6" src="https://raw.githubusercontent.com/bittencourtthulio/sprintx/main/.github/assets/badge-fases.svg">
-  <img alt="TDD obrigatorio" src="https://raw.githubusercontent.com/bittencourtthulio/sprintx/main/.github/assets/badge-tdd.svg">
-  <img alt="schema expx v1" src="https://raw.githubusercontent.com/bittencourtthulio/sprintx/main/.github/assets/badge-schema.svg">
-  <img alt="docs pt-BR" src="https://raw.githubusercontent.com/bittencourtthulio/sprintx/main/.github/assets/badge-lang.svg">
-  <img alt="licenca MIT" src="https://raw.githubusercontent.com/bittencourtthulio/sprintx/main/.github/assets/badge-license.svg">
+  <img alt="harness: Claude Code" src="https://raw.githubusercontent.com/AxisGov/sprintx/main/.github/assets/badge-claude.svg">
+  <img alt="harness: OpenCode" src="https://raw.githubusercontent.com/AxisGov/sprintx/main/.github/assets/badge-opencode.svg">
+  <img alt="fases F1 a F6" src="https://raw.githubusercontent.com/AxisGov/sprintx/main/.github/assets/badge-fases.svg">
+  <img alt="TDD obrigatorio" src="https://raw.githubusercontent.com/AxisGov/sprintx/main/.github/assets/badge-tdd.svg">
+  <img alt="schema expx v1" src="https://raw.githubusercontent.com/AxisGov/sprintx/main/.github/assets/badge-schema.svg">
+  <img alt="docs pt-BR" src="https://raw.githubusercontent.com/AxisGov/sprintx/main/.github/assets/badge-lang.svg">
+  <img alt="licenca MIT" src="https://raw.githubusercontent.com/AxisGov/sprintx/main/.github/assets/badge-license.svg">
 </p>
 
 <p>
-  <a href="https://bittencourtthulio.github.io/expxdev/#sprintx"><strong>📘 Documentação do método</strong></a>
+  <a href="https://github.com/AxisGov/sprintx#readme"><strong>📘 Documentação do método</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://bittencourtthulio.github.io/expxdev/#sprintx">Fases F1–F6</a>
+  <a href="#as-seis-fases">Fases F1–F6</a>
   &nbsp;·&nbsp;
-  <a href="https://bittencourtthulio.github.io/expxdev/#ecossistema">O ecossistema</a>
+  <a href="https://github.com/AxisGov/expxdev#o-ecossistema">O ecossistema</a>
   &nbsp;·&nbsp;
-  <a href="https://bittencourtthulio.github.io/expxdev/#schema">Contratos</a>
+  <a href="#os-contratos">Contratos</a>
 </p>
 
 <strong>A metade Build do método Expx</strong> — a skill de planejamento e execução<br>
@@ -40,23 +35,27 @@ de features novas para <a href="https://claude.com/claude-code">Claude Code</a> 
 
 ## O ecossistema Expx
 
-O método Expx é um conjunto de skills que se compõem, instaladas e mantidas pelo CLI [`expxdev`](https://github.com/bittencourtthulio/expxdev).
+O método Expx é um conjunto de skills que se compõem, instaladas e mantidas pelo CLI [`expxdev`](https://github.com/AxisGov/expxdev).
+
+<p align="center">
+  <img alt="O ecossistema Expx: prodx decide se há trabalho, sprintx decide como, camadas modificam o comportamento, mergex entrega, buildx orquestra o projeto inteiro" src=".github/assets/anim/ecossistema.svg" width="100%">
+</p>
 
 | Peça | Papel | Relação com a `sprintx` |
 |---|---|---|
-| **[expxdev](https://github.com/bittencourtthulio/expxdev)** | o CLI: instala, atualiza e diagnostica o ecossistema, e sobe o painel de operação | é quem instala esta skill (`npx expxdev init`) |
+| **[expxdev](https://github.com/AxisGov/expxdev)** | o CLI: instala, atualiza e diagnostica o ecossistema, e sobe o painel de operação | é quem instala esta skill (`npx expxdev init`) |
 | **sprintx** *(este repositório)* | **Build** — feature nova, F1…F6 | — |
-| **[runx](https://github.com/bittencourtthulio/runx)** | **Run** — ocorrência em produção, E1…E5 | skill irmã; mesmos contratos, gatilho diferente |
+| **[runx](https://github.com/AxisGov/runx)** | **Run** — ocorrência em produção, E1…E5 | skill irmã; mesmos contratos, gatilho diferente |
 | **[legadox](https://github.com/bittencourtthulio/legadox)** | **camada** de segurança para código legado | endurece as fases da `sprintx` quando existe `PERFIL.md` |
 | **[stackx](https://github.com/bittencourtthulio/stackx)** | **camada** de convenções do repositório | a `sprintx` lê o `CONVENCOES.md` antes de planejar e de escrever código |
-| **[mergex](https://github.com/bittencourtthulio/mergex)** | entrega: branch, commit por task, PR e pacote de QA | adota na F6 a branch e o worktree que a F1 abriu (regra 21), commita cada task concluída e entrega ao fim da fase |
+| **[mergex](https://github.com/AxisGov/mergex)** | entrega: branch, commit por task, PR e pacote de QA | adota na F6 a branch e o worktree que a F1 abriu (regra 21), commita cada task concluída e entrega ao fim da fase |
 | **[memox](https://github.com/bittencourtthulio/MemoX)** | **camada** de memória do projeto | consultada na F1 e na F3, sobre os arquivos que o plano pretende tocar |
 | **[prodx](https://github.com/bittencourtthulio/prodx)** | **camada** de produto: decide **se** há trabalho | roda antes da F1 e entrega o `BRIEFING.md` assinado como entrada dela |
-| **[buildx](https://github.com/bittencourtthulio/buildx)** | orquestra um projeto inteiro, da descrição ao sistema pronto | invoca a `sprintx` uma vez por feature do mapa; quebra a regra 10 — a F2 deixa de entrevistar o humano, a `buildx` responde no lugar dele derivando de `PROJETO.md`, `PREMISSAS.md` e `CONVENCOES.md` e registrando em `00-DECISOES.md` com `respondido_por: buildx`. TDD, regra 4 e auditoria da F5 seguem intactos. É dependência obrigatória dela |
+| **[buildx](https://github.com/AxisGov/buildx)** | orquestra um projeto inteiro, da descrição ao sistema pronto | invoca a `sprintx` uma vez por feature do mapa; quebra a regra 10 — a F2 deixa de entrevistar o humano, a `buildx` responde no lugar dele derivando de `PROJETO.md`, `PREMISSAS.md` e `CONVENCOES.md` e registrando em `00-DECISOES.md` com `respondido_por: buildx`. TDD, regra 4 e auditoria da F5 seguem intactos. É dependência obrigatória dela |
 
 **Camadas** (`legadox`, `stackx`, `memox`, `prodx`) sozinhas não fazem nada — elas modificam o comportamento da `sprintx` e da `runx`. A `prodx` é a única que roda **antes** de tudo: ela decide *se* há trabalho, e só depois a `sprintx` decide *como* fazê-lo. A ausência de qualquer irmã nunca quebra o fluxo desta skill: insumo que não existe vira aviso do que falta, nunca invenção. A `buildx` é a exceção do método: por ficar acima de todas, é a única peça que **depende** de outras — e a `sprintx` é uma delas.
 
-Detalhes do ecossistema inteiro no [README do expxdev](https://github.com/bittencourtthulio/expxdev).
+Detalhes do ecossistema inteiro no [README do expxdev](https://github.com/AxisGov/expxdev).
 
 ---
 
@@ -64,7 +63,11 @@ Detalhes do ecossistema inteiro no [README do expxdev](https://github.com/bitten
 
 O método Expx tem duas metades, irmãs e com a mesma disciplina de engenharia:
 
-| | **sprintx** (Build) | **[runx](https://github.com/bittencourtthulio/runx)** (Run) |
+<p align="center">
+  <img alt="Build e Run: sprintx e runx compartilham os mesmos contratos. Muda o gatilho e o tamanho, nunca o rigor." src=".github/assets/anim/build-run.svg" width="100%">
+</p>
+
+| | **sprintx** (Build) | **[runx](https://github.com/AxisGov/runx)** (Run) |
 |---|---|---|
 | **Gatilho** | feature nova, planejada do zero | ocorrência num sistema em produção |
 | **Entrada** | uma ideia, um requisito | um chamado, ticket ou relato de cliente |
@@ -75,7 +78,7 @@ As duas compartilham **exatamente** os mesmos contratos: base de conhecimento an
 
 **Muda o gatilho e o tamanho. Nunca o rigor.**
 
-> Precisa sustentar o que já está em produção — bug, ajuste, chamado de cliente? Essa é a outra metade: **[runx](https://github.com/bittencourtthulio/runx)**.
+> Precisa sustentar o que já está em produção — bug, ajuste, chamado de cliente? Essa é a outra metade: **[runx](https://github.com/AxisGov/runx)**.
 
 ---
 
@@ -86,6 +89,10 @@ A maioria dos fluxos "planeje e depois implemente" para agentes de IA falha da m
 - **Hierarquia clara** — sprint contém fases, fase contém tasks, cada nível em seu próprio arquivo.
 - **Contrato obrigatório por task** — toda task declara objetivo, arquivos tocados, teste de integração, teste funcional, critério de aceite verificável, dependências e se pode rodar em paralelo.
 - **TDD como regra, não como sugestão** — o teste é escrito antes da implementação; task só é concluída quando os dois testes passam.
+
+<p align="center">
+  <img alt="O ciclo de uma task: contrato, teste antes do código, vermelho, implementação, os dois testes verdes, e só então concluída" src=".github/assets/anim/tdd-ciclo.svg" width="100%">
+</p>
 - **Portões de aceite em toda transição** — task → task, task → fase, fase → sprint. Critério não atendido, não avança.
 - **Paralelismo declarado no plano**, nunca decidido pelo agente em tempo de execução.
 - **Execução que nunca para** — dúvida nova durante a execução vira bloqueio registrado, não uma pergunta. O agente pula para a próxima task paralelizável e segue.
@@ -121,6 +128,10 @@ Já os **hooks** divergem de mecanismo, e é a única parte com fork. A lógica 
 
 Várias sessões — do mesmo harness ou de harnesses diferentes — podem trabalhar ao mesmo tempo no mesmo projeto. Sem isolamento, um `stash` de uma sessão levaria o trabalho não salvo de outra, e a suíte inteira do fechamento de sprint reprovaria por causa do código que outra sessão está no meio de mudar.
 
+<p align="center">
+  <img alt="Sessões paralelas: worktree por feature, reivindicação de task pelo rastro e árvore limpa antes da suíte inteira" src=".github/assets/anim/sessoes-paralelas.svg" width="100%">
+</p>
+
 Três mecanismos resolvem isso:
 
 - **Worktree por feature** (regra 21): com git, a F1 abre a feature num `git worktree` próprio, num diretório irmão do checkout principal, na branch `feature/<slug>`.
@@ -136,6 +147,10 @@ O texto do método vale nos dois harnesses; os hooks rodam nativamente no Claude
 Toda regra do método é, sozinha, uma instrução que o modelo pode esquecer na task 14 de uma execução autônoma. **Hook é script determinístico: quem executa é o harness, não o modelo.** Agente roda em contexto próprio, com ferramentas restritas.
 
 Hooks e agentes **não criam regra nova** — eles garantem regras que já existem.
+
+<p align="center">
+  <img alt="Hooks: scripts determinísticos que o harness executa. Aviso deixa passar com marca; bloqueio barra." src=".github/assets/anim/hooks.svg" width="100%">
+</p>
 
 | Hook | Quando | Modo inicial | O que garante |
 |---|---|---|---|
@@ -155,14 +170,18 @@ Hooks e agentes **não criam regra nova** — eles garantem regras que já exist
 
 Os agentes de veredito têm **somente leitura**, o que transforma "aponta, não corrige" de promessa em impossibilidade técnica:
 
+<p align="center">
+  <img alt="Três agentes de veredito, somente leitura: sprintx-investigador, auditor-plano e sprintx-revisor-testes. Apontam, não corrigem." src=".github/assets/anim/agentes.svg" width="100%">
+</p>
+
 | Agente | Fase | Papel |
 |---|---|---|
 | `auditor-plano` | F5 | Fura o plano sem ter visto o raciocínio que o gerou |
-| `revisor-testes` | F5 e F6 | Esse teste passaria com a implementação errada? |
-| `investigador` | F1 (opcional) | Monta a base em contexto próprio |
+| `sprintx-revisor-testes` | F5 e F6 | Esse teste passaria com a implementação errada? |
+| `sprintx-investigador` | F1 (opcional) | Monta a base em contexto próprio |
 
 Cada agente fixa o modelo e o esforço no próprio frontmatter, em vez de herdar de quem chama:
-`auditor-plano` e `revisor-testes` em `opus`/`high`, `investigador` em `sonnet`/`medium`. É o piso do método:
+`auditor-plano` e `sprintx-revisor-testes` em `opus`/`high`, `sprintx-investigador` em `sonnet`/`medium`. É o piso do método:
 um veredito dado por um modelo mais fraco que o do autor não verifica nada. Quem precisa de outro custo
 sobrepõe no projeto, em `.expx/agentes.json` (instalação pelo `expx`; o `install.sh` manual instala o piso).
 Isto vale para o Claude Code; os agentes de `.opencode/agent/` não declaram modelo nem esforço e ficam fora desta política.
@@ -186,7 +205,7 @@ O `init` busca a `sprintx` na versão publicada, empacota como plugin local e co
 Monta a estrutura **dos dois harnesses de uma vez**:
 
 ```bash
-git clone https://github.com/bittencourtthulio/sprintx.git
+git clone https://github.com/AxisGov/sprintx.git
 cd sprintx
 ./install.sh
 ```
@@ -233,6 +252,10 @@ Descreva o que quer construir. **Não é preciso dizer `sprintx`, "plano" nem "s
 Quero adicionar exportação de relatório em CSV nessa tela.
 ```
 
+<p align="center">
+  <img alt="Demonstração: o usuário descreve a feature e a sprintx a leva pelas seis fases até a entrega" src=".github/assets/anim/demo-terminal.svg" width="100%">
+</p>
+
 ### Comandos
 
 | Comando | O que faz |
@@ -258,6 +281,10 @@ F1 INGESTÃO → F2 DESCOBERTA → F3 PLANO → [F3.5 ESTIMATIVA] → F4 ORQUEST
 
 Estritamente sequenciais. A skill descobre onde está **inspecionando o disco**, não perguntando — você nunca precisa dizer "estou na fase X". A fonte primária é o `00-PLANEJAMENTO.md` da feature, o estado durável do laço F3 ↔ F5; com Git, cada fim de F2, F3, F4 e cada veredito da F5 vira um checkpoint local na branch `feature/<slug>`, só da pasta da feature, para o planejamento sobreviver à sessão antes da execução.
 
+<p align="center">
+  <img alt="A skill descobre em que fase está inspecionando o disco, nunca perguntando" src=".github/assets/anim/maquina-de-estados.svg" width="100%">
+</p>
+
 A elas se soma uma única fase **opcional**, a F3.5 (estimativa), que roda entre a F3 e a F4 apenas quando você pede — e cuja ausência nunca impede nada.
 
 | Fase | Nome | O que faz |
@@ -270,11 +297,21 @@ A elas se soma uma única fase **opcional**, a F3.5 (estimativa), que roda entre
 | **F5** | Auditoria | A IA vira auditora do próprio plano e não corrige nada — só aponta. Verifica tasks sem teste, testes fracos, critérios subjetivos, dependências circulares, paralelismo falso e mais. Veredito único: pronto para execução autônoma, SIM ou NÃO. Teste fraco é tipado (`ausente`, `criterio`, `teste`) e a severidade sai do tipo, não do julgamento da sessão. Quem aciona a skill pode declarar um teto de reprovações; ao atingi-lo, o planejamento para em `orcamento_esgotado`, sem F6. |
 | **F6** | Execução | Lê o orquestrador e implementa até o fim, sob as regras de autonomia. Escreve o teste antes do código, atualiza o status de cada task, e entrega um relatório final com o que foi concluído, os bloqueios e a saída da suíte. Um bloqueio `defeito_de_plano` devolve o plano à F3 (`replanejar_execucao`, com orçamento próprio declarado pelo caller) sem descartar nem reabrir as tasks já concluídas. |
 
+Na F6, dúvida nova vira bloqueio registrado e a execução segue para a próxima task paralelizável.
+
+<p align="center">
+  <img alt="F6: a execução nunca para. Paralelismo declarado no plano, dúvida vira bloqueio registrado, e o agente segue para a próxima task." src=".github/assets/anim/execucao-autonoma.svg" width="100%">
+</p>
+
 ---
 
 ## Orçar sem chutar
 
 Uma software house vive de orçar, e a maior parte das estimativas erra por não ter insumo: sem tasks granulares, com dependências e paralelismo declarados, estimar é chute com aparência de método. O plano da `sprintx` já é esse insumo — a **F3.5** é a camada opcional que o converte em faixa de esforço.
+
+<p align="center">
+  <img alt="F3.5: faixa de esforço, nunca número único; esforço, nunca prazo. Esforço total versus caminho crítico." src=".github/assets/anim/estimativa.svg" width="100%">
+</p>
 
 Rode `/sprintx-estimar <feature>` sobre um plano pronto. Sai um `00-ESTIMATIVA.md` assim:
 
@@ -362,6 +399,10 @@ docs/sprintx/
 
 Todo arquivo de estado carrega um **frontmatter YAML legível por máquina**, para que um painel de operação leia o andamento das features sem depender de prosa.
 
+<p align="center">
+  <img alt="expx-schema v1: a máquina lê o YAML do frontmatter, a pessoa lê a prosa. Só a skill escreve." src=".github/assets/anim/schema.svg" width="100%">
+</p>
+
 ```yaml
 ---
 expx_schema: 1
@@ -391,7 +432,7 @@ tasks:
 
 O painel apenas **lê**; a skill continua sendo a única a escrever. A máquina lê o YAML, a pessoa lê a prosa abaixo dele.
 
-Os kinds `orquestrador`, `sprint`, `fases`, `tasks`, `bloqueios` e `base_indice` são **idênticos campo por campo** aos da [`runx`](https://github.com/bittencourtthulio/runx) — o campo `expx_tool` (`sprintx` | `runx`) diz qual das duas escreveu. A única diferença é na task: a `runx` acrescenta `teste_regressao`, que só faz sentido quando existe um comportamento errado a provar. Pendente: o bloqueio da `sprintx` ganhou a chave `classe` (tipada, nunca inferida da descrição), ainda não adotada pela `runx`; sem ela, o B-NN é lido como legado. A `sprintx` tem ainda dois kinds próprios da camada de estimativa: `estimativa` e `estimativa_historico`. Contrato completo em [`references/00-schema.md`](.claude/skills/sprintx/references/00-schema.md).
+Os kinds `orquestrador`, `sprint`, `fases`, `tasks`, `bloqueios` e `base_indice` são **idênticos campo por campo** aos da [`runx`](https://github.com/AxisGov/runx) — o campo `expx_tool` (`sprintx` | `runx`) diz qual das duas escreveu. A única diferença é na task: a `runx` acrescenta `teste_regressao`, que só faz sentido quando existe um comportamento errado a provar. Pendente: o bloqueio da `sprintx` ganhou a chave `classe` (tipada, nunca inferida da descrição), ainda não adotada pela `runx`; sem ela, o B-NN é lido como legado. A `sprintx` tem ainda dois kinds próprios da camada de estimativa: `estimativa` e `estimativa_historico`. Contrato completo em [`references/00-schema.md`](.claude/skills/sprintx/references/00-schema.md).
 
 ---
 
@@ -421,8 +462,8 @@ Os kinds `orquestrador`, `sprint`, `fases`, `tasks`, `bloqueios` e `base_indice`
     sprintx/                    escopo-da-task, git-perigoso, task-so-fecha-verde, tdd, placeholder
   agents/
     auditor-plano.md            F5 em contexto separado, somente leitura
-    revisor-testes.md           o teste passaria com a implementação errada?
-    investigador.md             auxiliar opcional da F1
+    sprintx-revisor-testes.md           o teste passaria com a implementação errada?
+    sprintx-investigador.md             auxiliar opcional da F1
   settings.json                 registra os hooks no Claude Code
 .expx/
   hooks.json                    o modo (aviso/bloqueio) de cada hook
@@ -451,11 +492,11 @@ MIT — use, copie e adapte livremente.
 
 <div align="center">
 <sub>Parte do método <strong>Expx</strong> ·
-<a href="https://github.com/bittencourtthulio/expxdev">expxdev</a> ·
-<a href="https://github.com/bittencourtthulio/buildx">buildx</a> ·
+<a href="https://github.com/AxisGov/expxdev">expxdev</a> ·
+<a href="https://github.com/AxisGov/buildx">buildx</a> ·
 sprintx ·
-<a href="https://github.com/bittencourtthulio/runx">runx</a> ·
+<a href="https://github.com/AxisGov/runx">runx</a> ·
 <a href="https://github.com/bittencourtthulio/legadox">legadox</a> ·
 <a href="https://github.com/bittencourtthulio/stackx">stackx</a> ·
-<a href="https://github.com/bittencourtthulio/mergex">mergex</a></sub>
+<a href="https://github.com/AxisGov/mergex">mergex</a></sub>
 </div>

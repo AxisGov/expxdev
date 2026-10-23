@@ -65,7 +65,7 @@ describe("P1 — integração com RunX canônica", () => {
     expect(lock["skills"]["runx"]["repositorio"]).toBe("https://github.com/AxisGov/runx");
     expect(readFileSync(join(instaladaSkill, "SKILL.md"), "utf8")).toContain("usage_limit_reached");
     expect(readFileSync(join(instaladaSkill, "references", "06-estado.md"), "utf8")).toContain("mecanico_triagem");
-    expect(readFileSync(join(projeto, ".claude", "agents", "revisor-testes.md"), "utf8")).toContain("model: haiku");
+    expect(readFileSync(join(projeto, ".claude", "agents", "runx-revisor-testes.md"), "utf8")).toContain("model: haiku");
     expect(Buffer.byteLength(readFileSync(join(instaladaSkill, "SKILL.md")))).toBeLessThanOrEqual(8000);
     for (const prefixo of ["00", "01", "02", "03", "04", "05", "06", "07"]) {
       expect(

@@ -10,13 +10,13 @@ As nove skills e seus repositórios atuais:
 |---|---|---|
 | `sprintx` | `https://github.com/AxisGov/sprintx` | planeja e executa features novas |
 | `runx` | `https://github.com/AxisGov/runx` | ocorrências de manutenção do dia a dia |
-| `legadox` | `https://github.com/bittencourtthulio/legadox` | camada para projetos legados |
-| `stackx` | `https://github.com/bittencourtthulio/stackx` | descobre o dialeto técnico do repositório |
+| `legadox` | `https://github.com/AxisGov/legadox` | camada para projetos legados |
+| `stackx` | `https://github.com/AxisGov/stackx` | descobre o dialeto técnico do repositório |
 | `mergex` | `https://github.com/AxisGov/mergex` | versionamento, entrega e revisão de PRs |
 | `memox` | `https://github.com/bittencourtthulio/MemoX` | memória dos artefatos já fechados |
 | `prodx` | `https://github.com/bittencourtthulio/prodx` | camada de produto |
 | `buildx` | `https://github.com/AxisGov/buildx` | orquestra um projeto inteiro |
-| `designx` | `https://github.com/bittencourtthulio/designx` | cartografa e audita o design system |
+| `designx` | `https://github.com/AxisGov/designx` | cartografa e audita o design system |
 
 RunX, MergeX, SprintX e BuildX têm propriedade canônica confirmada na
 organização AxisGov. LegadoX, StackX, MemoX, ProdX e DesignX permanecem com a

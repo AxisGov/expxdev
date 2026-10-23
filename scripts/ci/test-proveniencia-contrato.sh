@@ -19,9 +19,12 @@ printf '%s\n' \
   > "$base/scripts/ci/proveniencia-allowlist.tsv"
 printf '%s\n' \
   "https://$github_host/AxisGov/runx" \
+  "https://$github_host/AxisGov/legadox" \
+  "https://$github_host/AxisGov/stackx" \
   "https://$github_host/AxisGov/mergex" \
   "https://$github_host/AxisGov/sprintx" \
   "https://$github_host/AxisGov/buildx" \
+  "https://$github_host/AxisGov/designx" \
   "https://$github_host/AxisGov/expxdev" \
   > "$base/README.md"
 printf '%s\n' \

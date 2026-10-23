@@ -24,7 +24,7 @@ import {
 } from "../teste/candidatos.js";
 
 /**
- * Certificação P0.2: SprintX 08d6173 + MergeX ccee68c instaladas SÓ pelo
+ * Certificação P0.2: snapshots canônicos de SprintX + MergeX instalados SÓ pelo
  * `expxdev init` real (o binário do `dist/`, num processo novo), a partir dos
  * snapshots fixados em `fixtures/candidatos/`. Nenhum arquivo é copiado,
  * nenhum settings ou hooks.json é montado à mão: o que está no produto é o que
@@ -34,6 +34,8 @@ import {
  * AxisGov/mergex#8. A SprintX produz `00-PREDECESSORES.md` com prova pela
  * história Git; a MergeX consome essa prova na V9 e permite retomar uma entrega
  * bloqueada exclusivamente pelos predecessores demonstrados.
+ * A fixture SprintX avança com os merges canônicos necessários à composição;
+ * o SHA abaixo torna qualquer avanço explícito e auditável.
  *
  * Os dois snapshots são o commit, byte a byte — não há propagação a reaplicar.
  */
@@ -257,7 +259,7 @@ describe("P0.2 — init real de SprintX + MergeX", () => {
 
   it("funcional: 8 — o catálogo de método da MergeX está instalado pelo mecanismo normal", () => {
     const rel = ".claude/skills/mergex/scripts/catalogo-de-metodo.sh";
-    expect(CANDIDATOS.sprintx.sha).toBe("e1f88c98b4180f5df4ad9f8775999bbeb1dbdb8d");
+    expect(CANDIDATOS.sprintx.sha).toBe("7fc8a3f854edf6be1445405d1ff6dbc7deb08f09");
     expect(CANDIDATOS.mergex.sha).toBe("60065157060cb84f0246d6e10844d475fbe1b8df");
     expect(sha256(join(A, rel))).toBe(sha256(join(snapshot("mergex"), rel)));
     expect(readFileSync(join(A, rel), "utf8")).toContain("PREFLIGHT.md");

@@ -99,7 +99,7 @@ Objetivo, fases, critério de saída, riscos conhecidos.
 ## Entrega no repositório
 
 A `sprintx` termina com o código escrito e os testes verdes. Levar isso até o repositório e até
-o revisor é trabalho da [`mergex`](https://github.com/bittencourtthulio/mergex): ela adota a
+o revisor é trabalho da [`mergex`](https://github.com/AxisGov/mergex): ela adota a
 branch e o worktree que a F1 abriu (regra 21), commita cada task que fecha, e ao fim monta a
 entrega — portão de prontidão, classificação do diff por atenção humana, descrição do pull
 request e pacote para o QA.
@@ -225,8 +225,8 @@ Os agentes de veredito têm **acesso somente de leitura**. É isso que transform
 | Agente | Fase | Ferramentas | Papel |
 |---|---|---|---|
 | `auditor-plano` | F5 | leitura | Fura o plano antes de virar código, sem ter visto o raciocínio que o gerou |
-| `revisor-testes` | F5 e F6 | leitura | Responde a uma pergunta só: esse teste passaria com a implementação errada? |
-| `investigador` | F1 (opcional) | leitura | Monta a base em contexto próprio, para não consumir o contexto principal |
+| `sprintx-revisor-testes` | F5 e F6 | leitura | Responde a uma pergunta só: esse teste passaria com a implementação errada? |
+| `sprintx-investigador` | F1 (opcional) | leitura | Monta a base em contexto próprio, para não consumir o contexto principal |
 
 Quando o agente não existe no harness em uso, a fase roda como sempre rodou — a skill nunca fica bloqueada por falta de agente.
 

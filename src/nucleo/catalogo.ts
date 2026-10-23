@@ -41,13 +41,15 @@ export const CATALOGO: readonly Skill[] = [
   },
   {
     nome: "legadox",
-    repositorio: "https://github.com/bittencourtthulio/legadox",
+    repositorio: "https://github.com/AxisGov/legadox",
+    origensLegadas: ["https://github.com/bittencourtthulio/legadox"],
     papel: "camada para projetos legados",
     camada: true,
   },
   {
     nome: "stackx",
-    repositorio: "https://github.com/bittencourtthulio/stackx",
+    repositorio: "https://github.com/AxisGov/stackx",
+    origensLegadas: ["https://github.com/bittencourtthulio/stackx"],
     papel: "descobre o dialeto tecnico do repositorio",
     camada: true,
   },
@@ -79,7 +81,8 @@ export const CATALOGO: readonly Skill[] = [
   },
   {
     nome: "designx",
-    repositorio: "https://github.com/bittencourtthulio/designx",
+    repositorio: "https://github.com/AxisGov/designx",
+    origensLegadas: ["https://github.com/bittencourtthulio/designx"],
     papel: "camada de design, cartografa e audita o design system",
     camada: true,
   },

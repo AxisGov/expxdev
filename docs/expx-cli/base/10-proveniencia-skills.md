@@ -8,11 +8,14 @@ Os repositórios abaixo foram confirmados na organização AxisGov em 2026-10-22
 
 | Repositório | `origin/main` confirmado |
 |---|---|
-| `AxisGov/expxdev` | `6bc58bd644428453d9a1b3d435f9aa5181b4ba5b` |
-| `AxisGov/runx` | `979143f152152de014277b5034c9e01c6f917e0e` |
-| `AxisGov/mergex` | `8d4e4b7b6ab928962c5479aa945dd6aa7d1c978d` |
-| `AxisGov/sprintx` | `285a337423de907890fd1297671174e9a3f056d4` |
-| `AxisGov/buildx` | `6cd5dbd1b34410fbb5ac219ce0e03c8e9d347e88` |
+| `AxisGov/expxdev` | `0aab93ed1081a30ab7e3dfd9967549e13400c987` |
+| `AxisGov/runx` | `b3edbf1e68af81852e183678c4a634b9f2a043d7` |
+| `AxisGov/legadox` | `8d33c0c303f531e2c70dbbd32a40bad83e329b9b` |
+| `AxisGov/stackx` | `7379a5ee575c11b09d601048958934684bbe80b0` |
+| `AxisGov/mergex` | `4c10a0d79e930e8c569023ca44daede573ebd425` |
+| `AxisGov/sprintx` | `7fc8a3f854edf6be1445405d1ff6dbc7deb08f09` |
+| `AxisGov/buildx` | `b7dc7b6906904b3bf7184431518608a11422bd54` |
+| `AxisGov/designx` | `a0473ed769cd20dd298ceb581e428579f1781eab` |
 
 ## Catálogo completo
 
@@ -20,13 +23,13 @@ Os repositórios abaixo foram confirmados na organização AxisGov em 2026-10-22
 |---|---|---|---|---|---|---|---|---|
 | `sprintx` | SprintX | `https://github.com/AxisGov/sprintx` | `AxisGov/sprintx` | `https://github.com/bittencourtthulio/sprintx` | padrão `sprintx` detalhado abaixo | lock/manifestos padrão detalhados abaixo | [README](https://github.com/AxisGov/sprintx#readme) e [catálogo público](https://github.com/AxisGov/expxdev/blob/main/docs/expx-cli/base/04-skills-do-ecossistema.md) | `catalogo.test.ts`, `proveniencia-skills.test.ts`, `proveniencia.test.ts`, `pacote.test.ts` e guards `scripts/ci/test-proveniencia.sh` no ExpxDev/SprintX |
 | `runx` | RunX | `https://github.com/AxisGov/runx` | `AxisGov/runx` | `https://github.com/bittencourtthulio/runx` | padrão `runx` detalhado abaixo | lock/manifestos padrão detalhados abaixo | [README](https://github.com/AxisGov/runx#readme) e [catálogo público](https://github.com/AxisGov/expxdev/blob/main/docs/expx-cli/base/04-skills-do-ecossistema.md) | os quatro testes ExpxDev acima e guards `scripts/ci/test-proveniencia.sh` no ExpxDev/RunX |
-| `legadox` | LegadoX | `https://github.com/bittencourtthulio/legadox` | propriedade ainda não decidida | não classificada enquanto não houver decisão de propriedade | padrão `legadox` detalhado abaixo | lock/manifestos padrão detalhados abaixo | [README da origem observada](https://github.com/bittencourtthulio/legadox#readme) e [catálogo público](https://github.com/AxisGov/expxdev/blob/main/docs/expx-cli/base/04-skills-do-ecossistema.md) | `catalogo.test.ts` protege apenas a origem observada; decisão de propriedade pendente |
-| `stackx` | StackX | `https://github.com/bittencourtthulio/stackx` | propriedade ainda não decidida | não classificada enquanto não houver decisão de propriedade | padrão `stackx` detalhado abaixo | lock/manifestos padrão detalhados abaixo | [README da origem observada](https://github.com/bittencourtthulio/stackx#readme) e [catálogo público](https://github.com/AxisGov/expxdev/blob/main/docs/expx-cli/base/04-skills-do-ecossistema.md) | `catalogo.test.ts` protege apenas a presença no catálogo; decisão de propriedade pendente |
+| `legadox` | LegadoX | `https://github.com/AxisGov/legadox` | `AxisGov/legadox` | `https://github.com/bittencourtthulio/legadox` | padrão `legadox` detalhado abaixo | lock/manifestos padrão detalhados abaixo | [README](https://github.com/AxisGov/legadox#readme) e [catálogo público](https://github.com/AxisGov/expxdev/blob/main/docs/expx-cli/base/04-skills-do-ecossistema.md) | `catalogo.test.ts`, `proveniencia-skills.test.ts` e `proveniencia.test.ts` no ExpxDev |
+| `stackx` | StackX | `https://github.com/AxisGov/stackx` | `AxisGov/stackx` | `https://github.com/bittencourtthulio/stackx` | padrão `stackx` detalhado abaixo | lock/manifestos padrão detalhados abaixo | [README](https://github.com/AxisGov/stackx#readme) e [catálogo público](https://github.com/AxisGov/expxdev/blob/main/docs/expx-cli/base/04-skills-do-ecossistema.md) | `catalogo.test.ts`, `proveniencia-skills.test.ts` e `proveniencia.test.ts` no ExpxDev |
 | `mergex` | MergeX | `https://github.com/AxisGov/mergex` | `AxisGov/mergex` | `https://github.com/bittencourtthulio/mergex` | padrão `mergex` detalhado abaixo | lock/manifestos padrão detalhados abaixo | [README](https://github.com/AxisGov/mergex#readme) e [catálogo público](https://github.com/AxisGov/expxdev/blob/main/docs/expx-cli/base/04-skills-do-ecossistema.md) | os quatro testes ExpxDev acima e guards `scripts/ci/test-proveniencia.sh` no ExpxDev/MergeX |
 | `memox` | MemoX | `https://github.com/bittencourtthulio/MemoX` | propriedade ainda não decidida | não classificada enquanto não houver decisão de propriedade | padrão `memox` detalhado abaixo | lock/manifestos padrão detalhados abaixo | [README da origem observada](https://github.com/bittencourtthulio/MemoX#readme) e [catálogo público](https://github.com/AxisGov/expxdev/blob/main/docs/expx-cli/base/04-skills-do-ecossistema.md) | `catalogo.test.ts` protege a origem observada; decisão de propriedade pendente |
 | `prodx` | ProdX | `https://github.com/bittencourtthulio/prodx` | propriedade ainda não decidida | não classificada enquanto não houver decisão de propriedade | padrão `prodx` detalhado abaixo | lock/manifestos padrão detalhados abaixo | [README da origem observada](https://github.com/bittencourtthulio/prodx#readme) e [catálogo público](https://github.com/AxisGov/expxdev/blob/main/docs/expx-cli/base/04-skills-do-ecossistema.md) | `catalogo.test.ts` protege a origem observada; decisão de propriedade pendente |
 | `buildx` | BuildX | `https://github.com/AxisGov/buildx` | `AxisGov/buildx` | `https://github.com/bittencourtthulio/buildx` | padrão `buildx` detalhado abaixo | lock/manifestos padrão detalhados abaixo | [README](https://github.com/AxisGov/buildx#readme) e [catálogo público](https://github.com/AxisGov/expxdev/blob/main/docs/expx-cli/base/04-skills-do-ecossistema.md) | os quatro testes ExpxDev acima e guards `scripts/ci/test-proveniencia.sh` no ExpxDev/BuildX |
-| `designx` | DesignX | `https://github.com/bittencourtthulio/designx` | propriedade ainda não decidida | não classificada enquanto não houver decisão de propriedade | padrão `designx` detalhado abaixo | lock/manifestos padrão detalhados abaixo | [README da origem observada](https://github.com/bittencourtthulio/designx#readme) e [catálogo público](https://github.com/AxisGov/expxdev/blob/main/docs/expx-cli/base/04-skills-do-ecossistema.md) | `catalogo.test.ts` protege apenas a presença no catálogo; decisão de propriedade pendente |
+| `designx` | DesignX | `https://github.com/AxisGov/designx` | `AxisGov/designx` | `https://github.com/bittencourtthulio/designx` | padrão `designx` detalhado abaixo | lock/manifestos padrão detalhados abaixo | [README](https://github.com/AxisGov/designx#readme) e [catálogo público](https://github.com/AxisGov/expxdev/blob/main/docs/expx-cli/base/04-skills-do-ecossistema.md) | `catalogo.test.ts`, `proveniencia-skills.test.ts` e `proveniencia.test.ts` no ExpxDev |
 
 ## Caminhos e registros padrão
 
@@ -44,8 +47,8 @@ A origem resolvida fica em
 
 ## Regras de migração
 
-- RunX, MergeX, SprintX e BuildX sempre resolvem a origem gerenciada para
-  AxisGov, inclusive quando um lock antigo termina em `.git`.
+- As sete skills com fork AxisGov — SprintX, RunX, LegadoX, StackX, MergeX,
+  BuildX e DesignX — resolvem a origem gerenciada para AxisGov, inclusive quando um lock antigo termina em `.git`.
 - `update --check` apenas informa; `update --yes` migra somente o campo
   `repositorio` e preserva referência, commit, data, hashes, harness e
   configuração instalada.

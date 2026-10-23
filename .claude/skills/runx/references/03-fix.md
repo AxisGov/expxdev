@@ -51,14 +51,14 @@ Para CADA task, exatamente nesta ordem, sem inverter nenhum passo:
    Um ponto que não muda: **task com teste vermelho não fecha**, seja o subconjunto ou a suíte inteira. `parcial` significa "o que era desta task passou", nunca "passou mais ou menos".
 6. Antes de aceitar o verde, responda: **este teste falharia com uma implementação errada?** Se a resposta é não, o teste não discrimina — reescreva-o e volte ao passo 2.
 
-   **Se o agente `revisor-testes` estiver disponível, é ele quem responde essa pergunta** — você acabou de escrever o teste e é o pior juiz da própria armadilha. Passe a pasta da ocorrência e a task. Ele lê, roda o que precisar e devolve a tabela de achados mais a linha `TESTES: DISCRIMINAM` / `TESTES: NÃO DISCRIMINAM`. Ele não corrige: não tem ferramenta de escrita. Achado ALTA dele = teste reescrito por você e volta ao passo 2.
+   **Se o agente `runx-revisor-testes` estiver disponível, é ele quem responde essa pergunta** — você acabou de escrever o teste e é o pior juiz da própria armadilha. Passe a pasta da ocorrência e a task. Ele lê, roda o que precisar e devolve a tabela de achados mais a linha `TESTES: DISCRIMINAM` / `TESTES: NÃO DISCRIMINAM`. Ele não corrige: não tem ferramenta de escrita. Achado ALTA dele = teste reescrito por você e volta ao passo 2.
 
    Na primeira task da primeira fase, peça a ele a checagem que mais falha em silêncio: **o `teste_regressao` realmente falhava antes do fix?** Ele confirma contra o código anterior (`git worktree`, `git show`) e devolve `REGRESSÃO PROVA` ou `REGRESSÃO NÃO PROVA`. `NÃO PROVA` cai na regra abaixo — para a execução e volta ao E1.
 
    Registre no rastro:
 
    ```
-   python3 .claude/runx-hooks/comum/rastro.py --evento veredito_emitido --agente revisor-testes \
+   python3 .claude/runx-hooks/comum/rastro.py --evento veredito_emitido --agente runx-revisor-testes \
      --fase e3 --task <T-NN.MM> --resultado <discriminam|nao_discriminam> --detalhe "N achados"
    ```
 7. Verifique **de fato** o `criterio_aceite` da task — não presuma que ele decorre do teste verde.

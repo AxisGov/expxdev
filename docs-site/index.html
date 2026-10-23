@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Documentação do método Expx</title>
-<meta name="description" content="Referência da linha AxisGov v0.11.0 do CLI expxdev e das nove skills do método Expx: instalação, contratos, grafo, painel, watch e arquitetura interna.">
+<meta name="description" content="Referência da linha AxisGov v0.11.1 do CLI expxdev e das nove skills do método Expx: instalação, contratos, grafo, painel, watch e arquitetura interna.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -24,7 +24,7 @@
       <path d="M7.6 7.4 L16.4 16.6 M16.4 7.4 L7.6 16.6" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/>
     </svg>
     <span class="marca__nome">expx<b>dev</b></span>
-    <span class="marca__versao" id="versao">v0.11.0</span>
+    <span class="marca__versao" id="versao">v0.11.1</span>
   </a>
 
   <div class="busca">
@@ -115,20 +115,20 @@
     o bastante para o agente decidir sozinho no meio da implementação, e ele decide: escolhe um padrão
     que não é o do projeto, escreve o teste na pasta que o runner não olha, refatora três arquivos que
     ninguém pediu. O método Expx é o conjunto das restrições que evitam isso, escrito. Este site é a
-    referência da linha <strong>AxisGov v0.11.0</strong> do <code>expxdev</code> — o CLI que instala e
+    referência da linha <strong>AxisGov v0.11.1</strong> do <code>expxdev</code> — o CLI que instala e
     mantém as nove skills — e de cada contrato que permite a elas cooperarem.
   </p>
 
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
-    <pre><code><span class="tok-cmd">gh</span> release download v0.11.0 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
-<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.11.0.tgz expx <span class="tok-flag">--version</span></code></pre>
+    <pre><code><span class="tok-cmd">gh</span> release download v0.11.1 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
+<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.11.1.tgz expx <span class="tok-flag">--version</span></code></pre>
   </div>
 
   <div class="cartoes">
     <div class="cartao"><div class="cartao__num">9</div><div class="cartao__rot">skills no catálogo</div></div>
     <div class="cartao"><div class="cartao__num">8</div><div class="cartao__rot">subcomandos do CLI</div></div>
-    <div class="cartao"><div class="cartao__num">1461</div><div class="cartao__rot">testes aprovados</div></div>
+    <div class="cartao"><div class="cartao__num">1490</div><div class="cartao__rot">testes aprovados</div></div>
     <div class="cartao"><div class="cartao__num">30</div><div class="cartao__rot">verificações do doctor</div></div>
   </div>
 
@@ -208,9 +208,9 @@
   não executa <code>npm publish</code>: baixe o tarball e o checksum da GitHub Release explícita.</p>
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
-    <pre><code><span class="tok-cmd">gh</span> release download v0.11.0 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
-(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.11.0.tgz.sha256)
-<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.11.0.tgz expx init <span class="tok-flag">--skills</span> sprintx,runx,mergex <span class="tok-flag">--harness</span> claude,opencode <span class="tok-flag">--yes</span></code></pre>
+    <pre><code><span class="tok-cmd">gh</span> release download v0.11.1 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
+(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.11.1.tgz.sha256)
+<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.11.1.tgz expx init <span class="tok-flag">--skills</span> sprintx,runx,mergex <span class="tok-flag">--harness</span> claude,opencode <span class="tok-flag">--yes</span></code></pre>
   </div>
 
   <div class="tabela-caixa"><table>
@@ -235,7 +235,7 @@
   <div class="terminal">
     <div class="terminal__barra"><span class="terminal__bolha" style="background:#ff5f57"></span><span class="terminal__bolha" style="background:#febc2e"></span><span class="terminal__bolha" style="background:#28c840"></span><span class="terminal__titulo">expx init</span></div>
     <pre><code><span class="t-ciano">  ███████ ██   ██ ██████  ██   ██</span>   <span class="t-cinza">dev</span>
-<span class="t-cinza">  o CLI do metodo Expx · v0.11.0</span>
+<span class="t-cinza">  o CLI do metodo Expx · v0.11.1</span>
 
 <span class="t-verde">?</span> <span class="t-azul">Quais skills instalar?</span> <span class="t-cinza">(espaço marca, enter confirma)</span>
  <span class="t-verde">◉</span> sprintx   <span class="t-cinza">planeja e executa features novas</span>
@@ -441,13 +441,18 @@
     <thead><tr><th>Agente</th><th>Usado por</th><th>Ferramentas</th><th>Papel</th></tr></thead>
     <tbody>
       <tr><td><code>auditor-plano</code></td><td>sprintx F5</td><td><span class="selo selo--ok">leitura apenas</span></td><td>Fura o plano antes de ele virar código</td></tr>
-      <tr><td><code>revisor-testes</code></td><td>sprintx, runx</td><td><span class="selo selo--ok">leitura apenas</span></td><td>Responde: esse teste passaria com a implementação errada?</td></tr>
+      <tr><td><code>sprintx-revisor-testes</code></td><td>sprintx F5/F6</td><td><span class="selo selo--ok">leitura apenas</span></td><td>Verifica se o teste discrimina a implementação errada</td></tr>
+      <tr><td><code>sprintx-investigador</code></td><td>sprintx F1</td><td>leitura + busca web</td><td>Condensa bases grandes para o planejamento</td></tr>
+      <tr><td><code>runx-revisor-testes</code></td><td>runx E3</td><td>leitura + rodar teste</td><td>Verifica se o teste discrimina a implementação errada</td></tr>
+      <tr><td><code>runx-investigador</code></td><td>runx E1</td><td>leitura + busca + comandos</td><td>Prova causa raiz ou dimensiona o impacto</td></tr>
       <tr><td><code>qa</code></td><td>runx E4</td><td>leitura + rodar suíte</td><td>Valida contra os critérios; não corrige</td></tr>
-      <tr><td><code>investigador</code></td><td>runx E1, sprintx F1</td><td>leitura + busca</td><td>Monta a base e prova a causa raiz</td></tr>
-      <tr><td><code>cartografo</code></td><td>stackx, legadox</td><td>leitura + histórico</td><td>Varre o repositório e extrai convenção ou perfil</td></tr>
-      <tr><td><code>avaliador-de-raio</code></td><td>legadox C2</td><td>leitura + escrita em <code>docs/legado/raio/</code></td><td>Coleta os oito sinais e classifica a faixa</td></tr>
-      <tr><td><code>revisor-diff</code></td><td>mergex E3</td><td>leitura + suíte</td><td>Classifica o diff nas três faixas de atenção</td></tr>
+      <tr><td><code>legadox-cartografo</code></td><td>legadox</td><td>leitura + comandos + escrita</td><td>Monta o perfil legado e prova que o código está vivo</td></tr>
+      <tr><td><code>avaliador-de-raio</code></td><td>legadox</td><td>leitura + comandos + escrita</td><td>Calcula o raio de impacto por evidência</td></tr>
+      <tr><td><code>stackx-cartografo</code></td><td>stackx</td><td>leitura + histórico + comandos</td><td>Extrai convenções sem escrever o <code>CONVENCOES.md</code></td></tr>
+      <tr><td><code>revisor-diff</code></td><td>mergex E3</td><td>leitura + comandos</td><td>Classifica o diff nas três faixas de atenção</td></tr>
       <tr><td><code>analista-de-conflito</code></td><td>mergex E9</td><td><span class="selo selo--ok">leitura apenas</span></td><td>Explica o que cada lado pretendia; nunca resolve</td></tr>
+      <tr><td><code>auditor-design</code></td><td>designx</td><td><span class="selo selo--ok">leitura apenas</span></td><td>Audita conformidade visual; não corrige</td></tr>
+      <tr><td><code>cartografo-visual</code></td><td>designx</td><td><span class="selo selo--ok">leitura apenas</span></td><td>Extrai do código o vocabulário visual em uso</td></tr>
     </tbody>
   </table></div>
 
@@ -869,7 +874,7 @@ docs/legado/comparacao/&lt;trabalho_id&gt;.md  <span class="tok-com"># C9</span>
   <div class="tabela-caixa"><table>
     <thead><tr><th>Etapa</th><th>Nome</th><th>O que produz</th></tr></thead>
     <tbody>
-      <tr><td><code>1</code></td><td>Detecção</td><td>inventário <code>FATO / EVIDÊNCIA / FORÇA</code> em memória — roda no agente <code>cartografo</code></td></tr>
+      <tr><td><code>1</code></td><td>Detecção</td><td>inventário <code>FATO / EVIDÊNCIA / FORÇA</code> em memória — roda no agente <code>stackx-cartografo</code></td></tr>
       <tr><td><code>2</code></td><td>O CONVENCOES.md</td><td><code>docs/stack/CONVENCOES.md</code></td></tr>
       <tr><td><code>3</code></td><td>Conflito e lacuna</td><td><code>docs/stack/LACUNAS.md</code></td></tr>
       <tr><td><code>4</code></td><td>Verificação de aderência</td><td>tabela severidade / arquivo / convenção violada / correção sugerida</td></tr>
@@ -1640,7 +1645,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
     <div class="codigo__topo"><span class="codigo__rotulo">.expx/expx-lock.json</span><button class="codigo__copiar">Copiar</button></div>
     <pre><code>{
   <span class="tok-key">"lock_version"</span>: <span class="tok-num">1</span>,
-  <span class="tok-key">"cli_version"</span>: <span class="tok-str">"0.11.0"</span>,
+  <span class="tok-key">"cli_version"</span>: <span class="tok-str">"0.11.1"</span>,
   <span class="tok-key">"harness"</span>: [<span class="tok-str">"claude"</span>],
   <span class="tok-key">"skills"</span>: {
     <span class="tok-key">"sprintx"</span>: {
@@ -2482,7 +2487,7 @@ docs/contrato/  <span class="tok-com">os contratos compartilhados pelas nove ski
   </div>
 
   <div class="cartoes">
-    <div class="cartao"><div class="cartao__num">1461</div><div class="cartao__rot">testes aprovados</div></div>
+    <div class="cartao"><div class="cartao__num">1490</div><div class="cartao__rot">testes aprovados</div></div>
     <div class="cartao"><div class="cartao__num">140</div><div class="cartao__rot">arquivos aprovados</div></div>
     <div class="cartao"><div class="cartao__num">4</div><div class="cartao__rot">projetos no runner</div></div>
     <div class="cartao"><div class="cartao__num">0</div><div class="cartao__rot">testes que dependem de rede</div></div>
@@ -2523,17 +2528,17 @@ docs/contrato/  <span class="tok-com">os contratos compartilhados pelas nove ski
 <footer class="rodape">
   <p>Documentação do método <strong>Expx</strong> · gerada a partir do código-fonte do
   <a href="https://github.com/AxisGov/expxdev">expxdev</a>
-  <a href="https://github.com/AxisGov/expxdev/releases/tag/v0.11.0">v0.11.0</a>.</p>
+  <a href="https://github.com/AxisGov/expxdev/releases/tag/v0.11.1">v0.11.1</a>.</p>
   <p>
     <a href="https://github.com/AxisGov/sprintx">sprintx</a> ·
     <a href="https://github.com/AxisGov/runx">runx</a> ·
-    <a href="https://github.com/bittencourtthulio/legadox">legadox</a> ·
-    <a href="https://github.com/bittencourtthulio/stackx">stackx</a> ·
+    <a href="https://github.com/AxisGov/legadox">legadox</a> ·
+    <a href="https://github.com/AxisGov/stackx">stackx</a> ·
     <a href="https://github.com/AxisGov/mergex">mergex</a> ·
     <a href="https://github.com/bittencourtthulio/MemoX">memox</a> ·
     <a href="https://github.com/bittencourtthulio/prodx">prodx</a> ·
     <a href="https://github.com/AxisGov/buildx">buildx</a> ·
-    <a href="https://github.com/bittencourtthulio/designx">designx</a>
+    <a href="https://github.com/AxisGov/designx">designx</a>
   </p>
 </footer>
 
