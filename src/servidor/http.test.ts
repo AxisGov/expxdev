@@ -45,12 +45,28 @@ describe("rotas de leitura", () => {
     expect(corpo.violacoes).toEqual([]);
   });
 
-  it("funcional: as quatro rotas de leitura respondem 200", async () => {
+  it("funcional: as seis rotas de leitura respondem 200", async () => {
     servidor = await criarServidor({ raiz: "fixtures/projeto-ruim", porta: 0 });
-    for (const rota of ["/api/projeto", "/api/conformidade", "/api/rejeicoes", "/api/historico"]) {
+    for (const rota of [
+      "/api/projeto",
+      "/api/conformidade",
+      "/api/rejeicoes",
+      "/api/historico",
+      "/api/eventos",
+      "/api/agentes",
+    ]) {
       const r = await fetch(`${servidor.url()}${rota}`);
       expect(r.status, rota).toBe(200);
     }
+  });
+  it("integração: a rota de eventos expõe o mesmo rastro rotacionado do estado", async () => {
+    servidor = await criarServidor({ raiz: "fixtures/watch/com-estado", porta: 0 });
+    const r = await fetch(`${servidor.url()}/api/eventos`);
+    const corpo = (await r.json()) as {
+      eventos: Record<string, Array<{ ts: string }>>;
+    };
+    expect(corpo.eventos["exportacao-csv"]).toHaveLength(7);
+    expect(corpo.eventos["exportacao-csv"]?.[0]?.ts).toBe("2026-08-29T14:32:00Z");
   });
 });
 

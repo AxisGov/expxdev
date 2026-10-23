@@ -358,6 +358,16 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
   display: grid; grid-template-columns: 84px 1fr auto; gap: 10px; align-items: baseline;
   padding: 6px 0; border-bottom: 1px solid var(--vscode-panel-border);
 }
+.linha-rastro {
+  display: grid; grid-template-columns: 154px minmax(180px, 1fr) auto;
+  gap: 12px; align-items: baseline;
+  padding: 7px 0; border-bottom: 1px solid var(--vscode-panel-border);
+}
+.linha-rastro:last-child { border-bottom: none; }
+@media (max-width: 720px) {
+  .linha-rastro { grid-template-columns: 1fr; gap: 3px; }
+  .linha-rastro > :last-child { text-align: left !important; }
+}
 .linha-task:last-child { border-bottom: none; }
 .dep { font-size: 11px; color: var(--vscode-descriptionForeground); font-family: var(--mono); }
 

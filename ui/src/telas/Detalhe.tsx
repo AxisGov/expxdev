@@ -1,9 +1,10 @@
 import type { JSX } from "react";
-import type { Estado, Task, Trabalho } from "../tipos.js";
+import type { ConfiguracaoAgente, Estado, Evento, Task, Trabalho } from "../tipos.js";
 import { ROTULO_ESTAGIO } from "../tipos.js";
 import { Barra, Etiqueta, Vazio, PageHeader } from "../comuns.js";
 import { GrafoVivo } from "./GrafoVivo.js";
 import { motivosDoAlerta, rotuloDoMotivo } from "./alerta-grafo.js";
+import { rotuloEvento } from "../../../src/watch/logica/atividade.js";
 
 const ROTULO_STATUS: Record<string, string> = {
   pendente: "pendente", em_andamento: "em andamento", concluida: "concluída", bloqueada: "bloqueada",
@@ -93,7 +94,15 @@ export function rolarAteTask(idTask: string, doc: Document = document): boolean 
  * mantê-lo recolhido esconde justamente o caso em que ele vale a tela. Nesses,
  * abre já expandido e o cabeçalho diz o que procurar.
  */
-function GrafoDoPlano({ trabalho }: { trabalho: Trabalho }): JSX.Element | null {
+function GrafoDoPlano({
+  trabalho,
+  eventos,
+  agentes,
+}: {
+  trabalho: Trabalho;
+  eventos: readonly Evento[];
+  agentes: readonly ConfiguracaoAgente[];
+}): JSX.Element | null {
   const temTask = trabalho.sprints.some((s) => s.tasks.length > 0);
   if (!temTask) return null;
 
@@ -120,9 +129,84 @@ function GrafoDoPlano({ trabalho }: { trabalho: Trabalho }): JSX.Element | null 
       <div style={{ marginTop: 11 }}>
         <GrafoVivo
           trabalho={trabalho}
+          eventos={eventos}
+          agentes={agentes}
           aoEscolherTask={(idTask) => rolarAteTask(idTask)}
         />
       </div>
+    </details>
+  );
+}
+
+function configuracaoDe(
+  nome: string,
+  agentes: readonly ConfiguracaoAgente[],
+): ConfiguracaoAgente | undefined {
+  return agentes.find((agente) => agente.nome === nome);
+}
+
+function instante(ts: string): string {
+  return ts.replace("T", " ").replace(/Z$/, " UTC");
+}
+
+function LinhaDoTempo({
+  eventos,
+  agentes,
+  branch,
+}: {
+  eventos: readonly Evento[];
+  agentes: readonly ConfiguracaoAgente[];
+  branch: string | null;
+}): JSX.Element {
+  const recentes = eventos.slice(0, 30);
+  return (
+    <details className="painel-det" open={eventos.length > 0}>
+      <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 560 }}>
+        Rastro de execução
+        <span className="dep">
+          {" "}· {eventos.length} evento(s)
+          {eventos.length > recentes.length ? ` · últimos ${recentes.length}` : ""}
+        </span>
+      </summary>
+      {branch !== null ? (
+        <div className="dep" style={{ marginTop: 11 }}>
+          O rastro dessa branch não está no checkout ativo; o painel não inventa nem mistura eventos.
+        </div>
+      ) : recentes.length === 0 ? (
+        <div className="dep" style={{ marginTop: 11 }}>
+          Nenhum evento válido em <code>docs/eventos/</code> para este trabalho.
+        </div>
+      ) : (
+        <>
+          <div className="dep" style={{ marginTop: 9, marginBottom: 7 }}>
+            Agente vem do evento. Modelo e esforço refletem a configuração instalada atual;
+            o contrato v1 ainda não registra qual modelo executou historicamente.
+          </div>
+          <div>
+            {recentes.map((evento, i) => {
+              const cfg = configuracaoDe(evento.agente, agentes);
+              const executor = [evento.agente, cfg?.model, cfg?.effort].filter(Boolean).join(" · ");
+              const contexto = [evento.fase, evento.task].filter(Boolean).join(" · ");
+              return (
+                <div className="linha-rastro" key={`${evento.ts}-${evento.evento}-${String(i)}`}>
+                  <time className="dep" dateTime={evento.ts}>{instante(evento.ts)}</time>
+                  <div>
+                    <div>
+                      <strong style={{ fontWeight: 560 }}>{rotuloEvento(evento.evento)}</strong>
+                      {contexto ? <span className="dep"> · {contexto}</span> : null}
+                    </div>
+                    <div className="dep">{evento.detalhe || "sem detalhe"}</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div className="mono">{executor}</div>
+                    <div className="dep">{evento.resultado}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </details>
   );
 }
@@ -141,6 +225,7 @@ export function Detalhe({
 
   const critico = new Set(t.caminho_critico);
   const abertos = t.bloqueios.filter((b) => b.aberto);
+  const eventos = t.branch === null ? (estado.eventos[t.trabalho_id] ?? []) : [];
 
   return (
     <>
@@ -172,7 +257,9 @@ export function Detalhe({
         ) : null}
       </div>
 
-      <GrafoDoPlano trabalho={t} />
+      <LinhaDoTempo eventos={eventos} agentes={estado.agentes} branch={t.branch} />
+
+      <GrafoDoPlano trabalho={t} eventos={eventos} agentes={estado.agentes} />
 
       {abertos.length > 0 ? (
         <div className="painel-det" style={{ borderColor: "var(--alerta)" }}>

@@ -131,6 +131,43 @@ describe("detalhe do trabalho", () => {
     expect(screen.getAllByText("T-01.01").length).toBeGreaterThan(0);
     expect(screen.getAllByText("T-01.03").length).toBeGreaterThan(0);
   });
+  it("integração: mostra o agente do evento e a configuração atual da LLM sem tratá-la como histórico", () => {
+    const comRastro: Estado = {
+      ...ok,
+      eventos: {
+        ...ok.eventos,
+        "exportacao-csv": [{
+          ts: "2026-08-29T14:32:00Z",
+          expx_eventos: 1,
+          trabalho_id: "exportacao-csv",
+          ferramenta: "sprintx",
+          origem: "agente",
+          evento: "agente_iniciado",
+          fase: "f6",
+          task: "T-01.02",
+          agente: "sprintx-investigador",
+          resultado: "ok",
+          detalhe: "investigação delegada",
+          arquivos: [],
+        }],
+      },
+      agentes: [{
+        nome: "sprintx-investigador",
+        model: "sonnet",
+        effort: "medium",
+        arquivo: ".claude/agents/sprintx-investigador.md",
+      }],
+    };
+    const { container } = render(
+      <Detalhe estado={comRastro} id="exportacao-csv" aoVoltar={() => undefined} />,
+    );
+
+    expect(screen.getByText("agente iniciado")).toBeDefined();
+    expect(screen.getByText("sprintx-investigador · sonnet · medium")).toBeDefined();
+    expect(screen.getByText(/contrato v1 ainda não registra/)).toBeDefined();
+    const titulos = [...container.querySelectorAll("svg title")].map((item) => item.textContent ?? "");
+    expect(titulos.some((item) => item.includes("sonnet") && item.includes("configuração atual"))).toBe(true);
+  });
 
   it("funcional: a barra de uma fase 1 de 2 mostra 50 por cento", () => {
     const { container } = render(<Detalhe estado={ok} id="exportacao-csv" aoVoltar={() => undefined} />);
@@ -167,7 +204,9 @@ describe("detalhe do trabalho", () => {
     const { container } = render(
       <Detalhe estado={ruim} id="violacoes" aoVoltar={() => undefined} />,
     );
-    const bloco = container.querySelector("details");
+    const bloco = [...container.querySelectorAll("details")].find((item) =>
+      item.querySelector("summary")?.textContent?.includes("Grafo de dependências"),
+    ) ?? null;
     if (bloco === null) return; // trabalho sem task: nao ha grafo, nada a afirmar
     expect(bloco.hasAttribute("open")).toBe(true);
     expect(bloco.querySelector("summary")?.textContent ?? "").toMatch(
@@ -177,7 +216,9 @@ describe("detalhe do trabalho", () => {
 
   it("funcional: plano sem defeito vem recolhido, para não empurrar o plano para baixo", () => {
     const { container } = render(<Detalhe estado={ok} id="exportacao-csv" aoVoltar={() => undefined} />);
-    const bloco = container.querySelector("details");
+    const bloco = [...container.querySelectorAll("details")].find((item) =>
+      item.querySelector("summary")?.textContent?.includes("Grafo de dependências"),
+    ) ?? null;
     expect(bloco).not.toBeNull();
     expect(bloco?.hasAttribute("open")).toBe(false);
   });
