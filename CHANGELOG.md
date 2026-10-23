@@ -1,5 +1,11 @@
 # Changelog
 
+## Próxima versão — histórico de modelo e esforço
+
+- Registra `model` e `effort` em cada evento novo, com prioridade para metadados explícitos do runtime e fallback para o agente instalado.
+- Mantém rastros anteriores válidos e rotula a configuração instalada atual como fallback, sem convertê-la em evidência histórica.
+- Aceita identificadores de modelos de qualquer provedor, preparando o rastro para a futura orquestração multimodelo sem acoplá-lo à seleção.
+
 ## 0.12.0 — rastro e configuração de agentes no painel
 
 - Projeta no detalhe do trabalho a linha do tempo do contrato `expx-eventos`, reutilizando o leitor do terminal.

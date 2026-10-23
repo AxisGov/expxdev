@@ -131,7 +131,7 @@ describe("detalhe do trabalho", () => {
     expect(screen.getAllByText("T-01.01").length).toBeGreaterThan(0);
     expect(screen.getAllByText("T-01.03").length).toBeGreaterThan(0);
   });
-  it("integração: mostra o agente do evento e a configuração atual da LLM sem tratá-la como histórico", () => {
+  it("integração: prefere o retrato histórico da LLM e rotula o fallback das linhas antigas", () => {
     const comRastro: Estado = {
       ...ok,
       eventos: {
@@ -149,6 +149,21 @@ describe("detalhe do trabalho", () => {
           resultado: "ok",
           detalhe: "investigação delegada",
           arquivos: [],
+          model: "openai/gpt-5.4",
+          effort: "high",
+        }, {
+          ts: "2026-08-29T14:31:00Z",
+          expx_eventos: 1,
+          trabalho_id: "exportacao-csv",
+          ferramenta: "sprintx",
+          origem: "agente",
+          evento: "agente_concluido",
+          fase: "f6",
+          task: "T-01.01",
+          agente: "sprintx-investigador",
+          resultado: "ok",
+          detalhe: "linha antiga",
+          arquivos: [],
         }],
       },
       agentes: [{
@@ -163,9 +178,11 @@ describe("detalhe do trabalho", () => {
     );
 
     expect(screen.getByText("agente iniciado")).toBeDefined();
-    expect(screen.getByText("sprintx-investigador · sonnet · medium")).toBeDefined();
-    expect(screen.getByText(/contrato v1 ainda não registra/)).toBeDefined();
+    expect(screen.getByText("sprintx-investigador · openai/gpt-5.4 · high · histórico")).toBeDefined();
+    expect(screen.getByText("sprintx-investigador · sonnet · medium · configuração atual")).toBeDefined();
+    expect(screen.getByText(/Linhas antigas sem esse retrato/)).toBeDefined();
     const titulos = [...container.querySelectorAll("svg title")].map((item) => item.textContent ?? "");
+    expect(titulos.some((item) => item.includes("openai/gpt-5.4") && item.includes("histórico"))).toBe(true);
     expect(titulos.some((item) => item.includes("sonnet") && item.includes("configuração atual"))).toBe(true);
   });
 

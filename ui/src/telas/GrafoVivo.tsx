@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type JSX, type PointerEvent, type WheelEvent } from "react";
 import type { ConfiguracaoAgente, Evento, Trabalho } from "../tipos.js";
 import { topologiaDeTasks, type No, type Topologia } from "../../../src/grafo/topologia.js";
+import { execucaoDoEvento } from "../modelos.js";
 
 /**
  * O grafo de dependências, desenhado na própria tela.
@@ -70,13 +71,6 @@ function corDoNo(no: No, apagado: boolean): string {
   if (no.status === "concluida") return "var(--vscode-charts-green)";
   if (no.status === "em_andamento") return "var(--vscode-charts-blue)";
   return "var(--vscode-panel-border)";
-}
-
-function configuracao(
-  agente: string,
-  agentes: readonly ConfiguracaoAgente[],
-): ConfiguracaoAgente | undefined {
-  return agentes.find((item) => item.nome === agente);
 }
 
 /** O evento delegado mais recente por task; na ausência dele, o evento mais recente. */
@@ -318,11 +312,9 @@ export function GrafoVivo({
               ].filter((x): x is string => x !== null);
 
               const atividade = atividadePorTask.get(no.id);
-              const agente = atividade?.agente;
-              const cfg = agente === undefined ? undefined : configuracao(agente, agentes);
-              const execucao = agente === undefined
+              const execucao = atividade === undefined
                 ? null
-                : [agente, cfg?.model, cfg?.effort].filter(Boolean).join(" · ");
+                : execucaoDoEvento(atividade, agentes);
 
               return (
                 <g
@@ -336,7 +328,7 @@ export function GrafoVivo({
                   <title>
                     {no.id} — {no.titulo}
                     {marcas.length > 0 ? ` (${marcas.join(", ")})` : ""}
-                    {execucao ? ` — ${execucao} (configuração atual)` : ""}
+                    {execucao ? ` — ${execucao.texto} (${execucao.fonte})` : ""}
                   </title>
                   <rect
                     x={p.x}
@@ -382,7 +374,7 @@ export function GrafoVivo({
                       fill="var(--vscode-charts-blue)"
                       style={{ font: "400 9px var(--mono)" }}
                     >
-                      {encurtar(execucao, 31)}
+                      {encurtar(execucao.texto, 31)}
                     </text>
                   ) : null}
                 </g>

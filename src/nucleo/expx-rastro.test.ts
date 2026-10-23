@@ -161,6 +161,43 @@ describe("fase e task", () => {
     expect(com).toMatchObject({ fase: "f6", task: 'T-01.01 "x"' });
     expect(sem).toMatchObject({ fase: null, task: null });
   });
+
+  it("integração: grava model/effort sem inventar o principal nem atribuir configuração Claude ao OpenCode", () => {
+    const raiz = temp();
+    mkdirSync(join(raiz, ".git"));
+    mkdirSync(join(raiz, ".claude", "agents"), { recursive: true });
+    writeFileSync(
+      join(raiz, ".claude", "agents", "runx-investigador.md"),
+      "---\nname: runx-investigador\nmodel: sonnet\neffort: medium\n---\n",
+    );
+
+    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok derivado', {
+      EXPX_TRABALHO_ID: "t",
+      EXPX_AGENTE: "runx-investigador",
+    });
+    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok explicito', {
+      EXPX_TRABALHO_ID: "t",
+      EXPX_AGENTE: "runx-investigador",
+      EXPX_MODEL: "openai/gpt-5.4",
+      EXPX_EFFORT: "xhigh",
+      EXPX_HARNESS: "opencode",
+    });
+    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok opencode-sem-metadado', {
+      EXPX_TRABALHO_ID: "t",
+      EXPX_AGENTE: "runx-investigador",
+      EXPX_HARNESS: "opencode",
+    });
+    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok principal', {
+      EXPX_TRABALHO_ID: "t",
+    });
+
+    const [derivado, explicito, opencodeSemMetadado, principal] = (eventos(raiz)["t.jsonl"] ?? [])
+      .map((l) => JSON.parse(l) as { model: unknown; effort: unknown });
+    expect(derivado).toMatchObject({ model: "sonnet", effort: "medium" });
+    expect(explicito).toMatchObject({ model: "openai/gpt-5.4", effort: "xhigh" });
+    expect(principal).toMatchObject({ model: null, effort: null });
+    expect(opencodeSemMetadado).toMatchObject({ model: null, effort: null });
+  });
 });
 
 describe("expx_trabalho_id", () => {

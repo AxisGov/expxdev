@@ -339,6 +339,52 @@ expx_modo() {
   esac
 }
 
+# Snapshot da configuracao efetiva do subagente instalado.
+#
+# O valor explicito do runtime (EXPX_MODEL/EXPX_EFFORT) vence esta leitura.
+# O arquivo e apenas o fallback para harnesses que conhecem o agente, mas nao
+# expoem modelo e esforco no payload do hook. O OpenCode nao usa a configuracao
+# do agente Claude, entao nunca a atribuimos a ele como historico. principal nao
+# tem arquivo proprio: sem dado do runtime, fica null em vez de inventar.
+expx_config_agente() {
+  local raiz="$1" agente="$2" campo="$3"
+  case "$campo" in model|effort) ;; *) return 0 ;; esac
+  case "$agente" in
+    ""|principal|*..*|*[!A-Za-z0-9._-]*) return 0 ;;
+  esac
+
+  local arq="$raiz/.claude/agents/$agente.md"
+  [ -f "$arq" ] || return 0
+
+  local linha chave valor dentro=0
+  while IFS= read -r linha || [ -n "$linha" ]; do
+    linha="${linha%$'\r'}"
+    if [ "$linha" = "---" ]; then
+      if [ "$dentro" -eq 0 ]; then dentro=1; continue; else break; fi
+    fi
+    [ "$dentro" -eq 1 ] || continue
+    case "$linha" in *:*) ;; *) continue ;; esac
+    chave="${linha%%:*}"
+    chave="${chave//[[:space:]]/}"
+    chave="${chave//\"/}"
+    chave="${chave//\'/}"
+    [ "$chave" = "$campo" ] || continue
+
+    valor="${linha#*:}"
+    valor="${valor#"${valor%%[![:space:]]*}"}"
+    valor="${valor%"${valor##*[![:space:]]}"}"
+    case "$valor" in
+      \"*\") valor="${valor#\"}"; valor="${valor%\"}" ;;
+      \'*\') valor="${valor#\'}"; valor="${valor%\'}" ;;
+    esac
+    # IDs multi-provider usam, alem do alfanumerico, . _ : / -.
+    # YAML mais complexo falha aberto: null, nunca evidencia parcial.
+    case "$valor" in ""|*[!A-Za-z0-9._:/-]*) return 0 ;; esac
+    printf '%s' "$valor"
+    return 0
+  done < "$arq"
+}
+
 # ---------------------------------------------------------------- gravacao
 
 # expx_rastro_grava <raiz> <evento> <origem> <resultado> <detalhe> [arquivos_json] [extras_json]
@@ -346,10 +392,8 @@ expx_modo() {
 # Grava UMA linha em docs/eventos/<trabalho_id>.jsonl.
 #
 # As DOZE chaves obrigatorias saem sempre todas, na ordem do contrato, e chave
-# sem valor vai como null — nunca omitida (R6). As extras declaradas (`hook`,
-# `faixa`) vao DEPOIS das doze, em `extras_json`, nunca no meio: quem valida
-# procura as doze por contencao, e uma chave no meio do objeto ja quebrou a
-# verificacao de uma skill irma.
+# sem valor vai como null — nunca omitida (R6). model e effort sao o snapshot
+# historico e saem em toda linha nova; as demais extras vêm em extras_json.
 #
 # Falha aberta: erro aqui e engolido. Um hook nunca trava o trabalho por nao
 # conseguir escrever o proprio rastro.
@@ -360,6 +404,16 @@ expx_rastro_grava() {
   {
     local dir="$raiz/docs/eventos"
     mkdir -p "$dir" 2>/dev/null || return 0
+
+    local agente="${EXPX_AGENTE:-principal}"
+    local model="${EXPX_MODEL:-}" effort="${EXPX_EFFORT:-}"
+    if [ "${EXPX_HARNESS:-}" != "opencode" ]; then
+      [ -n "$model" ] || model="$(expx_config_agente "$raiz" "$agente" model)"
+      [ -n "$effort" ] || effort="$(expx_config_agente "$raiz" "$agente" effort)"
+    fi
+    local model_json=null effort_json=null
+    [ -n "$model" ] && model_json="\"$(expx_json_escape "$model")\""
+    [ -n "$effort" ] && effort_json="\"$(expx_json_escape "$effort")\""
 
     local tid; tid="$(expx_trabalho_id "$raiz")"
     local arq="$dir/$tid.jsonl"
@@ -403,10 +457,12 @@ expx_rastro_grava() {
     linha="$linha,\"task\":$task"
     # Sem subagente o valor e "principal", nunca null: "foi o principal" e
     # informacao, nao ausencia.
-    linha="$linha,\"agente\":\"${EXPX_AGENTE:-principal}\""
+    linha="$linha,\"agente\":\"$(expx_json_escape "$agente")\""
     linha="$linha,\"resultado\":\"$resultado\""
     linha="$linha,\"detalhe\":\"$(expx_json_escape "$detalhe")\""
     linha="$linha,\"arquivos\":$arquivos"
+    linha="$linha,\"model\":$model_json"
+    linha="$linha,\"effort\":$effort_json"
     [ -n "$extras" ] && linha="$linha,$extras"
     linha="$linha}"
 

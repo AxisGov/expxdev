@@ -83,7 +83,9 @@ Escrito por hooks e pelas próprias skills nas transições de fase. Lido pelo p
   "agente": "implementador",
   "resultado": "ok",
   "detalhe": "suite verde, 14 testes",
-  "arquivos": ["src/frete/calculo.ts"]
+  "arquivos": ["src/frete/calculo.ts"],
+  "model": "openai/gpt-5.4",
+  "effort": "high"
 }
 ```
 
@@ -106,6 +108,13 @@ Por R6, nenhuma delas é omitida: sem valor, escreva `null` (ou `[]` em `arquivo
 | `hook` | mergex, legadox | nome do hook que decidiu, quando `origem: hook` |
 | `faixa` | legadox | faixa de atenção do arquivo tocado |
 | `sessao` · `harness` | sprintx, pelo escritor `scripts/rastro.sh` | identidade da sessão (`<harness>@<id>`), **derivada** do harness — nunca preenchida por quem chama. Obrigatória em `task_iniciada`/`task_concluida`/`task_bloqueada`, que são a reivindicação que os hooks leem; `null` num evento que não depende dela; ausente na linha gravada por hook |
+| `model` · `effort` | escritor comum `nucleo/hooks/expx-rastro.sh` | retrato da configuração usada naquela execução; identificadores de modelo são livres para suportar Claude, Codex, Gemini, Grok e outros provedores |
+
+`model` e `effort` são uma extensão aditiva do v1: continuam opcionais para que todo rastro anterior permaneça válido, mas o escritor comum inclui as duas chaves em cada linha nova. `EXPX_MODEL` e `EXPX_EFFORT`, quando fornecidos pelo runtime, têm prioridade.
+
+Fora do OpenCode, o fallback para subagentes é o frontmatter instalado em `.claude/agents/<agente>.md`. No OpenCode esse arquivo não determina a execução: sem metadado explícito do runtime, as duas chaves saem `null`, em vez de atribuir ao evento uma configuração Claude que ele pode não ter usado.
+
+Uma chave presente com `null` registra que o escritor tentou capturar o dado e o runtime não o informou — caso normal de `principal` sem metadado explícito. A ausência da chave identifica uma linha legada; leitores podem consultar a configuração instalada atual, desde que a rotulem como fallback e nunca como evidência histórica.
 
 Quem valida uma linha verifica que as doze estão **contidas** nela — nunca igualdade exata de conjunto. Um validador de igualdade estrita reprova as skills que usam extras legítimas, e foi assim que a verificação da `runx` passou a reprovar toda linha da `mergex` e da `legadox`.
 
@@ -162,6 +171,7 @@ Rotação: acima de 5 MB, o arquivo vira `<trabalho_id>.1.jsonl` e um novo come�
 
 - Linha do tempo do trabalho: cada fase, cada task, quanto tempo levou
 - **Quem fez o quê**: filtro por agente, com o que cada um tocou e que veredito emitiu
+- **Com qual configuração**: `model` e `effort` do evento como histórico; configuração instalada atual apenas como fallback rotulado para linhas legadas
 - Violações de regra em modo aviso, que é a lista que decide quais hooks promover a bloqueio
 - Ações bloqueadas, para ver se algum hook está atrapalhando mais que ajudando
 - Duração real por task, que alimenta a calibração de estimativa do `sprintx`

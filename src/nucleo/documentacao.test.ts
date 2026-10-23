@@ -307,7 +307,7 @@ describe("a condição das extras `sessao`/`harness` na documentação (revisão
 
   it("funcional: a página publicada diz QUANDO, não só que são permitidas", () => {
     const site = readFileSync("docs-site/index.html", "utf8");
-    const p = paragrafoHtml(site, "<p>Quatro chaves extras são permitidas");
+    const p = paragrafoHtml(site, `<p>${extensoExtras(EXTRAS_EVENTO.length)} chaves extras são permitidas`);
     for (const e of EVENTOS_COM_IDENTIDADE) expect(p, e).toContain(`<code>${e}</code>`);
     // Os três estados, não um: obrigatória, nula, ausente.
     expect(p).toMatch(/[Oo]brigat/);

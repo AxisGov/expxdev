@@ -272,8 +272,9 @@ ou escrever uma sexta amanhã.
 | **[`expx-eventos` v1](docs/contrato/CONTRATO-expx-eventos.md)** | o rastro append-only `docs/eventos/<trabalho_id>.jsonl`, e o comportamento de hooks e agentes | as skills e os hooks | as próprias skills, o `doctor` e **o painel** |
 
 > O painel lê os dois sem escrever em nenhum: usa o `expx-schema` para o estado e o
-> `expx-eventos` para a linha do tempo. A configuração atual de modelo/esforço vem do
-> frontmatter dos agentes que o `init` efetivamente instalou.
+> `expx-eventos` para a linha do tempo e o retrato histórico de modelo/esforço. Para linhas
+> legadas sem esse retrato, o fallback atual vem do frontmatter dos agentes que o `init`
+> efetivamente instalou.
 
 **O estado responde "onde está"; o rastro responde "o que aconteceu e quando".**
 
@@ -695,8 +696,9 @@ npx expxdev panel
 Lê a pasta `docs/` do projeto, descobre os trabalhos gravados pelas skills e mostra no
 navegador o que foi planejado, o que aconteceu, o que está em execução, o que travou e o
 histórico do que já foi entregue. O estado vem do frontmatter YAML sob o `expx-schema`;
-a atividade vem do JSONL append-only sob o `expx-eventos`; modelo e esforço atuais vêm dos
-agentes instalados em `.claude/agents/`.
+a atividade e o retrato histórico de modelo/esforço vêm do JSONL append-only sob o
+`expx-eventos`; em linhas legadas, o fallback atual vem dos agentes instalados em
+`.claude/agents/`.
 
 **Somente leitura, e não só por convenção.** Qualquer requisição que não seja `GET` recebe
 `405` com a mensagem `o painel e somente leitura`. O servidor escuta exclusivamente em
@@ -712,7 +714,8 @@ O painel é uma **projeção descartável**, não outro motor do método:
 
 - dependência e paralelismo pertencem ao plano escrito por `sprintx` ou `runx`;
 - início, conclusão, bloqueio e agente pertencem ao rastro escrito pelas skills e hooks;
-- modelo e esforço pertencem ao agente materializado pelo `init`, já com o override do projeto.
+- modelo e esforço históricos pertencem ao evento; para linhas legadas, o fallback atual pertence
+  ao agente materializado pelo `init`, já com o override do projeto.
 
 Se o painel for removido, nada da execução muda. Ele não reimplementa o orquestrador, não
 escolhe qual agente roda e não acrescenta campos ao contrato dos nove projetos.
@@ -733,11 +736,10 @@ Ele **não** observa `.expx/`: é lá que o índice é gravado, e observá-lo fa
 realimentar a recarga da tela sem dado novo nenhum.
 
 No detalhe há também uma linha do tempo dos eventos válidos, incluindo fase, task, agente,
-resultado e detalhe. Quando o agente instalado declara `model` e `effort`, o painel mostra
-essa configuração ao lado da atividade e no nó da task. Esse valor é rotulado como
-**configuração atual**: o `expx-eventos` v1 registra o agente, mas não registra qual modelo
-executou aquela linha no passado. O painel não transforma configuração presente em evidência
-histórica.
+resultado e detalhe. Eventos novos registram `model` e `effort` como retrato daquela execução;
+o painel mostra esse histórico ao lado da atividade e no nó da task. Linhas antigas, sem essas
+chaves, permanecem válidas e usam a configuração instalada atual apenas como fallback
+explicitamente rotulado — nunca como evidência retroativa.
 
 No detalhe de cada trabalho há o [grafo do plano](#o-grafo-do-plano), desenhado na própria
 tela. Ele é **interativo**: passar o mouse num nó apaga tudo que não é vizinho dele, clicar

@@ -34,7 +34,7 @@ export const CHAVES_EVENTO = [
  * liga a edição à task aberta. Opcionais no esquema porque têm TRÊS estados, e
  * `EVENTOS_COM_IDENTIDADE` (abaixo) é o único em que a ausência é defeito.
  */
-export const EXTRAS_EVENTO = ["hook", "faixa", "sessao", "harness"] as const;
+export const EXTRAS_EVENTO = ["hook", "faixa", "sessao", "harness", "model", "effort"] as const;
 
 /**
  * Os eventos em que `sessao`/`harness` são OBRIGATÓRIAS — a reivindicação da task.
@@ -154,6 +154,8 @@ export const LinhaEvento = z
     faixa: z.string().nullable().optional(),
     sessao: z.string().nullable().optional(),
     harness: z.string().nullable().optional(),
+    model: z.string().min(1).nullable().optional(),
+    effort: z.string().min(1).nullable().optional(),
   })
   // Extras declaradas passam; o que não é declarado é reportado por
   // `chavesDesconhecidas`, não rejeitado — o rastro nunca trava trabalho.
