@@ -86,6 +86,8 @@ describe("Actions oficiais sem runtime Node.js 20", () => {
 
   it.each(arquivos)("%s usa majors baseados em Node.js 24", (arquivo) => {
     const yaml = readFileSync(arquivo, "utf8");
+    expect(yaml, arquivo + " nao pode depender do rotulo movel ubuntu-latest").not.toContain("ubuntu-latest");
+    expect(yaml, arquivo + " precisa fixar a imagem Linux homologada").toContain("ubuntu-24.04");
     const referencias = [...yaml.matchAll(/uses:\s+actions\/([a-z-]+)@v(\d+)/g)];
     expect(referencias.length, `${arquivo} não contém Action oficial`).toBeGreaterThan(0);
     for (const referencia of referencias) {
