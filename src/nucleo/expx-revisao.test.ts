@@ -348,6 +348,23 @@ const semCodeant = (): string => dirname(noPath("git") ?? "");
 const naoChamou = (r: { chamadas: string[][] }) => expect(r.chamadas.filter((a) => a[0] === "review")).toEqual([]);
 
 describe("expx-revisao.mjs revisar v2: portões antes da CLI", () => {
+  it("funcional: caminho de --arquivos fora da raiz (../ ou absoluto) é erro de uso; nada é lido, copiado nem apagado fora do checkout", () => {
+    const c = cenario();
+    const fora = temp("expx-fora-");
+    const alvo = join(fora, "alvo.js");
+    writeFileSync(alvo, "segredo\n");
+    const relativo = `../${fora.split(/[\\/]/).pop() ?? ""}/alvo.js`;
+    expect(existsSync(join(c.raiz, relativo)), "o caminho relativo alcança o arquivo de fora").toBe(true);
+    for (const pedido of [relativo, `src/../${relativo}`, alvo, `src/a.js,${relativo}`]) {
+      const r = revisar(c, pedido);
+      expect(r.rc, pedido).toBe(64);
+      expect(r.err, pedido).toContain("fora da raiz do projeto");
+      expect(r.chamadas, pedido).toEqual([]);
+      expect(r.ev, pedido).toBeUndefined();
+    }
+    expect(readFileSync(alvo, "utf8")).toBe("segredo\n");
+  });
+
   it("funcional: limite40.json: 40 revisáveis, com 5.000 linhas sem quebra final e 204.800 bytes → ok; uma chamada com os 40", () => {
     const c = cenario({ fixture: "limite40" });
     const nomes = poeCaso(c.raiz, arquivosDoCaso("limite40"));

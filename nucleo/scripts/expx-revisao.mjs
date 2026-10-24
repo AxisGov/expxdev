@@ -17,7 +17,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { closeSync, existsSync, fstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, statSync,
   writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, posix, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { conferirIntegridade, excluido, EXCLUIDOS_DO_NUCLEO, fatiaNoAmbiente, homologadas, localizarPacote, medir, mensagemFatia,
   motivoAceito, perfilCli, revisavel } from "./expx-limites.mjs";
@@ -210,6 +210,8 @@ function snapshotDaRevisao(head, blobs) {
       const conteudo = blobGit(oid);
       if (conteudo === undefined) throw new Error(`blob ilegível: ${f}`);
       const destino = join(raiz, f);
+      const rel = relative(raiz, destino);
+      if (rel === "" || rel.split(/[\\/]/)[0] === ".." || isAbsolute(rel)) throw new Error(`caminho fora do snapshot: ${f}`);
       rmSync(destino, { recursive: true, force: true });
       mkdirSync(dirname(destino), { recursive: true });
       writeFileSync(destino, conteudo);
@@ -343,6 +345,10 @@ function revisar() {
   // sem aparar: espaço na ponta é parte do nome, e aparado o caminho seria outro arquivo (ou nenhum)
   const arquivos = op.arquivos.split(",").map(caminho).filter(Boolean);
   if (arquivos.length === 0) uso("--arquivos sem nenhum caminho");
+  // o caminho é relativo à raiz e fica dentro dela: com `..` ou absoluto, o snapshot apagaria e
+  // reescreveria um caminho fora do checkout temporário
+  const fora = arquivos.find((f) => isAbsolute(f) || /^[A-Za-z]:/.test(f) || posix.normalize(f).split("/")[0] === "..");
+  if (fora !== undefined) uso(`--arquivos fora da raiz do projeto: ${fora}`);
   if (op["base-commit"] !== undefined) {
     const sha = idDe("rev-parse", "--verify", "-q", `${op["base-commit"]}^{commit}`);
     if (!sha) uso(`base-commit inexistente: ${op["base-commit"]}`);
