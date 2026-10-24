@@ -268,10 +268,9 @@ echo "== M. portabilidade Git Bash: scripts e contratos markdown LF, caminho dev
 # cygpath traduzir, em qualquer SO — e o que mata os mutantes tanto em Linux quanto no Git
 # Bash. Real: sem falsos; no Git Bash o Git for Windows devolve `C:/...` de verdade.
 MS="$(mktemp -d)"
-# A parte pode ser carregada por uma bancada instalada em outro projeto. Sua
-# propria localização identifica a fonte; $H identifica apenas o host executor.
-RAIZ_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-[ -d "$RAIZ_SRC/.claude/hooks/sprintx" ] || { echo "bancada: raiz sprintx indisponivel" >&2; exit 1; }
+# A parte pode ser carregada por uma bancada instalada em outro projeto: a fonte sai de
+# fonte.sh, ao lado dela (RAIZ_SRC vazio quando a bancada esta instalada).
+. "$(dirname "${BASH_SOURCE[0]}")/fonte.sh"
 MSIM="$MS/sim"; MBIN="$MS/bin"; mkdir -p "$MSIM/z" "$MBIN" "$MS/vazio" "$MS/real"
 REALGIT="$(command -v git)"; BASHBIN="$(command -v bash)"
 cat > "$MBIN/cygpath" <<'EOF'
@@ -393,7 +392,25 @@ afirma "m-uma-regra-tres-consumidores" $? "planejamento.sh, bloqueios.sh e trava
 [ "$(find "$SK/scripts" "$H" -name '*.sh' -not -path '*/testes/*' -exec grep -l 'cygpath' {} + | sed 's|.*/||' | sort -u)" = caminho-git.sh ]
 afirma "m-cygpath-so-no-helper" $? "nenhuma copia da regra fora de caminho-git.sh"
 
+# A deteccao da fonte nos tres layouts: repositorio, marketplace do expx e projeto instalado.
+m_layout() { # m_layout <raiz> <testes-relativo> [marcadores da fonte: s|n] — projeto com .claude/hooks/sprintx
+  mkdir -p "$1/$2" "$1/.claude/hooks/sprintx"
+  [ "${3:-n}" = s ] && { mkdir -p "$1/scripts/ci"; : > "$1/install.sh"; : > "$1/scripts/ci/test-predecessores.sh"; }
+  return 0
+}
+m_layout "$MS/lay-fonte" .claude/hooks/testes s
+m_layout "$MS/lay-mkt" .expx/marketplace/plugins/expx/hooks/testes
+m_layout "$MS/lay-proj" .claude/hooks/testes
+[ "$(m_raiz_fonte "$MS/lay-fonte/.claude/hooks/testes")" = "$(cd "$MS/lay-fonte" && pwd)" ] \
+  && [ -z "$(m_raiz_fonte "$MS/lay-mkt/.expx/marketplace/plugins/expx/hooks/testes")" ] \
+  && [ -z "$(m_raiz_fonte "$MS/lay-proj/.claude/hooks/testes")" ]
+afirma "m-fonte-so-no-repositorio-da-sprintx" $? "repositorio reconhecido; marketplace e projeto instalado, nao"
+
 # J–L: clone limpo com core.autocrlf=true, sem depender de configuracao global/sistema.
+# Leem o repositorio da sprintx (git ls-files, .gitattributes): sem ele, dependencia externa.
+if [ -z "$RAIZ_SRC" ]; then
+  pula_externo "m-jl-eol-e-gitattributes-da-fonte" "$SEM_FONTE"
+else
 mgit() { GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="$MS/gitconfig-vazio" git "$@"; }
 : > "$MS/gitconfig-vazio"
 MSRC_SH="$(git -C "$RAIZ_SRC" ls-files -co --exclude-standard -- '*.sh')"
@@ -502,6 +519,7 @@ afirma "mm-mutante-11a-oraculo-sem-materializacao-morre" $? "sem a materializaca
 mkdir -p "$MS/tolerante"; tr -d '\r' < "$MS/clone-sem-md/$M_SKILL" > "$MS/tolerante/SKILL.md"
 [ "$(conta_regras "$MS/tolerante/SKILL.md")" -eq 21 ]
 afirma "mm-mutante-11b-oraculo-so-sed-fica-cego" $? "leitor tolerante a CR conta 21 no SKILL.md CRLF: so o sed nao mata o mutante"
+fi
 
 # Mutantes dos scripts e do helper, em copia da skill (scripts/ + assets/). O controle, copia
 # sem mutacao, sobrevive a todos os casos; cada mutante morre pelos casos designados.
@@ -509,7 +527,7 @@ copia_skill_m() {
   local d="$MS/mut/$1"; rm -rf "$d"; mkdir -p "$d/scripts/lib" "$d/assets"
   cp "$SK/assets/TEMPLATE-PLANEJAMENTO.md" "$SK/assets/TEMPLATE-BLOQUEIOS.md" "$d/assets/"
   cp "$SK/scripts/planejamento.sh" "$SK/scripts/bloqueios.sh" "$SK/scripts/caminho-git.sh" "$d/scripts/"
-  cp "$SK/scripts/lib/trava-autorizacao-f6.sh" "$d/scripts/lib/"
+  cp "$SK/scripts/lib/trava-autorizacao-f6.sh" "$SK/scripts/lib/execucao.sh" "$d/scripts/lib/"
   printf '%s' "$d"
 }
 m_troca() { muta_lit "$1" "$1.m" "$2" "$3" && mv "$1.m" "$1"; }
@@ -1476,7 +1494,7 @@ afirma "p11-segredo-mesma-lista-do-hook" $? "planejamento.sh e comum/segredo.sh"
 # Mutantes do S3-A, em copia da skill (como na K). Cada um morre pelo caso designado; o
 # controle, copia sem mutacao, sobrevive a todos.
 MP="$P/mut"
-copia_skill_p() { mkdir -p "$MP/$1/scripts/lib" "$MP/$1/assets"; cp "$SK/assets/TEMPLATE-PLANEJAMENTO.md" "$SK/assets/TEMPLATE-BLOQUEIOS.md" "$MP/$1/assets/"; cp "$BL" "$SK/scripts/caminho-git.sh" "$MP/$1/scripts/"; cp "$SK/scripts/lib/trava-autorizacao-f6.sh" "$MP/$1/scripts/lib/"; printf '%s/%s/scripts/planejamento.sh' "$MP" "$1"; }
+copia_skill_p() { mkdir -p "$MP/$1/scripts/lib" "$MP/$1/assets"; cp "$SK/assets/TEMPLATE-PLANEJAMENTO.md" "$SK/assets/TEMPLATE-BLOQUEIOS.md" "$MP/$1/assets/"; cp "$BL" "$SK/scripts/caminho-git.sh" "$MP/$1/scripts/"; cp "$SK/scripts/lib/trava-autorizacao-f6.sh" "$SK/scripts/lib/execucao.sh" "$MP/$1/scripts/lib/"; printf '%s/%s/scripts/planejamento.sh' "$MP" "$1"; }
 mutante_p() { # mutante_p <nome> <rc da geracao> <script> <caso que TEM de matar>...
   local nome="$1" rc="$2" s="$3" c vivos=""; shift 3
   if [ "$rc" -eq 0 ]; then for c in "$@"; do roda_p "$c" "$s" && vivos="$vivos$c "; done; fi
@@ -1579,7 +1597,11 @@ q_timeouts() {
 q_criticos() { q_timeouts "$2" "$3" && q_orcamento "$1" "$4"; }
 QGP=sprintx/git-perigoso.sh
 q_orcamento "$H" "$QGP"; afirma "q1-orcamento-de-processos-dos-criticos" $? "externos por execucao:$Q_CUSTO"
-q_timeouts "$RAIZ_SRC/.claude/settings.json" "$RAIZ_SRC/.opencode/plugin/sprintx.ts"; afirma "q2-timeout-30s-so-nos-tres-criticos" $? "settings.json e plugin do OpenCode"
+if [ -n "$RAIZ_SRC" ]; then
+  q_timeouts "$RAIZ_SRC/.claude/settings.json" "$RAIZ_SRC/.opencode/plugin/sprintx.ts"; afirma "q2-timeout-30s-so-nos-tres-criticos" $? "settings.json e plugin do OpenCode"
+else
+  pula_externo "q2-timeout-30s-so-nos-tres-criticos" "$SEM_FONTE"
+fi
 tem "$SKILLMD" 'timeout do runner é falha aberta' && tem "$SKILLMD" 'primeira barreira' && tem "$SKILLMD" 'E1 da `mergex`' \
   && [ "$(grep -c '^| DS-157 |' "$SK/DECISOES-DA-SKILL.md")" -eq 1 ]
 afirma "q3-contrato-fail-open-e-backstop" $? "SKILL.md e DS-157"
@@ -1602,6 +1624,10 @@ mkdir -p "$C2OC/sprint-03" "$C2OC/sprint-04"; C2RASTRO="$C2/docs/eventos/c2-esco
 l_prosa "$H/sprintx/escopo-da-task.sh"; afirma "q4-prosa-nao-declara-ownership" $? "corrente e a ultima task do frontmatter; o arquivo da irma na prosa continua da irma"
 
 # Mutantes do S3-B. Copia da arvore de hooks (sprintx/ + comum/), da configuracao e do plugin.
+# A configuracao e o plugin sao os da fonte: sem ela, dependencia externa.
+if [ -z "$RAIZ_SRC" ]; then
+  pula_externo "qm-mutantes-do-s3b" "$SEM_FONTE"
+else
 QM="$Q/mut"
 q_copia() { # q_copia <nome> — devolve a raiz de hooks copiada, com settings.json e plugin ao lado
   local d="$QM/$1"; rm -rf "$d"; mkdir -p "$d/hooks" "$d/plugin"
@@ -1640,14 +1666,18 @@ q_mutante "qm-mutante-4-escopo-muda-semantica-irma-corrente" $? l_c "$QMU/hooks/
 QMU="$(q_copia m5)"; muta_lit "$QMU/hooks/sprintx/escopo-da-task.sh" "$QMU/e.m" '  FNR > 1 && FM && $0 == "---" { FORA = 1; AT = "" }' \
   '  FNR > 1 && FM && $0 == "---" { FORA = 0 }' && mv "$QMU/e.m" "$QMU/hooks/sprintx/escopo-da-task.sh"
 q_mutante "qm-mutante-5-prosa-volta-a-declarar-ownership" $? l_prosa "$QMU/hooks/sprintx/escopo-da-task.sh"
+fi
 rm -rf "$Q" "$C2"
 
 echo "== R. git-perigoso com o namespace da skill, em qualquer ordem de instalacao (P0.2-C7-B S3-C) =="
 # A mergex publica um git-perigoso proprio em comum/, com regras dela. O da sprintx mora em
 # sprintx/, com o id sprintx/git-perigoso no .expx/hooks.json: nenhum sobrescreve o outro, e o
 # modo de um nao liga nem desliga o outro. Cada caso recebe a raiz de uma arvore de fonte da
-# sprintx (a do repositorio, ou a copia de um mutante).
+# sprintx (a do repositorio, ou a copia de um mutante): sem ela, dependencia externa.
 R="$(mktemp -d)"
+if [ -z "$RAIZ_SRC" ]; then
+  pula_externo "r1-r3-instalacao-a-partir-da-fonte" "$SEM_FONTE"
+else
 r_fonte() { # r_fonte <nome> — copia o que o install.sh publica
   local d="$R/fonte-$1"; rm -rf "$d"; mkdir -p "$d"
   cp -R "$RAIZ_SRC/.claude" "$RAIZ_SRC/.opencode" "$RAIZ_SRC/.expx" "$RAIZ_SRC/install.sh" "$d/"
@@ -1714,10 +1744,14 @@ RF="$(r_fonte repo)"
 r_caminhos "$RF"; afirma "r1-git-perigoso-com-namespace" $? "sprintx/git-perigoso.sh e id sprintx/git-perigoso em settings, plugin, doctor e .expx/hooks.json"
 r_modo "$RF"; afirma "r2-modo-pelo-id-com-namespace" $? "git-perigoso da mergex desligado nao desliga o da sprintx"
 r_instala "$RF"; afirma "r3-instalacao-sem-ordem-e-sem-apagar-a-mergex" $? "mergex antes, depois, reinstalacao, so-OpenCode e legado"
+fi
 tem "$SKILLMD" '`sprintx/git-perigoso`' && [ "$(grep -c '^| DS-158 |' "$SK/DECISOES-DA-SKILL.md")" -eq 1 ]
 afirma "r4-contrato-do-namespace" $? "SKILL.md e DS-158"
 
 # Mutantes do S3-C, em copia da fonte. O controle, copia sem mutacao, passa nos tres casos.
+if [ -z "$RAIZ_SRC" ]; then
+  pula_externo "rm-mutantes-do-s3c" "$SEM_FONTE"
+else
 RC="$(r_fonte controle)"; r_caminhos "$RC" && r_modo "$RC" && r_instala "$RC"
 afirma "rm-controle-copia-intacta-sobrevive" $? "caminhos, modo e instalacao na copia sem mutacao"
 r_mutante() { # r_mutante <nome> <rc geracao> <fonte> <caso que TEM de matar>...
@@ -1738,6 +1772,7 @@ muta_lit "$RM/.claude/hooks/sprintx/git-perigoso.sh" "$RM/g.m" 'rastro_modo_em M
   && mv "$RM/g.m" "$RM/.claude/hooks/sprintx/git-perigoso.sh" \
   && muta_lit "$RM/.expx/hooks.json" "$RM/h.m" '"sprintx/git-perigoso": {' '"git-perigoso": {' && mv "$RM/h.m" "$RM/.expx/hooks.json"
 r_mutante "rm-mutante-2-manifesto-com-id-sem-namespace" $? "$RM" r_caminhos r_modo
+fi
 rm -rf "$R"
 
 echo "== S. paths do tool input no Windows: C:\\ e C:/ decidem igual (P0.2-C7-B S3-D) =="
@@ -1816,7 +1851,7 @@ S_ROT=posix; S_FMT=posix; [ "$S_WIN" = 1 ] && { S_ROT="$(cygpath -m "$S_DIR" | c
 s_formatos "$S_SHOOK" "$S_DIR/fx c3d" "$S_TODOS" "A B C D E1 E2"
 afirma "s1-mesma-decisao-em-todo-formato-$S_ROT" $? "A..E x $S_FMT${S_FALHA:+ — FORA:$S_FALHA}"
 if [ "$S_WIN" = 1 ]; then
-  S_REPO_PAI="$(cd "$RAIZ_SRC/.." && pwd)"; S_ROT2="$(cygpath -m "$S_REPO_PAI" | cut -c1-2)"
+  S_REPO_PAI="$(cd "${RAIZ_SRC:-$H}/.." && pwd)"; S_ROT2="$(cygpath -m "$S_REPO_PAI" | cut -c1-2)"
   if [ "$(printf '%s' "$S_ROT2" | tr a-z A-Z)" != "$(printf '%s' "$S_ROT" | tr a-z A-Z)" ] \
     && S_DIR2="$(mktemp -d -p "$S_REPO_PAI" .sx-s3d.XXXXXX 2>/dev/null)"; then
     s_formatos "$S_SHOOK" "$S_DIR2/fx c3d" "posix win caixa-do-drive" "A B C D E1 E2"

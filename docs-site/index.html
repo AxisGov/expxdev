@@ -2239,7 +2239,8 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
   a origem é <code>hook</code>), <code>faixa</code> (a faixa de atenção do arquivo tocado), o par
   <code>sessao</code> · <code>harness</code> (a identidade da sessão) e <code>model</code> · <code>effort</code>
   (o snapshot daquela execução). O gravador comum inclui <code>model</code>/<code>effort</code> nas linhas que
-  ele escreve; os escritores próprios da SprintX ainda os omitem e, por isso, aparecem como <strong>sem
+  ele escreve, inclusive as de hook, e os escritores próprios da SprintX também, pela mesma regra; hooks com
+  gravador próprio (como os da SprintX) e linhas antigas os omitem e, por isso, aparecem como <strong>sem
   snapshot</strong>. O runtime explícito tem prioridade para qualquer harness. Somente no contexto Claude
   (<code>EXPX_HARNESS</code> igual a <code>claude</code> ou <code>claude-code</code> ou, sem ele,
   <code>CLAUDECODE</code> presente) o gravador comum pode usar como fallback o frontmatter instalado. Codex,

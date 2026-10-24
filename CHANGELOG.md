@@ -6,6 +6,7 @@
 - Mantém eventos sem snapshot válidos; a configuração atual só vira fallback quando o evento não identifica outro harness, e nos demais casos o painel informa que o histórico está indisponível.
 - Aceita identificadores de modelos de qualquer provedor, preparando o rastro para a futura orquestração multimodelo sem acoplá-lo à seleção.
 - Coloca entre aspas o caminho dos hooks registrados por nome de arquivo (os do MemoX), que quebravam com espaço em `$CLAUDE_PROJECT_DIR`; a reinstalação substitui a forma antiga sem duplicá-la, mesmo com lock anterior ao registro das entradas gerenciadas.
+- Certifica a SprintX em AxisGov/sprintx@1941c5a: os escritores próprios passam a gravar `model` e `effort` do executor, sem atribuir o modelo do principal a outro agente, e a bancada instalada pelo marketplace deixa de abortar e de derivar caminhos da fonte a partir dos hooks.
 - Mantém aceito o grupo vazio `()` em `merge_automatico.caminhos_protegidos`: a validação só recusa o que o Git Bash recusa. A recusa anunciada junto da 0.12.1 não faz parte do contrato.
 
 ## 0.12.1 — correções de revisão e fontes oficiais consolidadas
