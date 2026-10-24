@@ -117,7 +117,8 @@ exigir apagar a issue de `chamada.issues`, o que fica visível no diff da evidê
 `node expx-revisao.mjs revisar --trabalho <slug> --task <T-NN.MM> --arquivos <a,b,...> [--base-commit <sha>] [--raiz <dir>]`
 
 Sai **0** (`ok`), **1** (`achados`, algum aberto), **2** (`indisponivel`) ou
-**3** (`incompleta`); uso errado, **64** (inclusive `--arquivos` sem nenhum caminho,
+**3** (`incompleta`); uso errado, **64** (inclusive `--arquivos` sem nenhum caminho
+ou com caminho absoluto ou que sai da raiz por `..`,
 `--base-commit` que não é commit ou fora do `revisar`, e qualquer `FATIA_*` definida
 no ambiente, nos três subcomandos, com a mensagem da emenda e sem evidência);
 evidência travada, **75**. Imprime `<task> <resultado>[:<motivo>]`.
@@ -342,3 +343,4 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-10-20 | Subcomando `listar` (decisão do usuário de 2026-10-20, ponto 1 do plano `2026-10-20-mergex-limites-do-codeant-parte-2.md`): só leitura, com a validação do `conferir`, devolve numa linha de JSON (`expx_revisao_listar: 1`) os achados rejeitados com a rejeição que vale, as `rejeicoes` e os `removidos_sem_revisao` da evidência no commit, para as D1, D2 e a condição 6 da M2 da mergex não lerem a evidência com `jq`; sai 0, 1 (inválida) ou 3 (ausente). O `conferir` passa a exigir `rejeicoes` e `removidos_sem_revisao` na forma que o `listar` devolve (`evidencia-invalida:rejeicoes`, `evidencia-invalida:removidos_sem_revisao`); o `revisar` e o `rejeitar` já os gravavam assim. |
 | 2026-10-20 | Revisão da PR 72 (CodeAnt): a saída das listas do git (`diff --name-only`, `ls-tree -r`) é lida até 256 MiB, não até 1 MiB (o padrão do `spawnSync`), e o commit grande coberto deixa de dar `evidencia-invalida:cobertura`. |
 | 2026-10-20 | Revisão da PR 72 (CodeAnt, 2ª rodada): a evidência na árvore do commit que o git não lê é `evidencia-invalida` (antes, `evidencia-ausente`, AVISO em `se_disponivel`); na cobertura, `modo` fora dos dois ou `base_commit` que não é commit (que em `indisponivel`/`incompleta` nada mais conferia) é `evidencia-invalida:cobertura`. |
+| 2026-10-24 | `--arquivos` com caminho absoluto ou que sai da raiz por `..` é uso errado (64), antes de qualquer leitura (achado do CodeAnt em katosmv/conselhos-municipais#208): o snapshot apagava e reescrevia o caminho resolvido fora do checkout temporário. O snapshot também recusa destino fora dele (`indisponivel:snapshot`). |
