@@ -231,3 +231,69 @@ describe("hook de lembrete das skills", () => {
     }
   });
 });
+
+/**
+ * Os hooks soltos do memox não têm manifesto: o comando é montado aqui. Sem
+ * aspas, `$CLAUDE_PROJECT_DIR` com espaço quebra a palavra e o hook não roda.
+ */
+describe("hooks soltos com caminho entre aspas", () => {
+  const MEMOX = [
+    { skill: "memox", relativo: ".claude/hooks/memox-injetar.sh", evento: "UserPromptSubmit" },
+    { skill: "memox", relativo: ".claude/hooks/memox-reindexar.sh", evento: "Stop" },
+  ] as const;
+  type Settings = { hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>> };
+
+  it("funcional: os hooks do memox executam quando CLAUDE_PROJECT_DIR contém espaços", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx projeto com espacos-"));
+    try {
+      mkdirSync(join(raiz, ".claude", "hooks"), { recursive: true });
+      for (const h of MEMOX) {
+        const caminho = join(raiz, ...h.relativo.split("/"));
+        writeFileSync(caminho, `#!/usr/bin/env bash\nprintf ${h.evento}-ok\n`);
+        chmodSync(caminho, 0o755);
+      }
+      expect(mesclarSettings(raiz, "/tmp/mkt", MEMOX.map(({ skill, relativo }) => ({ skill, relativo }))).ok).toBe(true);
+      const s = JSON.parse(readFileSync(caminhoDoSettings(raiz), "utf8")) as Settings;
+      const bash = process.platform === "win32" && existsSync("C:/Program Files/Git/bin/bash.exe")
+        ? "C:/Program Files/Git/bin/bash.exe"
+        : "/bin/bash";
+      for (const h of MEMOX) {
+        const command = s.hooks[h.evento]?.[0]?.hooks[0]?.command ?? "";
+        expect(command).toBe(`"$CLAUDE_PROJECT_DIR/${h.relativo}"`);
+        const execucao = spawnSync(bash, ["-lc", command], {
+          cwd: raiz,
+          encoding: "utf8",
+          env: { ...process.env, CLAUDE_PROJECT_DIR: raiz },
+        });
+        expect(execucao.status, execucao.stderr).toBe(0);
+        expect(execucao.stdout).toBe(`${h.evento}-ok`);
+      }
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
+  });
+
+  it("funcional: a forma sem aspas de uma instalação anterior é substituída, sem duplicar, mesmo sem lock", () => {
+    const p = projetoTemporario();
+    try {
+      const daPessoa = { type: "command", command: "echo da-pessoa" };
+      mkdirSync(join(p.raiz, ".claude"), { recursive: true });
+      writeFileSync(caminhoDoSettings(p.raiz), JSON.stringify({
+        hooks: {
+          UserPromptSubmit: [{ hooks: [{ type: "command", command: "$CLAUDE_PROJECT_DIR/.claude/hooks/memox-injetar.sh" }, daPessoa] }],
+          Stop: [{ hooks: [{ type: "command", command: "$CLAUDE_PROJECT_DIR/.claude/hooks/memox-reindexar.sh" }] }],
+        },
+      }));
+      expect(mesclarSettings(p.raiz, "/tmp/mkt", MEMOX.map(({ skill, relativo }) => ({ skill, relativo }))).ok).toBe(true);
+      const s = JSON.parse(readFileSync(caminhoDoSettings(p.raiz), "utf8")) as Settings;
+      for (const h of MEMOX) {
+        const cmds = (s.hooks[h.evento] ?? []).flatMap((g) => g.hooks.map((x) => x.command)).filter((c) => c.includes(h.relativo));
+        expect(cmds).toEqual([`"$CLAUDE_PROJECT_DIR/${h.relativo}"`]);
+      }
+      const doUsuario = (s.hooks["UserPromptSubmit"] ?? []).flatMap((g) => g.hooks).filter((x) => x.command === "echo da-pessoa");
+      expect(doUsuario).toHaveLength(1);
+    } finally {
+      p.descartar();
+    }
+  });
+});

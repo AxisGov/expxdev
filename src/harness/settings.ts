@@ -51,8 +51,8 @@ function eventoDoHook(relativo: string): "UserPromptSubmit" | "Stop" | "SessionS
 /**
  * A entrada de um hook do núcleo, ou de skill que não publica
  * `.claude/settings.json` (o memox, com hooks soltos `memox-*.sh`): o evento
- * sai do nome do arquivo. A forma do comando é a de sempre, para que uma
- * instalação anterior seja reconhecida como a mesma entrada e não duplique.
+ * sai do nome do arquivo. O caminho vai entre aspas: `$CLAUDE_PROJECT_DIR`
+ * com espaço quebraria a palavra e o hook não rodaria.
  */
 export function entradaPorNome(h: HookInstalado): EntradaHook | null {
   const evento = eventoDoHook(h.relativo);
@@ -61,8 +61,20 @@ export function entradaPorNome(h: HookInstalado): EntradaHook | null {
     ? { type: "command", command: "node", args: [`\${CLAUDE_PROJECT_DIR}/${h.relativo}`] }
     : h.relativo.endsWith("expx-lembrete.sh")
       ? { type: "command", command: `"$CLAUDE_PROJECT_DIR/${h.relativo}"`, timeout: 1 }
-      : { type: "command", command: `$CLAUDE_PROJECT_DIR/${h.relativo}` };
+      : { type: "command", command: `"$CLAUDE_PROJECT_DIR/${h.relativo}"` };
   return { skill: h.skill, evento, hook };
+}
+
+/**
+ * A forma sem aspas que a mesma entrada tinha até a 0.12.1. Um lock anterior
+ * ao registro das entradas gerenciadas não a lista; reconhecida como da
+ * instalação anterior, ela sai na reinstalação em vez de rodar duplicada.
+ */
+export function formaSemAspas(e: EntradaHook): EntradaGerenciada | null {
+  const m = /^"(\$CLAUDE_PROJECT_DIR\/[^"]+)"$/.exec(e.hook.command);
+  if (m?.[1] === undefined || e.hook["timeout"] !== undefined) return null;
+  const hook = { ...e.hook, command: m[1] };
+  return e.matcher !== undefined ? { evento: e.evento, matcher: e.matcher, hook } : { evento: e.evento, hook };
 }
 
 /** Aceita array (documentado) ou objeto (real). Qualquer outra coisa vira `{}`. */
@@ -171,7 +183,8 @@ export function mesclarSettings(
   hooks: readonly HookInstalado[] = [],
 ): ResultadoMerge {
   const entradas = hooks.map(entradaPorNome).filter((e): e is EntradaHook => e !== null);
-  const p = planejarSettings(raizProjeto, caminhoMarketplace, entradas);
+  const legadas = entradas.map(formaSemAspas).filter((e): e is EntradaGerenciada => e !== null);
+  const p = planejarSettings(raizProjeto, caminhoMarketplace, entradas, legadas);
   if (!p.ok) return p;
   return gravarSettings(p.plano);
 }
