@@ -545,7 +545,7 @@ gh release download v0.12.2 -R AxisGov/expxdev -D ~/expx-cli/v0.12.2
   else
     shasum -a 256 -c expxdev-0.12.2.tgz.sha256
   fi
-)
+) &&
 npx --yes --package ~/expx-cli/v0.12.2/expxdev-0.12.2.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
@@ -569,11 +569,11 @@ npx --yes --package ~/expx-cli/v0.12.2/expxdev-0.12.2.tgz expx init --skills bui
 - `0.11.1` corrige as dependências vulneráveis e migra o runtime das GitHub Actions oficiais
   para Node.js 24, mantém Node.js 20.19 como piso suportado pelo produto e elimina as colisões
   de agentes na instalação simultânea das nove skills.
+- `0.12.0` acrescenta ao painel a linha do tempo do rastro e mostra, sem assumir valor
+  histórico, a configuração atual de modelo e esforço dos agentes instalados.
 - `0.12.1` corrige o portão de revisão, isola snapshots e travas operacionais e consolida
   MemoX e ProdX nos forks AxisGov, com os candidatos certificados de SprintX e MergeX
   atualizados para os commits revisados.
-- `0.12.0` acrescenta ao painel a linha do tempo do rastro e mostra, sem assumir valor
-  histórico, a configuração atual de modelo e esforço dos agentes instalados.
 - `0.12.2` registra no rastro o modelo e o esforço do executor, sem atribuir configuração
   Claude a outro harness, coloca entre aspas os hooks do MemoX, restringe `--arquivos` da
   revisão à raiz do projeto, instala a ponte de hooks da RunX no OpenCode e certifica a

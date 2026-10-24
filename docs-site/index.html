@@ -122,7 +122,7 @@
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
     <pre><code><span class="tok-cmd">gh</span> release download v0.12.2 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
-(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-com">if command -v sha256sum &gt;/dev/null 2&gt;&amp;1; then</span> <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.12.2.tgz.sha256<span class="tok-com">; else</span> <span class="tok-cmd">shasum</span> <span class="tok-flag">-a 256 -c</span> expxdev-0.12.2.tgz.sha256<span class="tok-com">; fi</span>)
+(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-com">if command -v sha256sum &gt;/dev/null 2&gt;&amp;1; then</span> <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.12.2.tgz.sha256<span class="tok-com">; else</span> <span class="tok-cmd">shasum</span> <span class="tok-flag">-a 256 -c</span> expxdev-0.12.2.tgz.sha256<span class="tok-com">; fi</span>) &amp;&amp;
 <span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.12.2.tgz expx <span class="tok-flag">--version</span></code></pre>
   </div>
 
@@ -211,7 +211,7 @@
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
     <pre><code><span class="tok-cmd">gh</span> release download v0.12.2 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
-(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-com">if command -v sha256sum &gt;/dev/null 2&gt;&amp;1; then</span> <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.12.2.tgz.sha256<span class="tok-com">; else</span> <span class="tok-cmd">shasum</span> <span class="tok-flag">-a 256 -c</span> expxdev-0.12.2.tgz.sha256<span class="tok-com">; fi</span>)
+(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-com">if command -v sha256sum &gt;/dev/null 2&gt;&amp;1; then</span> <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.12.2.tgz.sha256<span class="tok-com">; else</span> <span class="tok-cmd">shasum</span> <span class="tok-flag">-a 256 -c</span> expxdev-0.12.2.tgz.sha256<span class="tok-com">; fi</span>) &amp;&amp;
 <span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.12.2.tgz expx init <span class="tok-flag">--skills</span> sprintx,runx,mergex <span class="tok-flag">--harness</span> claude,opencode <span class="tok-flag">--yes</span></code></pre>
   </div>
 
@@ -1646,7 +1646,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">.expx/expx-lock.json</span><button class="codigo__copiar">Copiar</button></div>
     <pre><code>{
-  <span class="tok-key">"lock_version"</span>: <span class="tok-num">1</span>,
+  <span class="tok-key">"lock_version"</span>: <span class="tok-num">2</span>,
   <span class="tok-key">"cli_version"</span>: <span class="tok-str">"0.12.2"</span>,
   <span class="tok-key">"harness"</span>: [<span class="tok-str">"claude"</span>],
   <span class="tok-key">"skills"</span>: {
@@ -1659,6 +1659,11 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
       <span class="tok-key">"arquivos"</span>: {
         <span class="tok-key">"SKILL.md"</span>: <span class="tok-str">"e3b0c442…b855"</span>
       }
+    }
+  },
+  <span class="tok-key">"instalacao"</span>: {
+    <span class="tok-key">"arquivos"</span>: {
+      <span class="tok-key">".claude/skills/sprintx/SKILL.md"</span>: <span class="tok-str">"e3b0c442…b855"</span>
     }
   }
 }</code></pre>
