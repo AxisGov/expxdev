@@ -14,7 +14,7 @@
 // `continuar` entre a releitura e a gravação.
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { closeSync, existsSync, fstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, statSync,
+import { closeSync, existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, statSync,
   writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, posix, relative } from "node:path";
@@ -103,6 +103,15 @@ function medirArquivo(f) {
 
 // `\` é separador só no Windows; fora dele é parte do nome, e trocá-lo daria por ausente um arquivo que existe
 const caminho = (f) => (process.platform === "win32" ? f.replace(/\\/g, "/") : f).replace(/^\.\//, "");
+/** O primeiro diretório de `f` (relativo a `raiz`) que é link simbólico: por ele o caminho sairia da raiz. */
+function linkNoCaminho(raiz, f) {
+  const partes = f.split("/");
+  for (let i = 1; i < partes.length; i++) {
+    const d = join(raiz, ...partes.slice(0, i));
+    try { if (lstatSync(d).isSymbolicLink()) return partes.slice(0, i).join("/"); } catch { return undefined; }
+  }
+  return undefined;
+}
 const pausa = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 const velha = (d) => { try { return Date.now() - statSync(d).mtimeMs > 120000; } catch { return false; /* sumiu */ } };
 const caminhoDono = (trava) => join(trava, "dono.json");
@@ -212,6 +221,8 @@ function snapshotDaRevisao(head, blobs) {
       const destino = join(raiz, f);
       const rel = relative(raiz, destino);
       if (rel === "" || rel.split(/[\\/]/)[0] === ".." || isAbsolute(rel)) throw new Error(`caminho fora do snapshot: ${f}`);
+      // um diretório versionado como link levaria o rmSync e a escrita para fora do snapshot
+      if (linkNoCaminho(raiz, f) !== undefined) throw new Error(`caminho atravessa link no snapshot: ${f}`);
       rmSync(destino, { recursive: true, force: true });
       mkdirSync(dirname(destino), { recursive: true });
       writeFileSync(destino, conteudo);
@@ -347,7 +358,9 @@ function revisar() {
   if (arquivos.length === 0) uso("--arquivos sem nenhum caminho");
   // o caminho é relativo à raiz e fica dentro dela: com `..` ou absoluto, o snapshot apagaria e
   // reescreveria um caminho fora do checkout temporário
-  const fora = arquivos.find((f) => isAbsolute(f) || /^[A-Za-z]:/.test(f) || posix.normalize(f).split("/")[0] === "..");
+  // (`C:foo.js` só é caminho de drive no Windows; fora dele é nome de arquivo)
+  const fora = arquivos.find((f) => isAbsolute(f) || (process.platform === "win32" && /^[A-Za-z]:/.test(f))
+    || posix.normalize(f).split("/")[0] === ".." || linkNoCaminho(op.raiz, f) !== undefined);
   if (fora !== undefined) uso(`--arquivos fora da raiz do projeto: ${fora}`);
   if (op["base-commit"] !== undefined) {
     const sha = idDe("rev-parse", "--verify", "-q", `${op["base-commit"]}^{commit}`);

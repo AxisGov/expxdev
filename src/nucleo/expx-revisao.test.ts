@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ambienteCom, noPath, RAIZ_DO_REPO } from "../teste/candidatos.js";
 import { arquivosDoCaso, respostaDoCaso, type CasoConformidade } from "../teste/conformidade.js";
 import { chamadasDa, configurarFalsa, instalarCodeantFalsa, nucleoDeTeste, type CfgFalsa, type Falsa } from "../teste/codeant-falsa.js";
+import { suportaNomeComCaractereReservado, suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
 
 // `nucleo/scripts/expx-revisao.mjs`. A CLI do CodeAnt nunca é chamada de verdade: uma `codeant` falsa, instalada
 // como pacote npm, vem antes no PATH, responde um JSON e registra os argumentos recebidos.
@@ -363,6 +364,28 @@ describe("expx-revisao.mjs revisar v2: portões antes da CLI", () => {
       expect(r.ev, pedido).toBeUndefined();
     }
     expect(readFileSync(alvo, "utf8")).toBe("segredo\n");
+  });
+
+  const comLink = suportaSymlinkDeDiretorio();
+  it.skipIf(!comLink)(`funcional: caminho que atravessa diretório-link para fora da raiz é erro de uso${comLink ? "" : " [pulado: sem link de diretório]"}`, () => {
+    const c = cenario();
+    const fora = temp("expx-fora-link-");
+    writeFileSync(join(fora, "alvo.js"), "segredo\n");
+    symlinkSync(fora, join(c.raiz, "link"), "dir");
+    const r = revisar(c, "link/alvo.js");
+    expect(r).toMatchObject({ rc: 64, chamadas: [] });
+    expect(r.err).toContain("fora da raiz do projeto: link/alvo.js");
+    expect(readFileSync(join(fora, "alvo.js"), "utf8")).toBe("segredo\n");
+  });
+
+  // `C:foo.js` só é caminho de drive no Windows; no POSIX é nome de arquivo e é revisado.
+  const comNome = process.platform !== "win32" && suportaNomeComCaractereReservado();
+  it.skipIf(!comNome)(`funcional: no POSIX, \`C:foo.js\` é nome de arquivo e é revisado${comNome ? "" : " [pulado: Windows]"}`, () => {
+    const c = cenario();
+    escreve(c.raiz, "C:foo.js", "l1\n");
+    const r = revisar(c, "C:foo.js");
+    expect(r.rc).not.toBe(64);
+    expect(r.ev.arquivos["C:foo.js"]).toMatchObject({ revisao: "enviado" });
   });
 
   it("funcional: limite40.json: 40 revisáveis, com 5.000 linhas sem quebra final e 204.800 bytes → ok; uma chamada com os 40", () => {
