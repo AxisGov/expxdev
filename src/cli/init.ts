@@ -30,7 +30,7 @@ import {
   type Artefato,
 } from "../plugin/plano.js";
 import { artefatosOpenCode } from "../harness/opencode.js";
-import { entradaPorNome, gravarSettings, planejarSettings, type PlanoSettings } from "../harness/settings.js";
+import { entradaPorNome, formaSemAspas, gravarSettings, planejarSettings, type PlanoSettings } from "../harness/settings.js";
 import { artefatosDeHooks, comHooks, hooksPorNome } from "../harness/hooks.js";
 import {
   caminhosReferenciados,
@@ -249,9 +249,13 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
   // 2. Registros de hook: núcleo e hooks soltos por nome; skills pelo manifesto.
   const destinos = new Set(c.artefatos.map((a) => a.destino));
   const entradas: EntradaHook[] = [];
+  const legadas: EntradaGerenciada[] = [];
   for (const h of hooksPorNome(c.artefatos, montaveis)) {
     const e = entradaPorNome(h);
-    if (e !== null) entradas.push(e);
+    if (e === null) continue;
+    entradas.push(e);
+    const l = formaSemAspas(e);
+    if (l !== null) legadas.push(l);
   }
   const comHook = comHooks(montaveis);
   for (const s of comHook) {
@@ -270,7 +274,7 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
   }
   plano.hooksDeSkill = entradas.some((e) => e.skill !== SKILL_DO_NUCLEO);
 
-  const s = planejarSettings(op.raiz, join(op.raiz, ".expx", "marketplace"), entradas, anteriores.settings);
+  const s = planejarSettings(op.raiz, join(op.raiz, ".expx", "marketplace"), entradas, [...anteriores.settings, ...legadas]);
   if (!s.ok) erros.push(s.erro);
   else plano.settings = s.plano;
 
