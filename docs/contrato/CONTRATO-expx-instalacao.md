@@ -63,7 +63,7 @@ vence".
 |---|---|
 | pasta do `SKILL.md` | `.claude/skills/<skill>/…` e `.expx/marketplace/plugins/expx/skills/<skill>/…` |
 | `.claude/hooks/**` (árvore inteira, menos `hooks.json`) | `.claude/hooks/**` e `…/plugins/expx/hooks/**` |
-| `.claude/hooks/ponte/*.js` (ponte de hooks, como a `runx-ponte.js`) | além da árvore de hooks, `.opencode/plugins/<arquivo>` com `opencode` |
+| `.claude/hooks/ponte/*.js` (ponte de hooks, como a `runx-ponte.js`) | além da árvore de hooks, `.opencode/plugins/<arquivo>` com `claude` e `opencode` |
 | `.claude/commands/<skill>*.md` | `…/plugins/expx/commands/` (e `.opencode/commands/` com `opencode`) |
 | `.claude/agents/*.md` | `.claude/agents/*.md`, com o override de `.expx/agentes.json` aplicado (seção 8) |
 | `.claude/settings.json` | **composto** em `.claude/settings.json` |
@@ -77,10 +77,12 @@ pasta da skill. Não há caso especial por arquivo.
 
 A única cópia a mais é a da ponte de hooks: o OpenCode não carrega módulos de
 `.claude/hooks/ponte/`, só de `.opencode/plugins/`, que é onde o `install.sh`
-da runx a põe. Com `opencode` no harness, cada `.js` de
+da runx a põe. Com `claude` e `opencode` no harness, cada `.js` de
 `.claude/hooks/ponte/` vai também para `.opencode/plugins/`, com os mesmos
 bytes; a cópia da árvore continua, porque é a partir dela que a ponte acha o
-despachante e o `hooks.json` do marketplace. Só com `claude`, nada muda. O
+despachante e o `hooks.json` do marketplace. Só com `claude`, nada muda. Só com
+`opencode`, a árvore de hooks não é instalada e a ponte não teria para onde
+despachar: ela não vai, e o `init` avisa. O
 MimoCode não é harness do expx: a ponte em `.mimocode/hooks/` continua sendo
 instalada apenas pelo `install.sh` da runx. Como os demais artefatos fora de
 `.claude/agents/`, a ponte em `.opencode/plugins/` não é removida quando o

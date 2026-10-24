@@ -29,7 +29,7 @@ import {
   verificarDestinos,
   type Artefato,
 } from "../plugin/plano.js";
-import { artefatosOpenCode } from "../harness/opencode.js";
+import { artefatosOpenCode, pontesDeHooks } from "../harness/opencode.js";
 import { entradaPorNome, formaSemAspas, gravarSettings, planejarSettings, type PlanoSettings } from "../harness/settings.js";
 import { artefatosDeHooks, comHooks, hooksPorNome } from "../harness/hooks.js";
 import {
@@ -219,7 +219,15 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
       avisosDoPlano.push(...ag.avisos);
     }
   }
-  if (op.harness.includes("opencode")) candidatos.push(...artefatosOpenCode(montaveis));
+  if (op.harness.includes("opencode")) {
+    candidatos.push(...artefatosOpenCode(montaveis, claude));
+    // A ponte despacha para a árvore de hooks, que só é instalada com `claude`.
+    const semDespachante = claude ? [] : montaveis.filter((s) => pontesDeHooks(s).length > 0).map((s) => s.nome);
+    if (semDespachante.length > 0) {
+      avisosDoPlano.push(`ponte de hooks de ${semDespachante.join(", ")} nao instalada em .opencode/plugins: ` +
+        "ela despacha para .claude/hooks, que so e instalada com o harness claude (use --harness claude,opencode)");
+    }
+  }
   const c = consolidar(candidatos);
   if (!c.ok) {
     erros.push(descreverColisoes(c.colisoes));

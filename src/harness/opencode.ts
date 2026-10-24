@@ -32,22 +32,24 @@ import {
  * A ponte de hooks (`.claude/hooks/ponte/*.js`, a `runx-ponte.js` da runx) só é
  * carregada pelo OpenCode a partir de `.opencode/plugins/`, como o `install.sh`
  * da runx a instala. Ela continua indo também com a árvore de hooks, e é dali
- * que acha o despachante e o `hooks.json` do marketplace.
+ * que acha o despachante e o `hooks.json` do marketplace — por isso só vai
+ * quando a árvore de hooks também vai (`comPonte`, o harness inclui `claude`).
  */
-export function artefatosOpenCode(skills: readonly SkillMontavel[]): Artefato[] {
+export function artefatosOpenCode(skills: readonly SkillMontavel[], comPonte = true): Artefato[] {
   const saida: Artefato[] = [];
   for (const s of emOrdemCanonica(skills)) {
     // O nome da pasta precisa continuar igual ao `name` do frontmatter: o
     // OpenCode exige que os dois batam para descobrir a skill.
     saida.push(...artefatosDaArvore(s.raizSkill, `.claude/skills/${s.nome}`, s.nome, "skill"));
     for (const c of s.comandos) saida.push(artefato(c, `.opencode/commands/${basename(c)}`, s.nome, "comando"));
+    if (!comPonte) continue;
     for (const ponte of pontesDeHooks(s)) saida.push(artefato(ponte, `.opencode/plugins/${basename(ponte)}`, s.nome, "hook"));
   }
   return saida;
 }
 
 /** Os `.js` de `.claude/hooks/ponte/` da skill, em ordem estável. */
-function pontesDeHooks(s: SkillMontavel): string[] {
+export function pontesDeHooks(s: SkillMontavel): string[] {
   if (s.arvoreHooks === undefined) return [];
   const pasta = join(s.arvoreHooks, "ponte");
   if (!existsSync(pasta)) return [];

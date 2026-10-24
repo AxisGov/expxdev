@@ -263,4 +263,12 @@ describe("ponte de hooks para o OpenCode (.claude/hooks/ponte/*.js)", () => {
     expect(existsSync(join(p, ".opencode"))).toBe(false);
     expect(readFileSync(join(p, ".claude/hooks/ponte/alfa-ponte.js"), "utf8")).toBe(PONTE);
   });
+
+  it("funcional: só com opencode a ponte não vai (sem .claude/hooks ela não despacha) e o init avisa", async () => {
+    const p = produto();
+    const r = await executarInit({ raiz: p, skills: ["alfa"], harness: ["opencode"], origens: origens() });
+    expect(r.ok, r.erros.join("\n")).toBe(true);
+    expect(existsSync(join(p, ".opencode/plugins/alfa-ponte.js"))).toBe(false);
+    expect(r.avisos.join("\n")).toContain("ponte de hooks de alfa nao instalada em .opencode/plugins");
+  });
 });
