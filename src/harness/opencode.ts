@@ -1,4 +1,5 @@
-import { basename } from "node:path";
+import { existsSync, readdirSync } from "node:fs";
+import { basename, join } from "node:path";
 import type { SkillMontavel } from "../plugin/montagem.js";
 import {
   aplicarArtefatos,
@@ -27,6 +28,11 @@ import {
  * `commands/` no plural é a forma documentada. Os repositórios reais divergem
  * entre `.opencode/command/` e `.opencode/commands/`; normalizar aqui evita
  * projetos inconsistentes.
+ *
+ * A ponte de hooks (`.claude/hooks/ponte/*.js`, a `runx-ponte.js` da runx) só é
+ * carregada pelo OpenCode a partir de `.opencode/plugins/`, como o `install.sh`
+ * da runx a instala. Ela continua indo também com a árvore de hooks, e é dali
+ * que acha o despachante e o `hooks.json` do marketplace.
  */
 export function artefatosOpenCode(skills: readonly SkillMontavel[]): Artefato[] {
   const saida: Artefato[] = [];
@@ -35,8 +41,20 @@ export function artefatosOpenCode(skills: readonly SkillMontavel[]): Artefato[] 
     // OpenCode exige que os dois batam para descobrir a skill.
     saida.push(...artefatosDaArvore(s.raizSkill, `.claude/skills/${s.nome}`, s.nome, "skill"));
     for (const c of s.comandos) saida.push(artefato(c, `.opencode/commands/${basename(c)}`, s.nome, "comando"));
+    for (const ponte of pontesDeHooks(s)) saida.push(artefato(ponte, `.opencode/plugins/${basename(ponte)}`, s.nome, "hook"));
   }
   return saida;
+}
+
+/** Os `.js` de `.claude/hooks/ponte/` da skill, em ordem estável. */
+function pontesDeHooks(s: SkillMontavel): string[] {
+  if (s.arvoreHooks === undefined) return [];
+  const pasta = join(s.arvoreHooks, "ponte");
+  if (!existsSync(pasta)) return [];
+  return readdirSync(pasta, { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.endsWith(".js"))
+    .map((e) => join(pasta, e.name))
+    .sort();
 }
 
 export function materializarOpenCode(raizProjeto: string, skills: readonly SkillMontavel[]): void {

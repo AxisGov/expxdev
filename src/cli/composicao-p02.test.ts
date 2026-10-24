@@ -241,3 +241,26 @@ describe("install.sh das skills", () => {
     expect(arvore(p).filter((f) => f.endsWith("install.sh"))).toEqual([]);
   });
 });
+
+describe("ponte de hooks para o OpenCode (.claude/hooks/ponte/*.js)", () => {
+  // O OpenCode não carrega módulos de .claude/hooks/ponte: a ponte só é alcançável em
+  // .opencode/plugins/, como o install.sh da runx a instala. Só com o harness opencode.
+  const PONTE = "export const AlfaPonte = async () => ({});\n";
+  const origens = () => ({ alfa: skill("alfa", { ".claude/hooks/ponte/alfa-ponte.js": PONTE, ".claude/hooks/alfa/h.sh": "exit 0\n" }) });
+
+  it("funcional: com opencode, a ponte também vai para .opencode/plugins com os mesmos bytes", async () => {
+    const p = produto();
+    const r = await executarInit({ raiz: p, skills: ["alfa"], harness: ["claude", "opencode"], origens: origens() });
+    expect(r.ok, r.erros.join("\n")).toBe(true);
+    expect(readFileSync(join(p, ".opencode/plugins/alfa-ponte.js"), "utf8")).toBe(PONTE);
+    expect(readFileSync(join(p, ".claude/hooks/ponte/alfa-ponte.js"), "utf8")).toBe(PONTE);
+  });
+
+  it("funcional: só com claude nada vai para .opencode, e a ponte segue só na árvore de hooks", async () => {
+    const p = produto();
+    const r = await executarInit({ raiz: p, skills: ["alfa"], harness: ["claude"], origens: origens() });
+    expect(r.ok, r.erros.join("\n")).toBe(true);
+    expect(existsSync(join(p, ".opencode"))).toBe(false);
+    expect(readFileSync(join(p, ".claude/hooks/ponte/alfa-ponte.js"), "utf8")).toBe(PONTE);
+  });
+});
