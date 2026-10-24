@@ -13,7 +13,7 @@ Os repositórios abaixo foram confirmados na organização AxisGov em 2026-10-23
 | `AxisGov/legadox` | `b185ef751e65d5f59d439528988344c52fe47b17` |
 | `AxisGov/stackx` | `1243537f2991e7097074889e2953ebc85ba726f4` |
 | `AxisGov/mergex` | `66dd6ace235287c1d094c3c77d25366ec4776635` |
-| `AxisGov/sprintx` | `3b45027335e3fc06cb6d354a704fbedf18f2ffdc` |
+| `AxisGov/sprintx` | `1941c5a7df823f1506a858f486aec3d0806ffda9` |
 | `AxisGov/MemoX` | `75f11897e7ac1a9123c5b1495b8e396122a85c4b` |
 | `AxisGov/prodx` | `7539db41013585d31b79ef21afd07268bd99d0c1` |
 | `AxisGov/buildx` | `b7dc7b6906904b3bf7184431518608a11422bd54` |

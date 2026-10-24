@@ -197,7 +197,7 @@ MJ="$J/mut"
 muta_lit() { # muta_lit <origem> <destino> <trecho> <troca> — troca literal; falha se o trecho nao existe
   ML_A="$3" ML_B="$4" awk '{ a = ENVIRON["ML_A"]; i = index($0, a); if (i) { $0 = substr($0, 1, i - 1) ENVIRON["ML_B"] substr($0, i + length(a)); n++ } print } END { exit n ? 0 : 1 }' "$1" > "$2"
 }
-copia_skill() { mkdir -p "$MJ/$1/scripts" "$MJ/$1/assets"; cp "$TPLB" "$MJ/$1/assets/"; cp "$SK/scripts/caminho-git.sh" "$MJ/$1/scripts/"; printf '%s/%s/scripts/bloqueios.sh' "$MJ" "$1"; }
+copia_skill() { mkdir -p "$MJ/$1/scripts/lib" "$MJ/$1/assets"; cp "$TPLB" "$MJ/$1/assets/"; cp "$SK/scripts/caminho-git.sh" "$MJ/$1/scripts/"; cp "$SK/scripts/lib/execucao.sh" "$MJ/$1/scripts/lib/"; printf '%s/%s/scripts/bloqueios.sh' "$MJ" "$1"; }
 mata() { local c; for c in $CASOS_J; do roda_caso "$c" "$1" || { printf '%s' "$c"; return; }; done; }
 mutante() { # mutante <nome> <rc da geracao> <script> <caso que TEM de matar>... — nao vale morrer de carona
   local nome="$1" rc="$2" s="$3" c vivos=""; shift 3
@@ -822,7 +822,7 @@ l_abridor_parametros() {
   mkdir -p "$r/scripts/lib" "$r/assets"
   cp "$SK/assets/TEMPLATE-PLANEJAMENTO.md" "$SK/assets/TEMPLATE-BLOQUEIOS.md" "$r/assets/"
   cp "$BL" "$SK/scripts/caminho-git.sh" "$r/scripts/"
-  cp "$SK/scripts/lib/trava-autorizacao-f6.sh" "$r/scripts/lib/"
+  cp "$SK/scripts/lib/trava-autorizacao-f6.sh" "$SK/scripts/lib/execucao.sh" "$r/scripts/lib/"
   muta_lit "$s" "$m" '  abre_rodada_f6 "$defeitos" "$P_MAX6"' \
     '  abre_rodada_f6 "$defeitos" 9 usuario 2026-10-12 orcamento_f6_nao_declarado' || return 1
   chmod +x "$m"
@@ -1532,7 +1532,7 @@ tr -d '\r' < "$SCHK" | grep -F '| `estado` (planejamento) |' | grep -qF '`replan
   && tem "$SCHK" '**Erro de contrato nunca vira esta recusa**' && tem "$EXEC" 'recusa **operacional**, gravada e persistida'
 afirma "k18-estado-replanejamento_execucao_recusado-no-enum" $? "schema, SKILL.md, 06-execucao e script"
 KCMD="$CMD_PL replanejar-execucao <slug>"
-onde="$(grep -rlF -- "$KCMD" "$SK" "$H/../commands" "$H/../../.opencode" 2>/dev/null)"
+onde="$(grep -rlF -- "$KCMD" "$SK" "$H/../commands" ${RAIZ_SRC:+"$RAIZ_SRC/.opencode"} 2>/dev/null)"
 [ "$(printf '%s\n' "$onde" | sed '/^$/d' | wc -l | tr -d ' ')" -eq 1 ] && [ "$(basename "$onde")" = 06-execucao.md ] && [ "$(conta "$EXEC" "$KCMD")" -eq 1 ]
 afirma "k19-instrucao-unica-replanejar-execucao" $? "${onde:-nenhum arquivo}"
 L_REG=$(linha_de "$EXEC" 'bash <raiz-da-skill>/scripts/bloqueios.sh registrar <slug>'); L_RPL=$(linha_de "$EXEC" "$KCMD")
@@ -1566,7 +1566,7 @@ afirma "k23-ds140-a-ds148-registradas" $? "$n de 7, mais DS-147 e DS-148"
 # casos designados; o controle, copia SEM mutacao na mesma estrutura, tem de sobreviver a
 # todos eles — se morrer, e a bancada que esta quebrada.
 MK="$K/mut"
-copia_skill_k() { mkdir -p "$MK/$1/scripts/lib" "$MK/$1/assets"; cp "$SK/assets/TEMPLATE-PLANEJAMENTO.md" "$SK/assets/TEMPLATE-BLOQUEIOS.md" "$MK/$1/assets/"; cp "$BL" "$SK/scripts/caminho-git.sh" "$MK/$1/scripts/"; cp "$SK/scripts/lib/trava-autorizacao-f6.sh" "$MK/$1/scripts/lib/"; printf '%s/%s/scripts/planejamento.sh' "$MK" "$1"; }
+copia_skill_k() { mkdir -p "$MK/$1/scripts/lib" "$MK/$1/assets"; cp "$SK/assets/TEMPLATE-PLANEJAMENTO.md" "$SK/assets/TEMPLATE-BLOQUEIOS.md" "$MK/$1/assets/"; cp "$BL" "$SK/scripts/caminho-git.sh" "$MK/$1/scripts/"; cp "$SK/scripts/lib/trava-autorizacao-f6.sh" "$SK/scripts/lib/execucao.sh" "$MK/$1/scripts/lib/"; printf '%s/%s/scripts/planejamento.sh' "$MK" "$1"; }
 mutante_k() { # mutante_k <nome> <rc da geracao> <script> <caso que TEM de matar>...
   local nome="$1" rc="$2" s="$3" c vivos=""; shift 3
   if [ "$rc" -eq 0 ]; then for c in "$@"; do roda_k "$c" "$s" && vivos="$vivos$c "; done; fi
