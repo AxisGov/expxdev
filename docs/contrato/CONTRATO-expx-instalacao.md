@@ -317,15 +317,19 @@ sem orquestração.
   (e `O_NOFOLLOW` onde existe), recebe `fsync` e é publicado com `link`, nunca
   com `rename`. O `link` falha se o final já existe, inclusive como link
   simbólico. Então:
-  - **garantido:** o registro nunca é sobrescrito nem seguido. Um final
-    existente só é aceito se for arquivo regular com os mesmos bytes, lido sem
-    seguir link. Dois `init` simultâneos publicam o mesmo conteúdo, e o segundo
-    aceita o do primeiro;
+  - **garantido:** o registro nunca é sobrescrito, e o temporário é escrito por
+    inteiro (escrita parcial é completada). Dois `init` simultâneos publicam o
+    mesmo conteúdo, e o segundo aceita o do primeiro. Em POSIX, um final
+    existente só é aceito se for arquivo regular com os mesmos bytes, lido com
+    `O_NOFOLLOW`. No Windows, sem `O_NOFOLLOW`, sobra um `lstat` antes do
+    `open`, com janela entre os dois;
   - **mitigado:** `.expx` e `.expx/resolucoes` precisam ser diretórios de
     verdade, sem link e dentro do projeto (`realpath` + `relative`), e manter o
     (dev, ino) da primeira checagem. Os dois são conferidos depois de criar
     `resolucoes` e de novo antes de publicar. Uma troca, por link ou por outro
-    diretório, ainda presente na revalidação aborta antes do lock. O `mkdir`
+    diretório, ainda presente na revalidação aborta antes do lock. A
+    revalidação vale também quando o registro já existia: a leitura passa pelo
+    caminho dos diretórios, e o `O_NOFOLLOW` só protege o componente final. O `mkdir`
     pode ter acontecido antes da detecção. O temporário de um diretório que
     mudou não é limpo: um órfão é preferível a remover por um caminho talvez
     redirecionado;

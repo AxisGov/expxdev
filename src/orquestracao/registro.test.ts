@@ -64,6 +64,25 @@ describe("gravarNoRegistro", () => {
     expect(temporarios(raiz)).toEqual([]);
   });
 
+  it("escrita parcial é completada, e o registro nunca sai truncado", () => {
+    const raiz = temp("expx-reg-");
+    gravarNoRegistro(raiz, resolucao, { limiteDeEscrita: 7 });
+    expect(readFileSync(final(raiz), "utf8")).toBe(TEXTO);
+  });
+
+  it.skipIf(!POSIX)("registro existente lido por um diretório trocado por link não é aceito", () => {
+    const raiz = temp("expx-reg-");
+    const fora = temp("expx-fora-");
+    gravarNoRegistro(raiz, resolucao);
+    // fora do projeto, um arquivo com o mesmo nome e os mesmos bytes
+    writeFileSync(join(fora, `${ID}.json`), TEXTO);
+    const trocar = () => {
+      renameSync(dirReg(raiz), join(raiz, ".expx", "resolucoes-original"));
+      symlinkSync(fora, dirReg(raiz));
+    };
+    expect(() => gravarNoRegistro(raiz, resolucao, { antesDaRevalidacao: trocar })).toThrow(/link simbolico|fora do projeto|trocado/);
+  });
+
   it("colisão do temporário: O_EXCL falha e o arquivo existente não é truncado", () => {
     const raiz = temp("expx-reg-");
     mkdirSync(dirReg(raiz), { recursive: true });

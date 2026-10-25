@@ -8,10 +8,12 @@ import type { Resolucao } from "./resolver.js";
  * Escrita do registro `.expx/resolucoes/` (CONTRATO-expx-instalacao §5.3).
  *
  * O que é GARANTIDO, em qualquer intercalação:
- * - o arquivo final nunca é sobrescrito nem seguido: o temporário nasce com
- *   `O_EXCL` (e `O_NOFOLLOW` onde existe) e é publicado com `link`, que falha
- *   se o final já existe — inclusive como link simbólico;
- * - um final que já existe só é aceito se é arquivo regular com os mesmos bytes.
+ * - o arquivo final nunca é sobrescrito: o temporário nasce com `O_EXCL` e é
+ *   publicado com `link`, que falha se o final já existe — inclusive como link;
+ * - o temporário é escrito por inteiro (escrita parcial é completada);
+ * - em POSIX, o final existente só é aceito se é arquivo regular com os mesmos
+ *   bytes, lido com `O_NOFOLLOW`. No Windows (sem `O_NOFOLLOW`) sobra o `lstat`
+ *   antes do `open`, com janela.
  *
  * O que é MITIGADO: a troca de `.expx` ou `.expx/resolucoes`, por link ou por
  * outro diretório. Os dois precisam ser diretórios de verdade, sem link, dentro
@@ -44,13 +46,18 @@ function diretorioSeguro(raizReal: string, abs: string, rel: string): Identidade
   return { dev: st.dev, ino: st.ino };
 }
 
-function existe(caminho: string): boolean {
+/** Uma única chamada: entre "existe?" e "o que é?" o arquivo pode sumir. */
+function lstatOuNada(caminho: string): Stats | undefined {
   try {
-    lstatSync(caminho);
-    return true;
-  } catch {
-    return false;
+    return lstatSync(caminho);
+  } catch (e: unknown) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw e;
   }
+}
+
+function existe(caminho: string): boolean {
+  return lstatOuNada(caminho) !== undefined;
 }
 
 /** O diretório continua sendo o mesmo (dev, ino), sem link e dentro da raiz. */
@@ -66,8 +73,12 @@ function garantirDiretorio(raizReal: string, raiz: string, rel: string): Identid
   return diretorioSeguro(raizReal, abs, rel);
 }
 
-/** Lê o final sem seguir link e confere os bytes. */
+/**
+ * Lê o final sem seguir link e confere os bytes. O `lstat` antes do `open` é a
+ * defesa que sobra no Windows, onde não há `O_NOFOLLOW` (com janela entre os dois).
+ */
 function conferirExistente(caminho: string, rel: string, texto: string): void {
+  if (lstatOuNada(caminho)?.isSymbolicLink() === true) throw erroLink(rel);
   let fd: number;
   try {
     fd = openSync(caminho, constants.O_RDONLY | NOFOLLOW);
@@ -106,10 +117,12 @@ function sincronizarDiretorio(dir: string): void {
 }
 
 export type OpcoesDeTeste = {
-  /** Chamado entre a criação do temporário e a revalidação: simula a corrida. */
+  /** Chamado no meio da operação (antes de ler o existente, ou depois de criar o temporário) e antes da revalidação: simula a corrida. */
   antesDaRevalidacao?: () => void;
   /** Nome fixo do temporário, para provar o `O_EXCL`. */
   nomeTemporario?: string;
+  /** Máximo de bytes por `writeSync`, para provar que escrita parcial é completada. */
+  limiteDeEscrita?: number;
 };
 
 /** Para o planejamento: o que já impede gravar sem sair do projeto. Vazio quando está tudo ausente ou seguro. */
@@ -131,10 +144,7 @@ export function destinoDoRegistroInseguro(raiz: string, ids: readonly string[]):
   }
   return ids
     .map(caminhoDoRegistro)
-    .filter((rel) => {
-      const abs = join(raiz, ...rel.split("/"));
-      return existe(abs) && lstatSync(abs).isSymbolicLink();
-    })
+    .filter((rel) => lstatOuNada(join(raiz, ...rel.split("/")))?.isSymbolicLink() === true)
     .map((rel) => erroLink(rel).message);
 }
 
@@ -153,8 +163,17 @@ export function gravarNoRegistro(raiz: string, r: Resolucao, teste?: OpcoesDeTes
   const caminho = join(raiz, ...rel.split("/"));
   const texto = serializarRegistro(r);
 
+  const revalidar = (): void => {
+    conferirIdentidade(raizReal, raiz, ".expx", idExpx);
+    conferirIdentidade(raizReal, raiz, DIR_REGISTRO, idDir);
+  };
+
   if (existe(caminho)) {
+    // O `O_NOFOLLOW` só protege o componente final: a leitura passou pelo
+    // caminho dos diretórios, que precisam continuar os mesmos.
+    teste?.antesDaRevalidacao?.();
     conferirExistente(caminho, rel, texto);
+    revalidar();
     return;
   }
 
@@ -162,7 +181,13 @@ export function gravarNoRegistro(raiz: string, r: Resolucao, teste?: OpcoesDeTes
   const fd = openSync(tmp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | NOFOLLOW, 0o644);
   let idTmp: Identidade;
   try {
-    writeSync(fd, texto);
+    // `writeSync` pode escrever menos que o pedido sem lançar: escreve até o fim.
+    const bytes = Buffer.from(texto, "utf8");
+    for (let feito = 0; feito < bytes.length; ) {
+      const n = writeSync(fd, bytes, feito, Math.min(bytes.length - feito, teste?.limiteDeEscrita ?? bytes.length));
+      if (n <= 0) throw new Error(`${rel}: a escrita do temporario nao progrediu`);
+      feito += n;
+    }
     fsyncSync(fd);
     const st = fstatSync(fd);
     idTmp = { dev: st.dev, ino: st.ino };
@@ -173,8 +198,7 @@ export function gravarNoRegistro(raiz: string, r: Resolucao, teste?: OpcoesDeTes
   // Revalidação: o diretório é o mesmo de antes, e o temporário é o nosso. Se
   // não for, nem a limpeza é confiável: o temporário fica órfão.
   teste?.antesDaRevalidacao?.();
-  conferirIdentidade(raizReal, raiz, ".expx", idExpx);
-  conferirIdentidade(raizReal, raiz, DIR_REGISTRO, idDir);
+  revalidar();
   if (!mesma(idTmp, lstatSync(tmp))) throw new Error(`${DIR_REGISTRO} foi trocado durante a gravacao (nada foi publicado)`);
 
   try {
@@ -184,9 +208,10 @@ export function gravarNoRegistro(raiz: string, r: Resolucao, teste?: OpcoesDeTes
       limpar(tmp, idTmp);
       throw e;
     }
-    // Outro escritor publicou primeiro: vale se é o mesmo conteúdo.
+    // Outro escritor publicou primeiro: vale se é o mesmo conteúdo, lido pelos mesmos diretórios.
     try {
       conferirExistente(caminho, rel, texto);
+      revalidar();
     } finally {
       limpar(tmp, idTmp);
     }
