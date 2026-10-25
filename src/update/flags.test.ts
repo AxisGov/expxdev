@@ -211,6 +211,25 @@ describe("update de uma skill e as outras", () => {
     expect(readFileSync(join(pastaDaSkill(p.raiz, "sprintx"), "references", "01.md"), "utf8")).toBe("# conteudo de v1.1.0\n");
   });
 
+  it("funcional: --to com SHA em maiúsculas é o mesmo commit", async () => {
+    const sprintx = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    repos.push(sprintx);
+    const origens = origensPorUrl({ sprintx });
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    expect((await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens })).ok).toBe(true);
+
+    novaTag(sprintx, "v1.1.0");
+    const alvo = execFileSync("git", ["rev-parse", "HEAD"], { cwd: sprintx, encoding: "utf8" }).trim();
+    novaTag(sprintx, "v1.2.0");
+    const r = await executarUpdate({ raiz: p.raiz, skills: ["sprintx"], to: alvo.toUpperCase(), sim: true, origens });
+
+    expect(r.aplicou).toBe(true);
+    const l = lerLock(p.raiz);
+    if (!l.ok) throw new Error(l.erro);
+    expect(l.lock.skills["sprintx"]?.commit).toBe(alvo);
+    expect(l.lock.skills["sprintx"]?.referencia).toBe(alvo);
+  });
+
   it("funcional: skill bloqueada por modificação local não é remontada por cima", async () => {
     const sprintx = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
     const runx = criarRepoSkill({ nome: "runx", tags: ["v1.0.0"], layout: "plano" });

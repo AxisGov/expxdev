@@ -17,7 +17,7 @@ import { adquirirBloqueioOperacao } from "../nucleo/bloqueio-operacao.js";
  */
 
 /** Um SHA-1 completo: só ele é buscado como commit, sem ambiguidade com tag ou branch. */
-const SHA_COMPLETO = /^[0-9a-f]{40}$/;
+const SHA_COMPLETO = /^[0-9a-f]{40}$/i;
 
 export const AVISO_ROLLBACK =
   "para desfazer esta atualizacao, reverta o .expx/ pelo versionador (ex.: git checkout -- .expx)";
@@ -126,7 +126,10 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   }
   const migracao = migrarProveniencias(l.lock, op.skills);
 
-  const referencias = op.to !== undefined && op.skills?.[0] !== undefined ? { [op.skills[0]]: op.to } : undefined;
+  // o git aceita SHA em maiúsculas, mas devolve e grava em minúsculas: sem
+  // normalizar, o lock e a conferência do commit buscado divergiriam
+  const to = op.to !== undefined && SHA_COMPLETO.test(op.to) ? op.to.toLowerCase() : op.to;
+  const referencias = to !== undefined && op.skills?.[0] !== undefined ? { [op.skills[0]]: to } : undefined;
   const origens: Record<string, string> = {};
   for (const [nome, travada] of Object.entries(l.lock.skills)) {
     const origem = resolverOrigem(nome, travada.repositorio, op.origens?.[nome]);
@@ -256,7 +259,7 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   }
   // `--to <sha>`: `git clone --branch` não aceita SHA, então ele vai como commit
   const nomeada = op.skills?.[0];
-  if (op.to !== undefined && nomeada !== undefined && SHA_COMPLETO.test(op.to)) commits[nomeada] = op.to;
+  if (to !== undefined && nomeada !== undefined && SHA_COMPLETO.test(to)) commits[nomeada] = to;
 
   const init = await executarInit({
     raiz: op.raiz,
