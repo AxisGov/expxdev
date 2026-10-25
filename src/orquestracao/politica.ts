@@ -99,8 +99,8 @@ export function validarPolitica(bruto: unknown): ValidacaoPolitica {
   for (const a of ADAPTADORES) {
     for (const c of CLASSES) {
       politica.adaptadores[a]?.classes[c]?.forEach((alt, i) => {
-        const motivo = validarAlternativa(a, c, alt);
-        if (motivo !== null) semanticos.push(`  adaptadores.${a}.classes.${c}[${String(i)}]: ${motivo}`);
+        const falha = validarAlternativa(a, c, alt);
+        if (falha !== null) semanticos.push(`  adaptadores.${a}.classes.${c}[${String(i)}].${falha.campo}: ${falha.motivo}`);
       });
     }
   }

@@ -73,28 +73,31 @@ export function modeloClaudeBemFormado(model: string): boolean {
   return MODELO_CLAUDE.test(model);
 }
 
-function validarClaude(classe: Classe, alt: Alternativa): string | null {
-  if (!MODELO_CLAUDE.test(alt.model)) return `model "${alt.model}" não é alias (opus, sonnet, haiku) nem ID claude-*`;
-  if (alt.model === "inherit") return "model inherit não se classifica e não pode entrar numa cadeia";
+function validarClaude(classe: Classe, alt: Alternativa): Falha | null {
+  if (!MODELO_CLAUDE.test(alt.model)) return { campo: "model", motivo: `model "${alt.model}" não é alias (opus, sonnet, haiku) nem ID claude-*` };
+  if (alt.model === "inherit") return { campo: "model", motivo: "model inherit não se classifica e não pode entrar numa cadeia" };
   const doModelo = classeDoModeloClaude(alt.model);
-  if (doModelo === null) return `model "${alt.model}" está sem classe na v1 (família não reconhecida)`;
-  if (posto(doModelo) < posto(classe)) return `model "${alt.model}" (${doModelo}) não satisfaz a classe ${classe}`;
+  if (doModelo === null) return { campo: "model", motivo: `model "${alt.model}" está sem classe na v1 (família não reconhecida)` };
+  if (posto(doModelo) < posto(classe)) return { campo: "model", motivo: `model "${alt.model}" (${doModelo}) não satisfaz a classe ${classe}` };
   if (alt.effort !== undefined) {
     const niveis = niveisDeEsforcoClaude(alt.model);
-    if (niveis.length === 0) return `model "${alt.model}" não aceita esforço; remova effort`;
-    if (!niveis.includes(alt.effort)) return `effort "${alt.effort}" não é suportado por "${alt.model}" (aceitos: ${niveis.join(", ")})`;
+    if (niveis.length === 0) return { campo: "effort", motivo: `model "${alt.model}" não aceita esforço; remova effort` };
+    if (!niveis.includes(alt.effort)) return { campo: "effort", motivo: `effort "${alt.effort}" não é suportado por "${alt.model}" (aceitos: ${niveis.join(", ")})` };
   }
   return null;
 }
 
-function validarForma(alt: Alternativa, modelo: RegExp, descricao: string): string | null {
-  if (!modelo.test(alt.model)) return `model "${alt.model}" precisa ser ${descricao}`;
-  if (alt.effort !== undefined && !FORMA_EFFORT.test(alt.effort)) return `effort "${alt.effort}" fora da forma ^[a-z]+$`;
+function validarForma(alt: Alternativa, modelo: RegExp, descricao: string): Falha | null {
+  if (!modelo.test(alt.model)) return { campo: "model", motivo: `model "${alt.model}" precisa ser ${descricao}` };
+  if (alt.effort !== undefined && !FORMA_EFFORT.test(alt.effort)) return { campo: "effort", motivo: `effort "${alt.effort}" fora da forma ^[a-z]+$` };
   return null;
 }
 
-/** `null` quando a alternativa vale para a classe naquele adaptador; senão, o motivo. */
-export function validarAlternativa(adaptador: Adaptador, classe: Classe, alt: Alternativa): string | null {
+/** O campo da alternativa que reprovou, para o caminho da mensagem chegar até ele. */
+export type Falha = { campo: "model" | "effort"; motivo: string };
+
+/** `null` quando a alternativa vale para a classe naquele adaptador; senão, o campo e o motivo. */
+export function validarAlternativa(adaptador: Adaptador, classe: Classe, alt: Alternativa): Falha | null {
   switch (adaptador) {
     case "claude":
       return validarClaude(classe, alt);

@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { classeDoModeloClaude, niveisDeEsforcoClaude, validarAlternativa } from "./adaptadores.js";
+import { classeDoModeloClaude, niveisDeEsforcoClaude, validarAlternativa as validarComCampo } from "./adaptadores.js";
 import { validarPolitica } from "./politica.js";
 import { TABELA_EMBUTIDA } from "./tabela.js";
 import { ADAPTADORES, CLASSES } from "./tipos.js";
 
 /** CONTRATO-expx-orquestracao §4.2 (validação por adaptador), §5 (tabela) e §6 (matriz). */
+
+/** O motivo, para os casos que só conferem o texto; o campo tem teste próprio. */
+const validarAlternativa = (...args: Parameters<typeof validarComCampo>) => validarComCampo(...args)?.motivo ?? null;
 
 describe("classeDoModeloClaude — a família contida no nome", () => {
   it.each([
@@ -58,6 +61,13 @@ describe("validarAlternativa — claude", () => {
     expect(validarAlternativa("claude", "raciocinio_normal", alt("sonnet", "high"))).toBeNull();
     expect(validarAlternativa("claude", "raciocinio_normal", alt("opus", "medium"))).toBeNull();
     expect(validarAlternativa("claude", "mecanico_triagem", alt("claude-haiku-4-5"))).toBeNull();
+  });
+
+  it("diz qual campo reprovou", () => {
+    expect(validarComCampo("claude", "profundo_excepcional", alt("haiku"))?.campo).toBe("model");
+    expect(validarComCampo("claude", "profundo_excepcional", alt("claude-opus-4-6", "xhigh"))?.campo).toBe("effort");
+    expect(validarComCampo("claude", "mecanico_triagem", alt("claude-haiku-4-5", "low"))?.campo).toBe("effort");
+    expect(validarComCampo("codex", "raciocinio_normal", { id: "x", model: "Gpt 6" })?.campo).toBe("model");
   });
 
   it("recusa modelo abaixo da classe", () => {
@@ -116,6 +126,29 @@ describe("validarPolitica — validação por adaptador, com o caminho", () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.erro).toContain("adaptadores.claude.classes.profundo_excepcional[0]");
+  });
+
+  it("o caminho chega ao campo, e a mensagem é exatamente a do contrato", () => {
+    const r = validarPolitica({
+      expx_orquestracao: 1,
+      adaptadores: {
+        claude: {
+          classes: {
+            profundo_excepcional: [
+              { id: "o46", model: "claude-opus-4-6", effort: "xhigh" },
+              { id: "barato", model: "haiku" },
+            ],
+          },
+        },
+      },
+    });
+    expect(r).toEqual({
+      ok: false,
+      erro:
+        ".expx/orquestracao.json inválido:\n" +
+        '  adaptadores.claude.classes.profundo_excepcional[0].effort: effort "xhigh" não é suportado por "claude-opus-4-6" (aceitos: low, medium, high, max)\n' +
+        '  adaptadores.claude.classes.profundo_excepcional[1].model: model "haiku" (mecanico_triagem) não satisfaz a classe profundo_excepcional',
+    });
   });
 
   it("aponta o effort fora da matriz", () => {

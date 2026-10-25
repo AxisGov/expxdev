@@ -7,6 +7,10 @@ import { CLASSES, posto, type Adaptador, type Classe, type Politica } from "./ti
  * enumeração EXAUSTIVA do produto cartesiano abaixo. O domínio é finito e
  * pequeno; percorrê-lo inteiro é mais forte que sortear casos.
  *
+ * O eixo de adaptador tem o `claude` e um representante dos sem suporte
+ * (`opencode`); o `codex`, que recusa pelo mesmo motivo, está nos testes de
+ * exemplo de `resolver.test.ts`.
+ *
  * Eixos cobertos:
  *   adaptador   × claude, opencode
  *   declarada   × ausente, as três classes

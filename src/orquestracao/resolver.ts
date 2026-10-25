@@ -152,8 +152,8 @@ export function resolver(e: EntradaResolucao, tabela: TabelaEmbutida = TABELA_PA
     if (modeloClaudeBemFormado(fm.model) && (doModelo === null || posto(doModelo) < posto(declarada))) {
       return recusa("frontmatter_fora_da_classe", `o frontmatter de ${agente.nome} usa "${fm.model}", que não satisfaz a classe declarada ${declarada}`);
     }
-    const motivo = validarAlternativa(adaptador, declarada, alt);
-    if (motivo !== null) return recusa("frontmatter_invalido", `frontmatter de ${agente.nome}: ${motivo}`);
+    const falha = validarAlternativa(adaptador, declarada, alt);
+    if (falha !== null) return recusa("frontmatter_invalido", `frontmatter de ${agente.nome}, ${falha.campo}: ${falha.motivo}`);
     cadeia = [alt];
     origemAlternativa = "skill";
   } else if (embutida !== undefined) {

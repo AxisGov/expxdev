@@ -161,9 +161,10 @@ Bedrock, Agent Platform e Foundry, resolvem para versões anteriores, algumas se
 nenhum esforço (Haiku 4.5, por exemplo). O ExpxDev não sabe qual provedor o
 projeto usa. Por isso a v1 **valida o alias como se fosse a API da Anthropic** e
 declara essa suposição. Um provedor que resolve o alias para outro modelo é
-detectado pela observação do executor (F3: `effort.level` diferente do pedido
-põe a execução fora da política). Quem precisa de garantia estática usa o ID
-completo.
+detectado pela observação do executor na F3, que compara **o `model`
+observado** com a alternativa, e não só o esforço: um alias pode resolver para
+outra versão que aceita o mesmo `effort`, e nesse caso só o modelo denuncia a
+divergência. Quem precisa de garantia estática usa o ID completo.
 
 ## 7. Resolução
 
