@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
 import { fazerBackup, hojeISO } from "./backup.js";
@@ -103,5 +103,21 @@ describe("backup do settings.json versionado", () => {
     if (!r.ok) return;
     expect(r.backupOmitidoPorGitLimpo).toBeUndefined();
     expect(r.backup).toBeDefined();
+  });
+
+  // sem privilégio, o Windows não cria link simbólico; o CI Linux roda o caso
+  it.skipIf(process.platform === "win32")("funcional: rastreado como link simbólico ganha cópia, porque o git não guarda o alvo", () => {
+    p = projetoTemporario("fixtures/cli/settings-valido");
+    const caminho = caminhoDoSettings(p.raiz);
+    const original = readFileSync(caminho, "utf8");
+    renameSync(caminho, join(p.raiz, "settings-real.json"));
+    symlinkSync("../settings-real.json", caminho);
+    versionarSettings(p.raiz);
+
+    const r = mesclarSettings(p.raiz, "/qualquer/caminho");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.backupOmitidoPorGitLimpo).toBeUndefined();
+    expect(readFileSync(r.backup ?? "", "utf8")).toBe(original);
   });
 });

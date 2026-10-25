@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync } from "node:fs";
+import { copyFileSync, existsSync, lstatSync } from "node:fs";
 import { basename, dirname } from "node:path";
 
 /**
@@ -37,14 +37,16 @@ export function fazerBackup(arquivo: string, agora: Date = new Date()): string {
  *
  * Só nesse caso a cópia ao lado é redundante: o versionador já desfaz a
  * escrita, e a cópia `.backup-*` acabaria no commit do projeto. Rastreado com
- * edição pendente NÃO conta — a edição manual só existe no disco. Qualquer
- * dúvida (sem git, `safe.directory`, arquivo fora da árvore) devolve `false`, e
- * o backup acontece como sempre.
+ * edição pendente NÃO conta — a edição manual só existe no disco —, nem link
+ * simbólico, cujo alvo o git não guarda e a escrita alcança. Qualquer dúvida
+ * (sem git, `safe.directory`, arquivo fora da árvore) devolve `false`, e o
+ * backup acontece como sempre.
  */
 export function rastreadoELimpo(arquivo: string): boolean {
   const opcoes = { cwd: dirname(arquivo), encoding: "utf8" as const, stdio: ["ignore", "pipe", "ignore"] as ["ignore", "pipe", "ignore"] };
   const nome = basename(arquivo);
   try {
+    if (lstatSync(arquivo).isSymbolicLink()) return false;
     execFileSync("git", ["ls-files", "--error-unmatch", "--", nome], opcoes);
     return execFileSync("git", ["status", "--porcelain", "--", nome], opcoes).trim() === "";
   } catch {
