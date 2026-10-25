@@ -29,6 +29,7 @@ import { expxNoGitignore } from "../cli/projeto.js";
 import { verificarModificacaoLocal, pastaDaSkill } from "../update/modificacao.js";
 import { MarketplaceJson, PluginJson, ORIGEM_DO_PLUGIN, NOME_DO_PLUGIN, NOME_DO_MARKETPLACE } from "../plugin/manifestos.js";
 import { lerPluginsHabilitados, caminhoDoSettings } from "../harness/settings.js";
+import { verificarOrquestracao } from "./orquestracao.js";
 
 /**
  * Diagnóstico de instalação quebrada.
@@ -218,6 +219,7 @@ export function diagnosticar(raiz: string, env: NodeJS.ProcessEnv = process.env)
     verificarInstalacao(raiz, l.lock.instalacao, push);
     verificarModoExecutavel(raiz, executaveisDoLock(l.lock.instalacao), push);
   }
+  verificarOrquestracao(raiz, l.lock, env, push);
   verificarHooks(raiz, push);
   verificarRastro(raiz, push);
   verificarFatiamento(raiz, env, fatias, push);
