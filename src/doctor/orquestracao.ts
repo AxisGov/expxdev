@@ -90,8 +90,10 @@ export function verificarOrquestracao(raiz: string, lock: Lock | undefined, env:
       continue;
     }
     const r = lerRegistro(id, texto);
-    if (r.ok) resolucoes.push(r.resolucao);
-    else adulterados.push(`${agente} (${id}): ${r.erro}`);
+    if (!r.ok) adulterados.push(`${agente} (${id}): ${r.erro}`);
+    else if (r.resolucao.agente !== agente || r.resolucao.adaptador !== "claude") {
+      adulterados.push(`${agente} (${id}): o registro e de ${r.resolucao.agente}/${r.resolucao.adaptador}, nao de ${agente}/claude`);
+    } else resolucoes.push(r.resolucao);
   }
   if (ausentes.length > 0) {
     push({
@@ -153,7 +155,9 @@ export function verificarOrquestracao(raiz: string, lock: Lock | undefined, env:
   if (fallback !== undefined && fallback.modelos.length > 0) {
     const fora: string[] = [];
     for (const r of resolucoes) {
-      const aceitos = r.materializado !== undefined ? [r.materializado.model] : r.cadeia.map((a) => a.model);
+      // A cadeia é o que a política autoriza; com o v1, o materializado é a
+      // exceção aceita (CONTRATO-expx-orquestracao §7.4). Os dois valem.
+      const aceitos = [...r.cadeia.map((a) => a.model), ...(r.materializado !== undefined ? [r.materializado.model] : [])];
       const estranhos = fallback.modelos.filter((m) => !aceitos.some((a) => correspondeClaude(m, a)));
       if (estranhos.length > 0) fora.push(`${r.agente}: ${lista(estranhos)}`);
     }

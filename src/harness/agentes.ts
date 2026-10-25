@@ -157,6 +157,9 @@ export function planejarAgentes(skills: readonly SkillMontavel[], overrides: Ove
   const conhecidos = new Set<string>();
   const erros: string[] = [];
   const resolucoes: Resolucao[] = [];
+  // Com a política, o nome é a chave do lock e do registro: dois agentes com o
+  // mesmo `name:` deixariam só o último no lock.
+  const donoDoNome = new Map<string, string>();
   for (const s of emOrdemCanonica(skills)) {
     for (const origem of s.agentes ?? []) {
       const destino = `.claude/agents/${basename(origem)}`;
@@ -170,12 +173,22 @@ export function planejarAgentes(skills: readonly SkillMontavel[], overrides: Ove
           erros.push(lido.erro);
           continue;
         }
-        const r = resolver({ agente: { ...lido.agente, nome }, adaptador: "claude", politica });
-        if (!r.ok) {
-          erros.push(`agente ${nome} (skill ${s.nome}) sem resolucao: ${r.motivo} — ${r.mensagem}`);
+        // A identidade vem do YAML, como o Claude Code a lê: `name: x # nota` é `x`.
+        const id = lido.agente.nome;
+        conhecidos.add(id);
+        const dono = donoDoNome.get(id);
+        if (dono !== undefined) {
+          erros.push(`agente ${id} publicado pelas skills ${dono} e ${s.nome}; com a politica de orquestracao, o name precisa ser unico`);
           continue;
         }
-        const final = o === undefined ? r.resolucao : sobreporV1(r.resolucao, o);
+        donoDoNome.set(id, s.nome);
+        const r = resolver({ agente: lido.agente, adaptador: "claude", politica });
+        if (!r.ok) {
+          erros.push(`agente ${id} (skill ${s.nome}) sem resolucao: ${r.motivo} — ${r.mensagem}`);
+          continue;
+        }
+        const ov = Object.prototype.hasOwnProperty.call(overrides, id) ? overrides[id] : undefined;
+        const final = ov === undefined ? r.resolucao : sobreporV1(r.resolucao, ov);
         resolucoes.push(final);
         const alvo = final.materializado ?? final.alternativa;
         const reescrito = reescreverModeloEsforco(texto, alvo.model, alvo.effort);

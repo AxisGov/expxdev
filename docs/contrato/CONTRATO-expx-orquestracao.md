@@ -241,7 +241,9 @@ resolução que ele altera, o piso deixa de valer. A resolução ganha
 `sobreposta_por: "agentes-json-v1"`, `materializado` (o `model`/`effort` finais)
 e `origem_alternativa: "agentes-json-v1"`. A `cadeia` e a `alternativa` são
 preservadas, e o `resolucao_id` é recalculado sobre essa forma. Override que não
-muda nada não altera a resolução. **Meta:** a exceção é removida ou revista na
+muda nada não altera a resolução. Para julgar um modelo observado ou um
+fallback, valem **a cadeia e o `materializado`**: a cadeia é o que a política
+autoriza, e o `materializado` é a exceção aceita. **Meta:** a exceção é removida ou revista na
 próxima versão maior do ExpxDev.
 
 ## 8. O objeto de resolução e o `resolucao_id`

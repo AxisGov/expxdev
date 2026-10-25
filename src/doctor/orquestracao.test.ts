@@ -95,6 +95,30 @@ describe("doctor — orquestração", () => {
     expect(a?.problema).toContain("auditor");
   });
 
+  it("com override v1, o fallback aceita a cadeia e o materializado", async () => {
+    const p = await projeto({ politica: { expx_orquestracao: 1 }, agentesJson: { expx_agentes: 1, agentes: { auditor: { model: "haiku" } } } });
+    const fora = (modelos: string[]) => {
+      gravar(p.raiz, ".claude/settings.local.json", { fallbackModel: modelos });
+      return achados(p.raiz, { HOME: p.home }).find((x) => x.id === "orquestracao-fallback-fora")?.problema ?? "";
+    };
+    // auditor: cadeia = sonnet (frontmatter), materializado = haiku; triagem: cadeia = haiku
+    expect(fora(["haiku"])).toBe("");
+    expect(fora(["sonnet"])).not.toContain("auditor");
+    expect(fora(["claude-opus-4-6"])).toContain("auditor");
+  });
+
+  it("registro válido de outro agente, apontado pelo lock, é adulteração", async () => {
+    const p = await projeto({ politica: { expx_orquestracao: 1 } });
+    const lockPath = join(p.raiz, ".expx/expx-lock.json");
+    const lock = JSON.parse(readFileSync(lockPath, "utf8")) as { orquestracao: { agentes: Record<string, { claude: string }> } };
+    const doTriagem = lock.orquestracao.agentes["triagem"]?.claude ?? "";
+    lock.orquestracao.agentes["auditor"] = { claude: doTriagem };
+    writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+    const a = achados(p.raiz, { HOME: p.home }).find((x) => x.id === "orquestracao-registro-adulterado");
+    expect(a?.problema).toContain("auditor");
+    expect(a?.problema).toContain("triagem");
+  });
+
   it("variáveis que sobrepõem o frontmatter no ambiente do doctor são aviso", async () => {
     const p = await projeto({ politica: { expx_orquestracao: 1 } });
     const a = achados(p.raiz, { HOME: p.home, CLAUDE_CODE_SUBAGENT_MODEL_FORCE: "1", CLAUDE_CODE_EFFORT_LEVEL: "low" }).find(

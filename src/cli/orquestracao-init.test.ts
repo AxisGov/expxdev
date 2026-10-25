@@ -140,6 +140,33 @@ describe("init com política", () => {
   });
 });
 
+describe("init com política — identidade do agente", () => {
+  it("o nome vem do YAML: comentário no name não entra na identidade", async () => {
+    const p = produto();
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+    gravar(p, ".expx/agentes.json", { expx_agentes: 1, agentes: { auditor: { effort: "low" } } });
+    const o = { alfa: skill("alfa", { ".claude/agents/auditor.md": "---\nname: auditor # o revisor\ndescription: x\nclasse: raciocinio_normal\nmodel: sonnet\n---\nCorpo.\n" }) };
+    const r = await init(p, o);
+    expect(r.ok, r.erros.join("\n")).toBe(true);
+    expect(Object.keys(lerLock(p).orquestracao?.agentes ?? {})).toEqual(["auditor"]);
+    expect(registro(p, lerLock(p).orquestracao?.agentes["auditor"]?.claude ?? "")).toMatchObject({ agente: "auditor", materializado: { model: "sonnet", effort: "low" } });
+  });
+
+  it("dois agentes com o mesmo name em skills diferentes falham antes de escrever", async () => {
+    const p = produto();
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+    const o = {
+      alfa: skill("alfa", { ".claude/agents/auditor.md": AGENTE("auditor", "classe: raciocinio_normal\nmodel: sonnet") }),
+      beta: skill("beta", { ".claude/agents/auditor-beta.md": AGENTE("auditor", "classe: raciocinio_normal\nmodel: sonnet") }),
+    };
+    const r = await executarInit({ raiz: p, skills: ["alfa", "beta"], harness: ["claude"], origens: o });
+    expect(r.ok).toBe(false);
+    expect(r.erros.join("\n")).toMatch(/auditor.*alfa.*beta|auditor.*beta.*alfa/s);
+    expect(existsSync(join(p, ".expx/expx-lock.json"))).toBe(false);
+    expect(existsSync(join(p, ".expx/resolucoes"))).toBe(false);
+  });
+});
+
 describe("init com política — falha antes de escrever", () => {
   async function falhaSemEscrever(p: string, o = origens()): Promise<string> {
     const r = await init(p, o);

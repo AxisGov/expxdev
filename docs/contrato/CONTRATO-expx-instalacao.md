@@ -314,16 +314,19 @@ sem orquestração.
   ele nunca é apagado, nem quando a política sai.
 - **Lock.** A seção opcional `orquestracao` (seção 9) guarda as versões e o
   `resolucao_id` vigente por agente.
+- **Identidade.** O nome do agente é o `name:` lido como YAML (como o Claude
+  Code o lê), e é a chave da política, do override v1, do registro e do lock.
 - **Falhas antes de escrever** (seção 8): política inválida; `classe:` fora do
-  vocabulário num agente da skill; agente que a política não resolve, com o
-  motivo do resolvedor; arquivo do registro que já existe com outros bytes
-  (o registro é imutável).
+  vocabulário num agente da skill; dois agentes com o mesmo `name:` (só o
+  último ficaria no lock); agente que a política não resolve, com o motivo do
+  resolvedor; arquivo do registro que já existe com outros bytes (o registro é
+  imutável).
 
 O `expx doctor` só fala da orquestração quando há política ou seção no lock.
 São **erro**: `orquestracao-invalida`, `orquestracao-resolucao-ausente` (o
 lock cita um id sem arquivo) e `orquestracao-registro-adulterado` (o arquivo
 não confere com o id ou não está na forma canônica legível, inclusive só nos
-espaços). São **aviso**: `orquestracao-lock-sem-politica`,
+espaços, ou um registro válido de outro agente ou adaptador). São **aviso**: `orquestracao-lock-sem-politica`,
 `orquestracao-classe-inferida`, `orquestracao-v1-abaixo-da-classe`,
 `orquestracao-variavel-sobrepoe` (`CLAUDE_CODE_SUBAGENT_MODEL_FORCE` ou
 `CLAUDE_CODE_EFFORT_LEVEL` no ambiente do doctor) e
