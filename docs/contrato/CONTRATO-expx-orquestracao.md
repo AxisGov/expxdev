@@ -6,12 +6,13 @@ as alternativas descartadas e o histórico de revisão, está em
 `docs/superpowers/specs/2026-10-24-orquestracao-multimodelo-design.md`. Onde
 este texto e o desenho divergem, vale este texto.
 
-**Estado da v1 (F1):** são normativos o vocabulário, o arquivo de política, a
+**Estado da v1:** são normativos o vocabulário, o arquivo de política, a
 tabela embutida, a matriz de esforço do Claude, a função de resolução e o
-formato do registro e do lock. Nada disso é aplicado ainda: o `init`, o lock,
-os agentes instalados, os hooks, o rastro e o painel **não mudam**. A F2 ativa a
-materialização, a F3 o rastro e a F3b a invocação, cada uma emendando este
-contrato.
+formato do registro e do lock. **Desde a F2**, o `init` aplica a política no
+adaptador Claude: materializa os agentes, grava o registro e a seção do lock, e
+o `doctor` diagnostica (`CONTRATO-expx-instalacao.md` §5.3). O rastro, o
+painel e os hooks de invocação continuam sem mudança até a F3 e a F3b, que
+emendam este contrato.
 
 ## 1. Três coisas separadas
 
@@ -271,7 +272,7 @@ próxima versão maior do ExpxDev.
   confere remove o campo, recalcula e compara. Campo ausente, valor fora do
   formato ou divergência reprovam a conferência.
 
-## 9. Registro e lock (formato; implementação na F2)
+## 9. Registro e lock (implementados na F2)
 
 Só com a camada ativa.
 
@@ -279,6 +280,11 @@ Só com a camada ativa.
   É imutável e endereçado pelo conteúdo: um arquivo existente nunca é reescrito
   nem apagado automaticamente, nem quando a política é removida (H7). Guarda
   toda resolução efetivamente gravada, na instalação ou na invocação.
+- **Forma do arquivo:** chaves ordenadas em todos os níveis, indentação de 2
+  espaços e quebra de linha final. É só legibilidade: o `resolucao_id` continua
+  calculado sobre o JSON canônico compacto. Um arquivo é válido só se é JSON, se
+  o id confere com o conteúdo e com o nome do arquivo, e se os bytes são
+  exatamente essa forma.
 - **Lock:** a seção opcional `orquestracao` guarda `versao_resolvedor`,
   `tabela_embutida`, `matriz_effort_claude` e, por agente e adaptador, só o
   `resolucao_id` vigente. É evidência de reprodução, não fonte de política: o
