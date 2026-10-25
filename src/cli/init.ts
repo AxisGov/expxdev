@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { repositorioCanonico, resolverOrigem } from "../nucleo/catalogo.js";
 import { resolverAlvo } from "../nucleo/versao.js";
 import { buscarSkill } from "../nucleo/busca.js";
@@ -45,7 +45,7 @@ import { ORIGEM_DO_PLUGIN } from "../plugin/manifestos.js";
 import { materializarCodex } from "../harness/codex.js";
 import { lerOverridesDoProjeto, planejarAgentes, planejarLimpeza } from "../harness/agentes.js";
 import { lerPolitica } from "../orquestracao/politica.js";
-import { caminhoDoRegistro, serializarRegistro } from "../orquestracao/materializar.js";
+import { caminhoDoRegistro, destinoDoRegistroInseguro, gravarNoRegistro, serializarRegistro } from "../orquestracao/materializar.js";
 import { VERSAO_RESOLVEDOR, type Resolucao } from "../orquestracao/resolver.js";
 import { VERSAO_TABELA } from "../orquestracao/tabela.js";
 import { VERSAO_MATRIZ_EFFORT_CLAUDE } from "../orquestracao/adaptadores.js";
@@ -268,7 +268,8 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
       erros.push(...ag.erros);
       if (politica !== undefined) {
         resolucoes = ag.resolucoes;
-        erros.push(...conferirRegistroExistente(op.raiz, resolucoes));
+        const inseguro = destinoDoRegistroInseguro(op.raiz, resolucoes.map((r) => r.resolucao_id));
+        erros.push(...(inseguro.length > 0 ? inseguro : conferirRegistroExistente(op.raiz, resolucoes)));
       }
     }
   }
@@ -547,12 +548,7 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     try {
       // O registro antes dos agentes e do lock: uma falha no meio deixa no
       // máximo resoluções órfãs, inofensivas e reaproveitadas pelo próximo init.
-      for (const r of p.plano.resolucoes ?? []) {
-        const caminho = join(op.raiz, ...caminhoDoRegistro(r.resolucao_id).split("/"));
-        if (existsSync(caminho)) continue;
-        mkdirSync(dirname(caminho), { recursive: true });
-        escreverArquivoAtomico(caminho, serializarRegistro(r));
-      }
+      for (const r of p.plano.resolucoes ?? []) gravarNoRegistro(op.raiz, r);
       aplicarArtefatos(op.raiz, p.plano.projeto);
       for (const rel of p.plano.remover) rmSync(join(op.raiz, ...rel.split("/")), { force: true });
       if (p.plano.settings !== undefined) gravarSettings(p.plano.settings);

@@ -79,7 +79,8 @@ export const OrquestracaoTravada = z.object({
   versao_resolvedor: z.number().int(),
   tabela_embutida: z.number().int(),
   matriz_effort_claude: z.number().int(),
-  agentes: z.record(z.string(), z.object({ claude: z.string() })),
+  // O id vira caminho em `.expx/resolucoes/`: fora do formato, o lock é ilegível.
+  agentes: z.record(z.string(), z.object({ claude: z.string().regex(/^[0-9a-f]{64}$/) })),
 });
 export type OrquestracaoTravada = z.infer<typeof OrquestracaoTravada>;
 

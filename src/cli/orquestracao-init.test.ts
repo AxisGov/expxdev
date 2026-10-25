@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
@@ -217,6 +217,28 @@ describe("init com política — falha antes de escrever", () => {
     gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
     const o = { alfa: skill("alfa", { ".claude/agents/auditor.md": AGENTE("auditor", "classe: altissima\nmodel: opus") }) };
     expect(await falhaSemEscrever(p, o)).toContain("altissima");
+  });
+
+  it.skipIf(process.platform === "win32")(".expx/resolucoes como link simbólico é recusado, sem gravar fora do projeto", async () => {
+    const p = produto();
+    const fora = mkdtempSync(join(tmpdir(), "expx-fora-"));
+    criados.push(fora);
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+    symlinkSync(fora, join(p, ".expx/resolucoes"));
+    const r = await init(p);
+    expect(r.ok).toBe(false);
+    expect(r.erros.join("\n")).toContain(".expx/resolucoes");
+    expect(readdirSync(fora)).toEqual([]);
+    expect(existsSync(join(p, ".expx/expx-lock.json"))).toBe(false);
+  });
+
+  it("agente com BOM é reescrito como os demais", async () => {
+    const p = produto();
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1, agentes: { auditor: { classe: "profundo_excepcional", justificativa: "legado" } } });
+    const o = { alfa: skill("alfa", { ".claude/agents/auditor.md": `\uFEFF${AUDITOR}` }) };
+    const r = await init(p, o);
+    expect(r.ok, r.erros.join("\n")).toBe(true);
+    expect(lerAgente(p, "auditor")).toBe(`\uFEFF${AGENTE("auditor", "classe: raciocinio_normal\nmodel: opus\neffort: high")}`);
   });
 
   it("registro existente com bytes diferentes é corrupção", async () => {

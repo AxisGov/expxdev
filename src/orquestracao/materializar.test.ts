@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { correspondeClaude, familiaClaude } from "./adaptadores.js";
-import { lerAgenteDaSkill, lerRegistro, reescreverModeloEsforco, serializarRegistro } from "./materializar.js";
-import { conferirResolucaoId, resolver } from "./resolver.js";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { gravarNoRegistro, lerAgenteDaSkill, lerRegistro, reescreverModeloEsforco, serializarRegistro } from "./materializar.js";
+import { conferirResolucaoId, resolucaoId, resolver } from "./resolver.js";
 
 /** CONTRATO-expx-orquestracao §9 e CONTRATO-expx-instalacao §5.3 (F2). */
 
@@ -22,6 +25,12 @@ describe("lerAgenteDaSkill", () => {
     });
   });
 
+  it.each(["__proto__", "Auditor", "auditor x"])("name %s fora do padrão de agente é skill inválida", (nome) => {
+    const r = lerAgenteDaSkill("x/a.md", `---\nname: ${nome}\nmodel: opus\n---\n`);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erro).toContain("name");
+  });
+
   it("classe fora do vocabulário é skill inválida", () => {
     const r = lerAgenteDaSkill("x/auditor.md", AGENTE("classe: altissima\nmodel: opus"));
     expect(r.ok).toBe(false);
@@ -36,6 +45,11 @@ describe("reescreverModeloEsforco", () => {
 
   it("sem effort na alternativa, remove a linha effort", () => {
     expect(reescreverModeloEsforco(AGENTE("model: opus\neffort: high"), "claude-haiku-4-5", undefined)).toBe(AGENTE("model: claude-haiku-4-5"));
+  });
+
+  it("aceita o BOM no início, como o leitor de frontmatter, e o preserva", () => {
+    const comBom = `\uFEFF${AGENTE("model: opus\neffort: high")}`;
+    expect(reescreverModeloEsforco(comBom, "sonnet", "low")).toBe(`\uFEFF${AGENTE("model: sonnet\neffort: low")}`);
   });
 
   it("insere o que falta e preserva CRLF", () => {
@@ -55,6 +69,30 @@ describe("registro", () => {
     expect(texto).toContain('\n  "adaptador": "claude",\n');
     expect(texto.indexOf('"adaptador"')).toBeLessThan(texto.indexOf('"agente"'));
     expect(conferirResolucaoId(JSON.parse(texto))).toBe(true);
+  });
+
+  it("lerRegistro recusa objeto de forma inválida mesmo com o hash recalculado", () => {
+    const semCadeia: Record<string, unknown> = { ...resolucao };
+    delete semCadeia["cadeia"];
+    delete semCadeia["resolucao_id"];
+    const forjado = { ...semCadeia, resolucao_id: resolucaoId(semCadeia as never) };
+    expect(conferirResolucaoId(forjado)).toBe(true);
+    const r = lerRegistro(forjado.resolucao_id, serializarRegistro(forjado as never));
+    expect(r.ok).toBe(false);
+  });
+
+  it("gravarNoRegistro escreve o ausente, aceita o idêntico e recusa bytes diferentes", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-reg-"));
+    try {
+      gravarNoRegistro(raiz, resolucao);
+      const arquivo = join(raiz, ".expx/resolucoes", `${resolucao.resolucao_id}.json`);
+      expect(readFileSync(arquivo, "utf8")).toBe(serializarRegistro(resolucao));
+      gravarNoRegistro(raiz, resolucao);
+      writeFileSync(arquivo, "{}");
+      expect(() => gravarNoRegistro(raiz, resolucao)).toThrow(/imutavel/);
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
   });
 
   it("lerRegistro aceita só a forma canônica legível de um id conferível", () => {

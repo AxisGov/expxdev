@@ -119,6 +119,37 @@ describe("doctor — orquestração", () => {
     expect(a?.problema).toContain("triagem");
   });
 
+  it("id do lock fora do formato não sai de .expx/resolucoes: o lock é ilegível", async () => {
+    const p = await projeto({ politica: { expx_orquestracao: 1 } });
+    const lockPath = join(p.raiz, ".expx/expx-lock.json");
+    const lock = JSON.parse(readFileSync(lockPath, "utf8")) as { orquestracao: { agentes: Record<string, { claude: string }> } };
+    lock.orquestracao.agentes["auditor"] = { claude: "../expx-lock" };
+    writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+    const todos = diagnosticar(p.raiz, { HOME: p.home }).achados;
+    expect(todos.find((a) => a.id === "lock-ilegivel")?.severidade).toBe("erro");
+  });
+
+  it("registro forjado com hash válido e sem cadeia é adulteração, não derruba o doctor", async () => {
+    const p = await projeto({ politica: { expx_orquestracao: 1 } });
+    const dir = join(p.raiz, ".expx/resolucoes");
+    const lockPath = join(p.raiz, ".expx/expx-lock.json");
+    const lock = JSON.parse(readFileSync(lockPath, "utf8")) as { orquestracao: { agentes: Record<string, { claude: string }> } };
+    const id = lock.orquestracao.agentes["auditor"]?.claude ?? "";
+    const original = JSON.parse(readFileSync(join(dir, `${id}.json`), "utf8")) as Record<string, unknown>;
+    delete original["cadeia"];
+    delete original["resolucao_id"];
+    const { createHash } = await import("node:crypto");
+    const { jsonCanonico } = await import("../plugin/plano.js");
+    const novo = createHash("sha256").update(jsonCanonico(original)).digest("hex");
+    const ordenado = Object.fromEntries(Object.entries({ ...original, resolucao_id: novo }).sort(([a], [b]) => a.localeCompare(b)));
+    writeFileSync(join(dir, `${novo}.json`), `${JSON.stringify(ordenado, null, 2)}\n`);
+    lock.orquestracao.agentes["auditor"] = { claude: novo };
+    writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+    gravar(p.raiz, ".claude/settings.local.json", { fallbackModel: ["opus"] });
+    const a = achados(p.raiz, { HOME: p.home }).find((x) => x.id === "orquestracao-registro-adulterado");
+    expect(a?.problema).toContain("auditor");
+  });
+
   it("variáveis que sobrepõem o frontmatter no ambiente do doctor são aviso", async () => {
     const p = await projeto({ politica: { expx_orquestracao: 1 } });
     const a = achados(p.raiz, { HOME: p.home, CLAUDE_CODE_SUBAGENT_MODEL_FORCE: "1", CLAUDE_CODE_EFFORT_LEVEL: "low" }).find(
