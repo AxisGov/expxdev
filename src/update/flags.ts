@@ -1,6 +1,6 @@
 import { caminhoDoLock, lerLock, type Lock } from "../nucleo/lock.js";
 import { repositorioCanonico, resolverOrigem } from "../nucleo/catalogo.js";
-import { executarInit } from "../cli/init.js";
+import { ehCaminhoLocal, executarInit } from "../cli/init.js";
 import { compararComRemoto, type ItemComparacao } from "./comparar.js";
 import { verificarModificacaoLocal } from "./modificacao.js";
 import { escreverArquivoAtomico } from "../plugin/atomico.js";
@@ -135,6 +135,20 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
     const origem = resolverOrigem(nome, travada.repositorio, op.origens?.[nome]);
     if (origem !== undefined) origens[nome] = origem;
   }
+  // Origem em pasta local é copiada como árvore de trabalho (ver `copiarLocal`):
+  // a versão que o `--to` pede não seria a instalada.
+  const nomeada = op.skills?.[0];
+  const origemNomeada = nomeada !== undefined ? origens[nomeada] : undefined;
+  if (to !== undefined && origemNomeada !== undefined && ehCaminhoLocal(origemNomeada)) {
+    return {
+      ok: false,
+      aplicou: false,
+      atualizadas: [],
+      emDia: [],
+      bloqueadas: [],
+      mensagens: [`--to ${to} nao se aplica a ${String(nomeada)}: a origem local (${origemNomeada}) e copiada como arvore de trabalho, sem garantir a versao pedida`],
+    };
+  }
   const comparacao = await compararComRemoto({
     raiz: op.raiz,
     ...(op.skills !== undefined ? { somente: op.skills } : {}),
@@ -194,6 +208,16 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
     }
     return { ok: true, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens };
   }
+  // Havia o que aplicar e trabalho manual impediu: o pedido não foi cumprido,
+  // e a saída precisa dizer isso (o `--check`, só relatório, já saiu acima).
+  if (modificadas.length > 0) {
+    mensagens.push(
+      candidatas.length > 0
+        ? `nada foi aplicado: o update remonta todas as skills e sobrescreveria a modificacao local em ${modificadas.join(", ")}`
+        : `nada foi aplicado: modificacao local em ${modificadas.join(", ")}`,
+    );
+    return { ok: false, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens };
+  }
   if (candidatas.length === 0) {
     if (migracao.migradas.length === 0) {
       return { ok: true, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens };
@@ -237,13 +261,6 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
     };
   }
 
-  if (modificadas.length > 0) {
-    mensagens.push(
-      `nada foi aplicado: o update remonta todas as skills e sobrescreveria a modificacao local em ${modificadas.join(", ")}`,
-    );
-    return { ok: false, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens };
-  }
-
   // Remonta do zero com as versões novas, mantendo a seleção e o harness. As
   // skills que não estão sendo atualizadas voltam no commit travado: pela
   // referência, uma skill em `main` seria resolvida de novo na ponta.
@@ -258,7 +275,6 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
     if (travada.commit !== "local" && !travada.commit.endsWith("-local")) commits[nome] = travada.commit;
   }
   // `--to <sha>`: `git clone --branch` não aceita SHA, então ele vai como commit
-  const nomeada = op.skills?.[0];
   if (to !== undefined && nomeada !== undefined && SHA_COMPLETO.test(to)) commits[nomeada] = to;
 
   const init = await executarInit({
@@ -268,6 +284,9 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
     referencias: alvos,
     commits,
     origens,
+    // a checagem acima roda antes da busca; o init repete-a sob a trava, já
+    // perto da escrita, para a edição feita no meio não ser sobrescrita
+    recusarModificacaoLocal: true,
   });
 
   // O `update` remonta pelo `init`, então os avisos dele são os mesmos avisos —

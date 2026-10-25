@@ -188,6 +188,24 @@ describe("settings.json versionado", () => {
   });
 });
 
+describe("init que recusa modificação local", () => {
+  it("funcional: com recusarModificacaoLocal, a skill modificada barra a escrita, já sob a trava", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    const origens = catalogoLocal(["sprintx"]);
+    expect((await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens })).ok).toBe(true);
+    const ajuste = join(p.raiz, ".expx/marketplace/plugins/expx/skills/sprintx/references/01.md");
+    writeFileSync(ajuste, "# ajuste manual\n");
+    const lock = readFileSync(join(p.raiz, ".expx/expx-lock.json"), "utf8");
+
+    const r = await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens, recusarModificacaoLocal: true });
+
+    expect(r.ok).toBe(false);
+    expect(r.erros.join("\n")).toContain("sprintx");
+    expect(readFileSync(ajuste, "utf8")).toBe("# ajuste manual\n");
+    expect(readFileSync(join(p.raiz, ".expx/expx-lock.json"), "utf8")).toBe(lock);
+  });
+});
+
 describe("skill sem tag publicada", () => {
   it("integração: instala do topo da branch e NAO polui a saida com aviso", async () => {
     // O caso real: nenhum dos seis repositorios do metodo publica tag hoje.
