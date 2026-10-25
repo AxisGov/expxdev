@@ -1411,3 +1411,38 @@ describe("expx-revisao.mjs conferir: evidência que não se lê e base_commit qu
     expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:cobertura" });
   });
 });
+
+describe("expx-revisao.mjs: correções P1 do Login (falha fechada)", () => {
+  it("funcional: CLI que não responde no tempo → indisponivel:tempo-esgotado (rc 2), sem esperar a CLI terminar", () => {
+    const c = cenario({ dorme: 20_000 });
+    altera3(c.raiz);
+    const inicio = Date.now();
+    const r = revisar(c, "src/a.js", "T-01", undefined, { EXPX_REVISAO_TESTE_TEMPO_CLI: "500" });
+    expect(Date.now() - inicio).toBeLessThan(15_000);
+    expect(r.rc).toBe(2);
+    expect(r.ev.resultado).toBe("indisponivel");
+    expect(r.ev.motivo).toBe("tempo-esgotado");
+  });
+
+  it.each([
+    ["arquivo fora da task", achado("src/outro.js", 3)],
+    ["linha zero", achado("src/a.js", 0)],
+    ["linha não numérica", { ...achado("src/a.js", 3), start_line: "x" }],
+  ])("funcional: achado sem vínculo (%s) fica aberto e bloqueia, em vez de virar anterior", (_n, issue) => {
+    const c = cenario({ resposta: resp({}, { issues: [issue] }) });
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js");
+    expect(r.ev.achados.map((a) => a.estado)).toEqual(["aberto"]);
+    expect(r.ev.resultado).toBe("achados");
+    expect(r.rc).toBe(1);
+  });
+
+  it("os vereditos de revisar e conferir saem por process.exitCode, sem cortar o stdout assíncrono", () => {
+    // Em pipe no macOS e em TTY no Windows o stdout do Node é assíncrono: process.exit logo depois do
+    // write pode encerrar antes de a linha do veredito sair. No Linux o pipe é síncrono, e o defeito não
+    // se reproduz por execução; por isso a garantia é sobre o código, conferida contra mutação.
+    const fonte = readFileSync(SCRIPT, "utf8");
+    const depoisDoVeredito = [...fonte.matchAll(/process\.stdout\.write\(`\$\{(?:op\.task|linhas\.join)[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*(process\.[a-zA-Z]+)/g)].map((m) => m[1]);
+    expect(depoisDoVeredito).toEqual(["process.exitCode", "process.exitCode"]);
+  });
+});
