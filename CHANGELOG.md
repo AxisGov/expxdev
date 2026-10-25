@@ -1,9 +1,11 @@
 # Changelog
 
-## Próxima versão — dependência de execução corrigida
+## Próxima versão — dependência de execução corrigida e contrato de orquestração
 
 - Atualiza o `zod` para 4.6.7 e o intervalo direto para `^4.6.7`, fechando a GHSA-mrhx-c7xc-m3w5 (alta, `zod < 4.6.6`): validar coleções restritas muito grandes podia esgotar a memória. O `zod` é dependência de execução e ia no pacote publicado.
 - Estende a regressão de dependências auditadas ao `zod`, verificando todas as cópias do lockfile e o intervalo direto.
+- Publica o contrato `expx-orquestracao` v1 (`docs/contrato/CONTRATO-expx-orquestracao.md`): classes canônicas, o arquivo opcional `.expx/orquestracao.json`, a tabela embutida e a matriz de esforço do Claude, a precedência que nunca rebaixa a classe, a função de resolução e o formato do registro e do lock.
+- Implementa a leitura e a validação da política e o resolvedor puro, com testes de propriedade sobre o domínio inteiro. Nada disso é aplicado ainda: `init`, lock, agentes, hooks, rastro e painel não mudam, e um projeto sem `.expx/orquestracao.json` segue idêntico.
 
 ## 0.12.2 — histórico de modelo e esforço e correções de instalação
 
