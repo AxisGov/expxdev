@@ -164,9 +164,6 @@ export function planejarAgentes(skills: readonly SkillMontavel[], overrides: Ove
     for (const origem of s.agentes ?? []) {
       const destino = `.claude/agents/${basename(origem)}`;
       const texto = readFileSync(origem, "utf8");
-      const nome = nomeDoAgente(origem, texto);
-      conhecidos.add(nome);
-      const o = overrides[nome];
       if (politica !== undefined) {
         const lido = lerAgenteDaSkill(`${s.nome}/${basename(origem)}`, texto);
         if (!lido.ok) {
@@ -199,6 +196,10 @@ export function planejarAgentes(skills: readonly SkillMontavel[], overrides: Ove
         );
         continue;
       }
+      // Sem política: o nome e o override como sempre foram.
+      const nome = nomeDoAgente(origem, texto);
+      conhecidos.add(nome);
+      const o = overrides[nome];
       if (o === undefined || (o.model === undefined && o.effort === undefined)) {
         artefatos.push(artefato(origem, destino, s.nome, "agente"));
         continue;

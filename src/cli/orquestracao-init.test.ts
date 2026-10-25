@@ -152,6 +152,26 @@ describe("init com política — identidade do agente", () => {
     expect(registro(p, lerLock(p).orquestracao?.agentes["auditor"]?.claude ?? "")).toMatchObject({ agente: "auditor", materializado: { model: "sonnet", effort: "low" } });
   });
 
+  it("override com a chave do name cru (com o comentário) não vale e é avisado", async () => {
+    const p = produto();
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+    gravar(p, ".expx/agentes.json", { expx_agentes: 1, agentes: { "auditor # o revisor": { effort: "low" } } });
+    const o = { alfa: skill("alfa", { ".claude/agents/auditor.md": "---\nname: auditor # o revisor\ndescription: x\nclasse: raciocinio_normal\nmodel: sonnet\n---\nCorpo.\n" }) };
+    const r = await init(p, o);
+    expect(r.ok, r.erros.join("\n")).toBe(true);
+    expect(r.avisos.join("\n")).toContain("auditor # o revisor");
+    expect(registro(p, lerLock(p).orquestracao?.agentes["auditor"]?.claude ?? "").sobreposta_por).toBeUndefined();
+  });
+
+  it("agente chamado constructor não herda override do protótipo", async () => {
+    const p = produto();
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+    const o = { alfa: skill("alfa", { ".claude/agents/constructor.md": AGENTE("constructor", "classe: raciocinio_normal\nmodel: sonnet") }) };
+    const r = await init(p, o);
+    expect(r.ok, r.erros.join("\n")).toBe(true);
+    expect(registro(p, lerLock(p).orquestracao?.agentes["constructor"]?.claude ?? "")).toMatchObject({ origem_alternativa: "skill" });
+  });
+
   it("dois agentes com o mesmo name em skills diferentes falham antes de escrever", async () => {
     const p = produto();
     gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
