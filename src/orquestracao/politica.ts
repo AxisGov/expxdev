@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { validarAlternativa } from "./adaptadores.js";
@@ -139,7 +139,16 @@ export type LeituraPolitica =
 
 export function lerPolitica(raiz: string): LeituraPolitica {
   const arquivo = join(raiz, ".expx", "orquestracao.json");
-  if (!existsSync(arquivo)) return { ok: true, ativa: false };
+  // Só "não existe" desliga a camada. `existsSync` também responde false para
+  // erro de acesso, e uma `.expx/` sem permissão de leitura apagaria a política
+  // em silêncio.
+  try {
+    if (!statSync(arquivo).isFile()) return { ok: false, erro: `${ONDE} não é um arquivo` };
+  } catch (e: unknown) {
+    const codigo = (e as NodeJS.ErrnoException).code;
+    if (codigo === "ENOENT" || codigo === "ENOTDIR") return { ok: true, ativa: false };
+    return { ok: false, erro: `${ONDE} não pôde ser lido (${codigo ?? String(e)})` };
+  }
   let bruto: unknown;
   try {
     bruto = JSON.parse(readFileSync(arquivo, "utf8"));

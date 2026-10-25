@@ -130,7 +130,9 @@ export function resolver(e: EntradaResolucao, tabela: TabelaEmbutida = TABELA_PA
     origemClasse = "inferida";
   }
 
-  const doAgente = elevar(declarada, politica.agentes[agente.nome], `agentes.${agente.nome}`);
+  // Só a entrada própria: `constructor` e afins não podem chegar do protótipo.
+  const pedidoDoAgente = Object.prototype.hasOwnProperty.call(politica.agentes, agente.nome) ? politica.agentes[agente.nome] : undefined;
+  const doAgente = elevar(declarada, pedidoDoAgente, `agentes.${agente.nome}`);
   if (!doAgente.ok) return doAgente.resultado;
   if (doAgente.elevou) origemClasse = "agente";
   const daTarefa = elevar(doAgente.classe, e.tarefa, "a tarefa");

@@ -98,6 +98,13 @@ describe("validarAlternativa — opencode e codex (só forma)", () => {
     expect(validarAlternativa("codex", "raciocinio_normal", { id: "x", model: "Gpt 6" })).toMatch(/slug/);
   });
 
+  it("o $ das expressões não aceita quebra de linha final (o $ do JavaScript, sem a flag m, só casa no fim)", () => {
+    expect(validarAlternativa("codex", "raciocinio_normal", { id: "x", model: "gpt-6\n" })).toMatch(/slug/);
+    expect(validarAlternativa("codex", "raciocinio_normal", { id: "x", model: "gpt-6", effort: "high\n" })).toMatch(/effort/);
+    expect(validarAlternativa("opencode", "raciocinio_normal", { id: "x", model: "a/b\n" })).toMatch(/provedor/);
+    expect(validarAlternativa("claude", "raciocinio_normal", { id: "x", model: "sonnet\n" })).toMatch(/alias/);
+  });
+
   it("effort só como forma, sem inventar níveis válidos", () => {
     expect(validarAlternativa("codex", "raciocinio_normal", { id: "x", model: "gpt-6", effort: "HIGH" })).toMatch(/effort/);
     expect(validarAlternativa("opencode", "raciocinio_normal", { id: "x", model: "a/b", effort: "qualquer" })).toBeNull();

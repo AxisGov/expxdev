@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { lerPolitica, validarPolitica } from "./politica.js";
@@ -140,6 +140,29 @@ describe("lerPolitica", () => {
     const r = lerPolitica(projeto("{ nao e json"));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.erro).toContain(".expx/orquestracao.json");
+  });
+
+  // chmod não restringe leitura no Windows nem para o root.
+  const semPermissaoReal = process.platform === "win32" || process.getuid?.() === 0;
+
+  it.skipIf(semPermissaoReal)(".expx sem permissão de leitura falha, em vez de valer como ausente", () => {
+    const raiz = projeto(JSON.stringify(BASE));
+    chmodSync(join(raiz, ".expx"), 0o000);
+    try {
+      const r = lerPolitica(raiz);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.erro).toContain(".expx/orquestracao.json");
+    } finally {
+      chmodSync(join(raiz, ".expx"), 0o755);
+    }
+  });
+
+  it("um diretório no lugar do arquivo falha dizendo isso", () => {
+    const raiz = projeto();
+    mkdirSync(join(raiz, ".expx", "orquestracao.json"), { recursive: true });
+    const r = lerPolitica(raiz);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erro).toContain("não é um arquivo");
   });
 
   it("forma inválida falha com o caminho da chave", () => {

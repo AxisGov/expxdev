@@ -161,6 +161,24 @@ describe("sessão", () => {
   });
 });
 
+describe("nomes de agente que coincidem com propriedades de Object", () => {
+  it.each(["constructor", "tostring", "hasownproperty", "valueof"])("%s sem entrada na política resolve sem elevação", (nome) => {
+    const r = resolver({ agente: { nome, classe: "raciocinio_normal", frontmatter: { model: "sonnet" } }, adaptador: "claude", politica: VAZIA });
+    expect(r.ok ? r.resolucao.origem_classe : r.motivo).toBe("declarada");
+  });
+
+  it("toString (nome fora do padrão) também não herda nada do Object", () => {
+    const r = resolver({ agente: { nome: "toString", classe: "raciocinio_normal" }, adaptador: "claude", politica: VAZIA });
+    expect(r.ok ? r.resolucao.origem_classe : r.motivo).toBe("declarada");
+  });
+
+  it("constructor com entrada própria na política é elevado normalmente", () => {
+    const politica: Politica = { adaptadores: {}, agentes: { constructor: { classe: "profundo_excepcional", justificativa: "legado" } } };
+    const r = resolver({ agente: { nome: "constructor", classe: "raciocinio_normal" }, adaptador: "claude", politica });
+    expect(r.ok ? r.resolucao.classe_resolvida : r.motivo).toBe("profundo_excepcional");
+  });
+});
+
 describe("adaptadores sem suporte operacional na v1", () => {
   it.each(["opencode", "codex"] as const)("%s nunca resolve", (adaptador) => {
     expect(recusa({ agente: agente("raciocinio_normal", "sonnet"), adaptador, politica: VAZIA })).toBe("sem_suporte_operacional");
