@@ -136,7 +136,7 @@ conta como ausência da capacidade.
 | `hooks` | sim | por plugin | sim, com eventos próprios, não equivalentes um a um aos do Claude |
 | `subagentes` | sim | sim | sim (`.codex/agents/`, ligados por padrão) |
 | `troca_provedor_por_agente` | não documentado | não verificado (o formato `provider/model` sugere que sim, mas não há fonte nem teste) | **não**: o subagente herda o `model_provider` do pai |
-| `vincula_invocacao` | sim: `tool_use_id` no `PreToolUse` e no `PostToolUse`; `updatedInput` substitui o input; o input do `Agent` tem `model` (alias) e não tem `effort` | não verificado | não verificado |
+| `vincula_invocacao` | sim: `tool_use_id` no `PreToolUse`, `PostToolUse`, `PostToolUseFailure` e `PermissionDenied` (este só no modo auto); `session_id` comum a todos os hooks; `updatedInput` substitui o input; o input do `Agent` tem `model` (alias) e não tem `effort`; `onFailure: "block"` desde a v2.1.295 | não verificado | não verificado |
 | `paralelismo` | não verificado | não verificado | sim: `agents.max_concurrent_threads_per_session` limita as threads de subagente |
 
 Fontes (acesso em 2026-10-24): code.claude.com/docs/en/{model-config,
@@ -301,13 +301,14 @@ Invariantes:
   `classe:`, deduzida do frontmatter pela tabela inversa da 7.2), `agente`
   (elevada na camada 5) ou `tarefa` (elevada na camada 6);
 - `alternativa`, com `id`, `model` e `effort`;
-- `origem_alternativa`: `projeto`, `skill`, `embutida` ou `sessao`;
+- `origem_alternativa`: `projeto`, `skill`, `embutida`, `sessao` ou
+  `agentes-json-v1` (8.3);
 - `cadeia`: a cadeia **completa** autorizada para a classe resolvida, em ordem,
   com `id`, `model` e `effort` de cada alternativa. Ela é copiada para a
   resolução para que o julgamento de um fallback (10.2) não dependa da política
   vigente no momento da leitura;
 - `sobreposta_por` e `materializado` (`model`, `effort` finais), presentes só
-  na exceção da 8.3. Nesse caso `origem_alternativa` vale `agentes-json-v1`;
+  na exceção da 8.3;
 - `resolucao_id`: o SHA-256 do JSON canônico do objeto de resolução **sem** o
   campo `resolucao_id` (todos os campos acima, mais a versão do resolvedor e da
   tabela embutida). O campo é acrescentado depois do cálculo, e quem confere
@@ -324,26 +325,76 @@ Quem grava a resolução, e como ela chega ao julgamento:
   inofensivas por serem endereçadas pelo conteúdo, e o próximo `init` as
   reaproveita;
 - **na invocação** (toda chamada de agente gerenciado, com ou sem camadas 6 e
-  7): no Claude, um hook `PreToolUse` do `Agent` chama `expx resolucao` com o
-  `subagent_type`, a tarefa em curso e `EXPX_ALTERNATIVA`. O comando resolve,
-  grava a resolução (mesma escrita atômica) e grava o **envelope da
-  invocação**, `.expx/invocacoes/<tool_use_id>.json`, com `resolucao_id`,
-  agente e tarefa. Só então o hook devolve `updatedInput` com todos os campos
-  originais e o `model` da alternativa. O `PostToolUse` do mesmo `Agent` recebe
-  o mesmo `tool_use_id`, lê o envelope, julga (10.2), grava o evento com o
-  `resolucao_id` e apaga o envelope. Duas tarefas elevadas ao mesmo tempo nunca
-  se confundem, porque o vínculo é o `tool_use_id`, não o nome do agente;
+  7): no Claude, a sequência abaixo. A seção 8.4 diz de onde vem a tarefa.
+
+  1. **Antes da chamada**: o hook `PreToolUse` do `Agent` (matcher restrito ao
+     `Agent`) chama `expx resolucao` com o `subagent_type`, o `session_id` do
+     hook e `EXPX_ALTERNATIVA`. Um agente que nenhuma skill instalou passa sem
+     resolução e sem envelope. Para um agente gerenciado, o comando resolve,
+     grava a resolução (mesma escrita atômica) e grava o **envelope da
+     invocação**, `.expx/invocacoes/<tool_use_id>.json`, com `resolucao_id`,
+     agente, tarefa e `session_id`. Só então o hook devolve `updatedInput`
+     com todos os campos originais e o `model` da alternativa;
+  2. **Fechamento**: o envelope é fechado pelo evento terminal da chamada, que
+     traz o mesmo `tool_use_id`: `PostToolUse` (sucesso, inclusive
+     `async_launched`), `PostToolUseFailure` (falha da ferramenta) ou
+     `PermissionDenied` (negação pelo modo auto). Os três handlers seguem a
+     mesma ordem idempotente: gravar o julgamento (10.2) no envelope, gravar o
+     evento com a chave `invocacao` (o `tool_use_id`) e só então apagar o
+     envelope. Se o processo cai entre o evento e a remoção, a repetição acha o
+     evento com a mesma `invocacao` e não o duplica;
+  3. **Envelope abandonado**: uma negação por prompt de permissão fora do modo
+     auto, uma sessão que caiu ou um handler que não rodou deixam o envelope
+     sem fechamento. O hook `SessionStart` e o `doctor` o encontram, gravam um
+     evento `invocacao_abandonada` com a `invocacao` e o `resolucao_id` e o
+     removem, pela mesma ordem idempotente.
+
+- **o hook de antes da chamada é fail-closed**: ele é registrado com
+  `onFailure: "block"`, porque o padrão do Claude deixa a ação seguir quando o
+  hook estoura o tempo, quebra, falta ou devolve JSON inválido. Isso exige
+  Claude Code **v2.1.295 ou superior**: o `init` não instala a camada de
+  invocação numa versão anterior, e o `doctor` acusa a versão. É uma
+  **exceção explícita** à regra de que hooks de método falham abertos,
+  justificada porque este hook é o portão da política. O risco é bloquear toda
+  chamada de `Agent`, inclusive de agentes não gerenciados, se o hook quebrar.
+  Por isso o hook decide primeiro se o agente é gerenciado, só lendo o lock, e
+  não faz mais nada quando não é;
 - um arquivo de resolução com o mesmo id e bytes diferentes é corrupção e erro;
-- **se qualquer gravação falha, o `PreToolUse` nega a chamada**
+- **se qualquer gravação falha, o hook nega a chamada**
   (`permissionDecision: deny`) e o agente não é iniciado: nenhum evento cita um
-  `resolucao_id` ausente do registro. Um envelope que sobrou de uma sessão que
-  caiu é recuperável e o `doctor` o lista;
-- **limite do Claude**: o input do `Agent` aceita `model`, mas não `effort`.
-  Uma resolução de invocação cujo `effort` difere do materializado no agente
-  não pode ser honrada; é negada, nunca executada com o esforço errado;
+  `resolucao_id` ausente do registro;
+- **limites do Claude na invocação**: o `model` do input do `Agent` é um
+  **alias**, e não existe `effort`. Uma resolução de invocação só é honrada se
+  a alternativa usa alias e tem o mesmo `effort` do agente materializado. ID
+  completo (`claude-*`) e `effort` diferente continuam valendo na instalação,
+  no frontmatter, mas numa resolução de invocação são **negados pelo
+  resolvedor**, nunca executados com outro valor;
 - um adaptador sem hooks antes e depois da chamada de agente com um
   identificador de invocação comum não tem as camadas 6 e 7 nem o julgamento
   da 10.2. O manifesto expõe isso (`vincula_invocacao`).
+
+### 8.4 De onde vem a tarefa da invocação
+
+O input do `Agent` não traz a tarefa, e o texto que o modelo escreve no
+`prompt` não é fonte confiável. A fonte autoritativa é o rastro: o evento
+`task_iniciada`, gravado pelo escritor da skill **antes** de qualquer chamada de
+agente daquela tarefa, já carrega `sessao` (`<harness>@<id>`, derivada do
+harness e nunca preenchida por quem chama, como diz o contrato de eventos).
+
+O `expx resolucao` procura as tarefas **abertas** na sessão do hook: com
+`task_iniciada` e sem `task_concluida` nem `task_bloqueada`, e cuja `sessao` é
+`claude@<session_id>`.
+
+- nenhuma tarefa aberta: não há camada 6, e vale a resolução da instalação;
+- exatamente uma: é a tarefa da invocação;
+- mais de uma: se nenhuma delas eleva a classe daquele agente, não há
+  ambiguidade e vale a resolução sem camada 6; se alguma eleva, a escolha é
+  ambígua e **a chamada é negada**, com mensagem dizendo quais tarefas estão
+  abertas.
+
+Pré-requisito verificado na F3b: o `<id>` que o escritor da SprintX grava em
+`sessao` precisa ser o `session_id` que o Claude passa aos hooks. Se não for, a
+camada 6 fica indisponível até o escritor ser alinhado.
 
 O resolvedor vive no ExpxDev, em TypeScript, com testes de propriedade:
 determinismo, nunca rebaixa, id fora da cadeia é recusado e a mesma resolução
@@ -470,12 +521,15 @@ Todas opcionais, depois das doze obrigatórias, como manda o contrato:
 | `origem_alternativa` | `projeto`, `skill`, `embutida`, `sessao` ou `agentes-json-v1` (8.2, 8.3) |
 | `materializado` | só na exceção da 8.3: `{model, effort}` finais escritos pelo v1 |
 | `modelos_observados` | a sequência de modelos que o runtime informou para aquela execução (10.2), quando informou |
+| `invocacao` | o identificador da chamada do agente (no Claude, o `tool_use_id`), que torna idempotente o fechamento do envelope (8.2) |
 | `fora_da_politica` | `true` quando o executor observado saiu da cadeia (10.2); ausente nos demais casos |
 | `harness` | já existe na SprintX e passa a ser gravada também pelo escritor comum, quando houver sinal |
 
 `classe_declarada`, `classe_resolvida`, `alternativa`, as origens e, na
 exceção da 8.3, `materializado` vão **também** no evento, e não só no registro,
 para que o essencial sobreviva mesmo a um registro perdido.
+
+A emenda também declara o evento `invocacao_abandonada` (8.2, passo 3).
 
 `model` e `effort` são **somente** o executor observado e ficam `null` quando o
 runtime não os expõe. **Nenhum escritor preenche esses campos com
@@ -625,3 +679,4 @@ servir de ponto de partida.
 | 1 | Codex, 2026-10-24 | 5 bloqueantes e 3 não bloqueantes | registro imutável de resoluções (9); fallback nativo detectado e julgado, sem reinvocação (10.2); `origem_classe` separada de `origem_alternativa` (8.2, 11.1); `limita_ferramentas` separado de `garante_revisao_sem_escrita`, com verificação a posteriori da árvore (6, 12); tabela embutida normativa e ordem de escolha da cadeia (7.2); 11.2 com `resolvedModel`/`modelsUsed`/`PostModelSwitch`; H3 por agente; fases F6/F7; manifesto sem "provável" e com paralelismo por fonte. As afirmações novas do revisor foram conferidas nas fontes antes de entrar |
 | 2 | Codex, 2026-10-24 | 6 bloqueantes e 3 não bloqueantes | 7.3 com as regras 2–4 sem arquivo de política; escritor atômico das resoluções de invocação (`expx resolucao`), com bloqueio se não gravar (8.2); cadeia completa copiada na resolução, `modelos_observados` e correspondência por adaptador (8.2, 10.2); aprovação só com observação completa, sem `async_launched` (10.2); `model`/`effort` nunca preenchidos com configuração (11.1, 11.2, H10); níveis `estrutural`/`isolado`/`integridade_final`, com só os dois primeiros aceitando veredito (12, H8); `agentes-json-v1` no resolvedor, `classe_resolvida` e `materializado` inline; escopo do `doctor` em H11 |
 | 3 | Codex, 2026-10-24 | 5 bloqueantes e 2 não bloqueantes | `resolucao_id` calculado sem o próprio campo (8.2); envelope da invocação por `tool_use_id` entre `PreToolUse` e `PostToolUse` do `Agent`, com negação se a gravação falhar, e o limite de `effort` na invocação do Claude (8.2, manifesto `vincula_invocacao`); registro gravado antes dos agentes e do lock, com órfãs recuperáveis, sem alegar transação que o contrato de instalação não tem (8.2); `isolado` exige confinamento efetivo do processo (12); regime de transição e vigente por adaptador (12, H8, F3/F3b); camada 7 citando a cadeia da resolução; correspondência também contra `materializado`. Os campos `tool_use_id`, `updatedInput` e o input do `Agent` foram conferidos na documentação do Claude Code |
+| 4 | Codex, 2026-10-24 | 4 bloqueantes e 1 não bloqueante | hook de antes da chamada com `onFailure: "block"`, versão mínima v2.1.295 e exceção explícita ao fail-open (8.2); fechamento do envelope por `PostToolUse`, `PostToolUseFailure` e `PermissionDenied`, em ordem idempotente com a chave `invocacao`, e recuperação de envelope abandonado (8.2, 11.1); tarefa da invocação pelo `task_iniciada` aberto na mesma `sessao`, com ambiguidade negada (8.4); invocação só com alias e o mesmo `effort` do materializado (8.2); `agentes-json-v1` no enum da 8.2. Os eventos, `onFailure` e `session_id` foram conferidos na documentação do Claude Code |
