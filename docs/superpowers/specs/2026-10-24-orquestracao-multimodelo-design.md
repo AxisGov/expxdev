@@ -4,7 +4,7 @@ Data: 2026-10-24. Repositórios: AxisGov/expxdev (contrato, resolvedor, instala�
 rastro e painel); AxisGov/sprintx, AxisGov/runx, AxisGov/mergex e demais forks
 (declaração de classe nos agentes).
 Estado de partida: expxdev `f0a9dfb` (v0.12.2).
-Estado: **desenho para revisão do Codex e decisões do Flávio. Nenhuma linha de
+Estado: **desenho aprovado pelo Codex na revisão 5 (§17); aguarda as decisões do Flávio (§15). Nenhuma linha de
 código, nenhuma mudança de contrato vigente e nenhuma mudança em skill entram
 com este documento.**
 
@@ -336,8 +336,11 @@ Quem grava a resolução, e como ela chega ao julgamento:
      agente, tarefa e `session_id`. Só então o hook devolve `updatedInput`
      com todos os campos originais e o `model` da alternativa;
   2. **Fechamento**: o envelope é fechado pelo evento terminal da chamada, que
-     traz o mesmo `tool_use_id`: `PostToolUse` (sucesso, inclusive
-     `async_launched`), `PostToolUseFailure` (falha da ferramenta) ou
+     traz o mesmo `tool_use_id`: `PostToolUse` (sucesso; para
+     `async_launched`, só se a F3b provar que ele é emitido com o mesmo
+     `tool_use_id`; senão o envelope fica para a recuperação do passo 3, e
+     veredito de aprovação nunca é aceito em segundo plano),
+     `PostToolUseFailure` (falha da ferramenta) ou
      `PermissionDenied` (negação pelo modo auto). Os três handlers seguem a
      mesma ordem idempotente: gravar o julgamento (10.2) no envelope, gravar o
      evento com a chave `invocacao` (o `tool_use_id`) e só então apagar o
@@ -638,6 +641,31 @@ humano.
 | F6 | adaptador OpenCode (agentes em `.opencode/agents/`) | expxdev |
 | F7 | adaptador Codex (agentes em `.codex/agents/`) | expxdev |
 
+Pré-requisitos verificáveis da F3b, cada um com teste antes da ativação
+(levantados na revisão 5 do Codex):
+
+1. **`async_launched`**: provar se o `PostToolUse` é emitido com o mesmo
+   `tool_use_id`. Se não for, o envelope fica para recuperação e veredito de
+   aprovação nunca é aceito.
+2. **Sessão e tarefa**: provar ponta a ponta que o `session_id` do hook
+   coincide com o gravado pela SprintX em `sessao`, inclusive em subagente
+   aninhado e em segundo plano; testar zero, uma e várias tarefas abertas
+   (8.4).
+3. **Eventos terminais**: testar sucesso, falha (`PostToolUseFailure`),
+   negação automática (`PermissionDenied`), negação interativa, queda entre
+   julgamento, evento e remoção, e recuperação concorrente por `SessionStart`
+   e `doctor`. A deduplicação por `invocacao` precisa ser **atômica**, não só
+   uma convenção de campo.
+4. **Compatibilidade**: validar `onFailure: "block"` no settings materializado
+   e bloquear a ativação com Claude anterior à v2.1.295, inclusive instalação
+   antiga seguida de downgrade.
+5. **Escopo**: provar que agente não gerenciado passa sem envelope, e que lock
+   ausente, ilegível ou divergente, ou agente gerenciado ambíguo, nega sem
+   capturar indevidamente um agente do usuário.
+6. **Invocação**: testar a preservação integral do input, a aceitação só de
+   alias com esforço igual ao materializado e a rejeição de ID completo ou de
+   esforço diferente.
+
 Até a F4, um agente sem `classe:` tem a classe **inferida** do frontmatter pela
 tabela embutida do Claude (`haiku`→`mecanico_triagem`,
 `sonnet`→`raciocinio_normal`, `opus`→`profundo_excepcional`). A inferência
@@ -680,3 +708,4 @@ servir de ponto de partida.
 | 2 | Codex, 2026-10-24 | 6 bloqueantes e 3 não bloqueantes | 7.3 com as regras 2–4 sem arquivo de política; escritor atômico das resoluções de invocação (`expx resolucao`), com bloqueio se não gravar (8.2); cadeia completa copiada na resolução, `modelos_observados` e correspondência por adaptador (8.2, 10.2); aprovação só com observação completa, sem `async_launched` (10.2); `model`/`effort` nunca preenchidos com configuração (11.1, 11.2, H10); níveis `estrutural`/`isolado`/`integridade_final`, com só os dois primeiros aceitando veredito (12, H8); `agentes-json-v1` no resolvedor, `classe_resolvida` e `materializado` inline; escopo do `doctor` em H11 |
 | 3 | Codex, 2026-10-24 | 5 bloqueantes e 2 não bloqueantes | `resolucao_id` calculado sem o próprio campo (8.2); envelope da invocação por `tool_use_id` entre `PreToolUse` e `PostToolUse` do `Agent`, com negação se a gravação falhar, e o limite de `effort` na invocação do Claude (8.2, manifesto `vincula_invocacao`); registro gravado antes dos agentes e do lock, com órfãs recuperáveis, sem alegar transação que o contrato de instalação não tem (8.2); `isolado` exige confinamento efetivo do processo (12); regime de transição e vigente por adaptador (12, H8, F3/F3b); camada 7 citando a cadeia da resolução; correspondência também contra `materializado`. Os campos `tool_use_id`, `updatedInput` e o input do `Agent` foram conferidos na documentação do Claude Code |
 | 4 | Codex, 2026-10-24 | 4 bloqueantes e 1 não bloqueante | hook de antes da chamada com `onFailure: "block"`, versão mínima v2.1.295 e exceção explícita ao fail-open (8.2); fechamento do envelope por `PostToolUse`, `PostToolUseFailure` e `PermissionDenied`, em ordem idempotente com a chave `invocacao`, e recuperação de envelope abandonado (8.2, 11.1); tarefa da invocação pelo `task_iniciada` aberto na mesma `sessao`, com ambiguidade negada (8.4); invocação só com alias e o mesmo `effort` do materializado (8.2); `agentes-json-v1` no enum da 8.2. Os eventos, `onFailure` e `session_id` foram conferidos na documentação do Claude Code |
+| 5 | Codex, 2026-10-24 | **aprovado** para PR; sem bloqueante de F1/F2 | `async_launched` condicional à prova da F3b (8.2); seis pré-requisitos verificáveis da F3b registrados na §14 |
