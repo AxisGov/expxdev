@@ -13,14 +13,16 @@ import type { Resolucao } from "./resolver.js";
  *   se o final já existe — inclusive como link simbólico;
  * - um final que já existe só é aceito se é arquivo regular com os mesmos bytes.
  *
- * O que é MITIGADO: a troca de `.expx` ou `.expx/resolucoes` por um link. Antes
- * de criar o temporário e de novo antes de publicar, cada diretório precisa ser
- * diretório de verdade, sem link, dentro do projeto (`realpath` + `relative`),
- * e com o mesmo (dev, ino). Uma troca que persiste até a revalidação aborta.
+ * O que é MITIGADO: a troca de `.expx` ou `.expx/resolucoes`, por link ou por
+ * outro diretório. Os dois precisam ser diretórios de verdade, sem link, dentro
+ * do projeto (`realpath` + `relative`), e manter o (dev, ino) da primeira
+ * checagem — conferido logo depois de criar `resolucoes` e de novo antes de
+ * publicar. Uma troca ainda presente na revalidação aborta antes do lock.
  *
- * O que NÃO é fechado: o Node não tem `openat`/`linkat`, então uma troca feita e
- * desfeita entre a última revalidação e o `link` (ou a limpeza) não é
- * detectada. No Windows não há `O_NOFOLLOW`: a garantia forte é POSIX.
+ * O que NÃO é fechado: o Node não tem `openat`/`linkat`, e toda operação por
+ * caminho tem janela. Uma troca DEPOIS da última revalidação pode redirecionar
+ * o `link` ou a limpeza; desfazê-la em seguida só apaga a evidência. No Windows
+ * não há `O_NOFOLLOW`: a garantia forte é POSIX.
  */
 
 const NOFOLLOW = constants.O_NOFOLLOW ?? 0;
@@ -29,16 +31,16 @@ type Identidade = { dev: number; ino: number };
 const mesma = (a: Identidade, b: Stats): boolean => a.dev === b.dev && a.ino === b.ino;
 
 function erroLink(rel: string): Error {
-  return new Error(`${rel} e um link simbolico; o registro de resolucoes nao sai do projeto (nada foi escrito)`);
+  return new Error(`${rel} e um link simbolico; o registro de resolucoes nao sai do projeto (gravacao abortada)`);
 }
 
 /** O diretório existe como diretório real, sem link e dentro da raiz; devolve a identidade dele. */
 function diretorioSeguro(raizReal: string, abs: string, rel: string): Identidade {
   const st = lstatSync(abs);
   if (st.isSymbolicLink()) throw erroLink(rel);
-  if (!st.isDirectory()) throw new Error(`${rel} existe e nao e um diretorio (nada foi escrito)`);
+  if (!st.isDirectory()) throw new Error(`${rel} existe e nao e um diretorio (gravacao abortada)`);
   const dentro = relative(raizReal, realpathSync(abs));
-  if (dentro.startsWith("..") || isAbsolute(dentro)) throw new Error(`${rel} aponta para fora do projeto (nada foi escrito)`);
+  if (dentro.startsWith("..") || isAbsolute(dentro)) throw new Error(`${rel} aponta para fora do projeto (gravacao abortada)`);
   return { dev: st.dev, ino: st.ino };
 }
 
@@ -49,6 +51,12 @@ function existe(caminho: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** O diretório continua sendo o mesmo (dev, ino), sem link e dentro da raiz. */
+function conferirIdentidade(raizReal: string, raiz: string, rel: string, antes: Identidade): void {
+  const agora = diretorioSeguro(raizReal, join(raiz, ...rel.split("/")), rel);
+  if (agora.dev !== antes.dev || agora.ino !== antes.ino) throw new Error(`${rel} foi trocado durante a gravacao (nada foi publicado)`);
 }
 
 /** Cria um nível por vez, para cada componente passar pela mesma checagem. */
@@ -136,8 +144,10 @@ export function destinoDoRegistroInseguro(raiz: string, ids: readonly string[]):
  */
 export function gravarNoRegistro(raiz: string, r: Resolucao, teste?: OpcoesDeTeste): void {
   const raizReal = realpathSync(raiz);
-  garantirDiretorio(raizReal, raiz, ".expx");
+  const idExpx = garantirDiretorio(raizReal, raiz, ".expx");
   const idDir = garantirDiretorio(raizReal, raiz, DIR_REGISTRO);
+  // O `mkdir` de `resolucoes` passou pelo caminho de `.expx`: ele ainda é o mesmo?
+  conferirIdentidade(raizReal, raiz, ".expx", idExpx);
   const dir = join(raiz, ...DIR_REGISTRO.split("/"));
   const rel = caminhoDoRegistro(r.resolucao_id);
   const caminho = join(raiz, ...rel.split("/"));
@@ -163,10 +173,9 @@ export function gravarNoRegistro(raiz: string, r: Resolucao, teste?: OpcoesDeTes
   // Revalidação: o diretório é o mesmo de antes, e o temporário é o nosso. Se
   // não for, nem a limpeza é confiável: o temporário fica órfão.
   teste?.antesDaRevalidacao?.();
-  const trocado = new Error(`${DIR_REGISTRO} foi trocado durante a gravacao (nada foi publicado)`);
-  const agora = diretorioSeguro(raizReal, dir, DIR_REGISTRO);
-  if (agora.dev !== idDir.dev || agora.ino !== idDir.ino) throw trocado;
-  if (!mesma(idTmp, lstatSync(tmp))) throw trocado;
+  conferirIdentidade(raizReal, raiz, ".expx", idExpx);
+  conferirIdentidade(raizReal, raiz, DIR_REGISTRO, idDir);
+  if (!mesma(idTmp, lstatSync(tmp))) throw new Error(`${DIR_REGISTRO} foi trocado durante a gravacao (nada foi publicado)`);
 
   try {
     linkSync(tmp, caminho);

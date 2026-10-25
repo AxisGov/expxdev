@@ -112,6 +112,38 @@ describe("gravarNoRegistro", () => {
     expect(existsSync(final(raiz))).toBe(false);
   });
 
+  it.skipIf(!POSIX)(".expx trocado por link INTERNO para o original (resolucoes intacto) é detectado", () => {
+    const raiz = temp("expx-reg-");
+    const trocar = () => {
+      renameSync(join(raiz, ".expx"), join(raiz, ".expx-original"));
+      symlinkSync(join(raiz, ".expx-original"), join(raiz, ".expx"));
+    };
+    expect(() => gravarNoRegistro(raiz, resolucao, { antesDaRevalidacao: trocar })).toThrow(/\.expx/);
+    expect(existsSync(join(raiz, ".expx-original", "resolucoes", `${ID}.json`))).toBe(false);
+  });
+
+  it.skipIf(!POSIX)(".expx trocado por link EXTERNO com o mesmo resolucoes dentro é detectado", () => {
+    const raiz = temp("expx-reg-");
+    const fora = temp("expx-fora-");
+    const trocar = () => {
+      renameSync(dirReg(raiz), join(fora, "resolucoes"));
+      rmSync(join(raiz, ".expx"), { recursive: true });
+      symlinkSync(fora, join(raiz, ".expx"));
+    };
+    expect(() => gravarNoRegistro(raiz, resolucao, { antesDaRevalidacao: trocar })).toThrow();
+    expect(existsSync(join(fora, "resolucoes", `${ID}.json`))).toBe(false);
+  });
+
+  it(".expx trocado por outro diretório real, levando o mesmo resolucoes, é detectado pela identidade", () => {
+    const raiz = temp("expx-reg-");
+    const trocar = () => {
+      renameSync(join(raiz, ".expx"), join(raiz, ".expx-original"));
+      mkdirSync(join(raiz, ".expx"));
+      renameSync(join(raiz, ".expx-original", "resolucoes"), dirReg(raiz));
+    };
+    expect(() => gravarNoRegistro(raiz, resolucao, { antesDaRevalidacao: trocar })).toThrow(/\.expx foi trocado/);
+  });
+
   it.skipIf(!POSIX)(".expx como link é recusado antes de qualquer escrita", () => {
     const raiz = temp("expx-reg-");
     const fora = temp("expx-fora-");

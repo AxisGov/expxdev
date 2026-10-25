@@ -322,14 +322,17 @@ sem orquestração.
     seguir link. Dois `init` simultâneos publicam o mesmo conteúdo, e o segundo
     aceita o do primeiro;
   - **mitigado:** `.expx` e `.expx/resolucoes` precisam ser diretórios de
-    verdade, sem link e dentro do projeto (`realpath` + `relative`). Isso é
-    conferido antes de criar o temporário e de novo antes de publicar, com o
-    mesmo (dev, ino). Uma troca que persiste até a revalidação aborta antes do
-    lock. O temporário de um diretório que mudou não é limpo: um órfão é
-    preferível a remover por um caminho talvez redirecionado;
-  - **não fechado:** o Node não tem `openat`/`linkat`. Uma troca de diretório
-    feita **e desfeita** entre a última revalidação e o `link` ou a limpeza não
-    é detectada. Ela exige escrita concorrente no projeto, que já permite editar
+    verdade, sem link e dentro do projeto (`realpath` + `relative`), e manter o
+    (dev, ino) da primeira checagem. Os dois são conferidos depois de criar
+    `resolucoes` e de novo antes de publicar. Uma troca, por link ou por outro
+    diretório, ainda presente na revalidação aborta antes do lock. O `mkdir`
+    pode ter acontecido antes da detecção. O temporário de um diretório que
+    mudou não é limpo: um órfão é preferível a remover por um caminho talvez
+    redirecionado;
+  - **não fechado:** o Node não tem `openat`/`linkat`, e toda operação por
+    caminho tem janela. Uma troca **depois** da última revalidação pode
+    redirecionar o `link` ou a limpeza; desfazê-la em seguida só apaga a
+    evidência. Ela exige escrita concorrente no projeto, que já permite editar
     hooks. No Windows não há `O_NOFOLLOW`: a garantia forte é POSIX. Eliminar a
     classe exige primitivas relativas a descritor de diretório.
 - **Identidade.** O nome do agente é o `name:` lido como YAML (como o Claude
