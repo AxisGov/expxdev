@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import { validarAlternativa } from "./adaptadores.js";
 import { ADAPTADORES, CLASSES, ID_FRONTMATTER, type Politica } from "./tipos.js";
 
 /**
@@ -8,7 +9,7 @@ import { ADAPTADORES, CLASSES, ID_FRONTMATTER, type Politica } from "./tipos.js"
  *
  * O zod cuida da estrutura; a mensagem é montada aqui, com o caminho da chave,
  * porque o erro bruto do zod não diz à pessoa onde mexer. A validação de
- * `model`/`effort` por adaptador fica em `adaptadores.ts`.
+ * `model`/`effort` por adaptador é de `adaptadores.ts`, chamada depois da forma.
  *
  * Ausente é válido e quer dizer camada inativa (§3). Presente e inválido FALHA:
  * uma política que some em silêncio deixaria o agente no frontmatter quando a
@@ -93,7 +94,18 @@ export function validarPolitica(bruto: unknown): ValidacaoPolitica {
     });
     return { ok: false, erro: `${ONDE} inválido:\n${linhas.join("\n")}` };
   }
-  return { ok: true, politica: semAusentes(r.data) };
+  const politica = semAusentes(r.data);
+  const semanticos: string[] = [];
+  for (const a of ADAPTADORES) {
+    for (const c of CLASSES) {
+      politica.adaptadores[a]?.classes[c]?.forEach((alt, i) => {
+        const motivo = validarAlternativa(a, c, alt);
+        if (motivo !== null) semanticos.push(`  adaptadores.${a}.classes.${c}[${String(i)}]: ${motivo}`);
+      });
+    }
+  }
+  if (semanticos.length > 0) return { ok: false, erro: `${ONDE} inválido:\n${semanticos.join("\n")}` };
+  return { ok: true, politica };
 }
 
 /**
