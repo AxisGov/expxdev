@@ -172,6 +172,22 @@ describe("init de ponta a ponta", () => {
   });
 });
 
+describe("settings.json versionado", () => {
+  it("funcional: rastreado e limpo não ganha backup, e o init diz que o desfazer é pelo versionador", async () => {
+    p = projetoTemporario("fixtures/cli/settings-valido");
+    const env = { ...process.env, GIT_AUTHOR_NAME: "e", GIT_AUTHOR_EMAIL: "e@e.invalid", GIT_COMMITTER_NAME: "e", GIT_COMMITTER_EMAIL: "e@e.invalid" };
+    execFileSync("git", ["init", "-q", "-b", "main"], { cwd: p.raiz, env });
+    execFileSync("git", ["add", "--", ".claude/settings.json"], { cwd: p.raiz, env });
+    execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-q", "-m", "settings"], { cwd: p.raiz, env });
+
+    const r = await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: catalogoLocal(["sprintx"]) });
+
+    expect(r.ok).toBe(true);
+    expect(readdirSync(join(p.raiz, ".claude")).filter((a) => a.includes("backup"))).toEqual([]);
+    expect(r.avisos.join("\n")).toContain(".claude/settings.json rastreado e limpo no git: sem backup ao lado");
+  });
+});
+
 describe("skill sem tag publicada", () => {
   it("integração: instala do topo da branch e NAO polui a saida com aviso", async () => {
     // O caso real: nenhum dos seis repositorios do metodo publica tag hoje.

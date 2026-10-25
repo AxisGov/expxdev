@@ -1,16 +1,16 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { NOME_DO_MARKETPLACE, NOME_DO_PLUGIN } from "../plugin/manifestos.js";
-import { fazerBackup } from "./backup.js";
+import { fazerBackup, rastreadoELimpo } from "./backup.js";
 import type { HookInstalado } from "./hooks.js";
 import { comporSettings, type EntradaGerenciada, type EntradaHook } from "./composicao.js";
 
 /**
  * Merge do `.claude/settings.json` — o ponto mais fácil de errar.
  *
- * Regras: faz backup antes de tocar, mescla APENAS as chaves necessárias,
- * preserva todo o resto, e nunca sobrescreve o arquivo inteiro. JSON inválido
- * não é consertado: avisa e sai.
+ * Regras: faz backup antes de tocar (salvo arquivo rastreado e limpo no git),
+ * mescla APENAS as chaves necessárias, preserva todo o resto, e nunca
+ * sobrescreve o arquivo inteiro. JSON inválido não é consertado: avisa e sai.
  *
  * Duas formas de `enabledPlugins` circulam: a documentação mostra um array
  * (`["p@m"]`), e o arquivo que o Claude Code realmente escreve usa um objeto
@@ -30,7 +30,7 @@ import { comporSettings, type EntradaGerenciada, type EntradaHook } from "./comp
  */
 
 export type ResultadoMerge =
-  | { ok: true; criado: boolean; backup?: string }
+  | { ok: true; criado: boolean; backup?: string; backupOmitidoPorGitLimpo?: true }
   | { ok: false; erro: string };
 
 export type Habilitados = Record<string, boolean>;
@@ -164,12 +164,17 @@ export function planejarSettings(
   return { ok: true, plano: { caminho, existia, texto, mudou: texto !== bruto, gerenciadas: c.gerenciadas } };
 }
 
-/** Escreve o que o plano decidiu. Backup só quando um arquivo existente muda. */
+/**
+ * Escreve o que o plano decidiu. Backup só quando um arquivo existente muda, e
+ * não quando o git já guarda exatamente o que estava ali (ver `rastreadoELimpo`).
+ */
 export function gravarSettings(plano: PlanoSettings): ResultadoMerge {
   if (!plano.mudou) return { ok: true, criado: false };
-  const backup = plano.existia ? fazerBackup(plano.caminho) : undefined;
+  const omitido = plano.existia && rastreadoELimpo(plano.caminho);
+  const backup = plano.existia && !omitido ? fazerBackup(plano.caminho) : undefined;
   mkdirSync(join(plano.caminho, ".."), { recursive: true });
   writeFileSync(plano.caminho, plano.texto);
+  if (omitido) return { ok: true, criado: false, backupOmitidoPorGitLimpo: true };
   return backup === undefined ? { ok: true, criado: !plano.existia } : { ok: true, criado: !plano.existia, backup };
 }
 

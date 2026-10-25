@@ -552,7 +552,13 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
       for (const r of p.plano.resolucoes ?? []) gravarNoRegistro(op.raiz, r);
       aplicarArtefatos(op.raiz, p.plano.projeto);
       for (const rel of p.plano.remover) rmSync(join(op.raiz, ...rel.split("/")), { force: true });
-      if (p.plano.settings !== undefined) gravarSettings(p.plano.settings);
+      if (p.plano.settings !== undefined) {
+        const s = gravarSettings(p.plano.settings);
+        // sem a cópia ao lado, a pessoa precisa saber onde está o desfazer
+        if (s.ok && s.backupOmitidoPorGitLimpo === true) {
+          avisos.push(".claude/settings.json rastreado e limpo no git: sem backup ao lado; desfaca pelo versionador (ex.: git checkout -- .claude/settings.json)");
+        }
+      }
       if (op.harness.includes("codex")) {
         try {
           const aviso = materializarCodex(op.raiz);
