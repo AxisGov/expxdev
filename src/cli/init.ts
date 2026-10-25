@@ -44,6 +44,12 @@ import { comporModos, consolidarModos, lerModosDaSkill, type ModosPublicados } f
 import { ORIGEM_DO_PLUGIN } from "../plugin/manifestos.js";
 import { materializarCodex } from "../harness/codex.js";
 import { lerOverridesDoProjeto, planejarAgentes, planejarLimpeza } from "../harness/agentes.js";
+import { lerPolitica } from "../orquestracao/politica.js";
+import { caminhoDoRegistro, destinoDoRegistroInseguro, gravarNoRegistro, serializarRegistro } from "../orquestracao/materializar.js";
+import { VERSAO_RESOLVEDOR, type Resolucao } from "../orquestracao/resolver.js";
+import { VERSAO_TABELA } from "../orquestracao/tabela.js";
+import { VERSAO_MATRIZ_EFFORT_CLAUDE } from "../orquestracao/adaptadores.js";
+import type { OrquestracaoTravada } from "../nucleo/lock.js";
 import { adquirirBloqueioOperacao } from "../nucleo/bloqueio-operacao.js";
 
 /**
@@ -136,7 +142,43 @@ type Plano = {
   avisos: string[];
   /** Agentes de instalação anterior que saíram do plano (relativos à raiz). */
   remover: string[];
+  /**
+   * Só com a política de orquestração ativa: uma resolução por agente, para o
+   * registro `.expx/resolucoes/` e a seção `orquestracao` do lock.
+   */
+  resolucoes?: Resolucao[];
 };
+
+/** A seção `orquestracao` do lock: as versões e o `resolucao_id` vigente por agente. */
+function orquestracaoTravada(resolucoes: readonly Resolucao[]): OrquestracaoTravada {
+  const agentes: OrquestracaoTravada["agentes"] = {};
+  for (const r of [...resolucoes].sort((a, b) => a.agente.localeCompare(b.agente))) agentes[r.agente] = { claude: r.resolucao_id };
+  return { versao_resolvedor: VERSAO_RESOLVEDOR, tabela_embutida: VERSAO_TABELA, matriz_effort_claude: VERSAO_MATRIZ_EFFORT_CLAUDE, agentes };
+}
+
+/**
+ * O registro é imutável (CONTRATO-expx-orquestracao §9): um arquivo que já
+ * existe precisa ter exatamente os bytes da resolução. Diferente é corrupção, e
+ * o `init` falha antes de escrever qualquer coisa.
+ */
+function conferirRegistroExistente(raiz: string, resolucoes: readonly Resolucao[]): string[] {
+  const erros: string[] = [];
+  for (const r of resolucoes) {
+    const rel = caminhoDoRegistro(r.resolucao_id);
+    const caminho = join(raiz, ...rel.split("/"));
+    if (!existsSync(caminho)) continue;
+    let atual: string | undefined;
+    try {
+      atual = readFileSync(caminho, "utf8");
+    } catch {
+      atual = undefined;
+    }
+    if (atual !== serializarRegistro(r)) {
+      erros.push(`${rel} ja existe com outro conteudo; o registro de resolucoes e imutavel: restaure o arquivo pelo git (nada foi escrito)`);
+    }
+  }
+  return erros;
+}
 
 /** O que a instalação anterior gerenciava, segundo o lock dela. */
 function anterioresDoLock(raiz: string): { settings: EntradaGerenciada[]; modos?: ModosPublicados } {
@@ -207,16 +249,28 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
   const candidatos: Artefato[] = [];
   const avisosDoPlano: string[] = [];
   const agentesDoPlano: Artefato[] = [];
+  let resolucoes: Resolucao[] | undefined;
   if (claude) {
     candidatos.push(...artefatosDeHooks(montaveis));
-    // Agentes com o override do projeto (`.expx/agentes.json`) aplicado.
+    // Política de orquestração: ausente, a camada não existe e nada muda.
+    const pol = lerPolitica(op.raiz);
+    if (!pol.ok) erros.push(pol.erro);
+    const politica = pol.ok && pol.ativa ? pol.politica : undefined;
+    // Agentes resolvidos pela política (se houver) e com o override do projeto
+    // (`.expx/agentes.json`) aplicado.
     const ov = lerOverridesDoProjeto(op.raiz);
     if (!ov.ok) erros.push(ov.erro);
-    else {
-      const ag = planejarAgentes(montaveis, ov.overrides);
+    else if (pol.ok) {
+      const ag = planejarAgentes(montaveis, ov.overrides, politica);
       candidatos.push(...ag.artefatos);
       agentesDoPlano.push(...ag.artefatos);
       avisosDoPlano.push(...ag.avisos);
+      erros.push(...ag.erros);
+      if (politica !== undefined) {
+        resolucoes = ag.resolucoes;
+        const inseguro = destinoDoRegistroInseguro(op.raiz, resolucoes.map((r) => r.resolucao_id));
+        erros.push(...(inseguro.length > 0 ? inseguro : conferirRegistroExistente(op.raiz, resolucoes)));
+      }
     }
   }
   if (op.harness.includes("opencode")) {
@@ -233,7 +287,14 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
     erros.push(descreverColisoes(c.colisoes));
     return { ok: false, erros };
   }
-  const plano: Plano = { projeto: c.artefatos, plugin: plugin.ok ? plugin.artefatos : [], hooksDeSkill: false, avisos: avisosDoPlano, remover: [] };
+  const plano: Plano = {
+    projeto: c.artefatos,
+    plugin: plugin.ok ? plugin.artefatos : [],
+    hooksDeSkill: false,
+    avisos: avisosDoPlano,
+    remover: [],
+    ...(resolucoes !== undefined ? { resolucoes } : {}),
+  };
   if (claude) {
     const lk = lerLock(op.raiz);
     const anteriores = lk.ok ? (lk.lock.instalacao?.arquivos ?? {}) : {};
@@ -249,6 +310,7 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
     ".expx/marketplace/x",
     ".expx/expx-lock.json",
     ...(claude ? [".claude/settings.json", ".expx/hooks.json"] : []),
+    ...(resolucoes !== undefined && resolucoes.length > 0 ? [caminhoDoRegistro("x")] : []),
   ]);
   if (bloqueados.length > 0) erros.push(`destino impossivel de escrever (nada foi escrito):\n  ${bloqueados.join("\n  ")}`);
   if (!claude) return erros.length > 0 ? { ok: false, erros } : { ok: true, plano };
@@ -473,6 +535,7 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     harness: [...op.harness],
     skills: travadas,
     instalacao: instalacaoTravada(p.plano),
+    ...(p.plano.resolucoes !== undefined ? { orquestracao: orquestracaoTravada(p.plano.resolucoes) } : {}),
   };
   const bloqueio = adquirirBloqueioOperacao(op.raiz);
   if (!bloqueio.ok) {
@@ -483,6 +546,9 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
       montarMarketplace(tmp, montaveis, versaoDoCli());
     });
     try {
+      // O registro antes dos agentes e do lock: uma falha no meio deixa no
+      // máximo resoluções órfãs, inofensivas e reaproveitadas pelo próximo init.
+      for (const r of p.plano.resolucoes ?? []) gravarNoRegistro(op.raiz, r);
       aplicarArtefatos(op.raiz, p.plano.projeto);
       for (const rel of p.plano.remover) rmSync(join(op.raiz, ...rel.split("/")), { force: true });
       if (p.plano.settings !== undefined) gravarSettings(p.plano.settings);

@@ -68,12 +68,29 @@ export const InstalacaoTravada = z.object({
 });
 export type InstalacaoTravada = z.infer<typeof InstalacaoTravada>;
 
+/**
+ * `orquestracao` (CONTRATO-expx-orquestracao §9): só com a política ativa. As
+ * versões que produziram as resoluções e, por agente e adaptador, o
+ * `resolucao_id` VIGENTE. É evidência de reprodução, não fonte de política: o
+ * resolvedor lê `.expx/orquestracao.json`. Opcional e aditiva — o
+ * `lock_version` continua 2, e sem política o lock sai byte a byte igual.
+ */
+export const OrquestracaoTravada = z.object({
+  versao_resolvedor: z.number().int(),
+  tabela_embutida: z.number().int(),
+  matriz_effort_claude: z.number().int(),
+  // O id vira caminho em `.expx/resolucoes/`: fora do formato, o lock é ilegível.
+  agentes: z.record(z.string(), z.object({ claude: z.string().regex(/^[0-9a-f]{64}$/) })),
+});
+export type OrquestracaoTravada = z.infer<typeof OrquestracaoTravada>;
+
 export const Lock = z.object({
   lock_version: z.number().int(),
   cli_version: z.string().min(1),
   harness: z.array(z.string()),
   skills: z.record(z.string(), SkillTravada),
   instalacao: InstalacaoTravada.optional(),
+  orquestracao: OrquestracaoTravada.optional(),
 });
 export type Lock = z.infer<typeof Lock>;
 

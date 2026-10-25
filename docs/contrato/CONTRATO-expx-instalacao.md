@@ -288,11 +288,61 @@ checkout. Leitor ou módulo de limites ausente produz `fatiamento-sem-leitor`.
 Nos planos seguintes, a mergex E7 e a sprintx F3/F6 passarão a consumir o
 leitor.
 
+## 5.3 `.expx/orquestracao.json` — política de orquestração (F2)
+
+O formato, a validação e a resolução estão em `CONTRATO-expx-orquestracao.md`.
+Aqui fica o que a instalação faz com eles. Tudo vale **só com o harness
+`claude` e com o arquivo presente**. Sem `.expx/orquestracao.json`, nada desta
+seção acontece, e agentes e lock saem byte a byte iguais aos de uma instalação
+sem orquestração.
+
+- **Materialização.** Cada agente de `.claude/agents/` é resolvido no
+  adaptador `claude`, sem tarefa nem sessão. O frontmatter da cópia recebe o
+  `model` e o `effort` da alternativa. Se a alternativa não tem `effort`, a
+  linha `effort` **sai**, porque o arquivo não pode dizer um esforço que a
+  resolução não pediu. O resto do arquivo não muda.
+- **`.expx/agentes.json` v1, depois.** Um override do v1 é aplicado sobre a
+  resolução e marcado nela (`sobreposta_por`, `materializado`). É a exceção de
+  compatibilidade da §7.4 do contrato de orquestração.
+- **Registro.** Cada resolução é gravada em
+  `.expx/resolucoes/<resolucao_id>.json` com chaves ordenadas, indentação 2 e
+  quebra final. Essa forma é só legibilidade: a identidade continua sendo o
+  JSON canônico compacto do `resolucao_id`. O registro é gravado **antes** dos
+  agentes e do lock, por arquivo temporário e `rename`; um arquivo que já existe
+  com os mesmos bytes fica como está. O registro **não** entra em
+  `instalacao.arquivos`: não é artefato gerenciado, a limpeza nunca o alcança e
+  ele nunca é apagado, nem quando a política sai.
+- **Lock.** A seção opcional `orquestracao` (seção 9) guarda as versões e o
+  `resolucao_id` vigente por agente.
+- **Identidade.** O nome do agente é o `name:` lido como YAML (como o Claude
+  Code o lê), e é a chave da política, do override v1, do registro e do lock.
+- **Falhas antes de escrever** (seção 8): política inválida; `classe:` fora do
+  vocabulário num agente da skill; dois agentes com o mesmo `name:` (só o
+  último ficaria no lock); agente que a política não resolve, com o motivo do
+  resolvedor; arquivo do registro que já existe com outros bytes (o registro é
+  imutável).
+
+O `expx doctor` só fala da orquestração quando há política ou seção no lock.
+São **erro**: `orquestracao-invalida`, `orquestracao-resolucao-ausente` (o
+lock cita um id sem arquivo) e `orquestracao-registro-adulterado` (o arquivo
+não confere com o id ou não está na forma canônica legível, inclusive só nos
+espaços, ou um registro válido de outro agente ou adaptador). São **aviso**: `orquestracao-lock-sem-politica`,
+`orquestracao-classe-inferida`, `orquestracao-v1-abaixo-da-classe`,
+`orquestracao-variavel-sobrepoe` (`CLAUDE_CODE_SUBAGENT_MODEL_FORCE` ou
+`CLAUDE_CODE_EFFORT_LEVEL` no ambiente do doctor) e
+`orquestracao-fallback-fora`. Este último lê o `fallbackModel` da fonte de
+maior precedência que o doctor consegue ler (`.claude/settings.local.json`,
+`.claude/settings.json`, `~/.claude/settings.json`), inteira e sem mescla, e
+cita a origem. Settings gerenciados e `--fallback-model` de outra sessão ficam
+fora: só a observação do executor os pega.
+
 ## 6. O que o `init` não apaga
 
 Só `.expx/marketplace/` é trocada de uma vez. O restante de `.expx/`
-(`estado.json`, `memoria/`, `agentes.json`, `fatiamento.json`, …) não é do
-`init` e fica intocado.
+(`estado.json`, `memoria/`, `agentes.json`, `fatiamento.json`,
+`orquestracao.json`, …) não é do `init` e fica intocado. Em
+`.expx/resolucoes/` o `init` só acrescenta arquivos novos: nunca reescreve nem
+apaga um existente (seção 5.3).
 
 ## 7. Dependências de runtime
 
@@ -319,7 +369,9 @@ Falham **antes da primeira escrita**, sem alterar o projeto:
   impossível de compor;
 - skill incompleta (hook registrado que ela não publica);
 - destino bloqueado (um arquivo onde precisa haver pasta);
-- dependência de runtime ausente (seção 7).
+- dependência de runtime ausente (seção 7);
+- política de orquestração inválida, agente que ela não resolve, `classe:`
+  inválida ou registro de resolução adulterado (seção 5.3).
 
 A aplicação escreve os arquivos do projeto, o settings e o `.expx/hooks.json`,
 troca `.expx/marketplace/` de uma vez, e grava o lock **por último**: ele é a
@@ -343,6 +395,15 @@ Além de `skills` (versão e hash da cópia de cada skill no plugin), o lock tem
   exatamente como escritas, e o hash delas;
 - `modos`: o que as skills publicaram para `.expx/hooks.json` e o hash do
   arquivo composto.
+
+Com a política de orquestração ativa (seção 5.3), o lock tem também
+`orquestracao`: `versao_resolvedor`, `tabela_embutida`, `matriz_effort_claude`
+e, por agente, `{ "claude": <resolucao_id> }` — o id **vigente**. A seção é
+opcional e aditiva, e o `lock_version` continua 2: sem política ela não
+aparece e o lock não muda. **Limite de downgrade:** uma versão do `expxdev`
+anterior à F2 aceita o lock, mas, se rodar o `init`, regrava-o sem a seção. O
+próximo `init` de uma versão com F2 a recompõe a partir da política, e o
+registro continua lá.
 
 Tudo em ordem canônica. O único campo que varia entre duas instalações das
 mesmas skills é `skills.<nome>.resolvido_em` (a data da resolução), que já

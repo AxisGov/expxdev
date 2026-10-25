@@ -11,21 +11,45 @@ import { posto, type Adaptador, type Alternativa, type Classe } from "./tipos.js
 
 export const VERSAO_MATRIZ_EFFORT_CLAUDE = 1;
 
-const FAMILIAS: ReadonlyArray<readonly [string, Classe]> = [
+export type FamiliaClaude = "haiku" | "sonnet" | "opus";
+
+const FAMILIAS: ReadonlyArray<readonly [FamiliaClaude, Classe]> = [
   ["haiku", "mecanico_triagem"],
   ["sonnet", "raciocinio_normal"],
   ["opus", "profundo_excepcional"],
 ];
 
 /**
- * A classe pela família contida no nome: o alias, ou um segmento de um ID
- * `claude-*` (`claude-3-5-sonnet-…` também é Sonnet). `inherit`, `fable`, um ID
- * sem família e um nome com duas famílias não se classificam.
+ * A família: o próprio alias, ou um SEGMENTO de um ID `claude-*`
+ * (`claude-3-5-sonnet-…` também é Sonnet). Nunca substring livre: `superopus`
+ * não é Opus. `inherit`, `fable`, um ID sem família e um nome com duas famílias
+ * ficam sem família.
  */
-export function classeDoModeloClaude(model: string): Classe | null {
+export function familiaClaude(model: string): FamiliaClaude | null {
   const segmentos = model.startsWith("claude-") ? model.split("-") : [model];
   const achadas = FAMILIAS.filter(([familia]) => segmentos.includes(familia));
-  return achadas.length === 1 ? (achadas[0]?.[1] ?? null) : null;
+  return achadas.length === 1 ? (achadas[0]?.[0] ?? null) : null;
+}
+
+/** A classe pela família do nome (CONTRATO-expx-orquestracao §4.2). */
+export function classeDoModeloClaude(model: string): Classe | null {
+  const familia = familiaClaude(model);
+  return FAMILIAS.find(([f]) => f === familia)?.[1] ?? null;
+}
+
+const ALIASES: ReadonlySet<string> = new Set(FAMILIAS.map(([f]) => f));
+
+/**
+ * Um modelo observado (ou de um `fallbackModel`) corresponde a uma alternativa
+ * quando é o mesmo ID, ou quando um dos dois é alias e o outro é da família
+ * dele. Dois IDs completos diferentes não correspondem, mesmo da mesma família:
+ * `claude-opus-4-6` não é `claude-opus-5-5`.
+ */
+export function correspondeClaude(observado: string, alternativa: string): boolean {
+  if (observado === alternativa) return true;
+  if (ALIASES.has(alternativa)) return familiaClaude(observado) === alternativa;
+  if (ALIASES.has(observado)) return familiaClaude(alternativa) === observado;
+  return false;
 }
 
 const TODOS = ["low", "medium", "high", "xhigh", "max"] as const;
