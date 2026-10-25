@@ -186,7 +186,12 @@ function grava(task, ev) {
   renameSync(tmp, caminhoEv(task));
 }
 /** A CLI: o arquivo do pacote conferido, pelo `node`; nunca o `codeant` do PATH depois da conferência. */
-const codeant = (bin, a, cwd = op.raiz) => spawnSync(process.execPath, [bin, ...a], { cwd, maxBuffer: 64 << 20 });
+// EXPX_REVISAO_TESTE_TEMPO_CLI é só para teste: o prazo da CLI em milissegundos, no lugar dos 15 minutos.
+const TEMPO_DA_CLI = Number(process.env.EXPX_REVISAO_TESTE_TEMPO_CLI) > 0 ? Number(process.env.EXPX_REVISAO_TESTE_TEMPO_CLI) : 15 * 60 * 1_000;
+/** A CLI que não responde no prazo é morta e a revisão falha fechado, em vez de esperar para sempre. */
+const codeant = (bin, a, cwd = op.raiz) => spawnSync(process.execPath, [bin, ...a], {
+  cwd, maxBuffer: 64 << 20, timeout: TEMPO_DA_CLI, killSignal: "SIGKILL",
+});
 /** Materializa o HEAD capturado em worktree descartável e sobrepõe os blobs medidos.
  *  A CLI nunca lê o checkout mutável que o usuário pode editar e restaurar durante a revisão. */
 function snapshotDaRevisao(head, blobs) {
@@ -429,6 +434,7 @@ function revisar() {
     raizRevisao = snapshot.raiz;
     limparSnapshot = snapshot.limpar;
     const r = codeant(cli.bin, ["review", "--headless", ...(base ? ["--base-commit", base] : ["--uncommitted"]), "--include", enviados.join(",")], raizRevisao);
+    if (r.error?.code === "ETIMEDOUT") return fim("indisponivel", "tempo-esgotado");
     const stdout = r.stdout ?? Buffer.alloc(0);
     const j = json(stdout.toString("utf8"));
     const falhas = String(r.stderr ?? "").split(/\r?\n/).filter((l) => l.startsWith("[error] Failed to review "));
@@ -467,7 +473,8 @@ function revisar() {
     return ev.achados.filter((a) => a.estado === "aberto").length;
   });
   process.stdout.write(`${op.task} ${ev.resultado}${ev.motivo ? `:${ev.motivo}` : ""}\n`);
-  process.exit({ indisponivel: 2, incompleta: 3 }[ev.resultado] ?? (abertos > 0 ? 1 : 0));
+  // exitCode, não exit(): o stdout pode ser assíncrono (pipe no macOS, TTY no Windows) e a linha se perderia
+  process.exitCode = { indisponivel: 2, incompleta: 3 }[ev.resultado] ?? (abertos > 0 ? 1 : 0);
 }
 
 /** As identidades rejeitadas em qualquer evidência do trabalho. */
@@ -491,7 +498,9 @@ function derivar(issues, arquivos, versao, alt, texto) {
     const viz = [linha - 2, linha - 1, linha].map((k) => (c.linhas[k] ?? "").trim());
     const label = String(i.label ?? "");
     const identidade = createHash("sha256").update([label, arquivo, ...viz, versao].join("\0")).digest("hex");
-    return { identidade, arquivo, linha, label, texto: String(i.issue_content ?? ""), estado: c.alt === true || c.alt.has(linha) ? "aberto" : "anterior" };
+    // Achado que não se liga a uma linha de um arquivo da task não pode ser dado por anterior: fica aberto.
+    const semVinculo = !Object.hasOwn(arquivos, arquivo) || !Number.isSafeInteger(linha) || linha < 1;
+    return { identidade, arquivo, linha, label, texto: String(i.issue_content ?? ""), estado: semVinculo || c.alt === true || c.alt.has(linha) ? "aberto" : "anterior" };
   });
 }
 
@@ -671,7 +680,7 @@ function achadosDivergem(ev, sha) {
 function conferir() {
   const linhas = op.tasks.map((p) => { const [task, sha] = p.split("="); return `${task} ${veredito(task, sha)}`; });
   process.stdout.write(`${linhas.join("\n")}\n`);
-  process.exit(linhas.some((l) => l.includes(" FALHA ")) ? 1 : linhas.some((l) => l.includes(" AVISO ")) ? 3 : 0);
+  process.exitCode = linhas.some((l) => l.includes(" FALHA ")) ? 1 : linhas.some((l) => l.includes(" AVISO ")) ? 3 : 0;
 }
 
 /** O que a mergex lê das evidências (D1, D2, condição 6 da M2), só da evidência que o `conferir` aceita: uma linha de JSON

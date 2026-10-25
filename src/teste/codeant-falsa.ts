@@ -30,6 +30,8 @@ export interface CfgFalsa {
   avisos?: string;
   /** Código de saída; sem ele, 1 se `error` não é nulo e 0 senão. */
   saida?: number;
+  /** Milissegundos de espera no `review`, para simular a CLI que trava. */
+  dorme?: number;
 }
 
 export type LayoutFalsa = "link" | "cmd" | "sh";
@@ -69,6 +71,7 @@ const conteudos = Object.fromEntries(inc.map((f) => [f, fs.readFileSync(f, "utf8
 fs.appendFileSync(dir + "/chamadas.jsonl", JSON.stringify({ args: a, arquivo: process.argv[1], shim: process.env.EXPX_FALSA_PELO_SHIM === "1", cwd: process.cwd(), conteudos }) + "\\n");
 if (a[0] === "review" && cfg.oscilaOrigem) fs.writeFileSync(cfg.oscilaOrigem[0], cfg.oscilaOrigem[2]);
 if (a[0] === "--version") { process.stdout.write(cfg.versao + "\\n"); process.exit(0); }
+if (a[0] === "review" && cfg.dorme) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, cfg.dorme);
 if (cfg.durante) fs.writeFileSync(cfg.durante[0], cfg.durante[1]);
 if (cfg.reescreve) fs.writeFileSync(cfg.reescreve, "mudou\\n");
 if (cfg.stderr) process.stderr.write(cfg.stderr);

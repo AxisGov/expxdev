@@ -79,7 +79,14 @@ fi
 # Minusculas e SEM acento: a pessoa digita "nao acompanha", "codigo", "calculo"
 # tanto quanto as formas acentuadas, e um padrao que so casa com acento perde
 # metade dos relatos reais.
-P="${PROMPT,,}"
+P="$PROMPT"
+# Em LC_ALL=C, ${P,,} só normaliza ASCII; trate maiúsculas acentuadas antes.
+P="${P//Á/a}"; P="${P//À/a}"; P="${P//Â/a}"; P="${P//Ã/a}"; P="${P//Ä/a}"
+P="${P//É/e}"; P="${P//È/e}"; P="${P//Ê/e}"; P="${P//Ë/e}"
+P="${P//Í/i}"; P="${P//Ì/i}"; P="${P//Î/i}"; P="${P//Ï/i}"
+P="${P//Ó/o}"; P="${P//Ò/o}"; P="${P//Ô/o}"; P="${P//Õ/o}"; P="${P//Ö/o}"
+P="${P//Ú/u}"; P="${P//Ù/u}"; P="${P//Û/u}"; P="${P//Ü/u}"; P="${P//Ç/c}"
+P="${P,,}"
 P="${P//á/a}"; P="${P//à/a}"; P="${P//â/a}"; P="${P//ã/a}"; P="${P//ä/a}"
 P="${P//é/e}"; P="${P//è/e}"; P="${P//ê/e}"; P="${P//ë/e}"
 P="${P//í/i}"; P="${P//ì/i}"; P="${P//î/i}"; P="${P//ï/i}"
