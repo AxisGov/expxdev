@@ -90,6 +90,12 @@ export type OpcoesInit = {
   /** Referência fixa por skill, quando o usuário pediu uma específica. */
   referencias?: Record<string, string>;
   /**
+   * Commit exato por skill. O `update` passa o travado no lock para as skills
+   * que não está atualizando: sem ele, uma skill em `main` seria resolvida de
+   * novo na ponta e andaria junto. A `referencia` gravada no lock não muda.
+   */
+  commits?: Record<string, string>;
+  /**
    * O ambiente em que as dependências de runtime são provadas. Padrão: o do
    * próprio processo, que é o que importa — ver `nucleo/runtime.ts`.
    */
@@ -447,11 +453,12 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     // Origem em disco (EXPX_SKILLS_LOCAIS, ou `--origem` apontando para uma
     // pasta) é COPIADA, não clonada: o clone traria só o commitado, e o ciclo
     // de desenvolvimento de skill deixaria de ser curto.
+    const commit = op.commits?.[nome];
     const busca = await buscarSkill({
       nome,
       repositorio,
       referencia: alvo.referencia,
-      ...(ehCaminhoLocal(repositorio) ? { local: true } : {}),
+      ...(ehCaminhoLocal(repositorio) ? { local: true } : commit !== undefined ? { commit } : {}),
     });
     if (!busca.ok) {
       falhas.push({ nome, erro: busca.erro });

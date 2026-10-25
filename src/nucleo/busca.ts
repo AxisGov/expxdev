@@ -30,6 +30,11 @@ export type PedidoBusca = {
    * efeito no projeto sem commitar. A cópia é o que torna o ciclo curto.
    */
   local?: boolean;
+  /**
+   * O commit exato a instalar, quando ele já está decidido (o travado no lock,
+   * ou um `--to` com SHA). Sem ele, vale a ponta da `referencia`.
+   */
+  commit?: string;
 };
 
 export type ResultadoBusca =
@@ -60,23 +65,53 @@ async function copiarLocal(p: PedidoBusca, destino: string): Promise<ResultadoBu
   return { ok: true, nome: p.nome, caminho: destino, commit };
 }
 
-/** Clona só a referência pedida, com profundidade 1. Devolve a pasta temporária. */
+/**
+ * Traz um commit exato para `destino`.
+ *
+ * `git clone --branch` não aceita SHA, e a ponta da branch pode já ter andado
+ * — é justamente o caso de uma skill sem tag travada num commit antigo. O
+ * pedido por SHA com profundidade 1 é o caminho rápido; servidor que recusa
+ * pedido de objeto não anunciado cai para a busca completa. Commit que não
+ * existe mais no remoto FALHA: cair para a ponta seria a deriva que o lock
+ * existe para impedir.
+ */
+async function trazerCommit(repositorio: string, commit: string, destino: string): Promise<void> {
+  await exec("git", ["init", "--quiet", destino]);
+  try {
+    await exec("git", ["fetch", "--quiet", "--depth", "1", repositorio, commit], { cwd: destino });
+  } catch {
+    await exec("git", ["fetch", "--quiet", repositorio, "+refs/heads/*:refs/remotes/origem/*", "+refs/tags/*:refs/tags/*"], {
+      cwd: destino,
+    });
+  }
+  await exec("git", ["checkout", "--quiet", "--detach", commit], { cwd: destino });
+}
+
+/** Clona só a referência pedida, com profundidade 1 — ou o commit pedido. Devolve a pasta temporária. */
 export async function buscarSkill(p: PedidoBusca): Promise<ResultadoBusca> {
   const destino = mkdtempSync(join(tmpdir(), `expx-busca-${p.nome}-`));
   try {
     if (p.local === true) return await copiarLocal(p, destino);
-    await exec("git", [
-      "clone",
-      "--quiet",
-      "--depth",
-      "1",
-      "--branch",
-      p.referencia,
-      p.repositorio,
-      destino,
-    ]);
+    if (p.commit !== undefined) {
+      await trazerCommit(p.repositorio, p.commit, destino);
+    } else {
+      await exec("git", [
+        "clone",
+        "--quiet",
+        "--depth",
+        "1",
+        "--branch",
+        p.referencia,
+        p.repositorio,
+        destino,
+      ]);
+    }
     const { stdout } = await exec("git", ["rev-parse", "HEAD"], { cwd: destino });
-    return { ok: true, nome: p.nome, caminho: destino, commit: stdout.trim() };
+    const commit = stdout.trim();
+    if (p.commit !== undefined && commit !== p.commit) {
+      throw new Error(`o commit ${p.commit} nao foi obtido de ${p.repositorio} (veio ${commit})`);
+    }
+    return { ok: true, nome: p.nome, caminho: destino, commit };
   } catch (e: unknown) {
     rmSync(destino, { recursive: true, force: true });
     return { ok: false, nome: p.nome, erro: String(e) };

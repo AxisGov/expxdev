@@ -16,6 +16,9 @@ import { adquirirBloqueioOperacao } from "../nucleo/bloqueio-operacao.js";
  * do comando de desfazer no pior momento.
  */
 
+/** Um SHA-1 completo: só ele é buscado como commit, sem ambiguidade com tag ou branch. */
+const SHA_COMPLETO = /^[0-9a-f]{40}$/;
+
 export const AVISO_ROLLBACK =
   "para desfazer esta atualizacao, reverta o .expx/ pelo versionador (ex.: git checkout -- .expx)";
 
@@ -141,18 +144,28 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
 
   const emDia = comparacao.itens.filter((i) => i.emDia).map((i) => i.nome);
   const candidatas: ItemComparacao[] = [];
+  const modificadas: string[] = [];
+  const bloquearSeModificada = (nome: string): boolean => {
+    const mod = verificarModificacaoLocal(op.raiz, nome);
+    if (!mod.temModificacao) return false;
+    bloqueadas.push({ nome, motivo: `modificacao local em: ${[...mod.alterados, ...mod.removidos].join(", ")}` });
+    modificadas.push(nome);
+    return true;
+  };
 
   for (const item of comparacao.aAplicar) {
     // Trabalho manual nunca é sobrescrito por um comando de rotina.
-    const mod = verificarModificacaoLocal(op.raiz, item.nome);
-    if (mod.temModificacao) {
-      bloqueadas.push({
-        nome: item.nome,
-        motivo: `modificacao local em: ${[...mod.alterados, ...mod.removidos].join(", ")}`,
-      });
-      continue;
-    }
+    if (bloquearSeModificada(item.nome)) continue;
     candidatas.push(item);
+  }
+  // O `init` remonta TODAS as skills do lock, não só as candidatas: uma
+  // modificação local em qualquer outra — em dia, ou fora do filtro — também
+  // seria sobrescrita.
+  if (candidatas.length > 0) {
+    const vistas = new Set(comparacao.aAplicar.map((i) => i.nome));
+    for (const nome of Object.keys(l.lock.skills)) {
+      if (!vistas.has(nome)) bloquearSeModificada(nome);
+    }
   }
 
   for (const i of comparacao.itens) {
@@ -221,19 +234,36 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
     };
   }
 
-  // Remonta do zero com as versões novas, mantendo a seleção e o harness.
+  if (modificadas.length > 0) {
+    mensagens.push(
+      `nada foi aplicado: o update remonta todas as skills e sobrescreveria a modificacao local em ${modificadas.join(", ")}`,
+    );
+    return { ok: false, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens };
+  }
+
+  // Remonta do zero com as versões novas, mantendo a seleção e o harness. As
+  // skills que não estão sendo atualizadas voltam no commit travado: pela
+  // referência, uma skill em `main` seria resolvida de novo na ponta.
   const selecao = Object.keys(l.lock.skills);
   const alvos: Record<string, string> = {};
+  const commits: Record<string, string> = {};
   for (const c of candidatas) alvos[c.nome] = c.nova;
   for (const [nome, travada] of Object.entries(l.lock.skills)) {
-    if (alvos[nome] === undefined) alvos[nome] = travada.referencia;
+    if (alvos[nome] !== undefined) continue;
+    alvos[nome] = travada.referencia;
+    // origem em disco grava `local` ou `<sha>-local`: não há commit a buscar
+    if (travada.commit !== "local" && !travada.commit.endsWith("-local")) commits[nome] = travada.commit;
   }
+  // `--to <sha>`: `git clone --branch` não aceita SHA, então ele vai como commit
+  const nomeada = op.skills?.[0];
+  if (op.to !== undefined && nomeada !== undefined && SHA_COMPLETO.test(op.to)) commits[nomeada] = op.to;
 
   const init = await executarInit({
     raiz: op.raiz,
     skills: selecao,
     harness: l.lock.harness,
     referencias: alvos,
+    commits,
     origens,
   });
 

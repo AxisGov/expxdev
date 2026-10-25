@@ -1,6 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { buscarSkill } from "./busca.js";
 
@@ -92,5 +94,53 @@ describe("origem local: o working tree, sem commit", () => {
     criados.push(r.caminho);
     const lido = readFileSync(join(r.caminho, ".claude/skills/sprintx/SKILL.md"), "utf8");
     expect(lido).not.toContain("MARCA-NAO-COMMITADA");
+  });
+});
+
+describe("busca de um commit exato", () => {
+  /** O commit de uma tag que já não é a ponta: é o caso do lock travado num commit antigo. */
+  function commitDe(repo: string, ref: string): string {
+    return execFileSync("git", ["rev-parse", `${ref}^{commit}`], { cwd: repo, encoding: "utf8" }).trim();
+  }
+
+  it("funcional: traz o commit pedido, não a ponta da referência", async () => {
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0", "v1.2.0"] });
+    criados.push(repo);
+    const alvo = commitDe(repo, "v1.0.0");
+    const r = await buscarSkill({ nome: "sprintx", repositorio: pathToFileURL(repo).href, referencia: "main", commit: alvo });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    criados.push(r.caminho);
+    expect(r.commit).toBe(alvo);
+    expect(readFileSync(join(r.caminho, ".claude/skills/sprintx/references/01.md"), "utf8")).toContain("v1.0.0");
+  });
+
+  it("funcional: servidor que recusa pedido por SHA cai para a busca completa", async () => {
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0", "v1.2.0"] });
+    criados.push(repo);
+    // o commit inicial: nenhuma branch ou tag aponta para ele, então o servidor
+    // não o anuncia — e no protocolo v0, sem allowReachableSHA1InWant, recusa o pedido
+    const alvo = commitDe(repo, "v1.0.0~1");
+    const antes = { ...process.env };
+    Object.assign(process.env, { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "protocol.version", GIT_CONFIG_VALUE_0: "0" });
+    try {
+      const r = await buscarSkill({ nome: "sprintx", repositorio: pathToFileURL(repo).href, referencia: "main", commit: alvo });
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      criados.push(r.caminho);
+      expect(r.commit).toBe(alvo);
+    } finally {
+      for (const k of ["GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"]) {
+        if (antes[k] === undefined) Reflect.deleteProperty(process.env, k);
+        else process.env[k] = antes[k];
+      }
+    }
+  });
+
+  it("funcional: commit que não existe no remoto falha, sem cair para a ponta", async () => {
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    criados.push(repo);
+    const r = await buscarSkill({ nome: "sprintx", repositorio: pathToFileURL(repo).href, referencia: "main", commit: "0".repeat(40) });
+    expect(r.ok).toBe(false);
   });
 });
