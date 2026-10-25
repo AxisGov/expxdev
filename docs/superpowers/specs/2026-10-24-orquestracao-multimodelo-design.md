@@ -130,7 +130,7 @@ conta como ausência da capacidade.
 | `observa_executor.model` | parcial: subagente em primeiro plano tem `resolvedModel` e `modelsUsed` no `tool_response` do `PostToolUse` do `Agent`; a sessão tem `from_model`/`to_model` em `PreModelSwitch`/`PostModelSwitch` e `model` no `SessionStart` (nem sempre); não existe `$CLAUDE_MODEL` | parcial: só no plugin `chat.message` (código, fora do doc); processos filhos não recebem | sim: `model` no stdin dos hooks |
 | `observa_executor.effort` | sim: `effort.level` nos hooks e `$CLAUDE_EFFORT` | parcial: `variant` no `chat.message` | **não**: ausente do payload |
 | `limita_ferramentas` | sim: `tools:` como lista permitida e `disallowedTools` (omitir os dois herda todas) | sim: `permission:` | **não**: o arquivo do agente não substitui sandbox nem aprovações do pai |
-| `garante_revisao_sem_escrita` | **forte** só com `tools:` sem `Edit`, `Write`, `NotebookEdit` e sem `Bash`; com `Bash` a escrita indireta continua possível e a garantia é **parcial** | não verificado | **não**: "custom agent instructions can ask an agent to avoid edits, but they don't create a separate read-only sandbox" |
+| `garante_revisao_sem_escrita` (nível `estrutural` da seção 12) | sim, só com `tools:` sem `Edit`, `Write`, `NotebookEdit` e sem `Bash`; com `Bash` a escrita indireta continua possível e o nível não se aplica | não verificado | **não**: "custom agent instructions can ask an agent to avoid edits, but they don't create a separate read-only sandbox" |
 | `fallback_nativo` | sim, **por sessão**: `fallbackModel` / `--fallback-model` (até três modelos), aplicado também aos subagentes desde a v2.1.247; não cobre rate limit, billing nem autenticação; não há cadeia por agente | não verificado | não verificado |
 | `seleciona_na_invocacao` | `model`: sim (o parâmetro `model` da invocação vence o frontmatter); `effort`: não verificado | não verificado | **não serve para sobrepor**: o valor do arquivo do agente vence o valor explícito do spawn |
 | `hooks` | sim | por plugin | sim, com eventos próprios, não equivalentes um a um aos do Claude |
@@ -252,9 +252,15 @@ Mudar a tabela embutida é mudar a versão do resolvedor, e com ela todo
 
 ### 7.3 Sem arquivo de política
 
-Sem `.expx/orquestracao.json`, só a regra 2 se aplica. O `init` **não
-reescreve** o agente: a cópia continua sendo o frontmatter da skill, mais o
-`agentes.json` v1, e a instalação sai byte a byte igual à de hoje.
+Sem `.expx/orquestracao.json`, as regras 2 a 4 continuam valendo; só a regra 1
+deixa de existir. Na instalação nada é elevado (a camada 5 vive no arquivo),
+então todo agente cai na regra 2. O `init` **não reescreve** o agente: a cópia
+continua sendo o frontmatter da skill, mais o `agentes.json` v1, e a instalação
+sai byte a byte igual à de hoje.
+
+Na invocação, uma tarefa elevada (camada 6) sem arquivo de política resolve
+pela regra 3 onde houver tabela embutida (hoje, só o Claude) e pela regra 4
+(sem resolução, bloqueio) nos demais adaptadores.
 
 ## 8. Precedência e resolução
 
@@ -294,9 +300,27 @@ Invariantes:
   (elevada na camada 5) ou `tarefa` (elevada na camada 6);
 - `alternativa`, com `id`, `model` e `effort`;
 - `origem_alternativa`: `projeto`, `skill`, `embutida` ou `sessao`;
-- `cadeia`: os `id` autorizados para a classe resolvida, em ordem;
+- `cadeia`: a cadeia **completa** autorizada para a classe resolvida, em ordem,
+  com `id`, `model` e `effort` de cada alternativa. Ela é copiada para a
+  resolução para que o julgamento de um fallback (10.2) não dependa da política
+  vigente no momento da leitura;
+- `sobreposta_por` e `materializado` (`model`, `effort` finais), presentes só
+  na exceção da 8.3. Nesse caso `origem_alternativa` vale `agentes-json-v1`;
 - `resolucao_id`: o SHA-256 do JSON canônico da própria resolução (todos os
   campos acima, mais a versão do resolvedor e da tabela embutida).
+
+Quem grava a resolução:
+
+- **na instalação** (camadas 1 a 5): o `init`/`update`, junto com os
+  artefatos, na mesma troca atômica que já existe (D-16);
+- **na invocação** (camadas 6 e 7): o comando `expx resolucao`, chamado por quem
+  abre a tarefa (o hook ou o lembrete da skill) **antes** de iniciar o agente.
+  Ele resolve, grava `.expx/resolucoes/<resolucao_id>.json` por arquivo
+  temporário no mesmo diretório seguido de `rename`, e só então devolve o
+  `model`/`effort` a passar ao agente. Um arquivo com o mesmo id que já exista
+  precisa ter bytes idênticos; diferente é corrupção e erro. **Se a gravação
+  falha, o agente não é iniciado**: nenhum evento pode citar um `resolucao_id`
+  que não esteja no registro.
 
 O resolvedor vive no ExpxDev, em TypeScript, com testes de propriedade:
 determinismo, nunca rebaixa, id fora da cadeia é recusado e a mesma resolução
@@ -311,8 +335,10 @@ de compatibilidade**:
 
 - num agente alterado pelo v1, **o piso deixa de valer** e a `alternativa` da
   resolução **não descreve mais** o que foi materializado. A resolução ganha
-  `sobreposta_por: "agentes-json-v1"` e os valores finais, e o
-  `resolucao_id` é calculado sobre essa forma final;
+  `sobreposta_por: "agentes-json-v1"`, `materializado` com os valores finais e
+  `origem_alternativa: "agentes-json-v1"`, e o `resolucao_id` é calculado sobre
+  essa forma final. Como os valores finais estão fora da cadeia, o julgamento
+  da 10.2 compara o observado com `materializado`, não com a `cadeia`;
 - o `doctor` avisa quando o v1 põe um agente abaixo da classe declarada.
 
 Se o rebaixamento pelo v1 continua permitido é decisão humana (H9).
@@ -348,7 +374,7 @@ Se o rebaixamento pelo v1 continua permitido é decisão humana (H9).
 |---|---|---|
 | `init`/`update` | sintaxe e semântica do arquivo; classe de cada agente; ids; compatibilidade de `model`/`effort` com o manifesto; classe sem resolução num adaptador instalado (7.2, regra 4) | erro antes de qualquer escrita, como no `agentes.json` |
 | `init`/`update` | **não** verifica disponibilidade de modelo nem credencial: o ExpxDev não consegue fazer isso sem invadir o harness | — |
-| `doctor` | capacidades exigidas contra o manifesto (12); variáveis que sobrepõem o frontmatter; `fallbackModel` com modelo fora das cadeias declaradas; v1 abaixo da classe; agente instalado que diverge do lock | achado com a correção sugerida |
+| `doctor` | capacidades exigidas contra o manifesto (12); variáveis que sobrepõem o frontmatter **no ambiente em que o `doctor` roda**; `fallbackModel` **persistido** nos settings que ele consegue ler com modelo fora das cadeias declaradas (um `--fallback-model` de outra sessão não é diagnosticável: quem pega é a 10.2); v1 abaixo da classe; agente instalado que diverge do lock | achado com a correção sugerida |
 | abertura da tarefa (hook ou lembrete das skills) | se existe resolução elegível para o papel no harness em uso, inclusive a da tarefa elevada (8.1) | bloqueia antes da execução, com mensagem acionável |
 | fim do subagente (hook `PostToolUse` do `Agent` no Claude; equivalente onde o manifesto comprovar) | o executor observado contra a cadeia da resolução (10.2) e a árvore de trabalho (12) | registra no rastro; em papel de aprovação, invalida o veredito |
 
@@ -368,17 +394,28 @@ declarada tem duas funções:
 Detecção e julgamento:
 
 - no Claude, o hook `PostToolUse` do `Agent` lê `resolvedModel` e `modelsUsed`
-  (presente só quando houve troca no meio da execução) e compara cada modelo
-  usado com os `model` da `cadeia` da resolução;
-- todos na cadeia: o evento registra a `alternativa` usada e segue;
-- algum fora da cadeia: o evento registra `fora_da_politica: true`. Num papel
+  (este só existe quando houve troca no meio da execução) e monta a sequência
+  observada: `modelsUsed` quando existe, senão `[resolvedModel]`;
+- **correspondência**: o adaptador define quando um modelo observado
+  corresponde a uma alternativa. No Claude, um ID completo corresponde a uma
+  alternativa com o mesmo ID ou com o alias da família contida nele (`opus`,
+  `sonnet`, `haiku`). Quando o esforço também é observado (`effort.level`), ele
+  precisa ser igual ao da alternativa. Um modelo observado pode corresponder a
+  mais de uma alternativa: basta uma, porque todas estão autorizadas;
+- todos os modelos da sequência correspondem a alternativas da `cadeia` da
+  resolução gravada: o evento registra `modelos_observados` e segue;
+- algum não corresponde: o evento registra `fora_da_politica: true`. Num papel
   `revisar` ou `testar`, o veredito **não é aceito** e a tarefa fica bloqueada
   para nova execução decidida por humano; nos demais papéis, aviso;
-- subagente em segundo plano (`async_launched`) só traz o `resolvedModel` do
-  momento da ida para o segundo plano: a observação é parcial e o evento diz
-  isso;
-- num adaptador sem `observa_executor.model`, a troca não é detectável. O
-  manifesto expõe isso, e H8 decide se um papel de aprovação pode rodar ali.
+- **papel de aprovação exige observação completa**: um veredito de `revisar`
+  ou `testar` só é aceito com a execução observada do início ao fim (no Claude,
+  `Agent` em primeiro plano com status `completed`). Em segundo plano
+  (`async_launched`), a observação só alcança o lançamento, e o veredito **não é
+  aceito**. Esses papéis rodam em primeiro plano até existir telemetria de
+  conclusão para o segundo plano;
+- num adaptador sem `observa_executor.model`, a troca não é detectável. Pela
+  regra acima, a observação é incompleta e o papel de aprovação não se sustenta
+  ali (H8).
 
 Sempre:
 
@@ -402,17 +439,24 @@ Todas opcionais, depois das doze obrigatórias, como manda o contrato:
 |---|---|
 | `resolucao_id` | a resolução em vigor para aquele agente; endereça `.expx/resolucoes/<id>.json`, que nunca é apagado (9) |
 | `classe_declarada` | a classe que a skill declarou, ou a inferida |
+| `classe_resolvida` | a classe depois das elevações (8.1) |
 | `origem_classe` | `declarada`, `inferida`, `agente` ou `tarefa` (8.2) |
-| `alternativa` | o `id` da alternativa materializada ou, depois de um fallback aceito, o da alternativa usada |
-| `origem_alternativa` | `projeto`, `skill`, `embutida` ou `sessao` (8.2); `agentes-json-v1` quando a 8.3 se aplica |
+| `alternativa` | o `id` da alternativa materializada (a primeira da cadeia, ou a escolhida na sessão) |
+| `origem_alternativa` | `projeto`, `skill`, `embutida`, `sessao` ou `agentes-json-v1` (8.2, 8.3) |
+| `materializado` | só na exceção da 8.3: `{model, effort}` finais escritos pelo v1 |
+| `modelos_observados` | a sequência de modelos que o runtime informou para aquela execução (10.2), quando informou |
 | `fora_da_politica` | `true` quando o executor observado saiu da cadeia (10.2); ausente nos demais casos |
 | `harness` | já existe na SprintX e passa a ser gravada também pelo escritor comum, quando houver sinal |
 
-`classe_declarada`, `alternativa` e as origens vão **também** no evento, e não
-só no registro, para que o essencial sobreviva mesmo a um registro perdido.
+`classe_declarada`, `classe_resolvida`, `alternativa`, as origens e, na
+exceção da 8.3, `materializado` vão **também** no evento, e não só no registro,
+para que o essencial sobreviva mesmo a um registro perdido.
 
-`model` e `effort` continuam sendo **somente** o executor observado e ficam
-`null` quando o runtime não os expõe. Linhas antigas continuam válidas, e quem
+`model` e `effort` são **somente** o executor observado e ficam `null` quando o
+runtime não os expõe. **Nenhum escritor preenche esses campos com
+configuração**, nem com frontmatter, resolução ou alternativa. A intenção é
+alcançada pelo `resolucao_id` e pelos campos acima, e o leitor (o painel) é quem
+decide mostrá-la quando a observação falta. Linhas antigas continuam válidas, e quem
 valida segue verificando que as doze chaves estão contidas na linha.
 
 ### 11.2 O fallback atual do Claude grava resolução como observação
@@ -432,34 +476,40 @@ O Claude expõe mais do que o escritor usa hoje:
 - `model` da sessão principal: `PostModelSwitch` (`to_model`) e, nem sempre,
   `SessionStart`.
 
-Proposta (H10): o escritor passa a preferir essas observações, cada uma no
-evento em que existe. O fallback para o frontmatter só fica para os eventos sem
-observação disponível, e nesses o evento leva `resolucao_id`, para que o leitor
-saiba que o valor veio da resolução. Mudar o comportamento publicado na 0.12.2 é
-decisão humana.
+Proposta (H10): o escritor passa a usar essas observações, cada uma no evento
+em que existe, e **deixa de gravar o frontmatter em `model`/`effort`**. Sem
+observação, os dois ficam `null` e o evento leva `resolucao_id`. O fallback
+para a configuração instalada continua existindo **no leitor**, como o
+contrato de eventos já permite, e não no escritor. Isso muda o comportamento
+publicado na 0.12.2 (o escritor comum passa a gravar `null` onde hoje grava o
+frontmatter) e é decisão humana.
 
 ## 12. Separação de papéis e isolamento
 
-Um papel `revisar` ou `testar` exige três coisas:
+Um papel `revisar` ou `testar` exige:
 
 1. **identidade e sessão distintas** de quem implementou;
 2. **contexto independente**;
-3. **ausência de escrita no projeto**, comprovada por pelo menos um destes
-   meios:
-   - **estrutural**: `garante_revisao_sem_escrita: forte` no adaptador, com a
-     configuração materializada verificável. No Claude: `tools:` sem `Edit`,
-     `Write`, `NotebookEdit` e sem `Bash`. Hoje é o caso de `auditor-plano` e
-     `sprintx-revisor-testes`;
-   - **verificada a posteriori**: hook no início e no fim do subagente registra
-     o estado da árvore (`git status --porcelain` e o hash dos arquivos
-     rastreados e não ignorados). Qualquer diferença invalida o veredito. É o
-     meio para agentes que precisam de `Bash` para rodar testes ou comandos,
-     como `revisor-diff` e o `qa` e o `revisor-testes` da RunX. A revisão da
-     MergeX já lê um snapshot Git imutável (0.12.1), o que é a mesma ideia do
-     lado da entrada;
-   - **por sandbox da sessão**: só onde o harness não isola por agente (Codex) e
-     a sessão inteira roda somente leitura. Não serve para uma sessão que também
-     implementa.
+3. **observação completa** da execução (10.2);
+4. **impossibilidade de escrever no projeto**, em um destes níveis:
+
+| Nível | O que garante | Como se comprova |
+|---|---|---|
+| `estrutural` (forte) | o agente não tem nenhum meio de escrita | configuração materializada verificável no manifesto. No Claude: `tools:` sem `Edit`, `Write`, `NotebookEdit` e sem `Bash`. Hoje é o caso de `auditor-plano` e `sprintx-revisor-testes` |
+| `isolado` (forte para o projeto) | o agente pode escrever, mas só numa cópia descartável; nada do que ele faz alcança a árvore de trabalho | o agente roda numa worktree ou snapshot Git próprio, criado para ele e apagado depois. Arquivos ignorados que o comando precise (dependências instaladas, por exemplo) são preparados ali, nunca lidos da árvore de trabalho. A revisão da MergeX já lê um snapshot Git imutável (0.12.1) |
+| `integridade_final` (fraco) | só que o estado **final** da árvore é igual ao inicial | hook no início e no fim do subagente compara `git status --porcelain` e o hash dos arquivos rastreados. **Não prova ausência de escrita**: não pega editar e reverter, nem arquivo ignorado alterado que mude o resultado de um comando |
+
+Para aceitar o veredito, valem só `estrutural` e `isolado`. `integridade_final`
+é sempre registrado quando disponível, porque uma diferença final invalida o
+veredito em qualquer nível, mas sozinho não sustenta o papel (H8).
+
+Hoje `revisor-diff`, o `qa` e o `revisor-testes` da RunX têm `Bash`, então não
+são `estrutural`. Para eles o caminho é `isolado`, ou ficam sem sustentação
+estrutural até a decisão H8.
+
+No Codex, o subagente herda o sandbox da sessão principal. `estrutural` não
+existe ali, e `isolado` exige que a sessão inteira rode somente leitura ou numa
+cópia. Isso não serve para uma sessão que também implementa.
 
 "Modelo diferente" não é garantia de independência. Exigir modelo distinto é
 uma opção adicional do projeto (H4).
@@ -492,7 +542,8 @@ humano.
 | F0 | este desenho, revisado | expxdev |
 | F1 | `CONTRATO-expx-orquestracao.md` normativo, schema do `.expx/orquestracao.json`, tabela embutida e resolvedor puro com testes de propriedade, **sem** mudar a instalação | expxdev |
 | F2 | adaptador Claude: materialização a partir da resolução, registro `.expx/resolucoes/`, seção `orquestracao` do lock, achados do `doctor` e emenda à instalação | expxdev |
-| F3 | rastro: chaves da seção 11 no escritor comum, julgamento do executor observado (10.2) e verificação da árvore (12), e emenda aos eventos; depois, os escritores próprios da SprintX | expxdev; sprintx |
+| F3 | rastro: chaves da seção 11 no escritor comum, `model`/`effort` só observados, julgamento do executor (10.2), `integridade_final` (12) e emenda aos eventos; depois, os escritores próprios da SprintX | expxdev; sprintx |
+| F3b | `expx resolucao` (camadas 6 e 7, gravação atômica antes da invocação) e nível `isolado` para agentes de aprovação com `Bash` | expxdev; skills que abrem tarefa |
 | F4 | `classe:` (e papel) declarados nos agentes de cada skill; recertificação dos candidatos | forks AxisGov; expxdev |
 | F5 | painel: classe declarada, resolução e executor observado, com divergência destacada | expxdev |
 | F6 | adaptador OpenCode (agentes em `.opencode/agents/`) | expxdev |
@@ -517,9 +568,9 @@ servir de ponto de partida.
 | H5 | Teto de custo, orçamento, paralelismo e política após o limite de uso | fora do primeiro rollout; o limite de uso continua bloqueio |
 | H6 | Quais harnesses entram no primeiro rollout? | Claude (F1–F5); OpenCode e Codex depois, cada um com o manifesto reverificado |
 | H7 | Que campos da resolução são persistidos, e por quanto tempo? | registro `.expx/resolucoes/`: toda resolução materializada, nunca apagada automaticamente; lock: só o `resolucao_id` vigente; rastro: os campos da 11.1, com a mesma retenção do rastro |
-| H8 | Adaptador em que nenhum meio da seção 12 comprova a ausência de escrita, ou sem `observa_executor.model`: bloqueia o papel de aprovação, ou só avisa? | bloqueia o papel `revisar`/`testar` naquele adaptador; a verificação a posteriori da árvore basta como comprovação |
+| H8 | Agente de aprovação sem nível `estrutural` nem `isolado`, ou sem observação completa: bloqueia o veredito, ou só avisa? Inclui `revisor-diff` e `qa`/`revisor-testes` da RunX, que hoje têm `Bash` | bloquear o veredito; implementar o nível `isolado` antes de ativar o bloqueio, para não parar MergeX e RunX; até lá, aviso com `integridade_final` registrado |
 | H9 | `.expx/agentes.json` v1 continua podendo rebaixar abaixo da classe? | sim, por compatibilidade, com aviso no `doctor` e marca no rastro; reavaliar numa versão maior |
-| H10 | Mudar o fallback do rastro no Claude (seção 11.2)? | sim: preferir `$CLAUDE_EFFORT`/`effort.level`, `resolvedModel`/`modelsUsed` e `PostModelSwitch`; o frontmatter só onde não há observação, com `resolucao_id` |
+| H10 | Mudar o escritor do rastro no Claude (seção 11.2)? | sim: usar `$CLAUDE_EFFORT`/`effort.level`, `resolvedModel`/`modelsUsed` e `PostModelSwitch`; sem observação, `null` + `resolucao_id`; o fallback para a configuração fica só no leitor |
 | H11 | O ExpxDev deve escrever `fallbackModel` nos settings do projeto para alinhar o fallback nativo do Claude à política? | não: o setting é do usuário e vale para a sessão inteira; o `doctor` só avisa quando ele sai das cadeias declaradas |
 
 ## 16. Critérios de aceite deste desenho
@@ -537,3 +588,4 @@ servir de ponto de partida.
 | Rodada | Revisor | Resultado | O que mudou |
 |---|---|---|---|
 | 1 | Codex, 2026-10-24 | 5 bloqueantes e 3 não bloqueantes | registro imutável de resoluções (9); fallback nativo detectado e julgado, sem reinvocação (10.2); `origem_classe` separada de `origem_alternativa` (8.2, 11.1); `limita_ferramentas` separado de `garante_revisao_sem_escrita`, com verificação a posteriori da árvore (6, 12); tabela embutida normativa e ordem de escolha da cadeia (7.2); 11.2 com `resolvedModel`/`modelsUsed`/`PostModelSwitch`; H3 por agente; fases F6/F7; manifesto sem "provável" e com paralelismo por fonte. As afirmações novas do revisor foram conferidas nas fontes antes de entrar |
+| 2 | Codex, 2026-10-24 | 6 bloqueantes e 3 não bloqueantes | 7.3 com as regras 2–4 sem arquivo de política; escritor atômico das resoluções de invocação (`expx resolucao`), com bloqueio se não gravar (8.2); cadeia completa copiada na resolução, `modelos_observados` e correspondência por adaptador (8.2, 10.2); aprovação só com observação completa, sem `async_launched` (10.2); `model`/`effort` nunca preenchidos com configuração (11.1, 11.2, H10); níveis `estrutural`/`isolado`/`integridade_final`, com só os dois primeiros aceitando veredito (12, H8); `agentes-json-v1` no resolvedor, `classe_resolvida` e `materializado` inline; escopo do `doctor` em H11 |
