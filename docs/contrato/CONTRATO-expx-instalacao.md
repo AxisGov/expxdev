@@ -308,12 +308,30 @@ sem orquestração.
   `.expx/resolucoes/<resolucao_id>.json` com chaves ordenadas, indentação 2 e
   quebra final. Essa forma é só legibilidade: a identidade continua sendo o
   JSON canônico compacto do `resolucao_id`. O registro é gravado **antes** dos
-  agentes e do lock, por arquivo temporário e `rename`; um arquivo que já existe
-  com os mesmos bytes fica como está. O registro **não** entra em
+  agentes e do lock; um arquivo que já existe com os mesmos bytes fica como está. O registro **não** entra em
   `instalacao.arquivos`: não é artefato gerenciado, a limpeza nunca o alcança e
   ele nunca é apagado, nem quando a política sai.
 - **Lock.** A seção opcional `orquestracao` (seção 9) guarda as versões e o
   `resolucao_id` vigente por agente.
+- **Escrita do registro.** O temporário, de nome aleatório, nasce com `O_EXCL`
+  (e `O_NOFOLLOW` onde existe), recebe `fsync` e é publicado com `link`, nunca
+  com `rename`. O `link` falha se o final já existe, inclusive como link
+  simbólico. Então:
+  - **garantido:** o registro nunca é sobrescrito nem seguido. Um final
+    existente só é aceito se for arquivo regular com os mesmos bytes, lido sem
+    seguir link. Dois `init` simultâneos publicam o mesmo conteúdo, e o segundo
+    aceita o do primeiro;
+  - **mitigado:** `.expx` e `.expx/resolucoes` precisam ser diretórios de
+    verdade, sem link e dentro do projeto (`realpath` + `relative`). Isso é
+    conferido antes de criar o temporário e de novo antes de publicar, com o
+    mesmo (dev, ino). Uma troca que persiste até a revalidação aborta antes do
+    lock. O temporário de um diretório que mudou não é limpo: um órfão é
+    preferível a remover por um caminho talvez redirecionado;
+  - **não fechado:** o Node não tem `openat`/`linkat`. Uma troca de diretório
+    feita **e desfeita** entre a última revalidação e o `link` ou a limpeza não
+    é detectada. Ela exige escrita concorrente no projeto, que já permite editar
+    hooks. No Windows não há `O_NOFOLLOW`: a garantia forte é POSIX. Eliminar a
+    classe exige primitivas relativas a descritor de diretório.
 - **Identidade.** O nome do agente é o `name:` lido como YAML (como o Claude
   Code o lê), e é a chave da política, do override v1, do registro e do lock.
 - **Falhas antes de escrever** (seção 8): política inválida; `classe:` fora do
