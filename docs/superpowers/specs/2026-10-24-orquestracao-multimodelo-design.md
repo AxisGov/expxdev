@@ -4,7 +4,7 @@ Data: 2026-10-24. Repositórios: AxisGov/expxdev (contrato, resolvedor, instala�
 rastro e painel); AxisGov/sprintx, AxisGov/runx, AxisGov/mergex e demais forks
 (declaração de classe nos agentes).
 Estado de partida: expxdev `f0a9dfb` (v0.12.2).
-Estado: **desenho aprovado pelo Codex na revisão 5 (§17); aguarda as decisões do Flávio (§15). Nenhuma linha de
+Estado: **desenho aprovado pelo Codex na revisão 5 (§17); decisões H1–H11 tomadas pelo Flávio em 2026-10-24 (§15). Nenhuma linha de
 código, nenhuma mudança de contrato vigente e nenhuma mudança em skill entram
 com este documento.**
 
@@ -705,9 +705,10 @@ aparece no `doctor` e no rastro (`origem_classe: "inferida"`). Um ID `claude-*` 
 
 ## 15. Decisões do Flávio
 
-Nenhuma destas é fechada por este desenho. Cada uma traz a recomendação e a
-posição do Codex (consulta de 2026-10-24), para servir de ponto de partida. A
-coluna "Trava" diz em que fase a decisão precisa estar tomada.
+**Decididas pelo Flávio em 2026-10-24: as onze aprovadas como estão na coluna
+"Recomendação"**, com os ajustes do Codex já incorporados. A coluna "Trava"
+diz em que fase cada decisão passa a valer. Uma revisão futura de qualquer
+uma delas ganha uma linha nova aqui, citando a anterior, e não apaga esta.
 
 | # | Decisão | Recomendação | Codex | Trava |
 |---|---|---|---|---|
@@ -726,7 +727,7 @@ coluna "Trava" diz em que fase a decisão precisa estar tomada.
 ## 16. Critérios de aceite deste desenho
 
 - O Codex revisa e não deixa achado bloqueante em aberto.
-- O Flávio decide H1–H11, ou adia explicitamente cada uma.
+- O Flávio decide H1–H11, ou adia explicitamente cada uma. **Atendido em 2026-10-24: todas aprovadas.**
 - Toda capacidade do manifesto tem fonte e data, ou está marcada como não
   verificada.
 - O texto preserva as seis decisões herdadas da seção 3 e não contradiz
@@ -743,3 +744,4 @@ coluna "Trava" diz em que fase a decisão precisa estar tomada.
 | 4 | Codex, 2026-10-24 | 4 bloqueantes e 1 não bloqueante | hook de antes da chamada com `onFailure: "block"`, versão mínima v2.1.295 e exceção explícita ao fail-open (8.2); fechamento do envelope por `PostToolUse`, `PostToolUseFailure` e `PermissionDenied`, em ordem idempotente com a chave `invocacao`, e recuperação de envelope abandonado (8.2, 11.1); tarefa da invocação pelo `task_iniciada` aberto na mesma `sessao`, com ambiguidade negada (8.4); invocação só com alias e o mesmo `effort` do materializado (8.2); `agentes-json-v1` no enum da 8.2. Os eventos, `onFailure` e `session_id` foram conferidos na documentação do Claude Code |
 | 5 | Codex, 2026-10-24 | **aprovado** para PR; sem bloqueante de F1/F2 | `async_launched` condicional à prova da F3b (8.2); seis pré-requisitos verificáveis da F3b registrados na §14 |
 | 6 | CodeAnt no PR #91 e Codex, 2026-10-24 | 3 achados do CodeAnt procedentes; Codex concordou com as correções e com H1–H11, com ajustes | camada opt-in, inteiramente inativa sem política, preservando lock e agentes byte a byte (7.3, 8.2, 9); busca de sessão pela família `claude`/`claude-code` com comparação do `<id>` (8.4, pré-requisito 2); ajuste mínimo do leitor do painel na F3 (14); 8.3 e 8.4 em ordem; §15 com a posição do Codex e a fase que cada decisão trava |
+| — | Flávio, 2026-10-24 | decisão | H1–H11 aprovadas como recomendadas (§15) |
