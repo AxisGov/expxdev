@@ -10,13 +10,14 @@ import {
   openSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   rmdirSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir, userInfo } from "node:os";
-import { isAbsolute, join, parse, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 const TTL_EVENTO_MS = 24 * 60 * 60 * 1_000;
 const TTL_TRABALHO_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -34,23 +35,14 @@ function dentroDe(base, candidato) {
   return trecho === "" || (!trecho.startsWith(`..${sep}`) && trecho !== ".." && !isAbsolute(trecho));
 }
 
-function componentes(caminho) {
-  const absoluto = resolve(caminho);
-  const raiz = parse(absoluto).root;
-  const resto = absoluto.slice(raiz.length).split(/[\\/]+/).filter(Boolean);
-  const resultado = [];
-  let atual = raiz;
-  for (const parte of resto) {
+function semSymlink(base, caminho) {
+  const trecho = relative(resolve(base), resolve(caminho));
+  if (trecho === ".." || trecho.startsWith(`..${sep}`) || isAbsolute(trecho)) return false;
+  let atual = realpathSync(resolve(base));
+  for (const parte of trecho.split(/[\\/]+/).filter(Boolean)) {
     atual = join(atual, parte);
-    resultado.push(atual);
-  }
-  return resultado;
-}
-
-function semSymlink(caminho) {
-  for (const parte of componentes(caminho)) {
     try {
-      if (lstatSync(parte).isSymbolicLink()) return false;
+      if (lstatSync(atual).isSymbolicLink()) return false;
     } catch (erro) {
       if (erro?.code === "ENOENT") continue;
       return false;
@@ -59,11 +51,11 @@ function semSymlink(caminho) {
   return true;
 }
 
-function prepararDiretorio(caminho) {
+function prepararDiretorio(base, caminho) {
   try {
-    if (!isAbsolute(caminho) || !semSymlink(caminho)) return false;
+    if (!isAbsolute(caminho) || !semSymlink(base, caminho)) return false;
     mkdirSync(caminho, { recursive: true, mode: 0o700 });
-    if (!semSymlink(caminho) || !lstatSync(caminho).isDirectory()) return false;
+    if (!semSymlink(base, caminho) || !lstatSync(caminho).isDirectory()) return false;
     if (process.platform !== "win32") chmodSync(caminho, 0o700);
     return true;
   } catch {
@@ -86,7 +78,7 @@ export function selecionarRaizEstado(input = {}, opcoes = {}) {
   const scratchpad = typeof input?.scratchpad_dir === "string" ? input.scratchpad_dir : "";
   if (scratchpad && isAbsolute(scratchpad)) {
     const raizScratchpad = join(resolve(scratchpad), "expx", "lembrete-v1");
-    if (dentroDe(scratchpad, raizScratchpad) && prepararDiretorio(raizScratchpad)) return raizScratchpad;
+    if (dentroDe(scratchpad, raizScratchpad) && prepararDiretorio(scratchpad, raizScratchpad)) return raizScratchpad;
   }
 
   const principal = opcoes.principal ?? principalLocal();
@@ -95,7 +87,7 @@ export function selecionarRaizEstado(input = {}, opcoes = {}) {
   const seguro = String(principal).replace(/[^a-zA-Z0-9_-]/g, "");
   if (!seguro) return null;
   const raizTemporaria = join(resolve(temporario), `expx-${seguro}`, "lembrete-v1");
-  return dentroDe(temporario, raizTemporaria) && prepararDiretorio(raizTemporaria)
+  return dentroDe(temporario, raizTemporaria) && prepararDiretorio(temporario, raizTemporaria)
     ? raizTemporaria
     : null;
 }
@@ -120,7 +112,7 @@ function lockStaleSeguro(caminho, agora) {
 }
 
 export function comLock(raiz, acao, opcoes = {}) {
-  if (!prepararDiretorio(raiz)) return { adquirido: false };
+  if (!prepararDiretorio(raiz, raiz)) return { adquirido: false };
   const caminho = join(raiz, "lock");
   if (!dentroDe(raiz, caminho)) return { adquirido: false };
   const inicio = typeof opcoes.agora === "function" ? opcoes.agora() : Date.now();
@@ -236,7 +228,7 @@ function removerTemporariosStale(raiz, agora) {
 }
 
 export function gravarEstadoAtomico(raiz, estado, opcoes = {}) {
-  if (!prepararDiretorio(raiz)) return false;
+  if (!prepararDiretorio(raiz, raiz)) return false;
   const destino = join(raiz, "estado.json");
   try {
     const atual = lstatSync(destino);

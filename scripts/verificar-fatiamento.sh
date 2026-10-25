@@ -141,6 +141,15 @@ revisavel() {
 # Escreve "linhas bytes" com a mesma decodificacao UTF-8 da CLI.
 medir_arquivo() {
   local arquivo="$1" bytes linhas
+  local bytes_brutos
+  bytes_brutos="$(wc -c < "$arquivo")" || return 2
+  # Acima do proprio limite L2 ja ha violacao certa. Nao copie nem carregue o
+  # blob inteiro para substituir UTF-8 invalido: isso limita memoria e disco.
+  if [ "$bytes_brutos" -gt "$MAX_BYTES" ]; then
+    linhas="$(wc -l < "$arquivo")" || return 2
+    printf '%d %d\n' "$((linhas + 1))" "$bytes_brutos"
+    return 0
+  fi
   command -v iconv >/dev/null 2>&1 || { echo "iconv ausente: nao foi possivel medir $novo" >&2; return 2; }
   if iconv -f UTF-8 -t UTF-8 < "$arquivo" > "$decodificado" 2>/dev/null; then
     bytes="$(wc -c < "$decodificado")" || return 2

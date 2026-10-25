@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { avaliarGateIncremental, codigoSaidaDoGate } from "../../scripts/benchmark-expx-lembrete.mjs";
 // @ts-expect-error O motor ESM e distribuido ao lado do wrapper shell.
 import { main } from "../../nucleo/hooks/expx-lembrete.mjs";
+import { suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
 
 const HOOK = resolve("nucleo/hooks/expx-lembrete.sh");
 const GIT_BASH = "C:/Program Files/Git/bin/bash.exe";
@@ -471,5 +472,40 @@ describe("veredito do benchmark dedicado", () => {
   it("retorna exit não zero quando o gate reprova sem repetir a medição", () => {
     expect(codigoSaidaDoGate({ passed: true })).toBe(0);
     expect(codigoSaidaDoGate({ passed: false })).toBe(1);
+  });
+});
+
+describe("correções P1 do Login", () => {
+  it("o fallback em bash normaliza maiúscula acentuada também em LC_ALL=C", () => {
+    // Com Node compatível quem classifica é o motor .mjs; o fallback shell só roda sem ele (caso 18).
+    const projeto = criarProjeto();
+    const falso = pathComNodeIncompativel();
+    const ambiente = { PATH: falso.path, EXPX_NODE_MARCADOR: falso.marcador, LC_ALL: "C", LANG: "C" };
+    expect(executarHook(projeto, evento(projeto, { prompt: "O CÁLCULO NÃO FUNCIONA NA TELA" }), ambiente)).toContain("runx");
+    expect(existsSync(falso.marcador)).toBe(true);
+  });
+
+  it.skipIf(!suportaSymlinkDeDiretorio())("aceita a base confiável atrás de um link sem liberar link dentro dela", async () => {
+    const estado = await import("../../nucleo/hooks/expx-lembrete-estado.mjs");
+    const dir = mkdtempSync(join(tmpdir(), "expx-estado-link-"));
+    temporarios.push(dir);
+    const real = join(dir, "real");
+    const link = join(dir, "link");
+    mkdirSync(real);
+    symlinkSync(real, link, process.platform === "win32" ? "junction" : "dir");
+    const raiz = estado.selecionarRaizEstado({ scratchpad_dir: link }, { principal: "" });
+    expect(raiz).toBe(join(link, "expx", "lembrete-v1"));
+    expect(estado.comLock(raiz, () => "ok")).toEqual({ adquirido: true, valor: "ok" });
+    expect(estado.gravarEstadoAtomico(raiz, { versao: 1, eventos: [], trabalhos: [] })).toBe(true);
+
+    // um link DENTRO da base continua recusado: o alvo fica intacto
+    const outra = mkdtempSync(join(tmpdir(), "expx-estado-base-"));
+    temporarios.push(outra);
+    const alvo = mkdtempSync(join(tmpdir(), "expx-estado-alvo-"));
+    temporarios.push(alvo);
+    symlinkSync(alvo, join(outra, "expx"), process.platform === "win32" ? "junction" : "dir");
+    const recusada = estado.selecionarRaizEstado({ scratchpad_dir: outra }, { principal: "" });
+    expect(recusada).not.toBe(join(outra, "expx", "lembrete-v1"));
+    expect(readdirSync(alvo)).toEqual([]);
   });
 });

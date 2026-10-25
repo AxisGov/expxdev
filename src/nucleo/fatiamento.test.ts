@@ -317,6 +317,22 @@ describe("verificar-fatiamento.sh — limites fixos L2 e L3", () => {
     expect(semNode.stdout).toContain("VIOLACAO L2: -n.md tem 1 linhas e 204801 bytes");
   });
 
+  it("arquivo acima de L2 em bytes brutos reprova sem decodificar o blob inteiro (correção P1 do Login)", () => {
+    // UTF-8 inválido vira U+FFFD (3 bytes), então o decodificado nunca é menor que o bruto: acima de
+    // 204.800 bytes brutos a violação é certa, e o node (que carregaria o blob) nem precisa rodar.
+    const d = repo();
+    git(d, "switch", "-q", "-c", "feature");
+    escreve(d, "grande.bin.md", Buffer.alloc(204801, 0xff));
+    commita(d, "invalido grande");
+    const bin = join(d, ".bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "node"), "#!/usr/bin/env bash\nexit 1\n", { mode: 0o755 });
+    const r = spawnSync(BASH, ["-c", 'PATH="$(cd "$1" && pwd):$PATH" exec bash "$2" main HEAD', "_", bin, SCRIPT],
+      { cwd: d, encoding: "utf8", env: ambiente() });
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(1);
+    expect(r.stdout).toContain("VIOLACAO L2: grande.bin.md tem 1 linhas e 204801 bytes");
+  });
+
   it("falha do git e uso incorreto saem 2", () => {
     expect(spawnSync(BASH, [SCRIPT], { encoding: "utf8", env: ambiente() }).status).toBe(2);
     const d = repo();
