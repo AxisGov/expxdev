@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { correspondeClaude, familiaClaude } from "./adaptadores.js";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { gravarNoRegistro, lerAgenteDaSkill, lerRegistro, reescreverModeloEsforco, serializarRegistro } from "./materializar.js";
+import { lerAgenteDaSkill, lerRegistro, reescreverModeloEsforco, serializarRegistro } from "./materializar.js";
 import { conferirResolucaoId, resolucaoId, resolver } from "./resolver.js";
 
 /** CONTRATO-expx-orquestracao §9 e CONTRATO-expx-instalacao §5.3 (F2). */
@@ -79,20 +76,6 @@ describe("registro", () => {
     expect(conferirResolucaoId(forjado)).toBe(true);
     const r = lerRegistro(forjado.resolucao_id, serializarRegistro(forjado as never));
     expect(r.ok).toBe(false);
-  });
-
-  it("gravarNoRegistro escreve o ausente, aceita o idêntico e recusa bytes diferentes", () => {
-    const raiz = mkdtempSync(join(tmpdir(), "expx-reg-"));
-    try {
-      gravarNoRegistro(raiz, resolucao);
-      const arquivo = join(raiz, ".expx/resolucoes", `${resolucao.resolucao_id}.json`);
-      expect(readFileSync(arquivo, "utf8")).toBe(serializarRegistro(resolucao));
-      gravarNoRegistro(raiz, resolucao);
-      writeFileSync(arquivo, "{}");
-      expect(() => gravarNoRegistro(raiz, resolucao)).toThrow(/imutavel/);
-    } finally {
-      rmSync(raiz, { recursive: true, force: true });
-    }
   });
 
   it("lerRegistro aceita só a forma canônica legível de um id conferível", () => {

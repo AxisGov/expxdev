@@ -1,8 +1,6 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename } from "node:path";
 import { z } from "zod";
 import { lerFrontmatter } from "../parser/leitura/frontmatter.js";
-import { escreverArquivoAtomico } from "../plugin/atomico.js";
 import { conferirResolucaoId, type AgenteDaSkill, type Resolucao } from "./resolver.js";
 import { ADAPTADORES, CLASSES, type Classe } from "./tipos.js";
 
@@ -141,42 +139,4 @@ export function lerRegistro(id: string, texto: string): LeituraRegistro {
   if (r.resolucao_id !== id) return { ok: false, erro: `o arquivo se chama ${id}, mas o conteúdo é de ${r.resolucao_id}` };
   if (serializarRegistro(r) !== texto) return { ok: false, erro: "os bytes não estão na forma canônica legível" };
   return { ok: true, resolucao: r };
-}
-
-/**
- * Erros que impedem gravar o registro sem sair do projeto: `.expx` ou
- * `.expx/resolucoes` como link simbólico levariam a escrita para outro lugar,
- * e um arquivo do registro que é link não é um registro.
- */
-export function destinoDoRegistroInseguro(raiz: string, ids: readonly string[]): string[] {
-  const erros: string[] = [];
-  for (const rel of [".expx", DIR_REGISTRO, ...ids.map(caminhoDoRegistro)]) {
-    try {
-      if (lstatSync(join(raiz, ...rel.split("/"))).isSymbolicLink()) erros.push(`${rel} e um link simbolico; o registro de resolucoes nao sai do projeto (nada foi escrito)`);
-    } catch {
-      // ausente: será criado
-    }
-  }
-  return erros;
-}
-
-/**
- * Grava uma resolução no registro. Ausente: escreve (temporário + rename).
- * Presente com os mesmos bytes: nada a fazer. Presente com outros bytes, ou
- * link simbólico: o registro é imutável e a gravação FALHA — mesmo que o
- * arquivo tenha aparecido depois do planejamento.
- */
-export function gravarNoRegistro(raiz: string, r: Resolucao): void {
-  const inseguro = destinoDoRegistroInseguro(raiz, [r.resolucao_id]);
-  if (inseguro.length > 0) throw new Error(inseguro.join("; "));
-  const caminho = join(raiz, ...caminhoDoRegistro(r.resolucao_id).split("/"));
-  const texto = serializarRegistro(r);
-  if (existsSync(caminho)) {
-    if (readFileSync(caminho, "utf8") !== texto) {
-      throw new Error(`${caminhoDoRegistro(r.resolucao_id)} mudou depois do planejamento; o registro de resolucoes e imutavel`);
-    }
-    return;
-  }
-  mkdirSync(join(raiz, ...DIR_REGISTRO.split("/")), { recursive: true });
-  escreverArquivoAtomico(caminho, texto);
 }
