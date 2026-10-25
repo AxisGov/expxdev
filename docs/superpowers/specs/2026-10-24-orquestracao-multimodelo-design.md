@@ -229,8 +229,8 @@ O ExpxDev traz uma tabela por adaptador, com versão própria
 OpenCode e Codex **não** têm entradas embutidas. Escolher provedor e modelo por
 eles seria adivinhar uma credencial que o ExpxDev não conhece.
 
-Ordem de escolha da cadeia, por agente, adaptador e classe resolvida `<c>`.
-A primeira regra que se aplica decide:
+Ordem de escolha da cadeia, por agente, adaptador e classe resolvida `<c>`,
+**com a camada ativa** (7.3). A primeira regra que se aplica decide:
 
 1. o projeto declara `adaptadores.<a>.classes.<c>`: essa cadeia **substitui**
    inteira qualquer outra (não há mescla de listas). `origem_alternativa:
@@ -251,17 +251,30 @@ elevada (pelo projeto ou pela tarefa) e o projeto não disse com o quê.
 Mudar a tabela embutida é mudar a versão do resolvedor, e com ela todo
 `resolucao_id`.
 
-### 7.3 Sem arquivo de política
+### 7.3 Sem arquivo de política: camada inativa
 
-Sem `.expx/orquestracao.json`, as regras 2 a 4 continuam valendo; só a regra 1
-deixa de existir. Na instalação nada é elevado (a camada 5 vive no arquivo),
-então todo agente cai na regra 2. O `init` **não reescreve** o agente: a cópia
-continua sendo o frontmatter da skill, mais o `agentes.json` v1, e a instalação
-sai byte a byte igual à de hoje.
+A orquestração é **opt-in**. Sem `.expx/orquestracao.json`, a camada fica
+**inteiramente inativa**:
 
-Na invocação, uma tarefa elevada (camada 6) sem arquivo de política resolve
-pela regra 3 onde houver tabela embutida (hoje, só o Claude) e pela regra 4
-(sem resolução, bloqueio) nos demais adaptadores.
+- nenhuma resolução é calculada para materializar nem gravada em
+  `.expx/resolucoes/`;
+- o lock não ganha a seção `orquestracao`;
+- nenhum agente é reescrito além do que o `agentes.json` v1 já faz;
+- os hooks de resolução e de invocação (8.2) não são instalados, e por isso
+  não há camadas 6 e 7.
+
+Os arquivos de agente e o lock saem **byte a byte iguais aos de hoje**. Um
+projeto que confere hashes do lock não muda sem pedir.
+
+Os hooks de rastro que já existem continuam independentes da camada. A
+semântica do H10 (`model`/`effort` só observados, `null` sem observação) vale
+com ou sem política. Sem política, o evento não leva `resolucao_id`, e o leitor
+aplica o fallback que o contrato de eventos já permite (configuração instalada,
+só em contexto Claude).
+
+Um projeto que **removeu** a política volta a esse regime no próximo `init`. As
+resoluções já gravadas não são apagadas (H7): deixam de ser referenciadas pelo
+lock, mas continuam endereçáveis pelos eventos antigos.
 
 ## 8. Precedência e resolução
 
@@ -325,7 +338,7 @@ Quem grava a resolução, e como ela chega ao julgamento:
   inofensivas por serem endereçadas pelo conteúdo, e o próximo `init` as
   reaproveita;
 - **na invocação** (toda chamada de agente gerenciado, com ou sem camadas 6 e
-  7): no Claude, a sequência abaixo. A seção 8.4 diz de onde vem a tarefa.
+  7, **só com a camada ativa**; 7.3): no Claude, a sequência abaixo. A seção 8.4 diz de onde vem a tarefa.
 
   1. **Antes da chamada**: o hook `PreToolUse` do `Agent` (matcher restrito ao
      `Agent`) chama `expx resolucao` com o `subagent_type`, o `session_id` do
@@ -376,33 +389,6 @@ Quem grava a resolução, e como ela chega ao julgamento:
   identificador de invocação comum não tem as camadas 6 e 7 nem o julgamento
   da 10.2. O manifesto expõe isso (`vincula_invocacao`).
 
-### 8.4 De onde vem a tarefa da invocação
-
-O input do `Agent` não traz a tarefa, e o texto que o modelo escreve no
-`prompt` não é fonte confiável. A fonte autoritativa é o rastro: o evento
-`task_iniciada`, gravado pelo escritor da skill **antes** de qualquer chamada de
-agente daquela tarefa, já carrega `sessao` (`<harness>@<id>`, derivada do
-harness e nunca preenchida por quem chama, como diz o contrato de eventos).
-
-O `expx resolucao` procura as tarefas **abertas** na sessão do hook: com
-`task_iniciada` e sem `task_concluida` nem `task_bloqueada`, e cuja `sessao` é
-`claude@<session_id>`.
-
-- nenhuma tarefa aberta: não há camada 6, e vale a resolução da instalação;
-- exatamente uma: é a tarefa da invocação;
-- mais de uma: se nenhuma delas eleva a classe daquele agente, não há
-  ambiguidade e vale a resolução sem camada 6; se alguma eleva, a escolha é
-  ambígua e **a chamada é negada**, com mensagem dizendo quais tarefas estão
-  abertas.
-
-Pré-requisito verificado na F3b: o `<id>` que o escritor da SprintX grava em
-`sessao` precisa ser o `session_id` que o Claude passa aos hooks. Se não for, a
-camada 6 fica indisponível até o escritor ser alinhado.
-
-O resolvedor vive no ExpxDev, em TypeScript, com testes de propriedade:
-determinismo, nunca rebaixa, id fora da cadeia é recusado e a mesma resolução
-dá o mesmo id.
-
 ### 8.3 Convivência com `.expx/agentes.json` v1
 
 O v1 **não é generalizado**: continua sendo um override de agentes Claude,
@@ -422,6 +408,37 @@ de compatibilidade**:
 
 Se o rebaixamento pelo v1 continua permitido é decisão humana (H9).
 
+### 8.4 De onde vem a tarefa da invocação
+
+O input do `Agent` não traz a tarefa, e o texto que o modelo escreve no
+`prompt` não é fonte confiável. A fonte autoritativa é o rastro: o evento
+`task_iniciada`, gravado pelo escritor da skill **antes** de qualquer chamada de
+agente daquela tarefa, já carrega `sessao` (`<harness>@<id>`, derivada do
+harness e nunca preenchida por quem chama, como diz o contrato de eventos).
+
+O `expx resolucao` procura as tarefas **abertas** na sessão do hook: com
+`task_iniciada` e sem `task_concluida` nem `task_bloqueada`, e cuja `sessao`
+tem exatamente a forma `<prefixo>@<id>`, com `<prefixo>` na família Claude
+(`claude` ou `claude-code`, o mesmo conjunto que o escritor comum trata como
+contexto Claude; a SprintX grava `claude-code@<id>`) e `<id>` **igual** ao
+`session_id` do hook. A comparação é por campo, não por busca textual, e um
+prefixo fora da família não casa.
+
+- nenhuma tarefa aberta: não há camada 6, e vale a resolução da instalação;
+- exatamente uma: é a tarefa da invocação;
+- mais de uma: se nenhuma delas eleva a classe daquele agente, não há
+  ambiguidade e vale a resolução sem camada 6; se alguma eleva, a escolha é
+  ambígua e **a chamada é negada**, com mensagem dizendo quais tarefas estão
+  abertas.
+
+Pré-requisito verificado na F3b: o `<id>` que o escritor da SprintX grava em
+`sessao` precisa ser o `session_id` que o Claude passa aos hooks. Se não for, a
+camada 6 fica indisponível até o escritor ser alinhado.
+
+O resolvedor vive no ExpxDev, em TypeScript, com testes de propriedade:
+determinismo, nunca rebaixa, id fora da cadeia é recusado e a mesma resolução
+dá o mesmo id.
+
 ## 9. Materialização, lock e registro de resoluções
 
 - **Claude:** como hoje: o frontmatter da cópia em `.claude/agents/` sai com o
@@ -432,13 +449,16 @@ Se o rebaixamento pelo v1 continua permitido é decisão humana (H9).
   versão instalada antes de implementar (no Codex há campos obrigatórios
   próprios, como `developer_instructions`). Entram só nas fases F6 e F7, e só se
   a decisão de rollout (H6) incluir esses harnesses.
-- **Registro de resoluções:** cada resolução materializada é gravada em
+- **Só com a camada ativa** (7.3). Sem política, nada desta seção é escrito.
+- **Registro de resoluções:** cada resolução **efetivamente gravada**, na
+  instalação ou na invocação (8.2), fica em
   `.expx/resolucoes/<resolucao_id>.json`, com o JSON canônico da 8.2. O arquivo é
   **imutável e endereçado pelo conteúdo**: o `init`/`update` cria os novos e
   **nunca apaga nem reescreve** os existentes. É o que permite a um evento
   antigo, depois de um `update`, continuar apontando para o objeto que o
   descreve. O diretório é versionado no projeto. A retenção é decisão humana
-  (H7); a proposta é nunca apagar automaticamente.
+  (H7); a proposta é nunca apagar automaticamente, nem quando a política é
+  removida.
 - **Lock:** uma seção nova e opcional, `orquestracao`, guarda a versão do
   resolvedor e da tabela embutida e, por agente e adaptador, o `resolucao_id`
   **vigente**, além dos hashes dos arquivos materializados, que já existem. Nunca
@@ -634,12 +654,23 @@ humano.
 | F0 | este desenho, revisado | expxdev |
 | F1 | `CONTRATO-expx-orquestracao.md` normativo, schema do `.expx/orquestracao.json`, tabela embutida e resolvedor puro com testes de propriedade, **sem** mudar a instalação | expxdev |
 | F2 | adaptador Claude: materialização a partir da resolução, registro `.expx/resolucoes/`, seção `orquestracao` do lock, achados do `doctor` e emenda à instalação | expxdev |
-| F3 | rastro: chaves da seção 11 no escritor comum, `model`/`effort` só observados, `integridade_final` (12) e emenda aos eventos; depois, os escritores próprios da SprintX. O julgamento da 10.2 depende do envelope e entra na F3b | expxdev; sprintx |
+| F3 | rastro: chaves da seção 11 no escritor comum, `model`/`effort` só observados, `integridade_final` (12) e emenda aos eventos, **junto com o ajuste mínimo do leitor do painel** (abaixo); depois, os escritores próprios da SprintX. O julgamento da 10.2 depende do envelope e entra na F3b | expxdev; sprintx |
 | F3b | `expx resolucao`, hooks `PreToolUse`/`PostToolUse` do `Agent` com envelope por `tool_use_id` (8.2), nível `isolado` com confinamento certificado no Claude e passagem do regime de transição para vigente (12) | expxdev; skills que abrem tarefa |
 | F4 | `classe:` (e papel) declarados nos agentes de cada skill; recertificação dos candidatos | forks AxisGov; expxdev |
 | F5 | painel: classe declarada, resolução e executor observado, com divergência destacada | expxdev |
 | F6 | adaptador OpenCode (agentes em `.opencode/agents/`) | expxdev |
 | F7 | adaptador Codex (agentes em `.codex/agents/`) | expxdev |
+
+Ajuste mínimo do leitor do painel na F3, no mesmo PR da mudança do escritor
+(H10) ou antes dele, para o painel não perder legibilidade na transição:
+
+- `model`/`effort` nulos e `resolucao_id` com registro legível: mostra a
+  resolução, rotulada "configuração (não observada)";
+- sem `resolucao_id`: mantém o fallback de hoje;
+- `resolucao_id` sem registro legível: sinaliza inconsistência, sem inventar
+  configuração.
+
+A F5 continua sendo a visão completa (declarada × resolvida × observada).
 
 Pré-requisitos verificáveis da F3b, cada um com teste antes da ativação
 (levantados na revisão 5 do Codex):
@@ -648,7 +679,8 @@ Pré-requisitos verificáveis da F3b, cada um com teste antes da ativação
    `tool_use_id`. Se não for, o envelope fica para recuperação e veredito de
    aprovação nunca é aceito.
 2. **Sessão e tarefa**: provar ponta a ponta que o `session_id` do hook
-   coincide com o gravado pela SprintX em `sessao`, inclusive em subagente
+   coincide com o `<id>` gravado pela SprintX em `sessao`, com os prefixos
+   `claude` e `claude-code`, inclusive em subagente
    aninhado e em segundo plano; testar zero, uma e várias tarefas abertas
    (8.4).
 3. **Eventos terminais**: testar sucesso, falha (`PostToolUseFailure`),
@@ -673,22 +705,23 @@ aparece no `doctor` e no rastro (`origem_classe: "inferida"`). Um ID `claude-*` 
 
 ## 15. Decisões do Flávio
 
-Nenhuma destas é fechada por este desenho. Cada uma traz a recomendação, para
-servir de ponto de partida.
+Nenhuma destas é fechada por este desenho. Cada uma traz a recomendação e a
+posição do Codex (consulta de 2026-10-24), para servir de ponto de partida. A
+coluna "Trava" diz em que fase a decisão precisa estar tomada.
 
-| # | Decisão | Recomendação |
-|---|---|---|
-| H1 | Existe configuração global do usuário? Com que papel? | sim, mas só declarando adaptadores e provedores disponíveis na máquina, nunca política. Pode ficar para depois da F2 |
-| H2 | Quem pode elevar para `profundo_excepcional`? Exige aprovação humana? | justificativa registrada basta no projeto e na tarefa; elevação por sessão não é permitida |
-| H3 | **Conflito existente:** `auditor-plano`, `sprintx-revisor-testes` e `revisor-diff` (papéis `revisar`/`testar`) e `analista-de-conflito` (papel `investigar`) declaram `opus`/`high`, que pela tabela inversa é `profundo_excepcional`, classe que a RunX diz exigir justificativa | a classe que a skill **declara** para o agente não é elevação e não pede justificativa; a justificativa vale só para elevações acima do declarado (camadas 5 e 6). A decisão é por agente, conforme o papel e a classe que cada skill declarar na F4 |
-| H4 | Revisão exige modelo distinto do implementador, ou só isolamento estrutural? | só isolamento estrutural como obrigação; modelo distinto como opção do projeto |
-| H5 | Teto de custo, orçamento, paralelismo e política após o limite de uso | fora do primeiro rollout; o limite de uso continua bloqueio |
-| H6 | Quais harnesses entram no primeiro rollout? | Claude (F1–F5); OpenCode e Codex depois, cada um com o manifesto reverificado |
-| H7 | Que campos da resolução são persistidos, e por quanto tempo? | registro `.expx/resolucoes/`: toda resolução materializada, nunca apagada automaticamente; lock: só o `resolucao_id` vigente; rastro: os campos da 11.1, com a mesma retenção do rastro |
-| H8 | Confirmar o regime de ativação da seção 12 para agentes de aprovação sem nível `estrutural` (hoje `revisor-diff` e `qa`/`revisor-testes` da RunX, que têm `Bash`), e o que fazer com observação incompleta | aprovar o regime: transição com aviso até a F3b certificar `isolado` no adaptador, rejeição obrigatória depois; observação incompleta rejeita desde já, porque não depende de implementação nova |
-| H9 | `.expx/agentes.json` v1 continua podendo rebaixar abaixo da classe? | sim, por compatibilidade, com aviso no `doctor` e marca no rastro; reavaliar numa versão maior |
-| H10 | Mudar o escritor do rastro no Claude (seção 11.2)? | sim: usar `$CLAUDE_EFFORT`/`effort.level`, `resolvedModel`/`modelsUsed` e `PostModelSwitch`; sem observação, `null` + `resolucao_id`; o fallback para a configuração fica só no leitor |
-| H11 | O ExpxDev deve escrever `fallbackModel` nos settings do projeto para alinhar o fallback nativo do Claude à política? | não: o setting é do usuário e vale para a sessão inteira; o `doctor` só avisa quando ele sai das cadeias declaradas |
+| # | Decisão | Recomendação | Codex | Trava |
+|---|---|---|---|---|
+| H1 | Existe configuração global do usuário? Com que papel? | sim, mas só declarando adaptadores e provedores disponíveis na máquina, nunca política; sozinha, não ativa a camada (7.3) | concorda | depois da F2 |
+| H2 | Quem pode elevar para `profundo_excepcional`? Exige aprovação humana? | justificativa registrada **e não vazia** basta no projeto e na tarefa; a sessão nunca eleva classe | concorda, com a validação da justificativa | F1 |
+| H3 | **Conflito existente:** `auditor-plano`, `sprintx-revisor-testes` e `revisor-diff` (papéis `revisar`/`testar`) e `analista-de-conflito` (papel `investigar`) declaram `opus`/`high`, que pela tabela inversa é `profundo_excepcional`, classe que a RunX diz exigir justificativa | a classe que a skill **declara** é o piso do papel, não uma elevação, e não pede justificativa; a justificativa vale só acima do declarado (camadas 5 e 6). A regra abstrata entra na F1; a classe concreta de cada agente, na F4 | concorda | F1 (regra), F4 (por agente) |
+| H4 | Revisão exige modelo distinto do implementador? | não: modelo distinto é opção do projeto. Continuam obrigatórios identidade e sessão distintas, contexto independente, observação completa e nível `estrutural` ou `isolado` (12) | concorda, com essa precisão | F1 |
+| H5 | Teto de custo, orçamento, paralelismo e política após o limite de uso | fora do primeiro rollout; o rollout só preserva os limites operacionais seguros que já existem; `usage_limit_reached` continua bloqueio | concorda, com esse limite | não trava a F1 |
+| H6 | Quais harnesses entram no primeiro rollout? | Claude (F1–F5); OpenCode e Codex só na F6/F7, com o manifesto reverificado. A F1 deixa o contrato extensível, mas não alega suporte operacional aos demais | concorda | F1 |
+| H7 | Que campos da resolução são persistidos, e por quanto tempo? | registro `.expx/resolucoes/`: toda resolução **efetivamente gravada** (instalação e invocação), nunca apagada automaticamente; lock: só o `resolucao_id` vigente; rastro: os campos da 11.1, com a retenção do rastro | concorda, com a troca de "materializada" por "efetivamente gravada" | F1 (contrato), F2 (implementação) |
+| H8 | Confirmar o regime de ativação da seção 12 para agentes de aprovação sem nível `estrutural` (hoje `revisor-diff` e `qa`/`revisor-testes` da RunX, que têm `Bash`), e o que fazer com observação incompleta | aprovar o regime: transição com aviso até a F3b certificar `isolado` no adaptador, rejeição obrigatória depois; observação incompleta rejeita desde já | concorda | F1 (contrato), F3b (ativação forte) |
+| H9 | `.expx/agentes.json` v1 continua podendo rebaixar abaixo da classe? | sim, por compatibilidade, com aviso no `doctor` e marca no rastro, e com **meta explícita de remoção ou revisão na próxima versão maior**, porque é uma exceção que permite sair da política | concorda, com a meta explícita | F1/F2 |
+| H10 | Mudar o escritor do rastro no Claude (seção 11.2)? | sim: `model`/`effort` só com observação (`$CLAUDE_EFFORT`/`effort.level`, `resolvedModel`/`modelsUsed`, `PostModelSwitch`), `null` sem ela; a configuração fica na resolução e no leitor. Entra na F3, com o ajuste do painel (14) | concorda | F3 |
+| H11 | O ExpxDev deve escrever `fallbackModel` nos settings do projeto? | não: o setting é do usuário, vale para a sessão inteira e não tem granularidade por agente; o `doctor` só diagnostica o que estiver persistido em settings que ele consiga ler | concorda | F2 |
 
 ## 16. Critérios de aceite deste desenho
 
@@ -709,3 +742,4 @@ servir de ponto de partida.
 | 3 | Codex, 2026-10-24 | 5 bloqueantes e 2 não bloqueantes | `resolucao_id` calculado sem o próprio campo (8.2); envelope da invocação por `tool_use_id` entre `PreToolUse` e `PostToolUse` do `Agent`, com negação se a gravação falhar, e o limite de `effort` na invocação do Claude (8.2, manifesto `vincula_invocacao`); registro gravado antes dos agentes e do lock, com órfãs recuperáveis, sem alegar transação que o contrato de instalação não tem (8.2); `isolado` exige confinamento efetivo do processo (12); regime de transição e vigente por adaptador (12, H8, F3/F3b); camada 7 citando a cadeia da resolução; correspondência também contra `materializado`. Os campos `tool_use_id`, `updatedInput` e o input do `Agent` foram conferidos na documentação do Claude Code |
 | 4 | Codex, 2026-10-24 | 4 bloqueantes e 1 não bloqueante | hook de antes da chamada com `onFailure: "block"`, versão mínima v2.1.295 e exceção explícita ao fail-open (8.2); fechamento do envelope por `PostToolUse`, `PostToolUseFailure` e `PermissionDenied`, em ordem idempotente com a chave `invocacao`, e recuperação de envelope abandonado (8.2, 11.1); tarefa da invocação pelo `task_iniciada` aberto na mesma `sessao`, com ambiguidade negada (8.4); invocação só com alias e o mesmo `effort` do materializado (8.2); `agentes-json-v1` no enum da 8.2. Os eventos, `onFailure` e `session_id` foram conferidos na documentação do Claude Code |
 | 5 | Codex, 2026-10-24 | **aprovado** para PR; sem bloqueante de F1/F2 | `async_launched` condicional à prova da F3b (8.2); seis pré-requisitos verificáveis da F3b registrados na §14 |
+| 6 | CodeAnt no PR #91 e Codex, 2026-10-24 | 3 achados do CodeAnt procedentes; Codex concordou com as correções e com H1–H11, com ajustes | camada opt-in, inteiramente inativa sem política, preservando lock e agentes byte a byte (7.3, 8.2, 9); busca de sessão pela família `claude`/`claude-code` com comparação do `<id>` (8.4, pré-requisito 2); ajuste mínimo do leitor do painel na F3 (14); 8.3 e 8.4 em ordem; §15 com a posição do Codex e a fase que cada decisão trava |
