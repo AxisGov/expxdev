@@ -14,18 +14,24 @@ type Lock = {
 const pacote = JSON.parse(readFileSync("package.json", "utf8")) as Pacote;
 const lock = JSON.parse(readFileSync("package-lock.json", "utf8")) as Lock;
 
-function partes(versao: string): number[] {
-  return versao.split(".").map((parte) => Number.parseInt(parte, 10));
+function partes(versao: string): { nucleo: number[]; preRelease: boolean } {
+  const [semBuild = ""] = versao.split("+");
+  const [nucleo = "", ...resto] = semBuild.split("-");
+  return {
+    nucleo: nucleo.split(".").map((parte) => Number.parseInt(parte, 10)),
+    preRelease: resto.length > 0,
+  };
 }
 
 function peloMenos(atual: string, piso: string): boolean {
   const a = partes(atual);
   const p = partes(piso);
-  for (let i = 0; i < Math.max(a.length, p.length); i += 1) {
-    const diferenca = (a[i] ?? 0) - (p[i] ?? 0);
+  for (let i = 0; i < Math.max(a.nucleo.length, p.nucleo.length); i += 1) {
+    const diferenca = (a.nucleo[i] ?? 0) - (p.nucleo[i] ?? 0);
     if (diferenca !== 0) return diferenca > 0;
   }
-  return true;
+  // Mesmo núcleo: a pré-release (4.6.6-beta.1) vem antes da versão corrigida.
+  return !a.preRelease || p.preRelease;
 }
 
 function versoesInstaladas(em: Lock, nome: string): string[] {
@@ -82,6 +88,13 @@ describe("pisos corrigidos das dependências auditadas", () => {
     } satisfies Lock;
     const vulneraveis = versoesInstaladas(artificial, "vite").filter((versao) => !peloMenos(versao, "8.2.4"));
     expect(vulneraveis).toEqual(["8.2.3"]);
+  });
+
+  it("pré-release da versão corrigida fica abaixo do piso", () => {
+    expect(peloMenos("4.6.6-beta.1", "4.6.6")).toBe(false);
+    expect(peloMenos("4.6.6", "4.6.6")).toBe(true);
+    expect(peloMenos("4.6.7-rc.0", "4.6.6")).toBe(true);
+    expect(peloMenos("4.6.5", "4.6.6")).toBe(false);
   });
 
   it("os intervalos diretos também começam nas versões corrigidas", () => {
