@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
 type Pacote = {
+  dependencies: Record<string, string>;
   devDependencies: Record<string, string>;
 };
 
@@ -61,6 +62,7 @@ describe("pisos corrigidos das dependências auditadas", () => {
     ["vitest", "4.1.12"],
     ["@vitest/mocker", "4.1.12"],
     ["source-map-js", "1.2.2"],
+    ["zod", "4.6.6"],
   ] as const;
 
   it.each(pisos)("%s fica fora das faixas vulneráveis", (nome, piso) => {
@@ -85,6 +87,7 @@ describe("pisos corrigidos das dependências auditadas", () => {
   it("os intervalos diretos também começam nas versões corrigidas", () => {
     expect(pacote.devDependencies["vite"]).toBe("^8.3.5");
     expect(pacote.devDependencies["vitest"]).toBe("^4.1.12");
+    expect(pacote.dependencies["zod"]).toBe("^4.6.7");
   });
 });
 
