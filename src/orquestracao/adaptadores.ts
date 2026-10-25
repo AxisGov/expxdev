@@ -68,6 +68,11 @@ const MODELO_OPENCODE = /^[a-z0-9][a-z0-9_-]*\/[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 const MODELO_CODEX = /^[a-z0-9][a-z0-9._-]*$/;
 const FORMA_EFFORT = /^[a-z]+$/;
 
+/** Alias ou ID `claude-*`, sem julgar a classe nem o esforço. */
+export function modeloClaudeBemFormado(model: string): boolean {
+  return MODELO_CLAUDE.test(model);
+}
+
 function validarClaude(classe: Classe, alt: Alternativa): string | null {
   if (!MODELO_CLAUDE.test(alt.model)) return `model "${alt.model}" não é alias (opus, sonnet, haiku) nem ID claude-*`;
   if (alt.model === "inherit") return "model inherit não se classifica e não pode entrar numa cadeia";
