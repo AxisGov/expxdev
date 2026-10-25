@@ -149,9 +149,16 @@ export function lerPolitica(raiz: string): LeituraPolitica {
     if (codigo === "ENOENT" || codigo === "ENOTDIR") return { ok: true, ativa: false };
     return { ok: false, erro: `${ONDE} não pôde ser lido (${codigo ?? String(e)})` };
   }
+  let texto: string;
+  try {
+    texto = readFileSync(arquivo, "utf8");
+  } catch (e: unknown) {
+    // Permissão do próprio arquivo, ou mudança entre o stat e a leitura.
+    return { ok: false, erro: `${ONDE} não pôde ser lido (${(e as NodeJS.ErrnoException).code ?? String(e)})` };
+  }
   let bruto: unknown;
   try {
-    bruto = JSON.parse(readFileSync(arquivo, "utf8"));
+    bruto = JSON.parse(texto);
   } catch (e: unknown) {
     return { ok: false, erro: `${ONDE} não é JSON válido e não será aplicado: ${String(e)}` };
   }

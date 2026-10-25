@@ -157,6 +157,18 @@ describe("lerPolitica", () => {
     }
   });
 
+  it.skipIf(semPermissaoReal)("arquivo sem permissão de leitura falha como leitura, não como JSON inválido", () => {
+    const raiz = projeto(JSON.stringify(BASE));
+    const arquivo = join(raiz, ".expx", "orquestracao.json");
+    chmodSync(arquivo, 0o000);
+    try {
+      const r = lerPolitica(raiz);
+      expect(r).toEqual({ ok: false, erro: ".expx/orquestracao.json não pôde ser lido (EACCES)" });
+    } finally {
+      chmodSync(arquivo, 0o644);
+    }
+  });
+
   it("um diretório no lugar do arquivo falha dizendo isso", () => {
     const raiz = projeto();
     mkdirSync(join(raiz, ".expx", "orquestracao.json"), { recursive: true });
