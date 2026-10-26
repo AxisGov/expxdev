@@ -452,3 +452,46 @@ describe("o enum de `evento` é global por contrato, não por descuido", () => {
     expect(inverso.defeitos).toEqual([]);
   });
 });
+
+describe("chaves da resolução (CONTRATO-expx-orquestracao §11.1)", () => {
+  const RESOLUCAO = {
+    model: null,
+    effort: null,
+    harness: "claude-code",
+    resolucao_id: "c".repeat(64),
+    classe_declarada: "raciocinio_normal",
+    classe_resolvida: "profundo_excepcional",
+    origem_classe: "agente",
+    alternativa: "opus-high",
+    origem_alternativa: "projeto",
+  };
+
+  it("funcional: a linha do escritor comum com as chaves da resolução é válida e conhecida", () => {
+    const r = validarRastro(j(linha({ agente: "auditor-plano", ...RESOLUCAO })));
+    expect(r.defeitos).toEqual([]);
+    expect(r.desconhecidas).toEqual([]);
+    const v1 = validarRastro(j(linha({ ...RESOLUCAO, origem_alternativa: "agentes-json-v1", materializado: { model: "haiku", effort: "low" } })));
+    expect(v1.defeitos).toEqual([]);
+  });
+
+  it("funcional: as chaves da F3b são declaradas, ainda que o escritor não as grave", () => {
+    const r = validarRastro(j(linha({ ...RESOLUCAO, invocacao: "toolu_01", modelos_observados: ["claude-opus-4-6"], fora_da_politica: true })));
+    expect(r.defeitos).toEqual([]);
+    expect(r.desconhecidas).toEqual([]);
+    expect(validarRastro(j(linha({ evento: "invocacao_abandonada", resultado: "abandonada" }))).defeitos).toEqual([]);
+  });
+
+  it("funcional: resolução fora da forma é defeito, não dado aceito", () => {
+    for (const ruim of [
+      { resolucao_id: "c".repeat(63) },
+      { classe_declarada: "rapida" },
+      { origem_classe: "palpite" },
+      { origem_alternativa: "outra" },
+      { materializado: { effort: "low" } },
+      { fora_da_politica: false },
+      { modelos_observados: [""] },
+    ]) {
+      expect(validarRastro(j(linha({ ...RESOLUCAO, ...ruim }))).defeitos, JSON.stringify(ruim)).toHaveLength(1);
+    }
+  });
+});

@@ -10,9 +10,12 @@ este texto e o desenho divergem, vale este texto.
 tabela embutida, a matriz de esforço do Claude, a função de resolução e o
 formato do registro e do lock. **Desde a F2**, o `init` aplica a política no
 adaptador Claude: materializa os agentes, grava o registro e a seção do lock, e
-o `doctor` diagnostica (`CONTRATO-expx-instalacao.md` §5.3). O rastro, o
-painel e os hooks de invocação continuam sem mudança até a F3 e a F3b, que
-emendam este contrato.
+o `doctor` diagnostica (`CONTRATO-expx-instalacao.md` §5.3). **Desde a F3a**,
+o rastro grava `model`/`effort` só como executor observado (H10) e, com a
+política ativa, as chaves da resolução no evento do subagente, a partir da
+projeção `.expx/orquestracao-rastro.tsv`; o painel mostra a resolução como
+configuração não observada (`CONTRATO-expx-eventos.md`). `integridade_final`
+(F3c) e o envelope da invocação (F3b) ainda não existem.
 
 ## 1. Três coisas separadas
 
@@ -297,5 +300,6 @@ Só com a camada ativa.
 
 H1–H11 do desenho foram aprovadas em 2026-10-24 como recomendadas. As que esta
 versão aplica diretamente são H2 (justificativa), H3 (classe declarada), H6
-(só Claude operacional), H7 (registro e lock) e H9 (exceção v1). As demais
-(H4, H5, H8, H10, H11) regem as fases seguintes e entram nas emendas delas.
+(só Claude operacional), H7 (registro e lock), H9 (exceção v1) e, desde a F3a,
+H10 (o escritor do rastro sem configuração em `model`/`effort`). As demais
+(H4, H5, H8, H11) regem as fases seguintes e entram nas emendas delas.
