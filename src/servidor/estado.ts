@@ -3,12 +3,15 @@ import { verificarConformidade, type Violacao } from "../parser/conformidade/reg
 import type { LinhaEvento } from "../parser/esquema/evento.js";
 import { lerRastro } from "../watch/fontes/rastro.js";
 import { lerConfiguracoesAgentes, type ConfiguracaoAgente } from "./agentes.js";
+import { lerResolucoesCitadas, type ResolucaoNoPainel } from "./resolucoes.js";
 
 /** O estado que o painel serve: o projeto lido do disco mais as violações derivadas. */
 export type EstadoPainel = Projeto & {
   violacoes: Violacao[];
   eventos: Record<string, LinhaEvento[]>;
   agentes: ConfiguracaoAgente[];
+  /** As resoluções que os eventos citam; `null` quando o registro não se lê. */
+  resolucoes: Record<string, ResolucaoNoPainel | null>;
 };
 
 export type OpcoesEstado = {
@@ -35,5 +38,6 @@ export function lerEstado(op: OpcoesEstado, agora: Date = new Date()): EstadoPai
       .map((trabalho) => [trabalho.trabalho_id, lerRastro(op.raiz, trabalho.trabalho_id, 200)]),
   );
   const agentes = lerConfiguracoesAgentes(op.raiz);
-  return { ...projeto, violacoes, eventos, agentes };
+  const resolucoes = lerResolucoesCitadas(op.raiz, eventos);
+  return { ...projeto, violacoes, eventos, agentes, resolucoes };
 }

@@ -212,6 +212,15 @@ export type Evento = {
   harness?: string | null;
   model?: string | null;
   effort?: string | null;
+  /** A resolução em vigor para o agente (CONTRATO-expx-orquestracao §11.1). */
+  resolucao_id?: string;
+};
+
+/** Uma resolução citada por evento, como o servidor a serve (`src/servidor/resolucoes.ts`). */
+export type ResolucaoNoPainel = {
+  agente: string;
+  model: string;
+  effort: string | null;
 };
 
 /** Configuração efetiva lida do agente instalado pelo `init`. */
@@ -231,6 +240,8 @@ export type Estado = {
   violacoes: Violacao[];
   eventos: Record<string, Evento[]>;
   agentes: ConfiguracaoAgente[];
+  /** As resoluções que os eventos citam; `null` quando o registro não se lê. */
+  resolucoes?: Record<string, ResolucaoNoPainel | null>;
   /** `null` quando não há índice de memória — o caso comum num clone (D-02). */
   memoria: Memoria | null;
   lido_em: string;

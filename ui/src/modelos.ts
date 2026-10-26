@@ -1,33 +1,45 @@
-import type { ConfiguracaoAgente, Evento } from "./tipos.js";
+import type { ConfiguracaoAgente, Evento, ResolucaoNoPainel } from "./tipos.js";
 
 export type ExecucaoDoEvento = {
   texto: string;
-  fonte: "histórico" | "configuração atual" | "histórico indisponível";
+  fonte: "histórico" | "configuração (não observada)" | "inconsistência" | "configuração atual" | "histórico indisponível";
 };
 
 /**
- * Modelo/esforço do próprio evento vencem a configuração instalada hoje.
+ * O executor do evento, e de onde o painel tirou o que mostra.
  *
- * A presença da chave é relevante: `null` significa que o escritor tentou
- * capturar e o runtime não informou; ausência significa "sem snapshot".
- * O fallback atual só vale quando o evento não identifica outro harness.
+ * `model`/`effort` são só o executor observado (H10): o que vier neles vence
+ * tudo e é histórico, e o que faltar não é completado. Sem nenhuma observação,
+ * a configuração é papel do leitor: a resolução que o evento cita, rotulada
+ * como não observada; a citada que não se lê, ou que é de outro agente, é
+ * inconsistência, sem inventar. Sem resolução, vale o fallback de antes — a
+ * configuração instalada hoje, só quando o evento não identifica outro harness.
  */
 export function execucaoDoEvento(
   evento: Evento,
   agentes: readonly ConfiguracaoAgente[],
+  resolucoes: Readonly<Record<string, ResolucaoNoPainel | null>> = {},
 ): ExecucaoDoEvento {
-  const temSnapshot =
-    Object.prototype.hasOwnProperty.call(evento, "model") ||
-    Object.prototype.hasOwnProperty.call(evento, "effort");
-
-  if (temSnapshot) {
+  const model = evento.model ?? null;
+  const effort = evento.effort ?? null;
+  if (model !== null || effort !== null) {
     return {
-      texto: [
-        evento.agente,
-        evento.model ?? "modelo não informado",
-        evento.effort ?? "esforço não informado",
-      ].join(" · "),
+      texto: [evento.agente, model ?? "modelo não informado", effort ?? "esforço não informado"].join(" · "),
       fonte: "histórico",
+    };
+  }
+
+  if (typeof evento.resolucao_id === "string") {
+    const r = resolucoes[evento.resolucao_id];
+    if (r === undefined || r === null || r.agente !== evento.agente) {
+      return {
+        texto: `${evento.agente} · resolução ${evento.resolucao_id.slice(0, 8)} ilegível no registro`,
+        fonte: "inconsistência",
+      };
+    }
+    return {
+      texto: [evento.agente, r.model, r.effort].filter(Boolean).join(" · "),
+      fonte: "configuração (não observada)",
     };
   }
 

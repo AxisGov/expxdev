@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import type { ConfiguracaoAgente, Estado, Evento, Task, Trabalho } from "../tipos.js";
+import type { ConfiguracaoAgente, Estado, Evento, ResolucaoNoPainel, Task, Trabalho } from "../tipos.js";
 import { ROTULO_ESTAGIO } from "../tipos.js";
 import { Barra, Etiqueta, Vazio, PageHeader } from "../comuns.js";
 import { GrafoVivo } from "./GrafoVivo.js";
@@ -99,10 +99,12 @@ function GrafoDoPlano({
   trabalho,
   eventos,
   agentes,
+  resolucoes,
 }: {
   trabalho: Trabalho;
   eventos: readonly Evento[];
   agentes: readonly ConfiguracaoAgente[];
+  resolucoes: Readonly<Record<string, ResolucaoNoPainel | null>>;
 }): JSX.Element | null {
   const temTask = trabalho.sprints.some((s) => s.tasks.length > 0);
   if (!temTask) return null;
@@ -132,6 +134,7 @@ function GrafoDoPlano({
           trabalho={trabalho}
           eventos={eventos}
           agentes={agentes}
+          resolucoes={resolucoes}
           aoEscolherTask={(idTask) => rolarAteTask(idTask)}
         />
       </div>
@@ -146,10 +149,12 @@ function instante(ts: string): string {
 function LinhaDoTempo({
   eventos,
   agentes,
+  resolucoes,
   branch,
 }: {
   eventos: readonly Evento[];
   agentes: readonly ConfiguracaoAgente[];
+  resolucoes: Readonly<Record<string, ResolucaoNoPainel | null>>;
   branch: string | null;
 }): JSX.Element {
   const recentes = eventos.slice(0, 30);
@@ -185,7 +190,7 @@ function LinhaDoTempo({
           </div>
           <div>
             {recentes.map((evento, i) => {
-              const execucao = execucaoDoEvento(evento, agentes);
+              const execucao = execucaoDoEvento(evento, agentes, resolucoes);
               const executor = `${execucao.texto} · ${execucao.fonte}`;
               const contexto = [evento.fase, evento.task].filter(Boolean).join(" · ");
               return (
@@ -258,9 +263,9 @@ export function Detalhe({
         ) : null}
       </div>
 
-      <LinhaDoTempo eventos={eventos} agentes={estado.agentes} branch={t.branch} />
+      <LinhaDoTempo eventos={eventos} agentes={estado.agentes} resolucoes={estado.resolucoes ?? {}} branch={t.branch} />
 
-      <GrafoDoPlano trabalho={t} eventos={eventos} agentes={estado.agentes} />
+      <GrafoDoPlano trabalho={t} eventos={eventos} agentes={estado.agentes} resolucoes={estado.resolucoes ?? {}} />
 
       {abertos.length > 0 ? (
         <div className="painel-det" style={{ borderColor: "var(--alerta)" }}>
