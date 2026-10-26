@@ -14,7 +14,7 @@
 #      SEM_PROVA (nunca o commit de um item anterior).
 #   3. A entrega de planejamento (`entrega-de-planejamento.sh`, antes de tudo) não tem
 #      task executada: `n/a`. Entrega incoerente: SEM_PROVA.
-#   4. O modo vem de `leitor-do-projeto.sh --rev HEAD` (consumo com `set -a`). Sem
+#   4. O modo vem de `leitor-do-projeto.sh --rev <o HEAD lido uma vez>` (com `set -a`). Sem
 #      `.expx/fatiamento.json`: `n/a`, sem node. Leitor que não lê (configuração
 #      inválida, `FATIA_*` no ambiente, núcleo ausente ou antigo, node ausente):
 #      SEM_PROVA em qualquer modo, porque o modo não pode ser lido.
@@ -77,15 +77,6 @@ na()        { printf 'V12=n/a\nmotivo=%s\n' "$1"; exit 0; }
 sem_prova() { printf 'V12=SEM_PROVA\nmotivo=%s\n' "$1"; exit 2; }
 repassa()   { [ ! -s "$tmp/err" ] || cat "$tmp/err" >&2; }
 
-# 1. a entrega de planejamento, antes de tudo
-marca="$("$SH" "$AQUI/entrega-de-planejamento.sh" --entrega "$ENTREGA" 2> "$tmp/err")" \
-  || { repassa; sem_prova 'entrega-de-planejamento-ilegivel'; }
-case "$marca" in
-  planejamento=sim*) na 'planejamento: nenhuma task executada' ;;
-  planejamento=nao*) ;;
-  *) repassa; sem_prova 'entrega-de-planejamento-ilegivel' ;;
-esac
-
 # o leitor único de `commits` (sequencia-de-commits.sh, por prova-de-commit.sh); daqui só
 # `escalar` e `limpa`, como na V11
 # shellcheck source=sequencia-de-commits.sh
@@ -114,20 +105,60 @@ sem_repositorio_git() {
   SEM_GIT_ERRO="o Git falhou: $saida"; return 1
 }
 
-# 2. o modo, pelo leitor do projeto, do commit (HEAD). Fora de um repositório Git não há
-# HEAD a ler: com `versionado: false` a V12 é `n/a` (não há commit de task), senão SEM_PROVA.
-# O Git que falha por outro motivo é sempre SEM_PROVA.
+# 1. o repositório, antes de tudo. Fora de QUALQUER repositório Git não há HEAD de onde ler a
+# entrega: com `versionado: false` a V12 é `n/a` (não há commit de task), senão SEM_PROVA. O Git
+# que falha por outro motivo é sempre SEM_PROVA.
+raiz_leitura="${RAIZ:-.}"
+if ! git -C "$raiz_leitura" rev-parse --git-dir >/dev/null 2>&1; then
+  cwd_v12="$PWD"
+  cd "$raiz_leitura" 2>/dev/null || sem_prova 'raiz-inexistente'
+  sem_repositorio_git; rc_sem_git=$?; erro_sem_git="$SEM_GIT_ERRO"
+  cd "$cwd_v12" 2>/dev/null || sem_prova 'retorno-ao-diretorio-falhou'
+  [ "$rc_sem_git" = 0 ] || { printf 'portao-v12: %s\n' "$erro_sem_git" >&2; sem_prova 'git-falhou'; }
+  [ "$(limpa "$(escalar "$ENTREGA" versionado)")" != false ] || na 'sem-versionador'
+  sem_prova 'fora-de-um-repositorio-git'
+fi
 if [ -z "$RAIZ" ]; then
-  RAIZ="$(git rev-parse --show-toplevel 2>/dev/null)" || {
-    sem_repositorio_git || { printf 'portao-v12: %s\n' "$SEM_GIT_ERRO" >&2; sem_prova 'git-falhou'; }
-    [ "$(limpa "$(escalar "$ENTREGA" versionado)")" != false ] || na 'sem-versionador'
-    sem_prova 'fora-de-um-repositorio-git'
-  }
+  RAIZ="$(git rev-parse --show-toplevel 2>/dev/null)" || sem_prova 'git-falhou'
 fi
 # absoluta: o node roda de dentro dela, e uma relativa seria resolvida duas vezes
 RAIZ="$(cd "$RAIZ" 2>/dev/null && pwd)" || sem_prova 'raiz-inexistente'
+
+# 2. a entrega do HEAD, num snapshot só, de onde saem a marca, o `versionado` e os `commits`. O E2
+# certifica um SHA (DM-181) e já lê a marca com `--rev HEAD`: a V12 não decide por uma edição não
+# commitada. O caminho, absoluto ou relativo a quem chama, vira relativo à raiz; fora dela, ou
+# ausente do HEAD como arquivo regular, é SEM_PROVA.
+rev_leitura="$(git -C "$RAIZ" rev-parse --verify 'HEAD^{commit}' 2> "$tmp/err")" \
+  || { repassa; sem_prova 'head-ilegivel'; }
+case "$ENTREGA" in /*) entrega_abs="$ENTREGA" ;; *) entrega_abs="$PWD/$ENTREGA" ;; esac
+# só bash: os casos sem node rodam com PATH mínimo, sem dirname nem basename
+entrega_pasta="${entrega_abs%/*}"; entrega_nome="${entrega_abs##*/}"
+entrega_dir="$(cd "${entrega_pasta:-/}" 2>/dev/null && pwd -P)" || sem_prova 'entrega-de-planejamento-ilegivel'
+raiz_fisica="$(cd "$RAIZ" && pwd -P)" || sem_prova 'raiz-inexistente'
+case "$entrega_dir/" in
+  "$raiz_fisica"/*) entrega_rel="${entrega_dir#"$raiz_fisica"}"; entrega_rel="${entrega_rel#/}" ;;
+  *) printf 'portao-v12: %s fica fora da raiz %s\n' "$ENTREGA" "$RAIZ" >&2; sem_prova 'entrega-de-planejamento-ilegivel' ;;
+esac
+ENTREGA="${entrega_rel:+$entrega_rel/}$entrega_nome"
+case "$(git -C "$RAIZ" ls-tree "$rev_leitura" -- "$ENTREGA" 2>/dev/null)" in
+  "100644 blob "*|"100755 blob "*) ;;
+  *) printf 'portao-v12: %s não está no HEAD como arquivo regular\n' "$ENTREGA" >&2; sem_prova 'entrega-de-planejamento-ilegivel' ;;
+esac
+entrega_head="$tmp/ENTREGA.md"
+git -C "$RAIZ" show "$rev_leitura:$ENTREGA" > "$entrega_head" 2> "$tmp/err" \
+  || { repassa; sem_prova 'entrega-de-planejamento-ilegivel'; }
+marca="$(cd "$RAIZ" && "$SH" "$AQUI/entrega-de-planejamento.sh" --entrega "$ENTREGA" --rev "$rev_leitura" 2> "$tmp/err")" \
+  || { repassa; sem_prova 'entrega-de-planejamento-ilegivel'; }
+case "$marca" in
+  planejamento=sim*) na 'planejamento: nenhuma task executada' ;;
+  planejamento=nao*) ;;
+  *) repassa; sem_prova 'entrega-de-planejamento-ilegivel' ;;
+esac
+
+# 3. o modo, pelo leitor do projeto, do mesmo commit da entrega: o HEAD pode ter andado desde o
+# passo 2, e a V12 não decide com dois snapshots.
 EXPX_REVISAO_POR_TASK=""; EXPX_FATIAMENTO_ORIGEM=""
-fatia="$("$SH" "$AQUI/leitor-do-projeto.sh" --raiz "$RAIZ" --rev HEAD 2> "$tmp/err")" \
+fatia="$("$SH" "$AQUI/leitor-do-projeto.sh" --raiz "$RAIZ" --rev "$rev_leitura" 2> "$tmp/err")" \
   || { rc=$?; repassa; sem_prova "configuracao-nao-lida:$rc"; }
 set -a; eval "$fatia"; set +a
 [ "$EXPX_FATIAMENTO_ORIGEM" != padrao ] || na 'sem-fatiamento-json'
@@ -138,13 +169,13 @@ case "$MODO" in
   *) sem_prova "modo-desconhecido:$MODO" ;;
 esac
 
-# 3. versionado e as tasks
-[ "$(limpa "$(escalar "$ENTREGA" versionado)")" != false ] || na 'sem-versionador'
+# 4. versionado e as tasks, do snapshot do HEAD
+[ "$(limpa "$(escalar "$entrega_head" versionado)")" != false ] || na 'sem-versionador'
 
 concluidas="$("$SH" "$AQUI/prova-de-commit.sh" --concluidas "$@" 2> "$tmp/err")" \
   || { repassa; sem_prova 'plano-ilegivel'; }
 [ -n "$concluidas" ] || na 'nenhuma-task-concluida'
-commits="$("$SH" "$AQUI/sequencia-de-commits.sh" --ler "$ENTREGA" 2> "$tmp/err")" \
+commits="$("$SH" "$AQUI/sequencia-de-commits.sh" --ler "$entrega_head" 2> "$tmp/err")" \
   || { repassa; sem_prova 'commits-ilegivel'; }
 
 # alvos: cada task concluída (uma vez só) com o commit do ÚLTIMO item dela, na ordem
@@ -175,7 +206,7 @@ $concluidas
 EOF
 [ -n "$ALVOS" ] || na 'nenhuma-task-com-commit'
 
-# 4. o conferir do núcleo instalado
+# 5. o conferir do núcleo instalado
 mjs="$RAIZ/.expx/marketplace/plugins/expx/nucleo/scripts/expx-revisao.mjs"
 if [ ! -f "$mjs" ]; then
   if [ "$MODO" = se_disponivel ]; then

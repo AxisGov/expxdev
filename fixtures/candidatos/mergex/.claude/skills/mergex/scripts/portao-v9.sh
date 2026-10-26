@@ -104,6 +104,7 @@
 #   base=<oid-completo>
 #   origem_base=<registrada_e0|registrada_sprint|inferida_legado|reconciliacao|inferida_leitura>
 #   aviso<TAB><texto>                  (zero ou mais)
+#   prova_n_a<TAB>sem_predecessor_elegivel<TAB><nascimento> (zero ou uma)
 #   resultado=<ok|v9>
 #   fora_do_plano<TAB><caminho>        (um por desvio, em ordem de byte;
 #                                       fora_do_planejamento com --planejamento)
@@ -579,13 +580,14 @@ fi
 : > "$TMP_DIR/predecessores-aceitos"
 : > "$TMP_DIR/predecessores-vistos"
 : > "$TMP_DIR/predecessores-fora"
+: > "$TMP_DIR/predecessores-na"
 if [ "$ORIGEM" = sprintx ] && [ "$PLANEJAMENTO" = 0 ]; then
   bash "$PREDECESSORES_SH" --verificar --rev "$HEAD_SHA" --trabalho "$TRABALHO" \
     > "$TMP_DIR/predecessores.out" 2> "$TMP_DIR/predecessores.err"
   RC_PRE=$?
   RESULTADOS="$(grep -c '^resultado=' "$TMP_DIR/predecessores.out" 2>/dev/null)"
   RESULTADO="$(sed -n 's/^resultado=//p' "$TMP_DIR/predecessores.out")"
-  PRE_N=0; FORA_N=0; MOTIVO_N=0; INVALIDA=0
+  PRE_N=0; FORA_N=0; MOTIVO_N=0; NA_N=0; INVALIDA=0
   [ "$RESULTADOS" = 1 ] || INVALIDA=1
   while IFS="$TAB" read -r tipo a b c extra; do
     case "$tipo" in
@@ -608,6 +610,9 @@ if [ "$ORIGEM" = sprintx ] && [ "$PLANEJAMENTO" = 0 ]; then
       fora_do_plano)
         [ -n "$a" ] && [ "$b" = blob_divergente ] && [ -z "$c$extra" ] || INVALIDA=1
         FORA_N=$((FORA_N + 1)); printf 'fora_do_plano\t%s\tblob_divergente\n' "$a" >> "$TMP_DIR/predecessores-fora" ;;
+      prova_n_a)
+        [ "$a" = sem_predecessor_elegivel ] && oid_valido "$b" && [ -z "$c$extra" ] || INVALIDA=1
+        NA_N=$((NA_N + 1)); printf 'prova_n_a\t%s\t%s\n' "$a" "$b" > "$TMP_DIR/predecessores-na" ;;
       motivo)
         [ -n "$a" ] && [ -z "$b$c$extra" ] || INVALIDA=1
         MOTIVO_N=$((MOTIVO_N + 1)) ;;
@@ -616,10 +621,11 @@ if [ "$ORIGEM" = sprintx ] && [ "$PLANEJAMENTO" = 0 ]; then
     esac
   done < "$TMP_DIR/predecessores.out"
   case "$RESULTADO:$RC_PRE" in
-    ausente:0) [ "$PRE_N:$FORA_N:$MOTIVO_N" = 0:0:0 ] || INVALIDA=1 ;;
-    ok:0) [ "$PRE_N" -ge 1 ] && [ "$FORA_N:$MOTIVO_N" = 0:0 ] || INVALIDA=1 ;;
-    v9:1) [ "$FORA_N" -ge 1 ] && [ "$MOTIVO_N" = 0 ] || INVALIDA=1 ;;
-    v9_sem_prova:3) [ "$MOTIVO_N" -ge 1 ] && [ "$PRE_N:$FORA_N" = 0:0 ] || INVALIDA=1 ;;
+    ausente:0) [ "$PRE_N:$FORA_N:$MOTIVO_N:$NA_N" = 0:0:0:0 ] || INVALIDA=1 ;;
+    n_a:0) [ "$PRE_N:$FORA_N:$MOTIVO_N:$NA_N" = 0:0:0:1 ] || INVALIDA=1 ;;
+    ok:0) [ "$PRE_N" -ge 1 ] && [ "$FORA_N:$MOTIVO_N:$NA_N" = 0:0:0 ] || INVALIDA=1 ;;
+    v9:1) [ "$FORA_N" -ge 1 ] && [ "$MOTIVO_N:$NA_N" = 0:0 ] || INVALIDA=1 ;;
+    v9_sem_prova:3) [ "$MOTIVO_N" -ge 1 ] && [ "$PRE_N:$FORA_N:$NA_N" = 0:0:0 ] || INVALIDA=1 ;;
     *) INVALIDA=1 ;;
   esac
   [ "$INVALIDA" = 0 ] || sem_prova 'predecessores-sprintx: saida_inconclusiva'
@@ -671,5 +677,6 @@ if [ -s "$TMP_DIR/fora" ]; then
   LC_ALL=C sort -u "$TMP_DIR/fora" | awk -F'\t' '{ print $1 "\t" $2 }' | LC_ALL=C sort -u
   exit 1
 fi
+cat "$TMP_DIR/predecessores-na"
 printf 'resultado=ok\n'
 exit 0

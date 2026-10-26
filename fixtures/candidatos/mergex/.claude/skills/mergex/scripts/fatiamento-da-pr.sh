@@ -21,8 +21,8 @@
 # nenhum repositorio de skill depende do expxdev por npm. Mudou la, muda aqui, e o
 # sha256 abaixo junto (scripts/ci/test-fatiamento-e7.sh confere; com EXPXDEV_RAIZ,
 # compara com o arquivo de la).
-# Origem: AxisGov/expxdev 405a134 scripts/verificar-fatiamento.sh
-# Corpo-sha256: 165d3495181c45eea605a7cadb10637bbce18c1630b999151a8b42073fddd43d
+# Origem: AxisGov/expxdev d4869c7 scripts/verificar-fatiamento.sh
+# Corpo-sha256: cb09640bf8ff52eeb118a81c1ba21f042c526f4a149739648b160535a5d41c26
 #
 # Saida: 0 sem violacao, 1 com (linhas `VIOLACAO L2|L3|planejamento: ...`), 2 uso,
 # `FATIA_*` no ambiente ou medicao impossivel (ref inexistente, sem ancestral comum,
@@ -164,6 +164,15 @@ revisavel() {
 # Escreve "linhas bytes" com a mesma decodificacao UTF-8 da CLI.
 medir_arquivo() {
   local arquivo="$1" bytes linhas
+  local bytes_brutos
+  bytes_brutos="$(wc -c < "$arquivo")" || return 2
+  # Acima do proprio limite L2 ja ha violacao certa. Nao copie nem carregue o
+  # blob inteiro para substituir UTF-8 invalido: isso limita memoria e disco.
+  if [ "$bytes_brutos" -gt "$MAX_BYTES" ]; then
+    linhas="$(wc -l < "$arquivo")" || return 2
+    printf '%d %d\n' "$((linhas + 1))" "$bytes_brutos"
+    return 0
+  fi
   command -v iconv >/dev/null 2>&1 || { echo "iconv ausente: nao foi possivel medir $novo" >&2; return 2; }
   if iconv -f UTF-8 -t UTF-8 < "$arquivo" > "$decodificado" 2>/dev/null; then
     bytes="$(wc -c < "$decodificado")" || return 2

@@ -2,6 +2,8 @@
 
 `00-PREDECESSORES.md` declara documentos Superpowers efetivamente consumidos antes do nascimento formal do planejamento SprintX. A V9 só aceita cada caminho quando `predecessores-sprintx.sh` prova, pela árvore de um SHA, a ancestralidade estrita e a identidade do blob. O catálogo de método isenta apenas o manifesto; nunca os caminhos que ele declara.
 
+A forma `predecessores: []` é válida somente como ausência comprovada: o verificador percorre o histórico alcançável estritamente anterior ao nascimento do planejamento e exige zero mudança sob `docs/superpowers/**`. Nesse caso emite `resultado=n_a` e `prova_n_a<TAB>sem_predecessor_elegivel<TAB><nascimento>`; a V9 valida e repete essa prova antes de `resultado=ok`. Se houver qualquer predecessor elegível, a lista vazia falha fechada.
+
 O protocolo novo existe somente no layout canônico emitido pela SprintX,
 `docs/sprintx/features/<trabalho>/00-PREDECESSORES.md`. O catálogo continua reconhecendo artefatos
 legados em `docs/<trabalho>`, mas não inventa nem migra um manifesto que a SprintX nunca emitiu;

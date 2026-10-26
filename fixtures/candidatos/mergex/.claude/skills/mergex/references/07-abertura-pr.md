@@ -23,7 +23,7 @@ A regra que governa esta etapa inteira: **ferramenta ausente não é erro** (reg
 upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}')" || exit 1   # ex.: origin/<branch>
 remoto="${upstream%%/*}"; ref_remota="${upstream#*/}"
 git fetch "$remoto" "$ref_remota" || { echo "busca de $upstream falhou: o E7 não abre nem retoma o PR"; exit 1; }
-publicado="$(git rev-parse --verify "refs/remotes/$upstream^{commit}")" || exit 1
+publicado="$(git rev-parse --verify "refs/remotes/$upstream^{commit}")" || exit 2
 enviado="$(git rev-parse HEAD)"
 [ "$publicado" = "$enviado" ] || { echo "a ponta remota ($publicado) não é o SHA enviado no E6 ($enviado): o E7 não abre nem retoma o PR"; exit 1; }
 bash .claude/skills/mergex/scripts/validade-do-portao.sh --verificar \
@@ -42,10 +42,18 @@ Se `push_feito: false` (sem remoto, ou sem versionador), o E7 não roda: siga di
 
 **Detecte antes de tentar.** Uma tentativa cega gera erro de autenticação na cara do usuário e, pior, um prompt pedindo credencial.
 
-Descubra o serviço pelo remoto:
+Descubra o serviço pelo remoto de upstream da branch. Não presuma `origin`: a configuração `branch.<nome>.remote` é a identidade exata gravada por `--set-upstream`. Sem branch simbólica, sem `branch.<nome>.remote`, sem `branch.<nome>.merge` ou com upstream local (`.`), o contrato dos pré-requisitos manda falhar fechado; não existe fallback para outro remote:
 
-```
-git remote get-url origin
+```bash
+resolver_remoto_upstream() {
+  branch_atual="$(git symbolic-ref --quiet --short HEAD)" || { echo "branch atual não é simbólica: o E7 não detecta provedor" >&2; return 1; }
+  remoto_atual="$(git config --get "branch.$branch_atual.remote")" || { echo "branch sem remote de upstream: o E7 não detecta provedor" >&2; return 1; }
+  git config --get "branch.$branch_atual.merge" >/dev/null || { echo "branch sem merge de upstream: o E7 não detecta provedor" >&2; return 1; }
+  case "$remoto_atual" in ""|.) echo "upstream local ou vazio: o E7 não detecta provedor" >&2; return 1 ;; esac
+  printf '%s\n' "$remoto_atual"
+}
+remoto="$(resolver_remoto_upstream)" || exit 1
+git remote get-url "$remoto"
 ```
 
 | Serviço no remoto | Ferramenta | Verificação de presença | Verificação de autenticação |
@@ -81,19 +89,24 @@ agora, no remoto, para o nome da branch padrão (`refs/heads/main` → `main`).
 Cada bloco de comandos deste reference roda numa chamada própria do shell, e variável de um
 bloco não chega ao seguinte: este bloco recalcula o `$remoto` e o `$publicado` dos
 pré-requisitos — e busca a branch de novo, conferida, porque a ref remota pode ter andado
-desde aquela chamada; a ponta continua tendo de ser o `HEAD` —, e grava o `$bb` resolvido num arquivo de estado do Git, que o passo 2 lê. O estado só
+desde aquela chamada; a ponta continua tendo de ser o `HEAD` —, e grava o remoto-base `$rb`, o
+`$bb` resolvido, o `$upstream` e o `$publicado` medido, nessa ordem, num arquivo de estado do
+Git, que o passo 2 lê. O estado só
 é gravado quando a medição sai `0`, e o de uma execução anterior é apagado na primeira linha,
 antes de qualquer busca ou conferência: qualquer falha do bloco, reprovado (`1`) ou não medido
 (`2`), deixa o arquivo ausente, e o passo 2 não tem base para abrir o PR:
 
 ```bash
-estado_bb="$(git rev-parse --git-path mergex-e7-base)" && rm -f "$estado_bb" || exit 1   # antes de tudo
-upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}')" || exit 1
+estado_bb="$(git rev-parse --git-path mergex-e7-base)" && rm -f "$estado_bb" || exit 2   # antes de tudo
+upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}')" || exit 2
 remoto="${upstream%%/*}"; ref_remota="${upstream#*/}"
-git fetch "$remoto" "$ref_remota" || { echo "busca de $upstream falhou: o E7 não mede nem abre o PR"; exit 1; }
-publicado="$(git rev-parse --verify "refs/remotes/$upstream^{commit}")" || exit 1
-[ "$publicado" = "$(git rev-parse HEAD)" ] || { echo "a ponta remota ($publicado) não é o HEAD: o E7 não mede nem abre o PR"; exit 1; }
-rb="$remoto"; bb="<branch_base>"
+git fetch "$remoto" "$ref_remota" || { echo "busca de $upstream falhou: o E7 não mede nem abre o PR"; exit 2; }
+publicado="$(git rev-parse --verify "refs/remotes/$upstream^{commit}")" || exit 2
+[ "$publicado" = "$(git rev-parse HEAD)" ] || { echo "a ponta remota ($publicado) não é o HEAD: o E7 não mede nem abre o PR"; exit 2; }
+rb="$remoto"
+IFS= read -r bb <<'BRANCH_BASE__INVALIDA~'
+<branch_base>
+BRANCH_BASE__INVALIDA~
 case "$bb" in
   refs/remotes/*/*) bb="${bb#refs/remotes/}"; rb="${bb%%/*}"; bb="${bb#*/}" ;;
   refs/heads/*) bb="${bb#refs/heads/}" ;;
@@ -102,16 +115,16 @@ case "$bb" in
          case "$rc_ls" in
            0) ;;
            2) rb="${bb%%/*}"; bb="${bb#*/}" ;;
-           *) echo "conferência de $bb em $rb falhou (ls-remote saiu $rc_ls): o E7 não mede nem abre o PR"; exit 1 ;;
+           *) echo "conferência de $bb em $rb falhou (ls-remote saiu $rc_ls): o E7 não mede nem abre o PR"; exit 2 ;;
          esac
        fi ;;
 esac
 if [ "$bb" = HEAD ]; then
   bb="$(git ls-remote --symref "$rb" HEAD | awk '$1 == "ref:" && $3 == "HEAD" { sub("^refs/heads/", "", $2); print $2; exit }')"
-  [ -n "$bb" ] || { echo "o HEAD de $rb não resolveu para uma branch: o E7 não mede nem abre o PR"; exit 1; }
+  [ -n "$bb" ] || { echo "o HEAD de $rb não resolveu para uma branch: o E7 não mede nem abre o PR"; exit 2; }
 fi
-git fetch "$rb" "$bb" || { echo "busca de $bb em $rb falhou: o E7 não mede nem abre o PR"; exit 1; }
-base="$(git rev-parse --verify "FETCH_HEAD^{commit}")" || exit 1
+git fetch "$rb" "$bb" || { echo "busca de $bb em $rb falhou: o E7 não mede nem abre o PR"; exit 2; }
+base="$(git rev-parse --verify "FETCH_HEAD^{commit}")" || exit 2
 planejamento="$(bash .claude/skills/mergex/scripts/entrega-de-planejamento.sh --entrega "docs/entregas/<trabalho_id>/ENTREGA.md" --rev "$publicado")" || { echo "ENTREGA.md ilegível ou incoerente no SHA publicado: o E7 não mede nem abre o PR"; exit 2; }
 fatia="$(bash .claude/skills/mergex/scripts/leitor-do-projeto.sh --rev "$publicado")" || { echo "configuração do projeto (.expx/fatiamento.json) não lida: o E7 não mede nem abre o PR"; exit 2; }
 set -a; eval "$fatia"; set +a
@@ -120,7 +133,7 @@ for parte in $EXPX_EXCLUIR_DA_REVISAO; do [ -n "$parte" ] && set -- "$@" --exclu
 IFS="$ifs_antes"; set +f
 case "$planejamento" in planejamento=sim*) set -- --planejamento "$@" ;; esac
 bash .claude/skills/mergex/scripts/fatiamento-da-pr.sh "$@" "$base" "$publicado"
-rc_fatia=$?; [ "$rc_fatia" = 0 ] && { printf '%s\n' "$bb" > "$estado_bb" || exit 1; }; exit "$rc_fatia"
+rc_fatia=$?; [ "$rc_fatia" = 0 ] && { printf '%s\n%s\n%s\n%s\n' "$rb" "$bb" "$upstream" "$publicado" > "$estado_bb" || exit 2; }; exit "$rc_fatia"
 ```
 
 Os limites são os do CodeAnt, **fixos**: vêm dos perfis do núcleo do expx, e nenhum projeto os
@@ -203,8 +216,16 @@ Rascunho é o padrão: no fluxo normal, a mergex entrega antes do QA rodar. Um P
 Título: o do trabalho — o mesmo do `ORQUESTRADOR.md`. Corpo: o conteúdo de `PR.md`, integralmente.
 A base é o `$bb` do passo 1.5 — a `branch_base` já sem o remoto e sem `refs/...` —, nunca a
 `branch_base` crua: o serviço não conhece `upstream/main` como branch, e a abertura falharia.
-O comando roda noutra chamada do shell, então o `$bb` vem do arquivo de estado que o passo 1.5
-gravou (sem ele, o passo 1.5 não chegou à medição, e o PR não abre), e a branch, do upstream.
+O destino é o projeto do remoto-base `$rb` medido, e a origem é o projeto do remoto do upstream;
+os dois são passados explicitamente à CLI. O comando roda noutra chamada do shell, então `$rb` e
+`$bb` vêm do arquivo de estado que o passo 1.5 gravou (sem eles, o passo 1.5 não chegou à
+medição, e o PR não abre), e a branch vem do upstream. O passo 2 só abre o que foi medido: o
+upstream e o `HEAD` têm de ser os do estado, e a ponta remota (`git ls-remote`), o SHA medido.
+Trocar de branch, commitar ou ver a branch remota andar entre as duas chamadas recusa a abertura;
+meça de novo pelo passo 1.5. URLs HTTP(S), SSH e SCP são normalizadas
+para `HOST/OWNER/REPO`; formato desconhecido falha fechado em vez de abrir no projeto errado. O
+`gh` aceita essa forma no `--repo`; o `glab` não a documenta (lê `HOST/…` como grupo), e por isso
+recebe a URL completa, `https://HOST/OWNER/REPO`, no `--repo` e no `--head`.
 
 O título é texto do `ORQUESTRADOR.md`, não comando: entre aspas duplas, um `$(...)` ou uma crase
 nele rodaria na abertura do PR. Ele entra pelo heredoc com o delimitador entre aspas
@@ -214,26 +235,119 @@ Troque só a linha `<título>` do bloco, por uma linha só; nunca ponha o títul
 No GitHub (`gh`, do passo 1):
 
 ```bash
-bb="$(cat "$(git rev-parse --git-path mergex-e7-base)")" && [ -n "$bb" ] || { echo "sem a base do passo 1.5: o E7 não abre o PR"; exit 1; }
+estado_bb="$(git rev-parse --git-path mergex-e7-base)"
+rb="$(sed -n '1p' "$estado_bb")"; bb="$(sed -n '2p' "$estado_bb")"
+upstream_medido="$(sed -n '3p' "$estado_bb")"; publicado="$(sed -n '4p' "$estado_bb")"
+[ -n "$rb" ] && [ -n "$bb" ] && [ -n "$upstream_medido" ] && [ -n "$publicado" ] \
+  || { echo "sem remoto, base, upstream e SHA medidos no passo 1.5: o E7 não abre o PR"; exit 1; }
 upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}')" || exit 1
+[ "$upstream" = "$upstream_medido" ] && [ "$(git rev-parse HEAD)" = "$publicado" ] \
+  || { echo "a branch ou o HEAD mudaram desde a medição do passo 1.5: o E7 não abre o PR"; exit 1; }
+remoto="${upstream%%/*}"; ref_remota="refs/heads/${upstream#*/}"
+ponta="$(git ls-remote "$remoto" "$ref_remota" | awk -v r="$ref_remota" '$2 == r { print $1; exit }')"
+[ "$ponta" = "$publicado" ] || { echo "a ponta de $upstream não é mais o SHA medido ($publicado): o E7 não abre o PR"; exit 1; }
+identidade_remota() {
+  local url resto autoridade host caminho
+  url="$(git remote get-url "$1")" || return 1
+  case "$url" in
+    http://*|https://*|git://*)
+      resto="${url#*://}"; host="${resto%%/*}"; caminho="${resto#*/}" ;;
+    ssh://*)
+      resto="${url#ssh://}"; resto="${resto#*@}"; autoridade="${resto%%/*}"
+      [ "$autoridade" != "$resto" ] || return 1
+      host="${autoridade%%:*}"; caminho="${resto#*/}" ;;
+    *:*)
+      resto="${url#*@}"; host="${resto%%:*}"; caminho="${resto#*:}" ;;
+    *) return 1 ;;
+  esac
+  caminho="${caminho#/}"; caminho="${caminho%.git}"
+  case "$host" in ''|*[!A-Za-z0-9.:-]*) return 1 ;; esac
+  case "$caminho" in ''|*[!A-Za-z0-9._/-]*) return 1 ;; esac
+  printf '%s/%s\n' "$host" "$caminho"
+}
+destino="$(identidade_remota "$rb")" || { echo "remoto-base não normalizável: o E7 não abre o PR"; exit 1; }
+fonte="$(identidade_remota "$remoto")" || { echo "remoto da origem não normalizável: o E7 não abre o PR"; exit 1; }
+[ "${destino%%/*}" = "${fonte%%/*}" ] || { echo "origem e destino estão em hosts distintos: o E7 não abre o PR"; exit 1; }
+opcao_rascunho=(--draft)
+qa="docs/manutencao/<trabalho_id>/QA.md"
+if [ -f "$qa" ] && grep -qF 'VEREDITO: APROVADO' "$qa"; then opcao_rascunho=(); fi
 IFS= read -r titulo <<'TITULO_DO_PR'
 <título>
 TITULO_DO_PR
 [ -n "$titulo" ] || { echo "título vazio: o E7 não abre o PR"; exit 1; }
-gh pr create --base "$bb" --head "${upstream#*/}" --title "$titulo" --body-file docs/entregas/<trabalho_id>/PR.md --draft
+head="${upstream#*/}"
+if [ "$fonte" != "$destino" ]; then
+  projeto_fonte="${fonte#*/}"; dono_fonte="${projeto_fonte%%/*}"
+  [ -n "$dono_fonte" ] && [ "${projeto_fonte#*/}" != "$projeto_fonte" ] || { echo "projeto da origem inválido: o E7 não abre o PR"; exit 1; }
+  head="$dono_fonte:$head"
+fi
+gh pr create --repo "$destino" --base "$bb" --head "$head" --title "$titulo" --body-file docs/entregas/<trabalho_id>/PR.md "${opcao_rascunho[@]}"
 ```
 
 No GitLab (`glab`, do passo 1), o equivalente é o merge request; o `--yes` pula a confirmação
 interativa do `glab`, que de outro modo esperaria uma resposta:
 
 ```bash
-bb="$(cat "$(git rev-parse --git-path mergex-e7-base)")" && [ -n "$bb" ] || { echo "sem a base do passo 1.5: o E7 não abre o PR"; exit 1; }
+estado_bb="$(git rev-parse --git-path mergex-e7-base)"
+rb="$(sed -n '1p' "$estado_bb")"; bb="$(sed -n '2p' "$estado_bb")"
+upstream_medido="$(sed -n '3p' "$estado_bb")"; publicado="$(sed -n '4p' "$estado_bb")"
+[ -n "$rb" ] && [ -n "$bb" ] && [ -n "$upstream_medido" ] && [ -n "$publicado" ] \
+  || { echo "sem remoto, base, upstream e SHA medidos no passo 1.5: o E7 não abre o PR"; exit 1; }
 upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}')" || exit 1
+[ "$upstream" = "$upstream_medido" ] && [ "$(git rev-parse HEAD)" = "$publicado" ] \
+  || { echo "a branch ou o HEAD mudaram desde a medição do passo 1.5: o E7 não abre o PR"; exit 1; }
+remoto="${upstream%%/*}"; ref_remota="refs/heads/${upstream#*/}"
+ponta="$(git ls-remote "$remoto" "$ref_remota" | awk -v r="$ref_remota" '$2 == r { print $1; exit }')"
+[ "$ponta" = "$publicado" ] || { echo "a ponta de $upstream não é mais o SHA medido ($publicado): o E7 não abre o PR"; exit 1; }
+identidade_remota() {
+  local url resto autoridade host caminho
+  url="$(git remote get-url "$1")" || return 1
+  case "$url" in
+    http://*|https://*|git://*)
+      resto="${url#*://}"; host="${resto%%/*}"; caminho="${resto#*/}" ;;
+    ssh://*)
+      resto="${url#ssh://}"; resto="${resto#*@}"; autoridade="${resto%%/*}"
+      [ "$autoridade" != "$resto" ] || return 1
+      host="${autoridade%%:*}"; caminho="${resto#*/}" ;;
+    *:*)
+      resto="${url#*@}"; host="${resto%%:*}"; caminho="${resto#*:}" ;;
+    *) return 1 ;;
+  esac
+  caminho="${caminho#/}"; caminho="${caminho%.git}"
+  case "$host" in ''|*[!A-Za-z0-9.:-]*) return 1 ;; esac
+  case "$caminho" in ''|*[!A-Za-z0-9._/-]*) return 1 ;; esac
+  printf '%s/%s\n' "$host" "$caminho"
+}
+destino="$(identidade_remota "$rb")" || { echo "remoto-base não normalizável: o E7 não abre o PR"; exit 1; }
+fonte="$(identidade_remota "$remoto")" || { echo "remoto da origem não normalizável: o E7 não abre o PR"; exit 1; }
+[ "${destino%%/*}" = "${fonte%%/*}" ] || { echo "origem e destino estão em hosts distintos: o E7 não abre o PR"; exit 1; }
+opcao_rascunho=(--draft)
+qa="docs/manutencao/<trabalho_id>/QA.md"
+if [ -f "$qa" ] && grep -qF 'VEREDITO: APROVADO' "$qa"; then opcao_rascunho=(); fi
 IFS= read -r titulo <<'TITULO_DO_PR'
 <título>
 TITULO_DO_PR
 [ -n "$titulo" ] || { echo "título vazio: o E7 não abre o PR"; exit 1; }
-glab mr create --target-branch "$bb" --source-branch "${upstream#*/}" --title "$titulo" --description "$(cat docs/entregas/<trabalho_id>/PR.md)" --draft --yes
+branch_fonte="${upstream#*/}"; projeto_fonte="${fonte#*/}"
+projeto_fonte_codificado="$(node -p 'encodeURIComponent(process.argv[1])' "$projeto_fonte")" || exit 1
+fonte_id="$(glab api "projects/$projeto_fonte_codificado" | node -e 'const fs=require("fs"); const v=JSON.parse(fs.readFileSync(0,"utf8")); if(!Number.isSafeInteger(v.id)) process.exit(2); process.stdout.write(String(v.id))')" || { echo "projeto fonte não resolvido"; exit 1; }
+pagina=1; por_pagina=100; quantidade=0; pr_url=""
+while :; do
+  pagina_json="$(glab mr list --repo "https://$destino" --source-branch "$branch_fonte" --target-branch "$bb" --output json --page "$pagina" --per-page "$por_pagina")" || { echo "MRs abertas não listadas no destino"; exit 1; }
+  pagina_lida="$(printf '%s' "$pagina_json" | node -e 'const fs=require("fs"); const b=process.argv[1], id=process.argv[2], target=process.argv[3]; const xs=JSON.parse(fs.readFileSync(0,"utf8")); if(!Array.isArray(xs)) process.exit(2); const ms=xs.filter(x => x.source_branch===b && String(x.source_project_id)===id && x.target_branch===target); process.stdout.write(String(xs.length)+"\n"+String(ms.length)+"\n"+(ms.length===1 ? String(ms[0].web_url||"") : ""))' "$branch_fonte" "$fonte_id" "$bb")" || exit 1
+  quantidade_pagina="$(printf '%s\n' "$pagina_lida" | sed -n '1p')"
+  encontradas_pagina="$(printf '%s\n' "$pagina_lida" | sed -n '2p')"
+  url_pagina="$(printf '%s\n' "$pagina_lida" | sed -n '3p')"
+  quantidade=$((quantidade + encontradas_pagina))
+  [ -z "$url_pagina" ] || [ -n "$pr_url" ] || pr_url="$url_pagina"
+  [ "$quantidade_pagina" -lt "$por_pagina" ] && break
+  pagina=$((pagina + 1))
+done
+case "$quantidade" in
+  0) glab mr create --repo "https://$destino" --head "https://$fonte" --target-branch "$bb" --source-branch "$branch_fonte" --title "$titulo" --description "$(cat docs/entregas/<trabalho_id>/PR.md)" "${opcao_rascunho[@]}" --yes ;;
+  1) [ -n "$pr_url" ] || { echo "MR única sem web_url"; exit 1; } ;;
+  *) echo "mais de uma MR aberta para $projeto_fonte:$branch_fonte no destino"; exit 1 ;;
+esac
 ```
 
 Sem `--draft` quando o QA já aprovou.
@@ -244,8 +358,15 @@ Não adicione revisor, etiqueta, marco ou responsável por conta própria: nada 
 
 Qualquer falha — sem permissão, PR já existe, base inválida, rede fora — **não interrompe a entrega**. Vá para o passo 3, registre o erro literal do comando, e siga.
 
-Se a falha for "PR já existe para esta branch", recupere a URL existente (`gh pr view --json url`; no GitLab, `glab mr view <branch> --output json`,
-campo `web_url`) e registre-a: é uma retomada, não uma falha. É o caso normal depois de uma reconciliação de base (`references/11-reconciliacao-base.md`): o PR existente é retomado, **nunca um segundo PR**.
+Se a falha for "PR já existe para esta branch" no GitHub, recupere uma URL escalar no **projeto de destino** e exija exatamente uma linha:
+
+```bash
+pr_url="$(gh pr view "$head" --repo "$destino" --json url --jq '.url')" || { echo "PR existente não recuperado no destino"; exit 1; }
+linhas_url="$(printf '%s\n' "$pr_url" | awk 'END { print NR }')"
+[ -n "$pr_url" ] && [ "$linhas_url" = 1 ] || { echo "recuperação do PR retornou zero ou múltiplas URLs"; exit 1; }
+```
+
+No GitLab, a consulta exata por projeto fonte e branch já ocorre antes do `glab mr create`: zero cria, uma retoma e mais de uma falha fechado. É uma retomada, não uma falha. É o caso normal depois de uma reconciliação de base (`references/11-reconciliacao-base.md`): a solicitação existente é retomada, **nunca uma segunda solicitação**.
 
 Na entrega `por_sprint`, isso só é retomada quando o PR existente é o da `sprint_atual` que o
 E0 registrou. Um PR `merged` da sprint anterior é histórico em `prs`, **não é retomada**: depois
