@@ -1,5 +1,12 @@
 # Changelog
 
+## Próxima versão — executor observado e resolução no rastro
+
+- O escritor comum do rastro grava `model` e `effort` só como executor observado (H10 de CONTRATO-expx-orquestracao): `EXPX_MODEL`/`EXPX_EFFORT` do chamador e, no Claude, `$CLAUDE_EFFORT` apenas para o principal. Deixa de completar o subagente do Claude com o frontmatter de `.claude/agents`, o que gravava configuração como execução e deixava de coincidir com `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, `CLAUDE_CODE_EFFORT_LEVEL` ou um `fallbackModel`. Sem observação, as duas chaves saem `null`. O escritor também grava o `harness` detectado.
+- Com a política de orquestração ativa, o `init` grava `.expx/orquestracao-rastro.tsv`, uma projeção plana das resoluções vigentes, e o escritor comum acrescenta à linha do subagente no Claude as chaves da resolução: `resolucao_id`, `classe_declarada`, `classe_resolvida`, `origem_classe`, `alternativa`, `origem_alternativa` e, na exceção do `agentes.json` v1, `materializado`. Sem política, nada muda. O `doctor` ganha `orquestracao-projecao-divergente`.
+- O painel mostra a resolução citada como "configuração (não observada)" quando o evento não tem observação, e sinaliza inconsistência quando o registro não se lê ou é de outro agente; sem resolução, mantém o fallback para a configuração instalada, agora também para o `null`/`null` sem observação.
+- O contrato de eventos declara as chaves da resolução, `invocacao`, `modelos_observados`, `fora_da_politica` e o evento `invocacao_abandonada`; os quatro últimos ficam para o envelope da invocação (F3b). Os escritores próprios da SprintX ainda completam o subagente com o frontmatter até receberem a mesma mudança.
+
 ## 0.12.4 — correções da 0.12.3
 
 - **Errata da 0.12.3:** a DM-270 (a `branch_base` e o título do E7 por arquivo) foi anunciada como incluída, mas não entrou na release. O commit subiu depois do merge do AxisGov/mergex#52 e ficou só na branch, e o E7 instalado pela 0.12.3 ainda cola os dois valores num heredoc, com a injeção aberta. Entra agora.
