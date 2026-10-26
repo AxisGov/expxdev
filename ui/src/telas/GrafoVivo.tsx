@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type JSX, type PointerEvent, type WheelEvent } from "react";
-import type { ConfiguracaoAgente, Evento, Trabalho } from "../tipos.js";
+import type { ConfiguracaoAgente, Evento, ResolucaoNoPainel, Trabalho } from "../tipos.js";
 import { topologiaDeTasks, type No, type Topologia } from "../../../src/grafo/topologia.js";
 import { execucaoDoEvento } from "../modelos.js";
 
@@ -90,11 +90,13 @@ export function GrafoVivo({
   trabalho,
   eventos = [],
   agentes = [],
+  resolucoes = {},
   aoEscolherTask,
 }: {
   trabalho: Trabalho;
   eventos?: readonly Evento[];
   agentes?: readonly ConfiguracaoAgente[];
+  resolucoes?: Readonly<Record<string, ResolucaoNoPainel | null>>;
   /** Chamado ao clicar num nó — a tela rola até a task no plano abaixo. */
   aoEscolherTask?: (id: string) => void;
 }): JSX.Element | null {
@@ -314,7 +316,7 @@ export function GrafoVivo({
               const atividade = atividadePorTask.get(no.id);
               const execucao = atividade === undefined
                 ? null
-                : execucaoDoEvento(atividade, agentes);
+                : execucaoDoEvento(atividade, agentes, resolucoes);
 
               return (
                 <g

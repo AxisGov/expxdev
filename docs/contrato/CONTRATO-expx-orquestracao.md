@@ -10,9 +10,12 @@ este texto e o desenho divergem, vale este texto.
 tabela embutida, a matriz de esforço do Claude, a função de resolução e o
 formato do registro e do lock. **Desde a F2**, o `init` aplica a política no
 adaptador Claude: materializa os agentes, grava o registro e a seção do lock, e
-o `doctor` diagnostica (`CONTRATO-expx-instalacao.md` §5.3). O rastro, o
-painel e os hooks de invocação continuam sem mudança até a F3 e a F3b, que
-emendam este contrato.
+o `doctor` diagnostica (`CONTRATO-expx-instalacao.md` §5.3). **Desde a F3a**,
+o rastro grava `model`/`effort` só como executor observado (H10) e, com a
+política ativa, as chaves da resolução no evento do subagente, a partir da
+projeção `.expx/orquestracao-rastro.tsv`; o painel mostra a resolução como
+configuração não observada (seção 11 e `CONTRATO-expx-eventos.md`). `integridade_final`
+(F3c) e o envelope da invocação (F3b) ainda não existem.
 
 ## 1. Três coisas separadas
 
@@ -297,5 +300,73 @@ Só com a camada ativa.
 
 H1–H11 do desenho foram aprovadas em 2026-10-24 como recomendadas. As que esta
 versão aplica diretamente são H2 (justificativa), H3 (classe declarada), H6
-(só Claude operacional), H7 (registro e lock) e H9 (exceção v1). As demais
-(H4, H5, H8, H10, H11) regem as fases seguintes e entram nas emendas delas.
+(só Claude operacional), H7 (registro e lock), H9 (exceção v1) e, desde a F3a,
+H10 (o escritor do rastro sem configuração em `model`/`effort`). As demais
+(H4, H5, H8, H11) regem as fases seguintes e entram nas emendas delas.
+
+## 11. Rastro (F3a)
+
+### 11.1 O evento: executor observado e resolução
+
+`model` e `effort` do rastro são **só o executor observado** (H10): nenhum
+escritor deve preenchê-los com configuração — frontmatter, resolução ou
+alternativa. O escritor comum já cumpre a regra; os escritores próprios da
+SprintX ainda completam o subagente do Claude com o frontmatter, exceção
+transitória até receberem a mesma mudança. O escritor comum (`nucleo/hooks/expx-rastro.sh`) os tira de
+`EXPX_MODEL`/`EXPX_EFFORT`, que o chamador lê do payload do runtime para o
+executor `EXPX_AGENTE` (no Claude, `effort.level`), e, no contexto Claude, de
+`$CLAUDE_EFFORT` apenas para `principal`. Sem observação, `null`. O `harness`
+detectado vai na linha, salvo se o chamador já o mandou.
+
+Com a política ativa, a linha de um **subagente no contexto Claude** leva a
+resolução vigente dele, depois das doze chaves:
+
+| Chave | Valor |
+|---|---|
+| `resolucao_id` | o id da seção 8, que endereça `.expx/resolucoes/<id>.json` |
+| `classe_declarada` · `classe_resolvida` · `origem_classe` | os campos de mesmo nome da resolução |
+| `alternativa` | o `id` da alternativa materializada |
+| `origem_alternativa` | o campo de mesmo nome |
+| `materializado` | `{model, effort?}`, **só** com `origem_alternativa: agentes-json-v1` (7.4) |
+
+O principal, outro harness e o agente fora da projeção não levam essas
+chaves. `invocacao`, `modelos_observados`, `fora_da_politica` e o evento
+`invocacao_abandonada` estão declarados em `CONTRATO-expx-eventos.md` para o
+envelope da invocação (F3b), e nenhum escritor os grava nesta versão.
+
+### 11.2 A projeção `.expx/orquestracao-rastro.tsv`
+
+O escritor é bash, sem `jq` nem runtime, e por isso não lê o lock nem o
+registro: lê uma projeção plana deles, que o `init` grava no mesmo plano em
+que grava o registro e o lock, de forma atômica, e remove quando a política
+sai. Ela não é fonte de nada.
+
+- Primeira linha: `# expx-orquestracao-rastro 1`. Depois, uma linha por
+  agente, em ordem, com nove campos separados por TAB: `agente`,
+  `resolucao_id`, `classe_declarada`, `origem_classe`, `classe_resolvida`, o
+  `id` da `alternativa`, `origem_alternativa`, `model` e `effort` do
+  `materializado`, com `-` quando ausentes.
+- Todo campo é preenchido e fica no alfabeto `[A-Za-z0-9._:/-]`, que entra no
+  JSON sem escape; `-` só vale nas duas colunas do `materializado`. Valor fora
+  disso, ou agente repetido, recusa o plano.
+- O escritor falha aberto: cabeçalho diferente, linha sem exatamente oito
+  TABs, campo vazio ou fora do alfabeto, `resolucao_id` fora do formato ou
+  agente fora do alfabeto de nome deixam a linha **sem** as chaves, nunca com
+  parte delas.
+- O `doctor` confere a projeção contra o lock e o registro
+  (`orquestracao-projecao-divergente`, `CONTRATO-expx-instalacao.md` §5.3).
+
+### 11.3 O leitor
+
+O painel mostra a configuração quando não há observação, e só ele:
+
+1. `model` ou `effort` observados (não `null`): histórico, sem completar o
+   que falta;
+2. sem observação e com `resolucao_id` cujo registro se lê e é do mesmo
+   agente: a alternativa resolvida (ou o `materializado`), rotulada
+   **configuração (não observada)**;
+3. `resolucao_id` sem registro legível, ou de outro agente: **inconsistência**,
+   sem inventar configuração. O id do evento só vira caminho se estiver no
+   formato, e o arquivo precisa ser regular e passar pela leitura do registro;
+4. sem `resolucao_id`: o fallback anterior — a configuração instalada, só
+   quando o evento não identifica outro harness.

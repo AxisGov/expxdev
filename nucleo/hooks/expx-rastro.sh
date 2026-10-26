@@ -339,50 +339,57 @@ expx_modo() {
   esac
 }
 
-# Snapshot da configuracao efetiva do subagente instalado.
-#
-# O valor explicito do runtime (EXPX_MODEL/EXPX_EFFORT) vence esta leitura.
-# O arquivo e apenas o fallback do contexto Claude quando o runtime nao expoe
-# modelo e esforco no payload do hook. Harnesses nao Claude nunca herdam essa
-# configuracao como historico. principal nao
-# tem arquivo proprio: sem dado do runtime, fica null em vez de inventar.
-expx_config_agente() {
-  local raiz="$1" agente="$2" campo="$3"
-  case "$campo" in model|effort) ;; *) return 0 ;; esac
-  case "$agente" in
-    ""|principal|*..*|*[!A-Za-z0-9._-]*) return 0 ;;
-  esac
-
-  local arq="$raiz/.claude/agents/$agente.md"
+# As chaves da resolucao do agente (CONTRATO-expx-orquestracao §11.1), lidas da
+# projecao plana que o `expx init` grava com a politica ativa
+# (.expx/orquestracao-rastro.tsv). Imprime o fragmento JSON ou nada: sem
+# projecao, com cabecalho, id ou campo fora do formato, ou com o agente fora
+# dela. Falha aberta — a linha sai sem as chaves, nunca com evidencia parcial.
+# Os campos so aceitam o que dispensa escape em JSON, entao entram literais.
+expx_resolucao_extras() {
+  local arq="$1/.expx/orquestracao-rastro.tsv" agente="$2" cab=""
   [ -f "$arq" ] || return 0
-
-  local linha chave valor dentro=0
+  IFS= read -r cab < "$arq" || true
+  [ "${cab%$'\r'}" = "# expx-orquestracao-rastro 1" ] || return 0
+  # o nome do agente no alfabeto de nome: fora dele, nem consigo mesmo casa
+  case "$agente" in ""|*[!A-Za-z0-9._-]*) return 0 ;; esac
+  local linha tabs ag id cd oc cr alt oa mm me v out="" achadas=0
   while IFS= read -r linha || [ -n "$linha" ]; do
     linha="${linha%$'\r'}"
-    if [ "$linha" = "---" ]; then
-      if [ "$dentro" -eq 0 ]; then dentro=1; continue; else break; fi
+    case "$linha" in "$agente"$'\t'*) ;; *) continue ;; esac
+    # agente repetido: a projecao nao vale para ele (o plano a recusaria). So se
+    # sabe no fim do arquivo: conta e segue lendo; a decisao vem depois do laco.
+    achadas=$((achadas + 1))
+    [ "$achadas" -eq 1 ] || continue
+    # Exatamente oito TABs, contados na linha crua: o `read` com IFS de TAB
+    # trata TAB como espaco em branco e juntaria coluna vazia ou TAB no fim.
+    tabs="${linha//[!$'\t']/}"
+    [ "${#tabs}" -eq 8 ] || return 0
+    IFS=$'\t' read -r ag id cd oc cr alt oa mm me <<EXPX_PROJECAO
+$linha
+EXPX_PROJECAO
+    case "$id" in ""|*[!0-9a-f]*) return 0 ;; esac
+    [ "${#id}" -eq 64 ] || return 0
+    # nove campos cheios: um vazio teria deslocado os demais e deixado o ultimo vazio
+    for v in "$ag" "$cd" "$oc" "$cr" "$alt" "$oa" "$mm" "$me"; do
+      case "$v" in ""|*[!A-Za-z0-9._:/-]*) return 0 ;; esac
+    done
+    # `-` so e ausencia nas duas colunas do materializado, e o materializado so
+    # existe na excecao do agentes.json v1, sempre com model
+    for v in "$cd" "$oc" "$cr" "$alt" "$oa"; do [ "$v" != - ] || return 0; done
+    [ "$mm" != - ] || [ "$me" = - ] || return 0
+    [ "$mm" = - ] || [ "$oa" = agentes-json-v1 ] || return 0
+    out="\"resolucao_id\":\"$id\",\"classe_declarada\":\"$cd\",\"classe_resolvida\":\"$cr\""
+    out="$out,\"origem_classe\":\"$oc\",\"alternativa\":\"$alt\",\"origem_alternativa\":\"$oa\""
+    if [ "$mm" != - ]; then
+      if [ "$me" != - ]; then out="$out,\"materializado\":{\"model\":\"$mm\",\"effort\":\"$me\"}"
+      else out="$out,\"materializado\":{\"model\":\"$mm\"}"
+      fi
     fi
-    [ "$dentro" -eq 1 ] || continue
-    case "$linha" in *:*) ;; *) continue ;; esac
-    chave="${linha%%:*}"
-    chave="${chave//[[:space:]]/}"
-    chave="${chave//\"/}"
-    chave="${chave//\'/}"
-    [ "$chave" = "$campo" ] || continue
-
-    valor="${linha#*:}"
-    valor="${valor#"${valor%%[![:space:]]*}"}"
-    valor="${valor%"${valor##*[![:space:]]}"}"
-    case "$valor" in
-      \"*\") valor="${valor#\"}"; valor="${valor%\"}" ;;
-      \'*\') valor="${valor#\'}"; valor="${valor%\'}" ;;
-    esac
-    # IDs multi-provider usam, alem do alfanumerico, . _ : / -.
-    # YAML mais complexo falha aberto: null, nunca evidencia parcial.
-    case "$valor" in ""|*[!A-Za-z0-9._:/-]*) return 0 ;; esac
-    printf '%s' "$valor"
-    return 0
   done < "$arq"
+  # o arquivo inteiro lido: so entao se sabe que o agente nao se repete
+  [ "$achadas" -eq 1 ] || return 0
+  printf '%s' "$out"
+  return 0
 }
 
 # ---------------------------------------------------------------- gravacao
@@ -392,8 +399,11 @@ expx_config_agente() {
 # Grava UMA linha em docs/eventos/<trabalho_id>.jsonl.
 #
 # As DOZE chaves obrigatorias saem sempre todas, na ordem do contrato, e chave
-# sem valor vai como null — nunca omitida (R6). model e effort sao o snapshot
-# historico e saem em toda linha nova; as demais extras vêm em extras_json.
+# sem valor vai como null — nunca omitida (R6). model e effort sao o executor
+# OBSERVADO e saem em toda linha nova: null quando o runtime nao informou, e
+# nunca preenchidos com configuracao (frontmatter, resolucao ou alternativa) —
+# CONTRATO-expx-orquestracao, H10. A intencao vai pelas chaves da resolucao, e
+# quem decide mostra-la e o leitor. As demais extras vêm em extras_json.
 #
 # Falha aberta: erro aqui e engolido. Um hook nunca trava o trabalho por nao
 # conseguir escrever o proprio rastro.
@@ -406,16 +416,18 @@ expx_rastro_grava() {
     mkdir -p "$dir" 2>/dev/null || return 0
 
     local agente="${EXPX_AGENTE:-principal}"
+    # EXPX_MODEL/EXPX_EFFORT: o que o chamador observou no payload do runtime
+    # (no Claude, `effort.level`) para o executor EXPX_AGENTE.
     local model="${EXPX_MODEL:-}" effort="${EXPX_EFFORT:-}"
-    # Contexto Claude: o harness declarado, ou, sem ele, a CLAUDECODE que o
-    # Claude Code exporta. Sem nenhum sinal o runtime e desconhecido e nao
-    # herda o frontmatter de .claude/agents.
+    # O harness declarado, ou, sem ele, a CLAUDECODE que o Claude Code exporta.
     local harness="${EXPX_HARNESS:-}"
     [ -z "$harness" ] && [ -n "${CLAUDECODE:-}" ] && harness=claude-code
+    # $CLAUDE_EFFORT e o esforco da sessao: observacao do principal, e so dele.
+    # Num hook disparado dentro de um subagente ele nao descreve o subagente, e
+    # atribui-lo seria gravar configuracao alheia como executor.
     case "$harness" in
       claude|claude-code)
-        [ -n "$model" ] || model="$(expx_config_agente "$raiz" "$agente" model)"
-        [ -n "$effort" ] || effort="$(expx_config_agente "$raiz" "$agente" effort)"
+        [ -z "$effort" ] && [ "$agente" = principal ] && effort="${CLAUDE_EFFORT:-}"
         ;;
     esac
     local model_json=null effort_json=null
@@ -470,6 +482,22 @@ expx_rastro_grava() {
     linha="$linha,\"arquivos\":$arquivos"
     linha="$linha,\"model\":$model_json"
     linha="$linha,\"effort\":$effort_json"
+    # o harness detectado, salvo quando o chamador ja o mandou nas extras
+    if [ -n "$harness" ]; then
+      case "$extras" in
+        *'"harness":'*) ;;
+        *) linha="$linha,\"harness\":\"$(expx_json_escape "$harness")\"" ;;
+      esac
+    fi
+    # a resolucao vigente do subagente, so no Claude: a projecao e do adaptador claude
+    case "$harness" in
+      claude|claude-code)
+        if [ "$agente" != principal ]; then
+          local resolucao; resolucao="$(expx_resolucao_extras "$raiz" "$agente")"
+          [ -n "$resolucao" ] && linha="$linha,$resolucao"
+        fi
+        ;;
+    esac
     [ -n "$extras" ] && linha="$linha,$extras"
     linha="$linha}"
 

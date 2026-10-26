@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
+import { bashDosHooks } from "../teste/candidatos.js";
 import { executarInit } from "./init.js";
 import { lerRegistro } from "../orquestracao/materializar.js";
 import type { Resolucao } from "../orquestracao/resolver.js";
@@ -63,6 +65,83 @@ describe("init sem política — camada inativa", () => {
     expect(existsSync(join(p, ".expx/resolucoes"))).toBe(false);
     expect(lerAgente(p, "auditor")).toBe(AUDITOR);
     expect(lerAgente(p, "triagem")).toBe(TRIAGEM);
+  });
+});
+
+const PROJECAO = ".expx/orquestracao-rastro.tsv";
+const linhasDaProjecao = (p: string) => readFileSync(join(p, PROJECAO), "utf8").split("\n").filter((l) => l !== "");
+
+describe("projeção do rastro (F3a)", () => {
+  it("sem política não existe", async () => {
+    const p = produto();
+    expect((await init(p)).ok).toBe(true);
+    expect(existsSync(join(p, PROJECAO))).toBe(false);
+  });
+
+  it("com política, uma linha por agente com o id do lock; removida quando a política sai", async () => {
+    const p = produto();
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+    const o = origens();
+    expect((await init(p, o)).ok).toBe(true);
+    const orq = lerLock(p).orquestracao;
+    const [cab, ...linhas] = linhasDaProjecao(p);
+    expect(cab).toBe("# expx-orquestracao-rastro 1");
+    expect(linhas.map((l) => l.split("\t").slice(0, 2))).toEqual([
+      ["auditor", orq?.agentes["auditor"]?.claude],
+      ["triagem", orq?.agentes["triagem"]?.claude],
+    ]);
+    rmSync(join(p, ".expx/orquestracao.json"));
+    expect((await init(p, o)).ok).toBe(true);
+    expect(existsSync(join(p, PROJECAO))).toBe(false);
+  });
+
+  it("na exceção do v1, a linha leva o materializado", async () => {
+    const p = produto();
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+    gravar(p, ".expx/agentes.json", { expx_agentes: 1, agentes: { auditor: { model: "haiku" } } });
+    expect((await init(p)).ok).toBe(true);
+    const auditor = linhasDaProjecao(p).find((l) => l.startsWith("auditor\t"))?.split("\t") ?? [];
+    expect(auditor.slice(6)).toEqual(["agentes-json-v1", "haiku", "high"]);
+  });
+});
+
+describe("transição da política, pelo init e pelo escritor instalado (F3a)", () => {
+  /** Grava um evento do subagente pelo escritor que o init instalou no projeto. */
+  function evento(p: string): Record<string, unknown> {
+    // o escritor que o init instalou, e nenhum outro: sem ele, o teste não prova a instalação
+    const instalado = join(p, ".expx/marketplace/plugins/expx/nucleo/hooks/expx-rastro.sh");
+    expect(existsSync(instalado), instalado).toBe(true);
+    const escritor = instalado.replace(/\\/g, "/");
+    const env: NodeJS.ProcessEnv = {};
+    for (const [k, v] of Object.entries(process.env)) if (!k.startsWith("EXPX_") && k !== "CLAUDECODE") env[k] = v;
+    const r = spawnSync(bashDosHooks(), ["-c", `. "$1"\nexpx_rastro_grava "$PWD" agente_concluido agente ok x`, "rastro", escritor], {
+      cwd: p,
+      encoding: "utf8",
+      env: { ...env, EXPX_TRABALHO_ID: "t", CLAUDECODE: "1", EXPX_AGENTE: "auditor" },
+    });
+    if (r.status !== 0) throw new Error(r.stderr);
+    const linhas = readFileSync(join(p, "docs/eventos/t.jsonl"), "utf8").split("\n").filter((l) => l !== "");
+    return JSON.parse(linhas[linhas.length - 1] ?? "{}") as Record<string, unknown>;
+  }
+
+  it("integração: inativa → ativa → inativa: a linha ganha a resolução vigente e depois a perde", async () => {
+    const p = produto();
+    const o = origens();
+    expect((await init(p, o)).ok).toBe(true);
+    const antes = evento(p);
+    expect(antes).not.toHaveProperty("resolucao_id");
+    expect(antes).toMatchObject({ model: null, effort: null, harness: "claude-code" });
+
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+    expect((await init(p, o)).ok).toBe(true);
+    const id = lerLock(p).orquestracao?.agentes["auditor"]?.claude;
+    expect(id).toMatch(/^[0-9a-f]{64}$/);
+    const ativa = evento(p);
+    expect(ativa).toMatchObject({ resolucao_id: id, classe_declarada: "raciocinio_normal", origem_alternativa: "skill", model: null, effort: null });
+
+    rmSync(join(p, ".expx/orquestracao.json"));
+    expect((await init(p, o)).ok).toBe(true);
+    expect(evento(p)).not.toHaveProperty("resolucao_id");
   });
 });
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CLASSES } from "../../orquestracao/tipos.js";
 import { Ferramenta } from "./enums.js";
 
 /**
@@ -34,7 +35,27 @@ export const CHAVES_EVENTO = [
  * liga a edição à task aberta. Opcionais no esquema porque têm TRÊS estados, e
  * `EVENTOS_COM_IDENTIDADE` (abaixo) é o único em que a ausência é defeito.
  */
-export const EXTRAS_EVENTO = ["hook", "faixa", "sessao", "harness", "model", "effort"] as const;
+export const EXTRAS_EVENTO = [
+  "hook",
+  "faixa",
+  "sessao",
+  "harness",
+  "model",
+  "effort",
+  // A resolução da orquestração (CONTRATO-expx-orquestracao §11.1): o escritor
+  // comum grava as sete primeiras desde a F3a; `invocacao`,
+  // `modelos_observados` e `fora_da_politica` são do envelope da F3b.
+  "resolucao_id",
+  "classe_declarada",
+  "classe_resolvida",
+  "origem_classe",
+  "alternativa",
+  "origem_alternativa",
+  "materializado",
+  "invocacao",
+  "modelos_observados",
+  "fora_da_politica",
+] as const;
 
 /**
  * Os eventos em que `sessao`/`harness` são OBRIGATÓRIAS — a reivindicação da task.
@@ -112,6 +133,9 @@ export const EventoNome = z.enum([
   // e `agente: principal`, e nunca interrompe a etapa. Entrou aqui para que o
   // rastro legítimo da mergex não seja contado como fora do contrato.
   "artefato_gravado",
+  // CONTRATO-expx-orquestracao §8.2, passo 3: o envelope de uma invocação de
+  // agente que nunca fechou. Declarado na F3a; quem o emite é a F3b.
+  "invocacao_abandonada",
 ]);
 
 export const Agente = z.enum([
@@ -156,10 +180,27 @@ export const LinhaEvento = z
     harness: z.string().nullable().optional(),
     model: z.string().min(1).nullable().optional(),
     effort: z.string().min(1).nullable().optional(),
+    resolucao_id: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+    classe_declarada: z.enum(CLASSES).optional(),
+    classe_resolvida: z.enum(CLASSES).optional(),
+    origem_classe: z.enum(["declarada", "inferida", "agente", "tarefa"]).optional(),
+    alternativa: z.string().min(1).optional(),
+    origem_alternativa: z.enum(["projeto", "skill", "embutida", "sessao", "agentes-json-v1"]).optional(),
+    materializado: z.strictObject({ model: z.string().min(1), effort: z.string().min(1).optional() }).optional(),
+    invocacao: z.string().min(1).optional(),
+    modelos_observados: z.array(z.string().min(1)).optional(),
+    // presente só quando o executor saiu da cadeia; ausente nos demais casos
+    fora_da_politica: z.literal(true).optional(),
   })
   // Extras declaradas passam; o que não é declarado é reportado por
   // `chavesDesconhecidas`, não rejeitado — o rastro nunca trava trabalho.
-  .passthrough();
+  .passthrough()
+  // `materializado` só existe na exceção do `.expx/agentes.json` v1
+  // (CONTRATO-expx-orquestracao §7.4): fora dela, é linha incoerente.
+  .refine((l) => l.materializado === undefined || l.origem_alternativa === "agentes-json-v1", {
+    message: "materializado só com origem_alternativa agentes-json-v1",
+    path: ["materializado"],
+  });
 
 export type LinhaEvento = z.infer<typeof LinhaEvento>;
 

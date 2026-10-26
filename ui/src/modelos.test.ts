@@ -25,15 +25,44 @@ const instalado: ConfiguracaoAgente = {
 };
 
 describe("execucaoDoEvento", () => {
-  it("unitário: snapshot parcial ou nulo continua histórico e nunca é completado pela configuração atual", () => {
+  it("unitário: observação parcial continua histórico e nunca é completada pela configuração", () => {
     expect(execucaoDoEvento({ ...base, model: "openai/gpt-5.4", effort: null }, [instalado])).toEqual({
       texto: "sprintx-investigador · openai/gpt-5.4 · esforço não informado",
       fonte: "histórico",
     });
-    expect(execucaoDoEvento({ ...base, model: null, effort: null }, [instalado])).toEqual({
-      texto: "sprintx-investigador · modelo não informado · esforço não informado",
+    expect(execucaoDoEvento({ ...base, model: null, effort: "high" }, [instalado])).toEqual({
+      texto: "sprintx-investigador · modelo não informado · high",
       fonte: "histórico",
     });
+  });
+
+  it("unitário: sem observação e sem resolução, o fallback de sempre (H10: null/null não é mais histórico)", () => {
+    expect(execucaoDoEvento({ ...base, model: null, effort: null }, [instalado])).toEqual({
+      texto: "sprintx-investigador · sonnet · medium",
+      fonte: "configuração atual",
+    });
+    expect(execucaoDoEvento({ ...base, model: null, effort: null, harness: "opencode" }, [instalado]).fonte).toBe("histórico indisponível");
+  });
+
+  it("unitário: sem observação, a resolução citada aparece como configuração não observada, nunca como histórico", () => {
+    const id = "c".repeat(64);
+    const resolucoes = { [id]: { agente: "sprintx-investigador", model: "claude-opus-4-6", effort: "high" } };
+    expect(execucaoDoEvento({ ...base, model: null, effort: null, resolucao_id: id }, [instalado], resolucoes)).toEqual({
+      texto: "sprintx-investigador · claude-opus-4-6 · high",
+      fonte: "configuração (não observada)",
+    });
+    // a observação vence a resolução
+    expect(execucaoDoEvento({ ...base, model: "sonnet", effort: null, resolucao_id: id }, [instalado], resolucoes).fonte).toBe("histórico");
+  });
+
+  it("unitário: resolução ilegível, ausente do mapa ou de outro agente é inconsistência, sem inventar", () => {
+    const id = "d".repeat(64);
+    for (const resolucoes of [{ [id]: null }, {}, { [id]: { agente: "auditor-plano", model: "opus", effort: null } }]) {
+      const r = execucaoDoEvento({ ...base, model: null, effort: null, resolucao_id: id }, [instalado], resolucoes);
+      expect(r.fonte, JSON.stringify(resolucoes)).toBe("inconsistência");
+      expect(r.texto).toContain("dddddddd");
+      expect(r.texto).not.toContain("sonnet");
+    }
   });
 
   it("unitário: evento antigo sem harness usa a configuração instalada, rotulada como atual", () => {

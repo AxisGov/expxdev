@@ -70,6 +70,28 @@ describe("doctor — orquestração", () => {
     expect(ids(achados(p.raiz, { HOME: p.home }))).toContain("orquestracao-lock-sem-politica:aviso");
   });
 
+  it("projeção do rastro ausente, alterada ou com linha a menos é erro; refeita pelo init, some", async () => {
+    const p = await projeto({ politica: { expx_orquestracao: 1 } });
+    const arq = join(p.raiz, ".expx/orquestracao-rastro.tsv");
+    const certa = readFileSync(arq, "utf8");
+    const id = (a: Achado[]) => a.filter((x) => x.id === "orquestracao-projecao-divergente").map((x) => x.severidade);
+
+    rmSync(arq);
+    expect(id(achados(p.raiz, { HOME: p.home }))).toEqual(["erro"]);
+    writeFileSync(arq, certa.replace("\tskill\t", "\toutra\t"));
+    expect(id(achados(p.raiz, { HOME: p.home }))).toEqual(["erro"]);
+    writeFileSync(arq, certa.split("\n").slice(0, 2).join("\n") + "\n");
+    expect(id(achados(p.raiz, { HOME: p.home }))).toEqual(["erro"]);
+    writeFileSync(arq, certa);
+    expect(id(achados(p.raiz, { HOME: p.home }))).toEqual([]);
+  });
+
+  it("projeção que sobrou sem política nem seção no lock é aviso", async () => {
+    const p = await projeto();
+    gravar(p.raiz, ".expx/orquestracao-rastro.tsv", "# expx-orquestracao-rastro 1\n");
+    expect(ids(achados(p.raiz, { HOME: p.home }))).toEqual(["orquestracao-projecao-divergente:aviso"]);
+  });
+
   it("registro citado pelo lock e ausente é erro", async () => {
     const p = await projeto({ politica: { expx_orquestracao: 1 } });
     const dir = join(p.raiz, ".expx/resolucoes");

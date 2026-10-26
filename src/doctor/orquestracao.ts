@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Lock } from "../nucleo/lock.js";
 import { classeDoModeloClaude, correspondeClaude } from "../orquestracao/adaptadores.js";
+import { CAMINHO_PROJECAO, serializarProjecao } from "../orquestracao/projecao.js";
 import { caminhoDoRegistro, lerRegistro } from "../orquestracao/materializar.js";
 import { lerPolitica } from "../orquestracao/politica.js";
 import type { Resolucao } from "../orquestracao/resolver.js";
@@ -53,7 +54,18 @@ export function verificarOrquestracao(raiz: string, lock: Lock | undefined, env:
   const politica = lerPolitica(raiz);
   const secao = lock?.orquestracao;
   const ativa = !politica.ok || politica.ativa;
-  if (!ativa && secao === undefined) return;
+  const projecao = join(raiz, ...CAMINHO_PROJECAO.split("/"));
+  if (!ativa && secao === undefined) {
+    if (existsSync(projecao)) {
+      push({
+        id: "orquestracao-projecao-divergente",
+        severidade: "aviso",
+        problema: `${CAMINHO_PROJECAO} sobrou sem politica nem secao orquestracao no lock: o rastro gravaria resolucao que nao vigora`,
+        correcao: "rode `expx init`, que a remove sem politica",
+      });
+    }
+    return;
+  }
 
   if (!politica.ok) {
     push({
@@ -110,6 +122,27 @@ export function verificarOrquestracao(raiz: string, lock: Lock | undefined, env:
       problema: `registro de resolucao fora do que foi gravado: ${lista(adulterados)}`,
       correcao: "o registro e imutavel: restaure o arquivo pelo git, sem reformatar",
     });
+  }
+
+  // A projeção que o escritor do rastro lê: só é conferível com todo registro legível.
+  if (politica.ok && politica.ativa && ausentes.length === 0 && adulterados.length === 0) {
+    const esperada = serializarProjecao(resolucoes);
+    let lida: string | undefined;
+    try {
+      lida = readFileSync(projecao, "utf8");
+    } catch {
+      lida = undefined;
+    }
+    if (!esperada.ok || lida !== esperada.texto) {
+      push({
+        id: "orquestracao-projecao-divergente",
+        severidade: "erro",
+        problema: lida === undefined
+          ? `${CAMINHO_PROJECAO} ausente: o rastro grava os eventos sem a resolucao vigente`
+          : `${CAMINHO_PROJECAO} diverge do lock e do registro: o rastro gravaria outra resolucao`,
+        correcao: "rode `expx init`, que a regrava a partir das resolucoes vigentes; nao a edite a mao",
+      });
+    }
   }
 
   const inferidas = resolucoes.filter((r) => r.origem_classe === "inferida").map((r) => r.agente);

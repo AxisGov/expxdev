@@ -1915,10 +1915,12 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
   ou o caminho crítico. Planos com ciclo ou dependência inexistente abrem o bloco automaticamente.</p>
   <div class="nota nota--info">
     <svg class="nota__icone" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6.4"/><path d="M8 7.2v4M8 4.9v.1" stroke-linecap="round"/></svg>
-    <div><p><strong>Snapshot quando existe; sem atribuição quando não existe.</strong> Se o evento traz
-    <code>model</code>/<code>effort</code>, o painel os mostra como histórico. Sem snapshot, só usa a
-    configuração atual quando o evento não identifica outro harness; em eventos de outro harness ou sem
-    agente compatível, mostra histórico indisponível.</p></div>
+    <div><p><strong>Observação quando existe; configuração rotulada quando não existe.</strong> Se o evento
+    traz <code>model</code>/<code>effort</code> observados, o painel os mostra como histórico. Sem observação e
+    com <code>resolucao_id</code>, mostra a resolução registrada como configuração não observada, e sinaliza
+    inconsistência se o registro não se lê. Sem <code>resolucao_id</code>, só usa a configuração atual quando o
+    evento não identifica outro harness; em eventos de outro harness ou sem agente compatível, mostra histórico
+    indisponível.</p></div>
   </div>
   <p>Toda tela exporta CSV. Um filtro de período global — <code>7d</code>, <code>30d</code>, <code>90d</code>,
   mês, ano ou intervalo — recorta trabalhos, histórico, bloqueios e violações; data ausente nunca é filtrada
@@ -2240,17 +2242,21 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
     <span class="selo">origem</span><span class="selo">evento</span><span class="selo">fase</span><span class="selo">task</span>
     <span class="selo">agente</span><span class="selo">resultado</span><span class="selo">detalhe</span><span class="selo">arquivos</span>
   </div>
-  <p>Seis chaves extras são permitidas depois das doze: <code>hook</code> (o nome do hook que decidiu, quando
+  <p>Dezesseis chaves extras são permitidas depois das doze: <code>hook</code> (o nome do hook que decidiu, quando
   a origem é <code>hook</code>), <code>faixa</code> (a faixa de atenção do arquivo tocado), o par
-  <code>sessao</code> · <code>harness</code> (a identidade da sessão) e <code>model</code> · <code>effort</code>
-  (o snapshot daquela execução). O gravador comum inclui <code>model</code>/<code>effort</code> nas linhas que
-  ele escreve, inclusive as de hook, e os escritores próprios da SprintX também, pela mesma regra; hooks com
-  gravador próprio (como os da SprintX) e linhas antigas os omitem e, por isso, aparecem como <strong>sem
-  snapshot</strong>. O runtime explícito tem prioridade para qualquer harness. Somente no contexto Claude
-  (<code>EXPX_HARNESS</code> igual a <code>claude</code> ou <code>claude-code</code> ou, sem ele,
-  <code>CLAUDECODE</code> presente) o gravador comum pode usar como fallback o frontmatter instalado. Codex,
-  OpenCode, runtime sem nenhum desses sinais e qualquer outro harness sem metadado explícito gravam <code>null</code>, em vez de receber uma configuração Claude. Uma chave presente com <code>null</code> registra dado não informado;
-  uma chave <strong>ausente</strong> significa sem snapshot. Permitidas, mas não indiferentes:
+  <code>sessao</code> · <code>harness</code> (a identidade da sessão), <code>model</code> · <code>effort</code>
+  (o executor <strong>observado</strong> naquela execução, nunca a configuração), as chaves da resolução da
+  orquestração — <code>resolucao_id</code>, <code>classe_declarada</code>, <code>classe_resolvida</code>,
+  <code>origem_classe</code>, <code>alternativa</code>, <code>origem_alternativa</code> e, na exceção do
+  <code>agentes.json</code> v1, <code>materializado</code> — e três declaradas para o envelope da invocação, que
+  ainda nenhum escritor grava: <code>invocacao</code>, <code>modelos_observados</code> e
+  <code>fora_da_politica</code>. O gravador comum inclui <code>model</code>/<code>effort</code> nas linhas que
+  ele escreve, inclusive as de hook, só com o que o runtime informou (no Claude, <code>effort.level</code> pelo
+  chamador e <code>$CLAUDE_EFFORT</code> apenas para o principal); sem observação, <code>null</code>. Com a
+  política de orquestração ativa, a linha do subagente no Claude leva também a resolução vigente. Hooks com
+  gravador próprio (como os da SprintX) e linhas antigas omitem <code>model</code>/<code>effort</code> e, por
+  isso, aparecem como <strong>sem snapshot</strong>. Uma chave presente com <code>null</code> registra dado não
+  informado; uma chave <strong>ausente</strong> significa sem snapshot. Permitidas, mas não indiferentes:
   <code>sessao</code> e <code>harness</code> são <strong>obrigatórias</strong> somente quando a ferramenta é
   SprintX e o evento é <code>task_iniciada</code>, <code>task_concluida</code> ou <code>task_bloqueada</code>.
   Nesses três eventos, sem identidade o escritor não grava a linha. Nos demais eventos da SprintX,
@@ -2282,6 +2288,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
       <tr><td><code>veredito_emitido</code></td><td>o agente auditor ou o QA</td></tr>
       <tr><td><code>commit_criado</code> · <code>pr_aberto</code></td><td>a mergex</td></tr>
       <tr><td><code>artefato_gravado</code></td><td>a mergex, quando a gravação de um artefato derivado (<code>estado.json</code>) falha</td></tr>
+      <tr><td><code>invocacao_abandonada</code></td><td>o envelope da invocação de agente que nunca fechou; declarado, ainda não gravado</td></tr>
     </tbody>
   </table></div>
   <p>O campo <code>agente</code> nunca é <code>null</code>: quando não há subagente, o valor é

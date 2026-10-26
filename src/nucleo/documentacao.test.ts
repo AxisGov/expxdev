@@ -196,6 +196,7 @@ const EXTENSO_EXTRAS: Record<number, string> = {
   4: "Quatro",
   5: "Cinco",
   6: "Seis",
+  16: "Dezesseis",
 };
 
 function extensoExtras(n: number): string {
