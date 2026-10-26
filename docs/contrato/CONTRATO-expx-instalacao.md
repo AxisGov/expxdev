@@ -341,6 +341,16 @@ sem orquestração.
     classe exige primitivas relativas a descritor de diretório.
 - **Identidade.** O nome do agente é o `name:` lido como YAML (como o Claude
   Code o lê), e é a chave da política, do override v1, do registro e do lock.
+- **Projeção do rastro.** Com a política ativa, `.expx/orquestracao-rastro.tsv`
+  leva, por agente, as chaves da resolução que o escritor comum do rastro grava
+  no evento (CONTRATO-expx-orquestracao §11.1): cabeçalho
+  `# expx-orquestracao-rastro 1` e uma linha por agente em ordem, com nove
+  campos separados por TAB (`agente`, `resolucao_id`, `classe_declarada`,
+  `origem_classe`, `classe_resolvida`, o `id` da `alternativa`,
+  `origem_alternativa`, `model` e `effort` do `materializado`, `-` quando
+  ausente). Sai do mesmo plano que o registro e o lock, é gravada de forma
+  atômica e removida quando a política sai. Não é fonte: valor fora do alfabeto
+  que o escritor lê sem escapar (`[A-Za-z0-9._:/-]`) recusa o plano.
 - **Falhas antes de escrever** (seção 8): política inválida; `classe:` fora do
   vocabulário num agente da skill; dois agentes com o mesmo `name:` (só o
   último ficaria no lock); agente que a política não resolve, com o motivo do
@@ -351,7 +361,11 @@ O `expx doctor` só fala da orquestração quando há política ou seção no lo
 São **erro**: `orquestracao-invalida`, `orquestracao-resolucao-ausente` (o
 lock cita um id sem arquivo) e `orquestracao-registro-adulterado` (o arquivo
 não confere com o id ou não está na forma canônica legível, inclusive só nos
-espaços, ou um registro válido de outro agente ou adaptador). São **aviso**: `orquestracao-lock-sem-politica`,
+espaços, ou um registro válido de outro agente ou adaptador) e
+`orquestracao-projecao-divergente` com a política ativa (a projeção ausente ou
+diferente da que sai do lock e do registro; só é conferida com todo registro
+legível). Com ela sobrando sem política nem seção no lock, o mesmo id é
+**aviso**. São **aviso**: `orquestracao-lock-sem-politica`,
 `orquestracao-classe-inferida`, `orquestracao-v1-abaixo-da-classe`,
 `orquestracao-variavel-sobrepoe` (`CLAUDE_CODE_SUBAGENT_MODEL_FORCE` ou
 `CLAUDE_CODE_EFFORT_LEVEL` no ambiente do doctor) e
