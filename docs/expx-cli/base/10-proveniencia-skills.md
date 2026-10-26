@@ -4,7 +4,7 @@ Esta é a fonte pública para origem, instalação e proteção de proveniência
 nove skills registradas no ExpxDev. O catálogo executável continua em
 `src/nucleo/catalogo.ts`.
 
-Os repositórios abaixo foram confirmados na organização AxisGov em 2026-10-23:
+Os repositórios abaixo foram confirmados na organização AxisGov em 2026-10-25:
 
 | Repositório | `origin/main` confirmado |
 |---|---|

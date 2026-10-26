@@ -537,16 +537,16 @@ Requisitos para os comandos abaixo: Node ≥ 20.19.0, `git`, GitHub CLI (`gh`) a
 `sha256sum` (Linux) ou `shasum` (macOS) para conferir o pacote antes de executá-lo.
 
 ```bash
-gh release download v0.12.2 -R AxisGov/expxdev -D ~/expx-cli/v0.12.2
+gh release download v0.12.3 -R AxisGov/expxdev -D ~/expx-cli/v0.12.3
 (
-  cd ~/expx-cli/v0.12.2
+  cd ~/expx-cli/v0.12.3
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.12.2.tgz.sha256
+    sha256sum -c expxdev-0.12.3.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.12.2.tgz.sha256
+    shasum -a 256 -c expxdev-0.12.3.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.12.2/expxdev-0.12.2.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.12.3/expxdev-0.12.3.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -555,7 +555,7 @@ npx --yes --package ~/expx-cli/v0.12.2/expxdev-0.12.2.tgz expx init --skills bui
 - O preflight recusa divergência entre `package.json`, `package-lock.json` e metadata do tarball,
   bem como tag ou release já existente. O pacote é gerado duas vezes e os hashes devem coincidir.
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.12.2 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.12.3 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -578,6 +578,11 @@ npx --yes --package ~/expx-cli/v0.12.2/expxdev-0.12.2.tgz expx init --skills bui
   Claude a outro harness, coloca entre aspas os hooks do MemoX, restringe `--arquivos` da
   revisão à raiz do projeto, instala a ponte de hooks da RunX no OpenCode e certifica a
   SprintX com os escritores próprios atualizados e a bancada instalada corrigida.
+- `0.12.3` corrige a dependência `zod` (GHSA-mrhx-c7xc-m3w5), aplica a orquestração
+  multimodelo no Claude quando o projeto a declara, leva à distribuição as correções P1 que o
+  Login aplicou na cópia instalada, faz o `update <skill>` deixar as outras skills no commit
+  travado, deixa de criar backup do `settings.json` versionado e certifica SprintX e MergeX
+  nos commits revisados.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
