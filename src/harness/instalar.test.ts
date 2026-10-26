@@ -4,7 +4,9 @@ import { comandosDeInstalacao, instrucaoManual } from "./instalar.js";
 describe("instalação do plugin no Claude Code", () => {
   it("integração: devolve os comandos, na ordem, com o caminho do marketplace", () => {
     const c = comandosDeInstalacao("/proj/.expx/marketplace");
-    expect(c[0]?.args).toEqual(["plugin", "marketplace", "add", "/proj/.expx/marketplace"]);
+    // o remove do registro anterior vem primeiro; o add usa o caminho dado
+    expect(c[0]?.args).toEqual(["plugin", "marketplace", "remove", "expx-local"]);
+    expect(c[1]?.args).toEqual(["plugin", "marketplace", "add", "/proj/.expx/marketplace"]);
     const args = c.map((x) => x.args.join(" "));
     expect(args).toContain("plugin install expx@expx-local");
   });

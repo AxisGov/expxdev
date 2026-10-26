@@ -39,6 +39,10 @@ export type ComandoExterno = { bin: string; args: string[] };
  */
 export function comandosDeInstalacao(caminhoMarketplace: string): ComandoExterno[] {
   return [
+    // Remove antes de adicionar: com o `expx-local` já registrado em outro caminho
+    // (por exemplo, uma worktree antiga), o `add` falharia como "já conhecido" e o
+    // registro velho ficaria — o plugin deixaria de carregar quando ela sumisse.
+    { bin: "claude", args: ["plugin", "marketplace", "remove", "expx-local"] },
     { bin: "claude", args: ["plugin", "marketplace", "add", caminhoMarketplace] },
     { bin: "claude", args: ["plugin", "marketplace", "update", "expx-local"] },
     { bin: "claude", args: ["plugin", "uninstall", "expx@expx-local"] },
@@ -49,14 +53,15 @@ export function comandosDeInstalacao(caminhoMarketplace: string): ComandoExterno
 /**
  * Comandos cuja falha não interrompe a sequência.
  *
- * `marketplace add` falha quando o marketplace já é conhecido, e `uninstall`
- * falha quando não há o que desinstalar. Os dois são o caminho normal de uma
- * reinstalação e de uma primeira instalação, respectivamente — tratá-los como
- * erro faria o `init` parar justamente nos dois casos mais comuns.
+ * `marketplace remove` e `uninstall` falham quando não há o que remover (a
+ * primeira instalação), e `marketplace add` quando o marketplace já é conhecido.
+ * São o caminho normal de uma primeira instalação e de uma reinstalação —
+ * tratá-los como erro faria o `init` parar justamente nos casos mais comuns.
  */
 function tolerante(args: readonly string[]): boolean {
   const s = args.join(" ");
-  return s.startsWith("plugin uninstall") || s.startsWith("plugin marketplace add");
+  return s.startsWith("plugin uninstall") || s.startsWith("plugin marketplace add")
+    || s.startsWith("plugin marketplace remove");
 }
 
 /** O que dizer quando o binário `claude` não está disponível. */
