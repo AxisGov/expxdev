@@ -172,6 +172,40 @@ describe("init de ponta a ponta", () => {
   });
 });
 
+describe("settings.json versionado", () => {
+  it("funcional: rastreado e limpo não ganha backup, e o init diz que o desfazer é pelo versionador", async () => {
+    p = projetoTemporario("fixtures/cli/settings-valido");
+    const env = { ...process.env, GIT_AUTHOR_NAME: "e", GIT_AUTHOR_EMAIL: "e@e.invalid", GIT_COMMITTER_NAME: "e", GIT_COMMITTER_EMAIL: "e@e.invalid" };
+    execFileSync("git", ["init", "-q", "-b", "main"], { cwd: p.raiz, env });
+    execFileSync("git", ["add", "--", ".claude/settings.json"], { cwd: p.raiz, env });
+    execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-q", "-m", "settings"], { cwd: p.raiz, env });
+
+    const r = await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: catalogoLocal(["sprintx"]) });
+
+    expect(r.ok).toBe(true);
+    expect(readdirSync(join(p.raiz, ".claude")).filter((a) => a.includes("backup"))).toEqual([]);
+    expect(r.avisos.join("\n")).toContain(".claude/settings.json rastreado e limpo no git: sem backup ao lado");
+  });
+});
+
+describe("init que recusa modificação local", () => {
+  it("funcional: com recusarModificacaoLocal, a skill modificada barra a escrita, já sob a trava", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    const origens = catalogoLocal(["sprintx"]);
+    expect((await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens })).ok).toBe(true);
+    const ajuste = join(p.raiz, ".expx/marketplace/plugins/expx/skills/sprintx/references/01.md");
+    writeFileSync(ajuste, "# ajuste manual\n");
+    const lock = readFileSync(join(p.raiz, ".expx/expx-lock.json"), "utf8");
+
+    const r = await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens, recusarModificacaoLocal: true });
+
+    expect(r.ok).toBe(false);
+    expect(r.erros.join("\n")).toContain("sprintx");
+    expect(readFileSync(ajuste, "utf8")).toBe("# ajuste manual\n");
+    expect(readFileSync(join(p.raiz, ".expx/expx-lock.json"), "utf8")).toBe(lock);
+  });
+});
+
 describe("skill sem tag publicada", () => {
   it("integração: instala do topo da branch e NAO polui a saida com aviso", async () => {
     // O caso real: nenhum dos seis repositorios do metodo publica tag hoje.

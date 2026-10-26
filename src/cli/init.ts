@@ -31,6 +31,7 @@ import {
 } from "../plugin/plano.js";
 import { artefatosOpenCode, pontesDeHooks } from "../harness/opencode.js";
 import { entradaPorNome, formaSemAspas, gravarSettings, planejarSettings, type PlanoSettings } from "../harness/settings.js";
+import { verificarModificacaoLocal } from "../update/modificacao.js";
 import { artefatosDeHooks, comHooks, hooksPorNome } from "../harness/hooks.js";
 import {
   caminhosReferenciados,
@@ -90,6 +91,17 @@ export type OpcoesInit = {
   /** Referência fixa por skill, quando o usuário pediu uma específica. */
   referencias?: Record<string, string>;
   /**
+   * Commit exato por skill. O `update` passa o travado no lock para as skills
+   * que não está atualizando: sem ele, uma skill em `main` seria resolvida de
+   * novo na ponta e andaria junto. A `referencia` gravada no lock não muda.
+   */
+  commits?: Record<string, string>;
+  /**
+   * Recusa a escrita se alguma skill do lock anterior diverge do disco. O
+   * `update` passa: a checagem dele roda antes da busca, e esta, sob a trava.
+   */
+  recusarModificacaoLocal?: boolean;
+  /**
    * O ambiente em que as dependências de runtime são provadas. Padrão: o do
    * próprio processo, que é o que importa — ver `nucleo/runtime.ts`.
    */
@@ -116,7 +128,7 @@ export type ResultadoInit = {
  * não existe cai no clone e produz a mensagem de erro do git, que é mais útil
  * que um erro de cópia.
  */
-function ehCaminhoLocal(origem: string): boolean {
+export function ehCaminhoLocal(origem: string): boolean {
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(origem) || origem.includes("@")) return false;
   try {
     return statSync(origem).isDirectory();
@@ -447,11 +459,17 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     // Origem em disco (EXPX_SKILLS_LOCAIS, ou `--origem` apontando para uma
     // pasta) é COPIADA, não clonada: o clone traria só o commitado, e o ciclo
     // de desenvolvimento de skill deixaria de ser curto.
+    const commit = op.commits?.[nome];
+    const local = ehCaminhoLocal(repositorio);
+    // a pasta local é copiada como está: o commit travado não vale, e isso é dito
+    if (local && commit !== undefined) {
+      avisos.push(`${nome}: origem local — instalada a arvore de trabalho de ${repositorio}, nao o commit travado ${commit.slice(0, 12)}`);
+    }
     const busca = await buscarSkill({
       nome,
       repositorio,
       referencia: alvo.referencia,
-      ...(ehCaminhoLocal(repositorio) ? { local: true } : {}),
+      ...(local ? { local: true } : commit !== undefined ? { commit } : {}),
     });
     if (!busca.ok) {
       falhas.push({ nome, erro: busca.erro });
@@ -543,6 +561,19 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     return { ok: false, instaladas: [], falhas, erros: [bloqueio.erro], naoTravadas, avisos };
   }
   try {
+    if (op.recusarModificacaoLocal === true) {
+      const modificadas = Object.keys(travadasAntes).filter((n) => verificarModificacaoLocal(op.raiz, n).temModificacao);
+      if (modificadas.length > 0) {
+        return {
+          ok: false,
+          instaladas: [],
+          falhas,
+          erros: [`modificacao local em ${modificadas.join(", ")}: nada foi escrito`],
+          naoTravadas,
+          avisos,
+        };
+      }
+    }
     const troca = prepararTroca(join(op.raiz, ".expx", "marketplace"), (tmp) => {
       montarMarketplace(tmp, montaveis, versaoDoCli());
     });
@@ -552,7 +583,13 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
       for (const r of p.plano.resolucoes ?? []) gravarNoRegistro(op.raiz, r);
       aplicarArtefatos(op.raiz, p.plano.projeto);
       for (const rel of p.plano.remover) rmSync(join(op.raiz, ...rel.split("/")), { force: true });
-      if (p.plano.settings !== undefined) gravarSettings(p.plano.settings);
+      if (p.plano.settings !== undefined) {
+        const s = gravarSettings(p.plano.settings);
+        // sem a cópia ao lado, a pessoa precisa saber onde está o desfazer
+        if (s.ok && s.backupOmitidoPorGitLimpo === true) {
+          avisos.push(".claude/settings.json rastreado e limpo no git: sem backup ao lado; desfaca pelo versionador (ex.: git checkout -- .claude/settings.json)");
+        }
+      }
       if (op.harness.includes("codex")) {
         try {
           const aviso = materializarCodex(op.raiz);

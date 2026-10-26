@@ -2,7 +2,10 @@ import { describe, it, expect, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
+import { lerLock } from "../nucleo/lock.js";
+import { pastaDaSkill } from "./modificacao.js";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
 import { executarInit } from "../cli/init.js";
 import { interpretarFlagsUpdate, AVISO_ROLLBACK, executarUpdate } from "./flags.js";
@@ -141,5 +144,192 @@ describe("flags do update", () => {
     expect(r.aplicou).toBe(false);
     expect(r.atualizadas).toEqual([]);
     expect(r.mensagens).not.toContain(AVISO_ROLLBACK);
+  });
+});
+
+const ENV_GIT = { ...process.env, GIT_AUTHOR_NAME: "e", GIT_AUTHOR_EMAIL: "e@e.invalid", GIT_COMMITTER_NAME: "e", GIT_COMMITTER_EMAIL: "e@e.invalid" };
+
+/** Novo commit na branch, sem tag: é a `main` de uma skill não travada andando. */
+function avancarMain(repo: string, arquivo: string, conteudo: string): void {
+  writeFileSync(join(repo, arquivo), conteudo);
+  execFileSync("git", ["add", "-A"], { cwd: repo, env: ENV_GIT });
+  execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-q", "-m", "main avanca"], { cwd: repo, env: ENV_GIT });
+}
+
+/**
+ * Origens por URL `file://`: uma pasta local seria COPIADA com a árvore de
+ * trabalho (ver `copiarLocal`), e o caminho por clone e por commit nunca rodaria.
+ */
+function origensPorUrl(repos: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(repos).map(([n, r]) => [n, pathToFileURL(r).href]));
+}
+
+describe("update de uma skill e as outras", () => {
+  it("funcional: atualizar uma skill não move a versão das outras, mesmo com a main delas andando", async () => {
+    const sprintx = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    const runx = criarRepoSkill({ nome: "runx", tags: [], layout: "plano" });
+    repos.push(sprintx, runx);
+    const origens = origensPorUrl({ sprintx, runx });
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    expect((await executarInit({ raiz: p.raiz, skills: ["sprintx", "runx"], harness: ["claude"], origens })).ok).toBe(true);
+    const antes = lerLock(p.raiz);
+    if (!antes.ok) throw new Error(antes.erro);
+    const arquivoRunx = join(pastaDaSkill(p.raiz, "runx"), "references", "01.md");
+    const conteudoRunx = readFileSync(arquivoRunx, "utf8");
+
+    avancarMain(runx, "skill/references/01.md", "# runx depois da instalacao\n");
+    novaTag(sprintx, "v1.1.0");
+    const r = await executarUpdate({ raiz: p.raiz, skills: ["sprintx"], sim: true, origens });
+
+    expect(r.ok).toBe(true);
+    expect(r.atualizadas).toEqual(["sprintx"]);
+    const depois = lerLock(p.raiz);
+    if (!depois.ok) throw new Error(depois.erro);
+    expect(depois.lock.skills["sprintx"]?.referencia).toBe("v1.1.0");
+    // o bloco inteiro: referência, commit, data e hashes
+    expect(depois.lock.skills["runx"]).toEqual(antes.lock.skills["runx"]);
+    expect(readFileSync(arquivoRunx, "utf8")).toBe(conteudoRunx);
+  });
+
+  it("funcional: --to com SHA completo instala exatamente aquele commit", async () => {
+    const sprintx = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    repos.push(sprintx);
+    const origens = origensPorUrl({ sprintx });
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    expect((await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens })).ok).toBe(true);
+
+    novaTag(sprintx, "v1.1.0");
+    const alvo = execFileSync("git", ["rev-parse", "HEAD"], { cwd: sprintx, encoding: "utf8" }).trim();
+    novaTag(sprintx, "v1.2.0");
+    const r = await executarUpdate({ raiz: p.raiz, skills: ["sprintx"], to: alvo, sim: true, origens });
+
+    expect(r.ok).toBe(true);
+    expect(r.aplicou).toBe(true);
+    const l = lerLock(p.raiz);
+    if (!l.ok) throw new Error(l.erro);
+    expect(l.lock.skills["sprintx"]?.commit).toBe(alvo);
+    // o conteúdo, sem o fim de linha: no Windows o checkout pode trazer CRLF; o commit exato já está no lock
+    const conteudo = readFileSync(join(pastaDaSkill(p.raiz, "sprintx"), "references", "01.md"), "utf8");
+    expect(conteudo).toContain("conteudo de v1.1.0");
+    expect(conteudo).not.toContain("v1.2.0");
+  });
+
+  it("funcional: --to com SHA em maiúsculas é o mesmo commit", async () => {
+    const sprintx = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    repos.push(sprintx);
+    const origens = origensPorUrl({ sprintx });
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    expect((await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens })).ok).toBe(true);
+
+    novaTag(sprintx, "v1.1.0");
+    const alvo = execFileSync("git", ["rev-parse", "HEAD"], { cwd: sprintx, encoding: "utf8" }).trim();
+    novaTag(sprintx, "v1.2.0");
+    const r = await executarUpdate({ raiz: p.raiz, skills: ["sprintx"], to: alvo.toUpperCase(), sim: true, origens });
+
+    expect(r.aplicou).toBe(true);
+    const l = lerLock(p.raiz);
+    if (!l.ok) throw new Error(l.erro);
+    expect(l.lock.skills["sprintx"]?.commit).toBe(alvo);
+    expect(l.lock.skills["sprintx"]?.referencia).toBe(alvo);
+  });
+
+  it("funcional: skill bloqueada por modificação local não é remontada por cima", async () => {
+    const sprintx = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    const runx = criarRepoSkill({ nome: "runx", tags: ["v1.0.0"], layout: "plano" });
+    repos.push(sprintx, runx);
+    const origens = origensPorUrl({ sprintx, runx });
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    expect((await executarInit({ raiz: p.raiz, skills: ["sprintx", "runx"], harness: ["claude"], origens })).ok).toBe(true);
+    const ajuste = join(pastaDaSkill(p.raiz, "runx"), "references", "01.md");
+    writeFileSync(ajuste, "# ajuste manual\n");
+
+    novaTag(sprintx, "v1.1.0");
+    avancarMain(runx, "skill/references/01.md", "# runx v1.1.0\n");
+    execFileSync("git", ["tag", "v1.1.0"], { cwd: runx });
+    const r = await executarUpdate({ raiz: p.raiz, sim: true, origens });
+
+    expect(r.ok).toBe(false);
+    expect(r.aplicou).toBe(false);
+    expect(r.bloqueadas.map((b) => b.nome)).toContain("runx");
+    expect(readFileSync(ajuste, "utf8")).toBe("# ajuste manual\n");
+  });
+
+  it("funcional: skill fora do filtro com modificação local também barra a remontagem", async () => {
+    const sprintx = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    const runx = criarRepoSkill({ nome: "runx", tags: ["v1.0.0"], layout: "plano" });
+    repos.push(sprintx, runx);
+    const origens = origensPorUrl({ sprintx, runx });
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    expect((await executarInit({ raiz: p.raiz, skills: ["sprintx", "runx"], harness: ["claude"], origens })).ok).toBe(true);
+    const ajuste = join(pastaDaSkill(p.raiz, "runx"), "references", "01.md");
+    writeFileSync(ajuste, "# ajuste manual\n");
+
+    novaTag(sprintx, "v1.1.0");
+    const r = await executarUpdate({ raiz: p.raiz, skills: ["sprintx"], sim: true, origens });
+
+    expect(r.ok).toBe(false);
+    expect(r.aplicou).toBe(false);
+    expect(r.bloqueadas.map((b) => b.nome)).toEqual(["runx"]);
+    expect(readFileSync(ajuste, "utf8")).toBe("# ajuste manual\n");
+    const l = lerLock(p.raiz);
+    if (!l.ok) throw new Error(l.erro);
+    expect(l.lock.skills["sprintx"]?.referencia).toBe("v1.0.0");
+  });
+
+  it("funcional: a única candidata, modificada, não aplica e sai com erro", async () => {
+    const sprintx = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    repos.push(sprintx);
+    const origens = origensPorUrl({ sprintx });
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    expect((await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens })).ok).toBe(true);
+    const ajuste = join(pastaDaSkill(p.raiz, "sprintx"), "references", "01.md");
+    writeFileSync(ajuste, "# ajuste manual\n");
+
+    novaTag(sprintx, "v1.1.0");
+    const r = await executarUpdate({ raiz: p.raiz, sim: true, origens });
+
+    expect(r.ok).toBe(false);
+    expect(r.aplicou).toBe(false);
+    expect(r.bloqueadas.map((b) => b.nome)).toEqual(["sprintx"]);
+    expect(readFileSync(ajuste, "utf8")).toBe("# ajuste manual\n");
+    // o --check continua só relatório
+    const c = await executarUpdate({ raiz: p.raiz, check: true, origens });
+    expect(c.ok).toBe(true);
+  });
+
+  for (const forma of ["tag", "sha"] as const) {
+    it(`funcional: --to (${forma}) com origem local é recusado, sem escrever nada`, async () => {
+      const sprintx = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+      repos.push(sprintx);
+      p = projetoTemporario("fixtures/cli/projeto-limpo");
+      expect((await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: origensPorUrl({ sprintx }) })).ok).toBe(true);
+      novaTag(sprintx, "v1.1.0");
+      const alvo = forma === "tag" ? "v1.1.0" : execFileSync("git", ["rev-parse", "HEAD"], { cwd: sprintx, encoding: "utf8" }).trim();
+      // a árvore de trabalho anda depois do alvo: a cópia local traria isto, e não o alvo
+      writeFileSync(join(sprintx, ".claude/skills/sprintx/references/01.md"), "# edicao nao commitada\n");
+      const lock = join(p.raiz, ".expx/expx-lock.json");
+      const antes = readFileSync(lock, "utf8");
+
+      const r = await executarUpdate({ raiz: p.raiz, skills: ["sprintx"], to: alvo, sim: true, origens: { sprintx } });
+
+      expect(r.ok).toBe(false);
+      expect(r.aplicou).toBe(false);
+      expect(r.mensagens.join("\n")).toContain("origem local");
+      expect(readFileSync(lock, "utf8")).toBe(antes);
+    });
+  }
+
+  it("funcional: skill fora do filtro com origem local é copiada da árvore, com aviso de que o commit travado não valeu", async () => {
+    const sprintx = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    const runx = criarRepoSkill({ nome: "runx", tags: ["v1.0.0"], layout: "plano" });
+    repos.push(sprintx, runx);
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    expect((await executarInit({ raiz: p.raiz, skills: ["sprintx", "runx"], harness: ["claude"], origens: origensPorUrl({ sprintx, runx }) })).ok).toBe(true);
+
+    novaTag(sprintx, "v1.1.0");
+    const r = await executarUpdate({ raiz: p.raiz, skills: ["sprintx"], sim: true, origens: { ...origensPorUrl({ sprintx }), runx } });
+
+    expect(r.ok).toBe(true);
+    expect(r.mensagens.join("\n")).toMatch(/runx: origem local/);
   });
 });

@@ -1,6 +1,6 @@
 import { caminhoDoLock, lerLock, type Lock } from "../nucleo/lock.js";
 import { repositorioCanonico, resolverOrigem } from "../nucleo/catalogo.js";
-import { executarInit } from "../cli/init.js";
+import { ehCaminhoLocal, executarInit } from "../cli/init.js";
 import { compararComRemoto, type ItemComparacao } from "./comparar.js";
 import { verificarModificacaoLocal } from "./modificacao.js";
 import { escreverArquivoAtomico } from "../plugin/atomico.js";
@@ -15,6 +15,9 @@ import { adquirirBloqueioOperacao } from "../nucleo/bloqueio-operacao.js";
  * toda execução que aplica alguma coisa, para que ninguém descubra a ausência
  * do comando de desfazer no pior momento.
  */
+
+/** Um SHA-1 completo: só ele é buscado como commit, sem ambiguidade com tag ou branch. */
+const SHA_COMPLETO = /^[0-9a-f]{40}$/i;
 
 export const AVISO_ROLLBACK =
   "para desfazer esta atualizacao, reverta o .expx/ pelo versionador (ex.: git checkout -- .expx)";
@@ -123,11 +126,28 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   }
   const migracao = migrarProveniencias(l.lock, op.skills);
 
-  const referencias = op.to !== undefined && op.skills?.[0] !== undefined ? { [op.skills[0]]: op.to } : undefined;
+  // o git aceita SHA em maiúsculas, mas devolve e grava em minúsculas: sem
+  // normalizar, o lock e a conferência do commit buscado divergiriam
+  const to = op.to !== undefined && SHA_COMPLETO.test(op.to) ? op.to.toLowerCase() : op.to;
+  const referencias = to !== undefined && op.skills?.[0] !== undefined ? { [op.skills[0]]: to } : undefined;
   const origens: Record<string, string> = {};
   for (const [nome, travada] of Object.entries(l.lock.skills)) {
     const origem = resolverOrigem(nome, travada.repositorio, op.origens?.[nome]);
     if (origem !== undefined) origens[nome] = origem;
+  }
+  // Origem em pasta local é copiada como árvore de trabalho (ver `copiarLocal`):
+  // a versão que o `--to` pede não seria a instalada.
+  const nomeada = op.skills?.[0];
+  const origemNomeada = nomeada !== undefined ? origens[nomeada] : undefined;
+  if (to !== undefined && origemNomeada !== undefined && ehCaminhoLocal(origemNomeada)) {
+    return {
+      ok: false,
+      aplicou: false,
+      atualizadas: [],
+      emDia: [],
+      bloqueadas: [],
+      mensagens: [`--to ${to} nao se aplica a ${String(nomeada)}: a origem local (${origemNomeada}) e copiada como arvore de trabalho, sem garantir a versao pedida`],
+    };
   }
   const comparacao = await compararComRemoto({
     raiz: op.raiz,
@@ -141,18 +161,28 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
 
   const emDia = comparacao.itens.filter((i) => i.emDia).map((i) => i.nome);
   const candidatas: ItemComparacao[] = [];
+  const modificadas: string[] = [];
+  const bloquearSeModificada = (nome: string): boolean => {
+    const mod = verificarModificacaoLocal(op.raiz, nome);
+    if (!mod.temModificacao) return false;
+    bloqueadas.push({ nome, motivo: `modificacao local em: ${[...mod.alterados, ...mod.removidos].join(", ")}` });
+    modificadas.push(nome);
+    return true;
+  };
 
   for (const item of comparacao.aAplicar) {
     // Trabalho manual nunca é sobrescrito por um comando de rotina.
-    const mod = verificarModificacaoLocal(op.raiz, item.nome);
-    if (mod.temModificacao) {
-      bloqueadas.push({
-        nome: item.nome,
-        motivo: `modificacao local em: ${[...mod.alterados, ...mod.removidos].join(", ")}`,
-      });
-      continue;
-    }
+    if (bloquearSeModificada(item.nome)) continue;
     candidatas.push(item);
+  }
+  // O `init` remonta TODAS as skills do lock, não só as candidatas: uma
+  // modificação local em qualquer outra — em dia, ou fora do filtro — também
+  // seria sobrescrita.
+  if (candidatas.length > 0) {
+    const vistas = new Set(comparacao.aAplicar.map((i) => i.nome));
+    for (const nome of Object.keys(l.lock.skills)) {
+      if (!vistas.has(nome)) bloquearSeModificada(nome);
+    }
   }
 
   for (const i of comparacao.itens) {
@@ -177,6 +207,16 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
       mensagens.push("sem confirmacao disponivel: nada foi aplicado (use --yes para aplicar sem perguntar)");
     }
     return { ok: true, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens };
+  }
+  // Havia o que aplicar e trabalho manual impediu: o pedido não foi cumprido,
+  // e a saída precisa dizer isso (o `--check`, só relatório, já saiu acima).
+  if (modificadas.length > 0) {
+    mensagens.push(
+      candidatas.length > 0
+        ? `nada foi aplicado: o update remonta todas as skills e sobrescreveria a modificacao local em ${modificadas.join(", ")}`
+        : `nada foi aplicado: modificacao local em ${modificadas.join(", ")}`,
+    );
+    return { ok: false, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens };
   }
   if (candidatas.length === 0) {
     if (migracao.migradas.length === 0) {
@@ -221,20 +261,32 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
     };
   }
 
-  // Remonta do zero com as versões novas, mantendo a seleção e o harness.
+  // Remonta do zero com as versões novas, mantendo a seleção e o harness. As
+  // skills que não estão sendo atualizadas voltam no commit travado: pela
+  // referência, uma skill em `main` seria resolvida de novo na ponta.
   const selecao = Object.keys(l.lock.skills);
   const alvos: Record<string, string> = {};
+  const commits: Record<string, string> = {};
   for (const c of candidatas) alvos[c.nome] = c.nova;
   for (const [nome, travada] of Object.entries(l.lock.skills)) {
-    if (alvos[nome] === undefined) alvos[nome] = travada.referencia;
+    if (alvos[nome] !== undefined) continue;
+    alvos[nome] = travada.referencia;
+    // origem em disco grava `local` ou `<sha>-local`: não há commit a buscar
+    if (travada.commit !== "local" && !travada.commit.endsWith("-local")) commits[nome] = travada.commit;
   }
+  // `--to <sha>`: `git clone --branch` não aceita SHA, então ele vai como commit
+  if (to !== undefined && nomeada !== undefined && SHA_COMPLETO.test(to)) commits[nomeada] = to;
 
   const init = await executarInit({
     raiz: op.raiz,
     skills: selecao,
     harness: l.lock.harness,
     referencias: alvos,
+    commits,
     origens,
+    // a checagem acima roda antes da busca; o init repete-a sob a trava, já
+    // perto da escrita, para a edição feita no meio não ser sobrescrita
+    recusarModificacaoLocal: true,
   });
 
   // O `update` remonta pelo `init`, então os avisos dele são os mesmos avisos —
