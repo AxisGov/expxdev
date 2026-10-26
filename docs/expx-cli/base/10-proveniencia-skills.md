@@ -8,16 +8,16 @@ Os repositórios abaixo foram confirmados na organização AxisGov em 2026-10-26
 
 | Repositório | `origin/main` confirmado |
 |---|---|
-| `AxisGov/expxdev` | `09a242635910918bd5f284b20dca330aa0dde13c` |
-| `AxisGov/runx` | `2673c26cb98681032d5e12c72c57826816dda404` |
-| `AxisGov/legadox` | `b185ef751e65d5f59d439528988344c52fe47b17` |
-| `AxisGov/stackx` | `1243537f2991e7097074889e2953ebc85ba726f4` |
+| `AxisGov/expxdev` | `e9a118c9043aaafda79274e250317a7cca007eb8` |
+| `AxisGov/runx` | `46d3a28789bfc8af69292ecbfc9a60131e125f0c` |
+| `AxisGov/legadox` | `ed669969b58087c1c36e4bbdbab7f1f19ca46282` |
+| `AxisGov/stackx` | `bc0c7c42a29eb2272212fb6154ed9d4d563447c6` |
 | `AxisGov/mergex` | `7ede97155b1e34bc1b5c54be28f3aeb2c99468f0` |
 | `AxisGov/sprintx` | `e93681ad93dd997b77ac7be1272853dac41189cd` |
-| `AxisGov/MemoX` | `75f11897e7ac1a9123c5b1495b8e396122a85c4b` |
+| `AxisGov/MemoX` | `1acd6a61e1e97dca9310f15ec9c4bee0cf7e75e5` |
 | `AxisGov/prodx` | `7539db41013585d31b79ef21afd07268bd99d0c1` |
-| `AxisGov/buildx` | `b7dc7b6906904b3bf7184431518608a11422bd54` |
-| `AxisGov/designx` | `1d0414a39b0f92138c595223d84a59d6da00a657` |
+| `AxisGov/buildx` | `97a2e4f6a53f1dc0579dce932979f2d6e5310496` |
+| `AxisGov/designx` | `389a42897dff438152b06d8054d00c9490c46c87` |
 
 ## Catálogo completo
 
