@@ -211,6 +211,61 @@ describe("fase e task", () => {
     expect(explicito).toMatchObject({ effort: "low" });
   });
 
+  it("integração: com a projeção da política, a linha do subagente no Claude leva as chaves da resolução", () => {
+    const raiz = temp();
+    mkdirSync(join(raiz, ".git"));
+    mkdirSync(join(raiz, ".expx"));
+    const id = "c".repeat(64);
+    writeFileSync(
+      join(raiz, ".expx", "orquestracao-rastro.tsv"),
+      ["# expx-orquestracao-rastro 1",
+        ["auditor", id, "raciocinio_normal", "declarada", "profundo_excepcional", "opus-high", "projeto", "-", "-"].join("\t"),
+        ["revisor", "d".repeat(64), "raciocinio_normal", "agente", "raciocinio_normal", "skill", "agentes-json-v1", "haiku", "low"].join("\t"),
+        ""].join("\n"),
+    );
+    const base = { EXPX_TRABALHO_ID: "t", CLAUDECODE: "1" };
+    roda(raiz, 'expx_rastro_grava "$PWD" veredito_emitido agente ok auditor', { ...base, EXPX_AGENTE: "auditor" });
+    roda(raiz, 'expx_rastro_grava "$PWD" veredito_emitido agente ok revisor', { ...base, EXPX_AGENTE: "revisor" });
+    roda(raiz, 'expx_rastro_grava "$PWD" veredito_emitido agente ok fora', { ...base, EXPX_AGENTE: "outro" });
+    roda(raiz, 'expx_rastro_grava "$PWD" veredito_emitido agente ok principal', base);
+    roda(raiz, 'expx_rastro_grava "$PWD" veredito_emitido agente ok opencode', { EXPX_TRABALHO_ID: "t", EXPX_HARNESS: "opencode", EXPX_AGENTE: "auditor" });
+
+    const [auditor, revisor, fora, principal, opencode] = (eventos(raiz)["t.jsonl"] ?? []).map((l) => JSON.parse(l) as Record<string, unknown>);
+    expect(auditor).toMatchObject({
+      model: null,
+      effort: null,
+      resolucao_id: id,
+      classe_declarada: "raciocinio_normal",
+      classe_resolvida: "profundo_excepcional",
+      origem_classe: "declarada",
+      alternativa: "opus-high",
+      origem_alternativa: "projeto",
+    });
+    expect(auditor).not.toHaveProperty("materializado");
+    expect(revisor).toMatchObject({ origem_alternativa: "agentes-json-v1", materializado: { model: "haiku", effort: "low" } });
+    for (const sem of [fora, principal, opencode]) expect(sem).not.toHaveProperty("resolucao_id");
+  });
+
+  it("integração: projeção ilegível (cabeçalho, id, campo a mais ou caractere fora) não acrescenta nada", () => {
+    const linha = (campos: string[]) => campos.join("\t");
+    const ok = ["auditor", "c".repeat(64), "raciocinio_normal", "declarada", "raciocinio_normal", "skill", "skill", "-", "-"];
+    const casos = [
+      ["# outra coisa 1", linha(ok)],
+      ["# expx-orquestracao-rastro 1", linha(["auditor", "c".repeat(63), ...ok.slice(2)])],
+      ["# expx-orquestracao-rastro 1", linha([...ok, "extra"])],
+      ["# expx-orquestracao-rastro 1", linha([...ok.slice(0, 5), 'sk"ill', ...ok.slice(6)])],
+    ];
+    for (const conteudo of casos) {
+      const raiz = temp();
+      mkdirSync(join(raiz, ".git"));
+      mkdirSync(join(raiz, ".expx"));
+      writeFileSync(join(raiz, ".expx", "orquestracao-rastro.tsv"), `${conteudo.join("\n")}\n`);
+      roda(raiz, 'expx_rastro_grava "$PWD" veredito_emitido agente ok x', { EXPX_TRABALHO_ID: "t", CLAUDECODE: "1", EXPX_AGENTE: "auditor" });
+      const [ev] = (eventos(raiz)["t.jsonl"] ?? []).map((l) => JSON.parse(l) as Record<string, unknown>);
+      expect(ev, conteudo.join(" | ")).not.toHaveProperty("resolucao_id");
+    }
+  });
+
   it("integração: o harness detectado vai na linha, sem duplicar o que o chamador já mandou nas extras", () => {
     const raiz = temp();
     mkdirSync(join(raiz, ".git"));

@@ -339,6 +339,41 @@ expx_modo() {
   esac
 }
 
+# As chaves da resolucao do agente (CONTRATO-expx-orquestracao §11.1), lidas da
+# projecao plana que o `expx init` grava com a politica ativa
+# (.expx/orquestracao-rastro.tsv). Imprime o fragmento JSON ou nada: sem
+# projecao, com cabecalho, id ou campo fora do formato, ou com o agente fora
+# dela. Falha aberta — a linha sai sem as chaves, nunca com evidencia parcial.
+# Os campos so aceitam o que dispensa escape em JSON, entao entram literais.
+expx_resolucao_extras() {
+  local arq="$1/.expx/orquestracao-rastro.tsv" agente="$2" cab=""
+  [ -f "$arq" ] || return 0
+  IFS= read -r cab < "$arq" || true
+  [ "${cab%$'\r'}" = "# expx-orquestracao-rastro 1" ] || return 0
+  local ag id cd oc cr alt oa mm me resto v out
+  while IFS=$'\t' read -r ag id cd oc cr alt oa mm me resto || [ -n "$ag" ]; do
+    [ "$ag" = "$agente" ] || continue
+    me="${me%$'\r'}"
+    [ -z "$resto" ] || return 0
+    case "$id" in ""|*[!0-9a-f]*) return 0 ;; esac
+    [ "${#id}" -eq 64 ] || return 0
+    for v in "$cd" "$oc" "$cr" "$alt" "$oa" "$mm" "$me"; do
+      case "$v" in ""|*[!A-Za-z0-9._:/-]*) return 0 ;; esac
+    done
+    out="\"resolucao_id\":\"$id\",\"classe_declarada\":\"$cd\",\"classe_resolvida\":\"$cr\""
+    out="$out,\"origem_classe\":\"$oc\",\"alternativa\":\"$alt\",\"origem_alternativa\":\"$oa\""
+    # materializado so na excecao do agentes.json v1 (8.3); `-` e ausencia
+    if [ "$mm" != - ]; then
+      if [ "$me" != - ]; then out="$out,\"materializado\":{\"model\":\"$mm\",\"effort\":\"$me\"}"
+      else out="$out,\"materializado\":{\"model\":\"$mm\"}"
+      fi
+    fi
+    printf '%s' "$out"
+    return 0
+  done < "$arq"
+  return 0
+}
+
 # ---------------------------------------------------------------- gravacao
 
 # expx_rastro_grava <raiz> <evento> <origem> <resultado> <detalhe> [arquivos_json] [extras_json]
@@ -436,6 +471,15 @@ expx_rastro_grava() {
         *) linha="$linha,\"harness\":\"$(expx_json_escape "$harness")\"" ;;
       esac
     fi
+    # a resolucao vigente do subagente, so no Claude: a projecao e do adaptador claude
+    case "$harness" in
+      claude|claude-code)
+        if [ "$agente" != principal ]; then
+          local resolucao; resolucao="$(expx_resolucao_extras "$raiz" "$agente")"
+          [ -n "$resolucao" ] && linha="$linha,$resolucao"
+        fi
+        ;;
+    esac
     [ -n "$extras" ] && linha="$linha,$extras"
     linha="$linha}"
 

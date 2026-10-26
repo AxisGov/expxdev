@@ -66,6 +66,43 @@ describe("init sem política — camada inativa", () => {
   });
 });
 
+const PROJECAO = ".expx/orquestracao-rastro.tsv";
+const linhasDaProjecao = (p: string) => readFileSync(join(p, PROJECAO), "utf8").split("\n").filter((l) => l !== "");
+
+describe("projeção do rastro (F3a)", () => {
+  it("sem política não existe", async () => {
+    const p = produto();
+    expect((await init(p)).ok).toBe(true);
+    expect(existsSync(join(p, PROJECAO))).toBe(false);
+  });
+
+  it("com política, uma linha por agente com o id do lock; removida quando a política sai", async () => {
+    const p = produto();
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+    const o = origens();
+    expect((await init(p, o)).ok).toBe(true);
+    const orq = lerLock(p).orquestracao;
+    const [cab, ...linhas] = linhasDaProjecao(p);
+    expect(cab).toBe("# expx-orquestracao-rastro 1");
+    expect(linhas.map((l) => l.split("\t").slice(0, 2))).toEqual([
+      ["auditor", orq?.agentes["auditor"]?.claude],
+      ["triagem", orq?.agentes["triagem"]?.claude],
+    ]);
+    rmSync(join(p, ".expx/orquestracao.json"));
+    expect((await init(p, o)).ok).toBe(true);
+    expect(existsSync(join(p, PROJECAO))).toBe(false);
+  });
+
+  it("na exceção do v1, a linha leva o materializado", async () => {
+    const p = produto();
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+    gravar(p, ".expx/agentes.json", { expx_agentes: 1, agentes: { auditor: { model: "haiku" } } });
+    expect((await init(p)).ok).toBe(true);
+    const auditor = linhasDaProjecao(p).find((l) => l.startsWith("auditor\t"))?.split("\t") ?? [];
+    expect(auditor.slice(6)).toEqual(["agentes-json-v1", "haiku", "high"]);
+  });
+});
+
 describe("init com política", () => {
   it("só com a versão: frontmatter fica, resolução vai para o registro e o id para o lock", async () => {
     const p = produto();

@@ -51,6 +51,7 @@ import { destinoDoRegistroInseguro, gravarNoRegistro } from "../orquestracao/reg
 import { VERSAO_RESOLVEDOR, type Resolucao } from "../orquestracao/resolver.js";
 import { VERSAO_TABELA } from "../orquestracao/tabela.js";
 import { VERSAO_MATRIZ_EFFORT_CLAUDE } from "../orquestracao/adaptadores.js";
+import { CAMINHO_PROJECAO, serializarProjecao } from "../orquestracao/projecao.js";
 import type { OrquestracaoTravada } from "../nucleo/lock.js";
 import { adquirirBloqueioOperacao } from "../nucleo/bloqueio-operacao.js";
 
@@ -163,6 +164,8 @@ type Plano = {
    * registro `.expx/resolucoes/` e a seção `orquestracao` do lock.
    */
   resolucoes?: Resolucao[];
+  /** A projeção plana das resoluções para o escritor do rastro; sem política, ausente. */
+  projecao?: string;
 };
 
 /** A seção `orquestracao` do lock: as versões e o `resolucao_id` vigente por agente. */
@@ -266,6 +269,7 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
   const avisosDoPlano: string[] = [];
   const agentesDoPlano: Artefato[] = [];
   let resolucoes: Resolucao[] | undefined;
+  let projecao: string | undefined;
   if (claude) {
     candidatos.push(...artefatosDeHooks(montaveis));
     // Política de orquestração: ausente, a camada não existe e nada muda.
@@ -286,6 +290,9 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
         resolucoes = ag.resolucoes;
         const inseguro = destinoDoRegistroInseguro(op.raiz, resolucoes.map((r) => r.resolucao_id));
         erros.push(...(inseguro.length > 0 ? inseguro : conferirRegistroExistente(op.raiz, resolucoes)));
+        const proj = serializarProjecao(resolucoes);
+        if (proj.ok) projecao = proj.texto;
+        else erros.push(proj.erro);
       }
     }
   }
@@ -310,6 +317,7 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
     avisos: avisosDoPlano,
     remover: [],
     ...(resolucoes !== undefined ? { resolucoes } : {}),
+    ...(projecao !== undefined ? { projecao } : {}),
   };
   if (claude) {
     const lk = lerLock(op.raiz);
@@ -327,6 +335,7 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
     ".expx/expx-lock.json",
     ...(claude ? [".claude/settings.json", ".expx/hooks.json"] : []),
     ...(resolucoes !== undefined && resolucoes.length > 0 ? [caminhoDoRegistro("x")] : []),
+    ...(projecao !== undefined ? [CAMINHO_PROJECAO] : []),
   ]);
   if (bloqueados.length > 0) erros.push(`destino impossivel de escrever (nada foi escrito):\n  ${bloqueados.join("\n  ")}`);
   if (!claude) return erros.length > 0 ? { ok: false, erros } : { ok: true, plano };
@@ -589,6 +598,9 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
       // O registro antes dos agentes e do lock: uma falha no meio deixa no
       // máximo resoluções órfãs, inofensivas e reaproveitadas pelo próximo init.
       for (const r of p.plano.resolucoes ?? []) gravarNoRegistro(op.raiz, r);
+      // a projeção acompanha a política: com ela, regravada; sem ela, some
+      if (p.plano.projecao !== undefined) escreverArquivoAtomico(join(op.raiz, ...CAMINHO_PROJECAO.split("/")), p.plano.projecao);
+      else rmSync(join(op.raiz, ...CAMINHO_PROJECAO.split("/")), { force: true });
       aplicarArtefatos(op.raiz, p.plano.projeto);
       for (const rel of p.plano.remover) rmSync(join(op.raiz, ...rel.split("/")), { force: true });
       if (p.plano.settings !== undefined) {
