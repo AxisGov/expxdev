@@ -194,7 +194,13 @@ export const LinhaEvento = z
   })
   // Extras declaradas passam; o que não é declarado é reportado por
   // `chavesDesconhecidas`, não rejeitado — o rastro nunca trava trabalho.
-  .passthrough();
+  .passthrough()
+  // `materializado` só existe na exceção do `.expx/agentes.json` v1
+  // (CONTRATO-expx-orquestracao §7.4): fora dela, é linha incoerente.
+  .refine((l) => l.materializado === undefined || l.origem_alternativa === "agentes-json-v1", {
+    message: "materializado só com origem_alternativa agentes-json-v1",
+    path: ["materializado"],
+  });
 
 export type LinhaEvento = z.infer<typeof LinhaEvento>;
 

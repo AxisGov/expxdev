@@ -490,6 +490,8 @@ describe("chaves da resolução (CONTRATO-expx-orquestracao §11.1)", () => {
       { materializado: { effort: "low" } },
       { fora_da_politica: false },
       { modelos_observados: [""] },
+      // materializado só existe na exceção do agentes.json v1
+      { materializado: { model: "haiku" } },
     ]) {
       expect(validarRastro(j(linha({ ...RESOLUCAO, ...ruim }))).defeitos, JSON.stringify(ruim)).toHaveLength(1);
     }
