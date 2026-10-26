@@ -54,6 +54,9 @@ import { VERSAO_MATRIZ_EFFORT_CLAUDE } from "../orquestracao/adaptadores.js";
 import type { OrquestracaoTravada } from "../nucleo/lock.js";
 import { adquirirBloqueioOperacao } from "../nucleo/bloqueio-operacao.js";
 
+/** O marketplace no `.claude/settings.json` do projeto (ver `planejarSettings`). */
+export const CAMINHO_MARKETPLACE_NO_PROJETO = "./.expx/marketplace";
+
 /**
  * O fluxo do `init`: busca, PLANEJA, VALIDA, aplica e trava.
  *
@@ -357,7 +360,12 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
   }
   plano.hooksDeSkill = entradas.some((e) => e.skill !== SKILL_DO_NUCLEO);
 
-  const s = planejarSettings(op.raiz, join(op.raiz, ".expx", "marketplace"), entradas, [...anteriores.settings, ...legadas]);
+  // Relativo: o settings do projeto vai no commit, e o Claude Code resolve o
+  // caminho relativo de um marketplace `directory` contra o checkout principal do
+  // repositório (também de dentro de um worktree). O absoluto de quem rodou o
+  // init quebraria quando aquele checkout sumisse. O `claude plugin marketplace
+  // add` continua recebendo o absoluto, no settings do usuário.
+  const s = planejarSettings(op.raiz, CAMINHO_MARKETPLACE_NO_PROJETO, entradas, [...anteriores.settings, ...legadas]);
   if (!s.ok) erros.push(s.erro);
   else plano.settings = s.plano;
 

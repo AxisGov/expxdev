@@ -110,8 +110,9 @@ export type PlanoSettings = {
 /**
  * Compõe o settings em memória. Não escreve nada.
  *
- * `caminhoMarketplace` é absoluto de propósito: é o que o `claude plugin
- * marketplace add` grava, e um caminho relativo não é resolvido aqui.
+ * `caminhoMarketplace` vai literal para `extraKnownMarketplaces`: o `init`
+ * passa o relativo `./.expx/marketplace`, que o Claude Code resolve contra o
+ * checkout principal do repositório. Ele não é resolvido aqui.
  */
 export function planejarSettings(
   raizProjeto: string,
