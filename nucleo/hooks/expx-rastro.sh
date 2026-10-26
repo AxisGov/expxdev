@@ -356,9 +356,10 @@ expx_resolucao_extras() {
   while IFS= read -r linha || [ -n "$linha" ]; do
     linha="${linha%$'\r'}"
     case "$linha" in "$agente"$'\t'*) ;; *) continue ;; esac
-    # agente repetido: a projecao nao vale para ele (o plano a recusaria)
+    # agente repetido: a projecao nao vale para ele (o plano a recusaria). So se
+    # sabe no fim do arquivo: conta e segue lendo; a decisao vem depois do laco.
     achadas=$((achadas + 1))
-    [ "$achadas" -eq 1 ] || return 0
+    [ "$achadas" -eq 1 ] || continue
     # Exatamente oito TABs, contados na linha crua: o `read` com IFS de TAB
     # trata TAB como espaco em branco e juntaria coluna vazia ou TAB no fim.
     tabs="${linha//[!$'\t']/}"
@@ -386,6 +387,7 @@ EXPX_PROJECAO
     fi
   done < "$arq"
   # o arquivo inteiro lido: so entao se sabe que o agente nao se repete
+  [ "$achadas" -eq 1 ] || return 0
   printf '%s' "$out"
   return 0
 }
