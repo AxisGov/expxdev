@@ -352,10 +352,13 @@ expx_resolucao_extras() {
   [ "${cab%$'\r'}" = "# expx-orquestracao-rastro 1" ] || return 0
   # o nome do agente no alfabeto de nome: fora dele, nem consigo mesmo casa
   case "$agente" in ""|*[!A-Za-z0-9._-]*) return 0 ;; esac
-  local linha tabs ag id cd oc cr alt oa mm me v out
+  local linha tabs ag id cd oc cr alt oa mm me v out="" achadas=0
   while IFS= read -r linha || [ -n "$linha" ]; do
     linha="${linha%$'\r'}"
     case "$linha" in "$agente"$'\t'*) ;; *) continue ;; esac
+    # agente repetido: a projecao nao vale para ele (o plano a recusaria)
+    achadas=$((achadas + 1))
+    [ "$achadas" -eq 1 ] || return 0
     # Exatamente oito TABs, contados na linha crua: o `read` com IFS de TAB
     # trata TAB como espaco em branco e juntaria coluna vazia ou TAB no fim.
     tabs="${linha//[!$'\t']/}"
@@ -369,17 +372,21 @@ EXPX_PROJECAO
     for v in "$ag" "$cd" "$oc" "$cr" "$alt" "$oa" "$mm" "$me"; do
       case "$v" in ""|*[!A-Za-z0-9._:/-]*) return 0 ;; esac
     done
+    # `-` so e ausencia nas duas colunas do materializado, e o materializado so
+    # existe na excecao do agentes.json v1, sempre com model
+    for v in "$cd" "$oc" "$cr" "$alt" "$oa"; do [ "$v" != - ] || return 0; done
+    [ "$mm" != - ] || [ "$me" = - ] || return 0
+    [ "$mm" = - ] || [ "$oa" = agentes-json-v1 ] || return 0
     out="\"resolucao_id\":\"$id\",\"classe_declarada\":\"$cd\",\"classe_resolvida\":\"$cr\""
     out="$out,\"origem_classe\":\"$oc\",\"alternativa\":\"$alt\",\"origem_alternativa\":\"$oa\""
-    # materializado so na excecao do agentes.json v1 (8.3); `-` e ausencia
     if [ "$mm" != - ]; then
       if [ "$me" != - ]; then out="$out,\"materializado\":{\"model\":\"$mm\",\"effort\":\"$me\"}"
       else out="$out,\"materializado\":{\"model\":\"$mm\"}"
       fi
     fi
-    printf '%s' "$out"
-    return 0
   done < "$arq"
+  # o arquivo inteiro lido: so entao se sabe que o agente nao se repete
+  printf '%s' "$out"
   return 0
 }
 

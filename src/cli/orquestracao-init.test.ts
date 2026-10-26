@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
-import { bashDosHooks, RAIZ_DO_REPO } from "../teste/candidatos.js";
+import { bashDosHooks } from "../teste/candidatos.js";
 import { executarInit } from "./init.js";
 import { lerRegistro } from "../orquestracao/materializar.js";
 import type { Resolucao } from "../orquestracao/resolver.js";
@@ -108,8 +108,10 @@ describe("projeção do rastro (F3a)", () => {
 describe("transição da política, pelo init e pelo escritor instalado (F3a)", () => {
   /** Grava um evento do subagente pelo escritor que o init instalou no projeto. */
   function evento(p: string): Record<string, unknown> {
+    // o escritor que o init instalou, e nenhum outro: sem ele, o teste não prova a instalação
     const instalado = join(p, ".expx/marketplace/plugins/expx/nucleo/hooks/expx-rastro.sh");
-    const escritor = (existsSync(instalado) ? instalado : join(RAIZ_DO_REPO, "nucleo/hooks/expx-rastro.sh")).replace(/\\/g, "/");
+    expect(existsSync(instalado), instalado).toBe(true);
+    const escritor = instalado.replace(/\\/g, "/");
     const env: NodeJS.ProcessEnv = {};
     for (const [k, v] of Object.entries(process.env)) if (!k.startsWith("EXPX_") && k !== "CLAUDECODE") env[k] = v;
     const r = spawnSync(bashDosHooks(), ["-c", `. "$1"\nexpx_rastro_grava "$PWD" agente_concluido agente ok x`, "rastro", escritor], {

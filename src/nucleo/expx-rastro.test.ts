@@ -258,6 +258,14 @@ describe("fase e task", () => {
       ["# expx-orquestracao-rastro 1", `${linha(ok)}\t`],
       // coluna vazia no meio: dois TABs seguidos
       ["# expx-orquestracao-rastro 1", linha([...ok.slice(0, 5), "", ...ok.slice(6)])],
+      // `-` só é ausência nas colunas do materializado
+      ["# expx-orquestracao-rastro 1", linha([...ok.slice(0, 5), "-", ...ok.slice(6)])],
+      // effort materializado sem model
+      ["# expx-orquestracao-rastro 1", linha([...ok.slice(0, 7), "-", "low"])],
+      // materializado fora da exceção do v1
+      ["# expx-orquestracao-rastro 1", linha([...ok.slice(0, 7), "haiku", "-"])],
+      // agente repetido: a projeção não vale para ele
+      ["# expx-orquestracao-rastro 1", linha(ok), linha([ok[0] as string, "d".repeat(64), ...ok.slice(2)])],
     ];
     for (const conteudo of casos) {
       const raiz = temp();
