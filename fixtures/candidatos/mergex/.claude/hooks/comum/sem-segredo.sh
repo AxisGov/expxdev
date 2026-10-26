@@ -45,12 +45,22 @@ case "$FERRAMENTA" in
     # `git commit -m x` seguido de 70 KB de linhas — com chave privada em
     # preparação (rodada extra da revisão). Sem `-q` o grep lê até o fim.
     printf '%s' "$CMD" | grep -E '(^|[;&|[:space:]])git([[:space:]]+-[^[:space:]]+)*[[:space:]]+commit([[:space:]]|$)' >/dev/null || exit 0
-    # A varredura é sobre o que está preparado, não sobre a linha de comando.
-    ALVO="$(git -C "$RAIZ" diff --cached 2>/dev/null)"
+    # A varredura é sobre o que ENTRA no histórico: as linhas adicionadas do que
+    # está preparado. A removida (tirar um segredo é a remediação) e o contexto
+    # do diff não são conteúdo novo. Só dentro de um bloco `@@` uma linha com `+`
+    # é conteúdo — fora dele, `+++ b/<arquivo>` é cabeçalho, e uma linha
+    # adicionada que começa com `++ ` também chega como `+++ `. O `+` inicial
+    # sai, para os limites à esquerda valerem.
+    # O índice não basta: `-a`, `-i`, `-o` e pathspec levam ao commit o que só
+    # está na árvore de trabalho, e reconhecer cada forma do comando seria
+    # frágil. As alterações não preparadas dos arquivos rastreados entram sempre:
+    # na dúvida, o hook barra (um segredo não preparado de outro arquivo também).
+    ALVO="$( { git -C "$RAIZ" diff --cached --no-color -U0; git -C "$RAIZ" diff --no-color -U0; } 2>/dev/null \
+      | awk '/^diff --git / { h = 0; next } /^@@/ { h = 1; next } h && /^\+/ { print substr($0, 2) }')"
     # Some a mensagem inline, que também vai para o histórico.
     ALVO="$ALVO
 $CMD"
-    ORIGEM="o que está em preparação para commit"
+    ORIGEM="o que está em preparação ou alterado nos arquivos rastreados"
     ;;
   Write|Edit|NotebookEdit)
     ALVO="$(printf '%s' "$ENTRADA" | jq -r '
@@ -77,8 +87,10 @@ eh_placeholder() {
     *'${'*|*'{{'*|*\<*\>*) return 0 ;;
   esac
   # Palavras reservadas só dispensam o valor inteiro, não uma credencial real
-  # que por acaso contenha "example", "sample" ou outro fragmento.
-  printf '%s' "$v" | grep -aEiq -e '^(sk-|gh[pousr]_|github_pat_|xox[baprs]-)?(x{4,}|0{4,}|your[-_](key|token|secret)([-_]here)?([-_](x{4,}|0{4,}))?|example|changeme|troque|placeholder|dummy|fake|sample|redacted|test[-_]?key|coloque)$'
+  # que por acaso contenha "example", "sample" ou outro fragmento. O valor pode
+  # juntar mais de uma (`sk-example-placeholder`), mas só delas é feito.
+  local w='(x{4,}|0{4,}|your[-_](key|token|secret)([-_]here)?([-_](x{4,}|0{4,}))?|example|changeme|troque|placeholder|dummy|fake|sample|redacted|test[-_]?key|coloque)'
+  printf '%s' "$v" | grep -aEiq -e "^(sk-|gh[pousr]_|github_pat_|xox[baprs]-)?$w([-_]$w)*\$"
 }
 
 achou() {
@@ -119,8 +131,24 @@ achou "chave de API"        'AIza[0-9A-Za-z_-]{35}' '(^|[^A-Za-z0-9_-])' '($|[^A
 # letra, digito ou _ e identificador mais longo, nao chave. Mesmo padrao do
 # segredo.sh da sprintx.
 achou "chave de API"        'A[KS]IA[0-9A-Z]{16}' '(^|[^A-Za-z0-9_])' '($|[^A-Za-z0-9_])'
-# 2. Credencial em atribuição
-achou "credencial"          '([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Nn][Hh][Aa]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii]_?[Kk][Ee][Yy])[[:space:]]*[:=][[:space:]]*['"'"'"]?[A-Za-z0-9/+_.=-]{8,}'
+# 2. Credencial em atribuição. O valor seguido de `(` é chamada de função
+# (`token: randomUUID()`), não credencial: o limite a direita o exclui...
+CREDENCIAL='([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Nn][Hh][Aa]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii]_?[Kk][Ee][Yy])[[:space:]]*[:=][[:space:]]*['"'"'"]?[A-Za-z0-9/+_.=-]{8,}'
+achou "credencial"          "$CREDENCIAL" '' '($|[^A-Za-z0-9/+_.=(-])'
+# ...salvo quando o valor tem dígito: identificador de função comum não tem
+# (`randomUUID`, `getToken`), e um valor aleatório quase sempre tem. Uma função
+# com dígito (`getToken2()`) barra — falso positivo assumido; valor sem dígito
+# seguido de `(` é o limite declarado.
+while IFS= read -r chamada; do
+  [ -n "$chamada" ] || continue
+  valor="${chamada%(}"; valor="${valor#*[:=]}"; valor="${valor#"${valor%%[![:space:]\'\"]*}"}"
+  case "$valor" in *[0-9]*) ;; *) continue ;; esac
+  eh_placeholder "$valor" && continue
+  ACHADOS="${ACHADOS}  - credencial: …${valor: -4}
+"
+done <<EXPX_CHAMADAS
+$(printf '%s' "$ALVO" | grep -aEo -e "$CREDENCIAL\(")
+EXPX_CHAMADAS
 # 3. Chave privada
 achou "chave privada"       '-----BEGIN [A-Z ]*PRIVATE KEY-----'
 # 4. Conexão com credencial embutida
