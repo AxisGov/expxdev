@@ -61,6 +61,6 @@ export async function marketplaceParaRegistrar(
     caminho: local,
     aviso:
       "esta e uma worktree, e o checkout principal nao tem .expx/marketplace: o registro aponta para esta worktree e quebra quando ela for removida. " +
-      `Depois do merge, rode \`expx init\` no checkout principal (ou \`claude plugin marketplace add ${doPrincipal}\`).`,
+      `Depois do merge, rode \`expx init\` no checkout principal (ou \`claude plugin marketplace remove expx-local\` e \`claude plugin marketplace add ${doPrincipal}\`).`,
   };
 }

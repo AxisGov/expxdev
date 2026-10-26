@@ -90,8 +90,18 @@ describe("registro do plugin: substitui o registro anterior", () => {
     expect(remove).toBeLessThan(add);
   });
 
-  it("a instrução manual traz o caminho escolhido", () => {
-    expect(instrucaoManual("/principal/.expx/marketplace")).toContain("/principal/.expx/marketplace");
+  it("a instrução manual remove o registro anterior antes de adicionar o caminho escolhido", () => {
+    const m = instrucaoManual("/principal/.expx/marketplace");
+    const remove = m.indexOf("claude plugin marketplace remove expx-local");
+    const add = m.indexOf("claude plugin marketplace add /principal/.expx/marketplace");
+    expect(remove).toBeGreaterThanOrEqual(0);
+    expect(remove).toBeLessThan(add);
+  });
+
+  it("o aviso da worktree sem marketplace no principal também manda remover antes de adicionar", async () => {
+    const { worktree } = repoComWorktree(false);
+    const alvo = await marketplaceParaRegistrar(worktree);
+    expect(alvo.aviso).toContain("claude plugin marketplace remove expx-local");
   });
 
   it("init e update registram pelo caminho resolvido e repassam o aviso", async () => {

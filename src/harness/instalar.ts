@@ -70,6 +70,7 @@ export function instrucaoManual(caminhoMarketplace: string): string {
     "O binario `claude` nao foi encontrado no PATH.",
     "O .expx/ foi montado e esta pronto; falta apenas registrar o plugin:",
     "",
+    "  claude plugin marketplace remove expx-local   (pode falhar na primeira vez: e esperado)",
     `  claude plugin marketplace add ${caminhoMarketplace}`,
     "  claude plugin marketplace update expx-local",
     "  claude plugin uninstall expx@expx-local",
