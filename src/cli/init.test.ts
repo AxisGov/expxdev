@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
@@ -203,6 +203,34 @@ describe("init que recusa modificação local", () => {
     expect(r.erros.join("\n")).toContain("sprintx");
     expect(readFileSync(ajuste, "utf8")).toBe("# ajuste manual\n");
     expect(readFileSync(join(p.raiz, ".expx/expx-lock.json"), "utf8")).toBe(lock);
+  });
+});
+
+describe("marketplace no settings do projeto", () => {
+  type Settings = { extraKnownMarketplaces?: Record<string, { source: { source: string; path: string } }> };
+  const lerSettings = (raiz: string) => JSON.parse(readFileSync(join(raiz, ".claude/settings.json"), "utf8")) as Settings;
+
+  it("funcional: o caminho vai relativo, para não levar ao commit o checkout (ou worktree) de quem rodou", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    expect((await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: catalogoLocal(["sprintx"]) })).ok).toBe(true);
+    const mkt = lerSettings(p.raiz).extraKnownMarketplaces?.["expx-local"];
+    expect(mkt).toEqual({ source: { source: "directory", path: "./.expx/marketplace" } });
+    expect(JSON.stringify(lerSettings(p.raiz))).not.toContain(p.raiz);
+  });
+
+  it("funcional: o absoluto que o expx gravava antes migra para o relativo, e outro marketplace fica", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    mkdirSync(join(p.raiz, ".claude"), { recursive: true });
+    writeFileSync(join(p.raiz, ".claude/settings.json"), JSON.stringify({
+      extraKnownMarketplaces: {
+        "expx-local": { source: { source: "directory", path: "/home/alguem/projeto--worktree/.expx/marketplace" } },
+        outro: { source: { source: "github", repo: "acme/plugins" } },
+      },
+    }, null, 2));
+    expect((await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: catalogoLocal(["sprintx"]) })).ok).toBe(true);
+    const mkts = lerSettings(p.raiz).extraKnownMarketplaces ?? {};
+    expect(mkts["expx-local"]).toEqual({ source: { source: "directory", path: "./.expx/marketplace" } });
+    expect(mkts["outro"]).toEqual({ source: { source: "github", repo: "acme/plugins" } });
   });
 });
 
