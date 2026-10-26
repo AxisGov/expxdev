@@ -163,7 +163,7 @@ describe("fase e task", () => {
     expect(sem).toMatchObject({ fase: null, task: null });
   });
 
-  it("integração: grava model/effort sem atribuir configuração Claude a outro harness", () => {
+  it("integração: model/effort são só o executor observado; o frontmatter instalado nunca vira observação (H10)", () => {
     const raiz = temp();
     mkdirSync(join(raiz, ".git"));
     mkdirSync(join(raiz, ".claude", "agents"), { recursive: true });
@@ -171,87 +171,64 @@ describe("fase e task", () => {
       join(raiz, ".claude", "agents", "runx-investigador.md"),
       "---\nname: runx-investigador\nmodel: sonnet\neffort: medium\n---\n",
     );
+    const sub = { EXPX_TRABALHO_ID: "t", EXPX_AGENTE: "runx-investigador" };
 
-    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok derivado', {
-      EXPX_TRABALHO_ID: "t",
-      EXPX_AGENTE: "runx-investigador",
-      EXPX_HARNESS: "claude",
-    });
+    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok claude-sem-observacao', { ...sub, EXPX_HARNESS: "claude" });
+    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok claudecode-sem-observacao', { ...sub, CLAUDECODE: "1" });
+    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok parcial-claude', { ...sub, EXPX_MODEL: "opus", EXPX_HARNESS: "claude-code" });
     roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok explicito', {
-      EXPX_TRABALHO_ID: "t",
-      EXPX_AGENTE: "runx-investigador",
+      ...sub,
       EXPX_MODEL: "openai/gpt-5.4",
       EXPX_EFFORT: "xhigh",
       EXPX_HARNESS: "opencode",
     });
-    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok opencode-sem-metadado', {
-      EXPX_TRABALHO_ID: "t",
-      EXPX_AGENTE: "runx-investigador",
-      EXPX_HARNESS: "opencode",
-    });
-    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok codex-explicito', {
-      EXPX_TRABALHO_ID: "t",
-      EXPX_AGENTE: "runx-investigador",
-      EXPX_MODEL: "openai/gpt-5.4-codex",
-      EXPX_EFFORT: "xhigh",
-      EXPX_HARNESS: "codex",
-    });
-    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok codex-sem-metadado', {
-      EXPX_TRABALHO_ID: "t",
-      EXPX_AGENTE: "runx-investigador",
-      EXPX_HARNESS: "codex",
-    });
-    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok principal', {
-      EXPX_TRABALHO_ID: "t",
-    });
+    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok codex-sem-metadado', { ...sub, EXPX_HARNESS: "codex" });
 
-    const [derivado, explicito, opencodeSemMetadado, codexExplicito, codexSemMetadado, principal] =
-      (eventos(raiz)["t.jsonl"] ?? [])
-        .map((l) => JSON.parse(l) as { model: unknown; effort: unknown });
-    expect(derivado).toMatchObject({ model: "sonnet", effort: "medium" });
+    const [claude, claudecode, parcialClaude, explicito, codex] = (eventos(raiz)["t.jsonl"] ?? [])
+      .map((l) => JSON.parse(l) as { model: unknown; effort: unknown });
+    expect(claude).toMatchObject({ model: null, effort: null });
+    expect(claudecode).toMatchObject({ model: null, effort: null });
+    expect(parcialClaude).toMatchObject({ model: "opus", effort: null });
     expect(explicito).toMatchObject({ model: "openai/gpt-5.4", effort: "xhigh" });
-    expect(opencodeSemMetadado).toMatchObject({ model: null, effort: null });
-    expect(codexExplicito).toMatchObject({ model: "openai/gpt-5.4-codex", effort: "xhigh" });
-    expect(codexSemMetadado).toMatchObject({ model: null, effort: null });
-    expect(principal).toMatchObject({ model: null, effort: null });
+    expect(codex).toMatchObject({ model: null, effort: null });
   });
 
-  it("integração: sem EXPX_HARNESS, o fallback Claude exige CLAUDECODE; o explícito vence e o parcial não é completado fora do Claude", () => {
+  it("integração: $CLAUDE_EFFORT é observação só do principal no Claude; nunca de subagente nem de outro harness", () => {
     const raiz = temp();
     mkdirSync(join(raiz, ".git"));
-    mkdirSync(join(raiz, ".claude", "agents"), { recursive: true });
-    writeFileSync(
-      join(raiz, ".claude", "agents", "runx-investigador.md"),
-      "---\nname: runx-investigador\nmodel: sonnet\neffort: medium\n---\n",
-    );
-    const base = { EXPX_TRABALHO_ID: "t", EXPX_AGENTE: "runx-investigador" };
+    const base = { EXPX_TRABALHO_ID: "t", CLAUDE_EFFORT: "high" };
 
-    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok sem-sinal', base);
-    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok claudecode', { ...base, CLAUDECODE: "1" });
-    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok explicito-sem-sinal', {
-      ...base,
-      EXPX_MODEL: "google/gemini-3-pro",
-      EXPX_EFFORT: "high",
-    });
-    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok parcial-opencode', {
-      ...base,
-      EXPX_MODEL: "openai/gpt-5.4",
-      EXPX_HARNESS: "opencode",
+    roda(raiz, 'expx_rastro_grava "$PWD" fase_iniciada skill ok principal', { ...base, CLAUDECODE: "1" });
+    roda(raiz, 'expx_rastro_grava "$PWD" fase_iniciada skill ok subagente', { ...base, CLAUDECODE: "1", EXPX_AGENTE: "auditor-plano" });
+    roda(raiz, 'expx_rastro_grava "$PWD" fase_iniciada skill ok opencode', { ...base, EXPX_HARNESS: "opencode" });
+    roda(raiz, 'expx_rastro_grava "$PWD" fase_iniciada skill ok explicito-vence', { ...base, CLAUDECODE: "1", EXPX_EFFORT: "low" });
+
+    const [principal, subagente, opencode, explicito] = (eventos(raiz)["t.jsonl"] ?? [])
+      .map((l) => JSON.parse(l) as { model: unknown; effort: unknown });
+    expect(principal).toMatchObject({ model: null, effort: "high" });
+    expect(subagente).toMatchObject({ effort: null });
+    expect(opencode).toMatchObject({ effort: null });
+    expect(explicito).toMatchObject({ effort: "low" });
+  });
+
+  it("integração: o harness detectado vai na linha, sem duplicar o que o chamador já mandou nas extras", () => {
+    const raiz = temp();
+    mkdirSync(join(raiz, ".git"));
+    roda(raiz, 'expx_rastro_grava "$PWD" fase_iniciada skill ok declarado', { EXPX_TRABALHO_ID: "t", EXPX_HARNESS: "opencode" });
+    roda(raiz, 'expx_rastro_grava "$PWD" fase_iniciada skill ok claudecode', { EXPX_TRABALHO_ID: "t", CLAUDECODE: "1" });
+    roda(raiz, 'expx_rastro_grava "$PWD" fase_iniciada skill ok sem-sinal', { EXPX_TRABALHO_ID: "t" });
+    roda(raiz, 'expx_rastro_grava "$PWD" fase_iniciada skill ok extras \'[]\' \'"sessao":"claude@1","harness":"claude"\'', {
+      EXPX_TRABALHO_ID: "t",
       CLAUDECODE: "1",
     });
-    roda(raiz, 'expx_rastro_grava "$PWD" agente_iniciado agente ok parcial-claude', {
-      ...base,
-      EXPX_MODEL: "opus",
-      EXPX_HARNESS: "claude-code",
-    });
 
-    const [semSinal, claudecode, explicito, parcialOpencode, parcialClaude] = (eventos(raiz)["t.jsonl"] ?? [])
-      .map((l) => JSON.parse(l) as { model: unknown; effort: unknown });
-    expect(semSinal).toMatchObject({ model: null, effort: null });
-    expect(claudecode).toMatchObject({ model: "sonnet", effort: "medium" });
-    expect(explicito).toMatchObject({ model: "google/gemini-3-pro", effort: "high" });
-    expect(parcialOpencode).toMatchObject({ model: "openai/gpt-5.4", effort: null });
-    expect(parcialClaude).toMatchObject({ model: "opus", effort: "medium" });
+    const linhas = eventos(raiz)["t.jsonl"] ?? [];
+    const [declarado, claudecode, semSinal, extras] = linhas.map((l) => JSON.parse(l) as Record<string, unknown>);
+    expect(declarado).toMatchObject({ harness: "opencode" });
+    expect(claudecode).toMatchObject({ harness: "claude-code" });
+    expect(semSinal).not.toHaveProperty("harness");
+    expect(extras).toMatchObject({ harness: "claude", sessao: "claude@1" });
+    expect((linhas[3] ?? "").match(/"harness":/g)).toHaveLength(1);
   });
 });
 
