@@ -198,6 +198,20 @@ caso "placeholder <>"       comum/sem-segredo.sh "$(write_json 'password: <coloq
 caso "marcador de template" comum/sem-segredo.sh "$(write_json 'token: {{seu_token}}')" 0
 caso "variavel de shell"    comum/sem-segredo.sh "$(write_json 'SECRET=${MINHA_VAR}')" 0
 caso "prosa sobre senha"    comum/sem-segredo.sh "$(write_json 'O campo senha e validado no login')" 0
+# Falsos positivos da 0.12.3, ao commitar o proprio update (relato do Login): placeholder feito
+# de duas palavras reservadas, e chamada de funcao no lugar do valor.
+caso "placeholder composto passa"         comum/sem-segredo.sh "$(write_json 'exemplo=sk-example-placeholder')" 0
+caso "chamada de funcao nao e credencial" comum/sem-segredo.sh "$(write_json 'const dono = { pid: 1, token: randomUUID(), em: 0 }')" 0
+# ...mas valor com digito seguido de `(` continua credencial (CodeAnt no #53); o falso positivo
+# de uma funcao com digito e assumido, e valor sem digito seguido de `(` e o limite declarado.
+caso "literal com digito seguido de ( barra" comum/sem-segredo.sh "$(write_json "token: $(printf 'abcd1234efgh5678')(x)")" 2
+FUNC2="getToken$(printf '2')"   # montada aqui: escrita no caso, o proprio teste.sh barraria no commit
+caso "funcao com digito barra (assumido)"   comum/sem-segredo.sh "$(write_json "token: $FUNC2()")" 2
+caso "valor sem digito seguido de ( passa (limite)" comum/sem-segredo.sh "$(write_json 'token: abcdefghijkl()')" 0
+B64="$(printf 'YWJjMTIzNDU2Nzg5MA')=="   # base64 com padding: o `=` do valor nao e o da atribuicao
+caso "base64 com = seguido de ( barra"     comum/sem-segredo.sh "$(write_json "token: $B64()")" 2
+caso "token literal sem aspas barra"      comum/sem-segredo.sh "$(write_json "TOKEN=$(printf 'abcd1234efgh5678')")" 2
+caso "palavra reservada colada em valor real barra" comum/sem-segredo.sh "$(write_json "k=sk-example-$(printf 'abcdef1234567890')")" 2
 caso "comando comum"        comum/sem-segredo.sh "$(bash_json 'npm test')" 0
 # SIGPIPE sob pipefail (rodada extra da revisao): a saida antecipada
 # `printf | grep -q … || exit 0` devolvia 141 quando o grep casava na 1a linha e
@@ -210,6 +224,39 @@ caso "commit + 70 KB de linhas: a varredura continua, barra"      comum/sem-segr
 caso "commit + 200 KB de linhas: barra"                           comum/sem-segredo.sh "$(json_grande "git commit -m x"$'\n'"$LINHAS200")" 2
 caso "comando legitimo + 200 KB de linhas: passa"                 comum/sem-segredo.sh "$(json_grande "npm test"$'\n'"$LINHAS200")" 0
 git rm -q --cached segredo.pem && rm -f segredo.pem
+# So o que ENTRA no historico e varrido: a linha adicionada e a mensagem. A linha removida
+# (tirar um segredo) e o contexto do diff nao sao conteudo novo, e barrar a remocao impediria
+# a remediacao. Repositorio proprio, para nao mexer no HEAD dos outros casos.
+SEG_T="$(mktemp -d)"
+git -C "$SEG_T" init -q -b feature/seg
+seg_git() { git -C "$SEG_T" -c user.email=t@t -c user.name=t -c commit.gpgsign=false "$@"; }
+printf 'antes\n%s\ndepois\n' "$PK" > "$SEG_T/chave.pem"; seg_git add chave.pem; seg_git commit -q -m base
+HOOK_CWD_ANTES="$HOOK_CWD"; HOOK_CWD="$SEG_T"
+printf 'antes\n%s\ndepois\nmais uma linha\n' "$PK" > "$SEG_T/chave.pem"; seg_git add chave.pem
+caso "segredo so no contexto do diff: passa"     comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 0
+printf 'antes\ndepois\n' > "$SEG_T/chave.pem"; seg_git add chave.pem
+caso "remover o segredo: passa"                  comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 0
+printf 'antes\n%s\ndepois\n' "$SK" > "$SEG_T/chave.pem"; seg_git add chave.pem
+caso "trocar por outro segredo: barra"           comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+printf 'antes\n++ %s\ndepois\n' "$SK" > "$SEG_T/chave.pem"; seg_git add chave.pem
+caso "linha adicionada que comeca com ++: barra" comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+seg_git reset -q --hard
+# `-a`, `-i`, `-o` e pathspec levam ao commit o que nao esta no indice (CodeAnt no #53): as linhas
+# adicionadas nos arquivos rastreados, preparadas ou nao, sao varridas sempre.
+printf 'antes\n%s\ndepois\n' "$SK" > "$SEG_T/chave.pem"
+for cmd in 'git commit -m x' 'git commit -a -m x' 'git commit -am x' 'git commit -i chave.pem -m x' \
+           'git commit -o chave.pem -m x' 'git commit chave.pem -m x' 'git commit -m x -- chave.pem'; do
+  caso "segredo so alterado, sem preparar ($cmd): barra" comum/sem-segredo.sh "$(bash_json "$cmd")" 2
+done
+seg_git reset -q --hard
+# O commit do proprio hook e da propria suite nao pode barrar: foi o que o Login encontrou ao
+# commitar o update da 0.12.3. Os valores sinteticos ficam montados em tempo de teste.
+cp "$H/teste.sh" "$SEG_T/teste.sh"; cp "$H/comum/sem-segredo.sh" "$SEG_T/sem-segredo.sh"
+seg_git add teste.sh sem-segredo.sh
+caso "commit do teste.sh e do sem-segredo.sh: passa" comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 0
+seg_git reset -q --hard; rm -f "$SEG_T/teste.sh" "$SEG_T/sem-segredo.sh"
+caso "segredo na mensagem do commit: barra"      comum/sem-segredo.sh "$(bash_json "git commit -m 'chave $SK'")" 2
+HOOK_CWD="$HOOK_CWD_ANTES"; rm -rf "$SEG_T"
 # Prefixo de chave no meio de um identificador nao e chave. Falso positivo do
 # conselho #204: "ta" + "sk-fora-do-plano-..." (nome de um caso da bancada da
 # sprintx) casava com sk-, e barrou os commits de instalacao do framework. O

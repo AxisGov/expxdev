@@ -537,16 +537,16 @@ Requisitos para os comandos abaixo: Node ≥ 20.19.0, `git`, GitHub CLI (`gh`) a
 `sha256sum` (Linux) ou `shasum` (macOS) para conferir o pacote antes de executá-lo.
 
 ```bash
-gh release download v0.12.3 -R AxisGov/expxdev -D ~/expx-cli/v0.12.3
+gh release download v0.12.4 -R AxisGov/expxdev -D ~/expx-cli/v0.12.4
 (
-  cd ~/expx-cli/v0.12.3
+  cd ~/expx-cli/v0.12.4
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.12.3.tgz.sha256
+    sha256sum -c expxdev-0.12.4.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.12.3.tgz.sha256
+    shasum -a 256 -c expxdev-0.12.4.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.12.3/expxdev-0.12.3.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.12.4/expxdev-0.12.4.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -555,7 +555,7 @@ npx --yes --package ~/expx-cli/v0.12.3/expxdev-0.12.3.tgz expx init --skills bui
 - O preflight recusa divergência entre `package.json`, `package-lock.json` e metadata do tarball,
   bem como tag ou release já existente. O pacote é gerado duas vezes e os hashes devem coincidir.
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.12.3 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.12.4 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -583,6 +583,9 @@ npx --yes --package ~/expx-cli/v0.12.3/expxdev-0.12.3.tgz expx init --skills bui
   Login aplicou na cópia instalada, faz o `update <skill>` deixar as outras skills no commit
   travado, deixa de criar backup do `settings.json` versionado e certifica SprintX e MergeX
   nos commits revisados.
+- `0.12.4` traz a correção do E7 que a `0.12.3` anunciou e não incluiu (DM-270), tira os falsos
+  positivos do `sem-segredo` no commit do update, grava o marketplace do projeto pelo caminho
+  relativo e certifica SprintX e MergeX com os achados do Login.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

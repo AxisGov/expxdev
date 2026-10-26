@@ -94,7 +94,15 @@ desde aquela chamada; a ponta continua tendo de ser o `HEAD` —, e grava o remo
 Git, que o passo 2 lê. O estado só
 é gravado quando a medição sai `0`, e o de uma execução anterior é apagado na primeira linha,
 antes de qualquer busca ou conferência: qualquer falha do bloco, reprovado (`1`) ou não medido
-(`2`), deixa o arquivo ausente, e o passo 2 não tem base para abrir o PR:
+(`2`), deixa o arquivo ausente, e o passo 2 não tem base para abrir o PR.
+
+A `branch_base` é texto do `ENTREGA.md`, e nunca entra no texto do bloco: no shell, um texto
+copiado pode virar comando. Antes do bloco, obtenha o caminho com
+`git rev-parse --path-format=absolute --git-path mergex-e7-branch-base` e grave nele o valor exato
+da `branch_base` **pela ferramenta de escrita de arquivo** do harness — nunca pelo shell (nada de
+`echo`, `printf`, heredoc ou redirecionamento com o valor no comando). O bloco lê o arquivo como
+dado e o apaga logo em seguida, válido ou não; ausente ou com mais de uma linha (ref nunca tem
+quebra de linha), o bloco sai `2`, sem medir. Cada execução exige gravar de novo:
 
 ```bash
 estado_bb="$(git rev-parse --git-path mergex-e7-base)" && rm -f "$estado_bb" || exit 2   # antes de tudo
@@ -104,9 +112,9 @@ git fetch "$remoto" "$ref_remota" || { echo "busca de $upstream falhou: o E7 nã
 publicado="$(git rev-parse --verify "refs/remotes/$upstream^{commit}")" || exit 2
 [ "$publicado" = "$(git rev-parse HEAD)" ] || { echo "a ponta remota ($publicado) não é o HEAD: o E7 não mede nem abre o PR"; exit 2; }
 rb="$remoto"
-IFS= read -r bb <<'BRANCH_BASE__INVALIDA~'
-<branch_base>
-BRANCH_BASE__INVALIDA~
+a="$(git rev-parse --path-format=absolute --git-path mergex-e7-branch-base)" || exit 2
+bb="$(awk 'NR == 1 { l = $0; sub(/\r$/, "", l) } END { if (NR == 1) print l }' "$a" 2>/dev/null)"; rm -f "$a"
+[ -n "$bb" ] || { echo "branch_base ausente ou com mais de uma linha em $a: o E7 não mede nem abre o PR"; exit 2; }
 case "$bb" in
   refs/remotes/*/*) bb="${bb#refs/remotes/}"; rb="${bb%%/*}"; bb="${bb#*/}" ;;
   refs/heads/*) bb="${bb#refs/heads/}" ;;
@@ -227,10 +235,13 @@ para `HOST/OWNER/REPO`; formato desconhecido falha fechado em vez de abrir no pr
 `gh` aceita essa forma no `--repo`; o `glab` não a documenta (lê `HOST/…` como grupo), e por isso
 recebe a URL completa, `https://HOST/OWNER/REPO`, no `--repo` e no `--head`.
 
-O título é texto do `ORQUESTRADOR.md`, não comando: entre aspas duplas, um `$(...)` ou uma crase
-nele rodaria na abertura do PR. Ele entra pelo heredoc com o delimitador entre aspas
-(`<<'TITULO_DO_PR'`), que o shell não avalia, e chega ao `gh`/`glab` como `"$titulo"`, literal.
-Troque só a linha `<título>` do bloco, por uma linha só; nunca ponha o título dentro do comando.
+O título é texto do `ORQUESTRADOR.md`, não comando, e nunca entra no texto do bloco: um `$(...)`,
+uma crase ou uma quebra de linha nele rodariam na abertura do PR. Antes do bloco, obtenha o
+caminho com `git rev-parse --path-format=absolute --git-path mergex-e7-titulo` e grave nele o título
+exato, numa linha, **pela ferramenta de escrita de arquivo** do harness — nunca pelo shell. O bloco
+o lê como dado, o apaga logo em seguida e o passa ao `gh`/`glab` como `"$titulo"`, literal; ausente
+ou com mais de uma linha, o bloco sai `1` sem abrir. Cada tentativa de abertura exige gravar de
+novo.
 
 No GitHub (`gh`, do passo 1):
 
@@ -271,10 +282,9 @@ fonte="$(identidade_remota "$remoto")" || { echo "remoto da origem não normaliz
 opcao_rascunho=(--draft)
 qa="docs/manutencao/<trabalho_id>/QA.md"
 if [ -f "$qa" ] && grep -qF 'VEREDITO: APROVADO' "$qa"; then opcao_rascunho=(); fi
-IFS= read -r titulo <<'TITULO_DO_PR'
-<título>
-TITULO_DO_PR
-[ -n "$titulo" ] || { echo "título vazio: o E7 não abre o PR"; exit 1; }
+a="$(git rev-parse --path-format=absolute --git-path mergex-e7-titulo)" || exit 1
+titulo="$(awk 'NR == 1 { l = $0; sub(/\r$/, "", l) } END { if (NR == 1) print l }' "$a" 2>/dev/null)"; rm -f "$a"
+[ -n "$titulo" ] || { echo "título ausente ou com mais de uma linha em $a: o E7 não abre o PR"; exit 1; }
 head="${upstream#*/}"
 if [ "$fonte" != "$destino" ]; then
   projeto_fonte="${fonte#*/}"; dono_fonte="${projeto_fonte%%/*}"
@@ -324,10 +334,9 @@ fonte="$(identidade_remota "$remoto")" || { echo "remoto da origem não normaliz
 opcao_rascunho=(--draft)
 qa="docs/manutencao/<trabalho_id>/QA.md"
 if [ -f "$qa" ] && grep -qF 'VEREDITO: APROVADO' "$qa"; then opcao_rascunho=(); fi
-IFS= read -r titulo <<'TITULO_DO_PR'
-<título>
-TITULO_DO_PR
-[ -n "$titulo" ] || { echo "título vazio: o E7 não abre o PR"; exit 1; }
+a="$(git rev-parse --path-format=absolute --git-path mergex-e7-titulo)" || exit 1
+titulo="$(awk 'NR == 1 { l = $0; sub(/\r$/, "", l) } END { if (NR == 1) print l }' "$a" 2>/dev/null)"; rm -f "$a"
+[ -n "$titulo" ] || { echo "título ausente ou com mais de uma linha em $a: o E7 não abre o PR"; exit 1; }
 branch_fonte="${upstream#*/}"; projeto_fonte="${fonte#*/}"
 projeto_fonte_codificado="$(node -p 'encodeURIComponent(process.argv[1])' "$projeto_fonte")" || exit 1
 fonte_id="$(glab api "projects/$projeto_fonte_codificado" | node -e 'const fs=require("fs"); const v=JSON.parse(fs.readFileSync(0,"utf8")); if(!Number.isSafeInteger(v.id)) process.exit(2); process.stdout.write(String(v.id))')" || { echo "projeto fonte não resolvido"; exit 1; }

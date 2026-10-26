@@ -120,11 +120,12 @@ case "$pr_url" in
       || { echo "sem glab ou jq: o merge do MR de planejamento não foi lido, nada gravado"; exit 3; }
     mr="$(glab api "projects/:id/merge_requests/$iid")" \
       || { echo "o serviço não respondeu sobre $pr_url: nada gravado"; exit 3; }
-    resposta="$(printf '%s\n' "$mr" | jq -r '[(.state // "" | ascii_upcase), (.merge_commit_sha // ""), (.squash_commit_sha // "")] | join(" ")')" \
+    # cada campo lido sozinho: juntos por espaço, o `read` engolia o vazio, e o
+    # squash_commit_sha de um squash sem merge_commit_sha caía no lugar do merge
+    estado_pr="$(printf '%s\n' "$mr" | jq -r '.state // "" | ascii_upcase')" \
+      && merge_api="$(printf '%s\n' "$mr" | jq -r '.merge_commit_sha // ""')" \
+      && squash_api="$(printf '%s\n' "$mr" | jq -r '.squash_commit_sha // ""')" \
       || { echo "a resposta do serviço para $pr_url é ilegível: nada gravado"; exit 3; }
-    read -r estado_pr merge_api squash_api _ <<EOF
-$resposta
-EOF
     if [ "$estado_pr" != MERGED ]; then
       resposta="$estado_pr  "
     else
