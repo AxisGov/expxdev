@@ -180,6 +180,8 @@ echo "sem-segredo — tem que BARRAR"
 # o que é o hook funcionando, mas deixaria a suíte impossível de versionar.
 # Nenhum valor aqui é real; todos são sintéticos e montados em tempo de teste.
 SK="sk-$(printf 'abcdef1234567890QRS')"
+FGH="github_pat_$(printf 'A%.0s' {1..40})"
+GKEY="AIza$(printf 'A%.0s' {1..35})"
 PK="$(printf -- '-----BEGIN RSA %s KEY-----' 'PRIVATE')"
 SENHA="$(printf 'password = %sTr0ub4dorZ3x%s' "'" "'")"
 CPF="$(printf 'cliente 123.%s-01' '456.789')"
@@ -227,6 +229,16 @@ caso "sk- depois de aspas"                 comum/sem-segredo.sh "$(write_json "k
 caso "sk- depois de :"                     comum/sem-segredo.sh "$(write_json "chave:$SK")" 2
 caso "identificador e chave na mesma linha" comum/sem-segredo.sh "$(write_json "${IDENT} $SK")" 2
 caso "ghp_ depois de ="                    comum/sem-segredo.sh "$(write_json "GH=ghp_$(printf 'Z9%.0s' {1..12})")" 2
+caso "github_pat depois de = barra"             comum/sem-segredo.sh "$(write_json "GH=$FGH")" 2
+caso "placeholder anterior nao mascara segredo" comum/sem-segredo.sh "$(write_json "fake=sk-your-key-here-xxxxxxxxxx real=$SK")" 2
+caso "example dentro de token real barra"       comum/sem-segredo.sh "$(write_json "GH=github_pat_example$(printf 'A%.0s' {1..32})")" 2
+caso "Google exata seguida de virgula barra"     comum/sem-segredo.sh "$(write_json "$GKEY,")" 2
+caso "Google seguida de identificador passa"    comum/sem-segredo.sh "$(write_json "${GKEY}X")" 0
+caso "placeholder anterior nao mascara AKIA"    comum/sem-segredo.sh "$(write_json "exemplo=sk-example-placeholder chave=AKIA$(printf 'ABCDEFGHIJKLMNOP')")" 2
+caso "ghs_ curto barra"                        comum/sem-segredo.sh "$(write_json "T=ghs_$(printf 'A%.0s' {1..20})")" 2
+caso "ghu_ curto barra"                        comum/sem-segredo.sh "$(write_json "T=ghu_$(printf 'A%.0s' {1..20})")" 2
+caso "ghr_ curto barra"                        comum/sem-segredo.sh "$(write_json "T=ghr_$(printf 'A%.0s' {1..20})")" 2
+caso "ghs_ dentro de identificador passa"      comum/sem-segredo.sh "$(write_json "id=prefixoghs_$(printf 'A%.0s' {1..20})")" 0
 # AKIA tem fronteira propria (conselho #204, rodada 3): o hifen antes dela nao
 # continua identificador, entao "id-AKIA..." e chave; letra, digito ou _ antes
 # continuam. O sk- depois de hifen segue passando (task-fora-do-plano).
@@ -249,11 +261,15 @@ caso "AKIA seguida de _: passa"                  comum/sem-segredo.sh "$(write_j
 caso "AKIA seguida de espaco: barra"             comum/sem-segredo.sh "$(write_json "$AK fim")" 2
 caso "AKIA seguida de aspas: barra"              comum/sem-segredo.sh "$(write_json "k=\"$AK\"")" 2
 caso "ASIA seguida de virgula: barra"            comum/sem-segredo.sh "$(write_json "$AS,outro")" 2
-mascara="$(write_json "k=\"$AK\",x" | bash "$H/comum/sem-segredo.sh" 2>&1)"
-case "$mascara" in
-  *"API: …MNPR (linha"*) OK=$((OK+1)); printf '  ok    %s\n' "AKIA com limite a direita: a mascara mostra so o fim da chave" ;;
-  *) FALHOU=$((FALHOU+1)); printf '  FALHA %s\n' "AKIA com limite a direita: a mascara nao e o fim da chave" ;;
-esac
+if [ "$SEM_JQ" = 0 ]; then
+  mascara="$(write_json "k=\"$AK\",x" | bash "$H/comum/sem-segredo.sh" 2>&1)"
+  case "$mascara" in
+    *"API: …MNPR (linha"*) OK=$((OK+1)); printf '  ok    %s\n' "AKIA com limite a direita: a mascara mostra so o fim da chave" ;;
+    *) FALHOU=$((FALHOU+1)); printf '  FALHA %s\n' "AKIA com limite a direita: a mascara nao e o fim da chave" ;;
+  esac
+else
+  PULADOS=$((PULADOS+1)); printf '  pulado %s (sem jq)\n' "AKIA com limite a direita: mascara"
+fi
 
 echo
 echo "git-perigoso — tem que BARRAR"

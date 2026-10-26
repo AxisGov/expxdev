@@ -71,36 +71,48 @@ esac
 # segredo (a assimetria é a única segura: falso negativo vaza credencial).
 ACHADOS=""
 
+eh_placeholder() {
+  local v="$1"
+  case "$v" in
+    *'${'*|*'{{'*|*\<*\>*) return 0 ;;
+  esac
+  # Palavras reservadas só dispensam o valor inteiro, não uma credencial real
+  # que por acaso contenha "example", "sample" ou outro fragmento.
+  printf '%s' "$v" | grep -aEiq -e '^(sk-|gh[pousr]_|github_pat_|xox[baprs]-)?(x{4,}|0{4,}|your[-_](key|token|secret)([-_]here)?([-_](x{4,}|0{4,}))?|example|changeme|troque|placeholder|dummy|fake|sample|redacted|test[-_]?key|coloque)$'
+}
+
 achou() {
   # achou <categoria> <regex estendida> [limite a esquerda] [limite a direita]
   # Os limites (opcionais) exigem o que vem antes e depois do valor: prefixo de
   # chave no meio de um identificador nao e chave, nem chave de tamanho fixo
   # seguida de mais caracteres. Entram na busca, nunca no valor mostrado.
-  local cat="$1" re="${3:-}$2${4:-}" esq="${3:-}${4:-}" linha valor
-  # O `head -1` sai cedo: com muitas linhas casando, o grep leva SIGPIPE e, sob
-  # `pipefail`, o pipeline devolve 141 — um `|| return 0` aqui diria "sem
-  # segredo" por causa do status. Decide-se pelo conteúdo (a linha), não pelo
-  # status (rodada extra da revisão).
-  linha="$(printf '%s' "$ALVO" | grep -aEn -e "$re" | head -1)"
-  [ -n "$linha" ] || return 0
-  # Descarta placeholder óbvio: xxx, 000, <coloque>, your-, example, changeme,
-  # dummy, fake, sample, redacted, ${VAR}, $VAR, {{marcador}}.
-  printf '%s' "$linha" | grep -aEi -e '(x{4,}|0{4,}|<[^>]*>|\{\{|\$\{|your[-_]|example|changeme|troque|placeholder|dummy|fake|sample|redacted|test[-_]?key|coloque)' >/dev/null && return 0
-  # Mascara: nunca ecoa o valor (DM-16). Mostra os 4 últimos caracteres.
-  valor="$(printf '%s' "$linha" | grep -aEo -e "$re" | head -1)"
-  # Os caracteres que fizeram os limites nao sao parte da chave: dentro do que
-  # casou, o valor e o que casa so o padrao, sem os limites.
-  [ -n "$esq" ] && valor="$(printf '%s' "$valor" | grep -aEo -e "$2" | head -1)"
-  local fim="${valor: -4}"
-  ACHADOS="${ACHADOS}  - ${cat}: …${fim} (linha ${linha%%:*})
+  local cat="$1" re="${3:-}$2${4:-}" esq="${3:-}${4:-}" linha valor fim
+  # Examine todos os candidatos: placeholder anterior nunca dispensa segredo posterior.
+  while IFS= read -r linha; do
+    [ -n "$linha" ] || continue
+    while IFS= read -r valor; do
+      [ -n "$valor" ] || continue
+      [ -n "$esq" ] && valor="$(printf '%s' "$valor" | grep -aEo -e "$2" | head -1)"
+      [ -n "$valor" ] || continue
+      # Placeholder dispensa somente este candidato.
+      eh_placeholder "$valor" && continue
+      fim="${valor: -4}"
+      ACHADOS="${ACHADOS}  - ${cat}: …${fim} (linha ${linha%%:*})
 "
+    done <<EXPX_MATCHES
+$(printf '%s' "${linha#*:}" | grep -aEo -e "$re")
+EXPX_MATCHES
+  done <<EXPX_LINHAS
+$(printf '%s' "$ALVO" | grep -aEn -e "$re")
+EXPX_LINHAS
 }
 
 # 1. Chave de API — o prefixo so vale no comeco da linha ou depois de caractere
 # que nao continua um identificador: "task-fora-do-plano" nao e chave "sk-"
 # (falso positivo que barrou a instalacao do framework no conselho #204).
 # `grep -E` nao tem limite de palavra portavel nem lookbehind: dai o grupo explicito.
-achou "chave de API"        '(sk-[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,})' '(^|[^A-Za-z0-9_-])'
+achou "chave de API"        '(sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,})' '(^|[^A-Za-z0-9_-])'
+achou "chave de API"        'AIza[0-9A-Za-z_-]{35}' '(^|[^A-Za-z0-9_-])' '($|[^A-Za-z0-9_-])'
 # A chave de acesso da AWS (AKIA; ASIA, a temporaria do STS) tem fronteira propria:
 # o hifen antes dela nao continua identificador nenhum ("id-AKIA..." e chave), so
 # letra, digito ou _ continuam. A chave tem exatamente 20 caracteres: seguida de

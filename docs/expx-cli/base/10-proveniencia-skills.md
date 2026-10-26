@@ -4,7 +4,7 @@ Esta é a fonte pública para origem, instalação e proteção de proveniência
 nove skills registradas no ExpxDev. O catálogo executável continua em
 `src/nucleo/catalogo.ts`.
 
-Os repositórios abaixo foram confirmados na organização AxisGov em 2026-10-23:
+Os repositórios abaixo foram confirmados na organização AxisGov em 2026-10-25:
 
 | Repositório | `origin/main` confirmado |
 |---|---|
@@ -12,8 +12,8 @@ Os repositórios abaixo foram confirmados na organização AxisGov em 2026-10-23
 | `AxisGov/runx` | `2673c26cb98681032d5e12c72c57826816dda404` |
 | `AxisGov/legadox` | `b185ef751e65d5f59d439528988344c52fe47b17` |
 | `AxisGov/stackx` | `1243537f2991e7097074889e2953ebc85ba726f4` |
-| `AxisGov/mergex` | `66dd6ace235287c1d094c3c77d25366ec4776635` |
-| `AxisGov/sprintx` | `9a742f4719999e2caae4047a2b56617acea26b23` |
+| `AxisGov/mergex` | `aae80ce06b731b297ee992d7110444dc0f9718b3` |
+| `AxisGov/sprintx` | `280d64ee3dc6e5ab8d6b197b5c2f3cd4603b9191` |
 | `AxisGov/MemoX` | `75f11897e7ac1a9123c5b1495b8e396122a85c4b` |
 | `AxisGov/prodx` | `7539db41013585d31b79ef21afd07268bd99d0c1` |
 | `AxisGov/buildx` | `b7dc7b6906904b3bf7184431518608a11422bd54` |

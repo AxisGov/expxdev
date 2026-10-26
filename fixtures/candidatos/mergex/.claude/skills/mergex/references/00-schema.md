@@ -119,9 +119,11 @@ commits:
   - seq: 1
     task: T-01.01
     commit: a3f19c2
+    revisao: null
   - seq: 2
     task: T-01.02
     commit: 7b2e401
+    revisao: null
 modulo_afetado: [fiscal, relatorios]
 arquivos_alterados: [src/fiscal/calculo_icms_st.py, src/fiscal/base_calculo.py, tests/fiscal/test_icms_st_desconto.py]
 faixa_atencao:

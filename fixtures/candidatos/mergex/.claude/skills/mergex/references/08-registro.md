@@ -50,7 +50,7 @@ o que segue é o que você precisa para gravar. As regras universais valem todas
 | `tipo_trabalho` | `feature` \| `ocorrencia` |
 | `entrega` | `por_trabalho` \| `por_sprint` |
 | `raio` | `baixo` \| `medio` \| `alto` \| `null` (sem modo legado) |
-| `causa` | as dez causas de `references/00-schema.md` \| `indeterminada` \| `null` |
+| `causa` | as doze causas de `references/00-schema.md` \| `indeterminada` \| `null` |
 
 `expx_tool` fica como a skill de **origem** do trabalho (`sprintx` ou `runx`) — é ela que governa o trabalho. O campo `entregue_por: mergex` diz quem gravou este arquivo.
 

@@ -67,7 +67,8 @@ n="$(grep -c . "$TMP_DIR/nascimentos")"
 NASCIMENTO="$(sed -n '1p' "$TMP_DIR/nascimentos")"
 
 # Parser fechado do frontmatter. Produz caminho/origem/papel/commit/blob.
-awk -v out="$TMP_DIR/itens" '
+# A forma inline [] é um estado explícito, validado contra o histórico abaixo.
+awk -v out="$TMP_DIR/itens" -v estado="$TMP_DIR/estado" '
   function erro(m) { print m > "/dev/stderr"; exit 2 }
   function fecha( k) {
     if (!item) return
@@ -82,7 +83,11 @@ awk -v out="$TMP_DIR/itens" '
   /^    (origem|papel|commit_sha|blob_oid): / {
     if (!item) erro("campo fora de item"); l=$0; sub(/^    /,"",l); k=l; sub(/:.*/,"",k); if (k in v) erro("campo repetido"); sub(/^[^:]*: /,"",l); v[k]=l; next
   }
-  /^predecessores:$/ { if (lista || depois) erro("lista repetida"); lista=1; topo["predecessores"]=1; next }
+  /^predecessores: \[\]$/ {
+    if (lista || depois || ("predecessores" in topo)) erro("lista repetida")
+    topo["predecessores"]=1; vazia=1; print "vazia" > estado; next
+  }
+  /^predecessores:$/ { if (lista || depois || ("predecessores" in topo)) erro("lista repetida"); lista=1; topo["predecessores"]=1; next }
   /^[a-z_][a-z_0-9]*: / {
     fecha(); if (lista) { lista=0; depois=1 }
     l=$0; k=l; sub(/:.*/,"",k)
@@ -94,7 +99,9 @@ awk -v out="$TMP_DIR/itens" '
     if (!fechado) erro("frontmatter sem fechamento")
     if (val["expx_schema"]!="1" || val["expx_tool"]!="sprintx" || val["kind"]!="predecessores") erro("cabecalho invalido")
     if (val["trabalho_id"]=="") erro("trabalho ausente")
-    if (!("predecessores" in topo) || itens<1) erro("lista vazia")
+    if (!("predecessores" in topo)) erro("lista ausente")
+    if (itens<1 && !vazia) erro("lista vazia fora da forma canonica")
+    if (itens>0 && vazia) erro("lista vazia com itens")
     if (val["criado_em"] !~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/ || val["atualizado_em"] !~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/) erro("data invalida")
   }
 ' "$TMP_DIR/manifesto" 2> "$TMP_DIR/parse.err"
@@ -103,6 +110,24 @@ rc=$?
 # O trabalho no manifesto é conferido separadamente para manter a gramática simples.
 trab_manifesto="$(sed -n 's/^trabalho_id:[[:space:]]*//p' "$TMP_DIR/manifesto" | head -n1)"
 [ "$trab_manifesto" = "$TRABALHO" ] || sem_prova 'trabalho_id diverge do trabalho solicitado'
+
+# Lista vazia só é N/A quando o Git prova que nenhum docs/superpowers/** existiu
+# em qualquer commit alcançável estritamente anterior ao nascimento do plano.
+if [ "$(cat "$TMP_DIR/estado" 2>/dev/null)" = vazia ]; then
+  linha_pais="$(git rev-list --parents -n 1 "$NASCIMENTO" 2>/dev/null)" \
+    || sem_prova 'pais do nascimento do planejamento ilegíveis'
+  case "$linha_pais" in *' '*) pais="${linha_pais#* }" ;; *) pais="" ;; esac
+  : > "$TMP_DIR/elegiveis"
+  if [ -n "$pais" ]; then
+    # Os pais são OIDs produzidos pelo Git; a expansão deliberada cobre merges.
+    git log --format=%H --full-history $pais -- docs/superpowers > "$TMP_DIR/elegiveis" 2>/dev/null \
+      || sem_prova 'histórico de predecessores elegíveis ilegível'
+  fi
+  [ ! -s "$TMP_DIR/elegiveis" ] \
+    || sem_prova 'lista vazia com predecessor elegível estritamente anterior ao planejamento'
+  printf 'resultado=n_a\nprova_n_a\tsem_predecessor_elegivel\t%s\n' "$NASCIMENTO"
+  exit 0
+fi
 
 : > "$TMP_DIR/predecessores"; : > "$TMP_DIR/fora"; : > "$TMP_DIR/vistos"
 while IFS="$TAB" read -r caminho origem papel commit blob; do

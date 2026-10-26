@@ -1,6 +1,6 @@
 # Changelog
 
-## Próxima versão — dependência de execução corrigida e orquestração no Claude
+## 0.12.3 — correções P1 do Login, update sem deriva e orquestração no Claude
 
 - Atualiza o `zod` para 4.6.7 e o intervalo direto para `^4.6.7`, fechando a GHSA-mrhx-c7xc-m3w5 (alta, `zod < 4.6.6`): validar coleções restritas muito grandes podia esgotar a memória. O `zod` é dependência de execução e ia no pacote publicado.
 - Estende a regressão de dependências auditadas ao `zod`, verificando todas as cópias do lockfile e o intervalo direto.
@@ -15,6 +15,9 @@
 - Sem `.expx/orquestracao.json`, nada muda: agentes e lock saem byte a byte iguais. Rastro, painel e hooks de invocação seguem inalterados até as próximas fases.
 - Grava o registro de resoluções com temporário `O_EXCL`/`O_NOFOLLOW` publicado por `link`: o registro nunca é sobrescrito nem seguido, inclusive quando outro escritor publica no meio (o `rename` anterior sobrescrevia), e a troca de `.expx` ou `.expx/resolucoes`, por link ou por outro diretório, que persista até a revalidação aborta antes do lock. O limite do Node (sem `openat`) fica declarado no contrato.
 - Traz para o núcleo as correções P1 que o Login aplicou na cópia instalada e que nunca chegaram à distribuição: o revisor mata a CLI que não responde em 15 minutos e falha fechado (`indisponivel:tempo-esgotado`), trata como aberto o achado sem vínculo a uma linha de arquivo da task (antes era dado por anterior e ignorado) e encerra os vereditos por `process.exitCode`, sem cortar o stdout assíncrono; o lembrete aceita a base confiável do estado atrás de um link (o scratchpad sob diretório-link) sem liberar link dentro dela; e o fallback em bash do lembrete normaliza maiúscula acentuada também em `LC_ALL=C`. O `verificar-fatiamento.sh` (e a cópia `fatiamento-da-pr.sh` da MergeX) reprova pelo tamanho bruto o arquivo que já passa de L2, sem copiar nem decodificar o blob inteiro.
+- Certifica a SprintX em AxisGov/sprintx@280d64e (AxisGov/sprintx#51): segredo com `github_pat_` e borda da chave Google; a base do caller na F1 chega por arquivo gravado pela ferramenta de escrita, fora do corpo do bloco, e não pode mais injetar comando (DS-188); escopo da task com o sufixo do plano inteiro; `predecessores: []` como ausência provada, aceito pelo schema e pela F1, recebendo o primeiro registro; e bancadas com assinatura de commit ligada e controle da geração do mutante 10.
+- Certifica a MergeX em AxisGov/mergex@aae80ce (AxisGov/mergex#52): o placeholder não mascara segredo vizinho; a V12 lê a entrega e o modo do mesmo snapshot do HEAD; a V9 aceita `predecessores: []` com ausência provada; o E7 resolve o remoto de upstream, mede contra a base certa e abre o PR no destino, com a origem explícita; o passo 2 só abre o que o passo 1.5 mediu; e a `branch_base` e o título chegam por arquivo, fora do corpo dos blocos (DM-270).
+- A BuildX (AxisGov/buildx#12) passa a citar as doze verificações do `mergex-check`; ela é instalada pela ponta da `main` e não tem candidato fixado.
 
 ## 0.12.2 — histórico de modelo e esforço e correções de instalação
 
