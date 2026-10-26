@@ -350,14 +350,23 @@ expx_resolucao_extras() {
   [ -f "$arq" ] || return 0
   IFS= read -r cab < "$arq" || true
   [ "${cab%$'\r'}" = "# expx-orquestracao-rastro 1" ] || return 0
-  local ag id cd oc cr alt oa mm me resto v out
-  while IFS=$'\t' read -r ag id cd oc cr alt oa mm me resto || [ -n "$ag" ]; do
-    [ "$ag" = "$agente" ] || continue
-    me="${me%$'\r'}"
-    [ -z "$resto" ] || return 0
+  # o nome do agente no alfabeto de nome: fora dele, nem consigo mesmo casa
+  case "$agente" in ""|*[!A-Za-z0-9._-]*) return 0 ;; esac
+  local linha tabs ag id cd oc cr alt oa mm me v out
+  while IFS= read -r linha || [ -n "$linha" ]; do
+    linha="${linha%$'\r'}"
+    case "$linha" in "$agente"$'\t'*) ;; *) continue ;; esac
+    # Exatamente oito TABs, contados na linha crua: o `read` com IFS de TAB
+    # trata TAB como espaco em branco e juntaria coluna vazia ou TAB no fim.
+    tabs="${linha//[!$'\t']/}"
+    [ "${#tabs}" -eq 8 ] || return 0
+    IFS=$'\t' read -r ag id cd oc cr alt oa mm me <<EXPX_PROJECAO
+$linha
+EXPX_PROJECAO
     case "$id" in ""|*[!0-9a-f]*) return 0 ;; esac
     [ "${#id}" -eq 64 ] || return 0
-    for v in "$cd" "$oc" "$cr" "$alt" "$oa" "$mm" "$me"; do
+    # nove campos cheios: um vazio teria deslocado os demais e deixado o ultimo vazio
+    for v in "$ag" "$cd" "$oc" "$cr" "$alt" "$oa" "$mm" "$me"; do
       case "$v" in ""|*[!A-Za-z0-9._:/-]*) return 0 ;; esac
     done
     out="\"resolucao_id\":\"$id\",\"classe_declarada\":\"$cd\",\"classe_resolvida\":\"$cr\""

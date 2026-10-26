@@ -254,6 +254,10 @@ describe("fase e task", () => {
       ["# expx-orquestracao-rastro 1", linha(["auditor", "c".repeat(63), ...ok.slice(2)])],
       ["# expx-orquestracao-rastro 1", linha([...ok, "extra"])],
       ["# expx-orquestracao-rastro 1", linha([...ok.slice(0, 5), 'sk"ill', ...ok.slice(6)])],
+      // TAB a mais no fim: o `read` com IFS de TAB juntaria a coluna vazia e aceitaria a linha
+      ["# expx-orquestracao-rastro 1", `${linha(ok)}\t`],
+      // coluna vazia no meio: dois TABs seguidos
+      ["# expx-orquestracao-rastro 1", linha([...ok.slice(0, 5), "", ...ok.slice(6)])],
     ];
     for (const conteudo of casos) {
       const raiz = temp();
@@ -264,6 +268,14 @@ describe("fase e task", () => {
       const [ev] = (eventos(raiz)["t.jsonl"] ?? []).map((l) => JSON.parse(l) as Record<string, unknown>);
       expect(ev, conteudo.join(" | ")).not.toHaveProperty("resolucao_id");
     }
+    // agente fora do alfabeto de nome nunca casa, nem consigo mesmo na projeção
+    const raiz = temp();
+    mkdirSync(join(raiz, ".git"));
+    mkdirSync(join(raiz, ".expx"));
+    writeFileSync(join(raiz, ".expx", "orquestracao-rastro.tsv"), `# expx-orquestracao-rastro 1\n${linha(["audi*", ...ok.slice(1)])}\n`);
+    roda(raiz, 'expx_rastro_grava "$PWD" veredito_emitido agente ok x', { EXPX_TRABALHO_ID: "t", CLAUDECODE: "1", EXPX_AGENTE: "audi*" });
+    const [ev] = (eventos(raiz)["t.jsonl"] ?? []).map((l) => JSON.parse(l) as Record<string, unknown>);
+    expect(ev).not.toHaveProperty("resolucao_id");
   });
 
   it("integração: o harness detectado vai na linha, sem duplicar o que o chamador já mandou nas extras", () => {
