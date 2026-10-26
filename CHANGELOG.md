@@ -1,7 +1,11 @@
 # Changelog
 
-## Próxima versão — correções da 0.12.3
+## 0.12.4 — correções da 0.12.3
 
+- **Errata da 0.12.3:** a DM-270 (a `branch_base` e o título do E7 por arquivo) foi anunciada como incluída, mas não entrou na release. O commit subiu depois do merge do AxisGov/mergex#52 e ficou só na branch, e o E7 instalado pela 0.12.3 ainda cola os dois valores num heredoc, com a injeção aberta. Entra agora.
+- Certifica a MergeX em AxisGov/mergex@7ede971 (AxisGov/mergex#53): a DM-270; o `sem-segredo` sem os falsos positivos que barravam o commit do próprio update (placeholder composto como `sk-example-placeholder`; chamada de função como `token: randomUUID()`), varrendo só as linhas adicionadas, de modo que remover um segredo não barra mais, e cobrindo as alterações não preparadas que `git commit -a`, `-i`, `-o` e pathspec levam; o E9 do GitLab lendo o squash sem `merge_commit_sha`; e a tabela da DM-239.
+- Certifica a SprintX em AxisGov/sprintx@e93681a (AxisGov/sprintx#52): as seis bancadas sem linha em branco no fim, com o `git diff --check` da árvore no CI; e `predecessores: []` provado também antes do checkpoint da F1 (`pre-checkpoint`).
+- A BuildX (AxisGov/buildx#13) passa a exigir os dez campos da feature no critério de saída do B3.
 - O `.claude/settings.json` do projeto passa a declarar o marketplace `expx-local` pelo caminho relativo `./.expx/marketplace`, e não pelo absoluto do checkout em que o `init` rodou. Rodado num worktree, o caminho do worktree ia para o commit e quebrava o plugin quando o worktree era removido. O Claude Code resolve o relativo contra o checkout principal do repositório, também de dentro de um worktree. O absoluto gravado antes migra no próximo `init`; o `claude plugin marketplace add` continua usando o absoluto, que vai para o settings do usuário.
 
 ## 0.12.3 — correções P1 do Login, update sem deriva e orquestração no Claude
