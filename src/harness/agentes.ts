@@ -241,6 +241,13 @@ function hashDoArquivo(caminho: string): string | undefined {
  * Cada pasta do caminho, a partir da primeira, é pasta de verdade e o fim é
  * arquivo comum — nenhum link simbólico no percurso. O `stat` e o `rm` seguem o
  * link, e uma pasta-link levaria a remoção para fora do projeto.
+ *
+ * Protege contra o lock editado e contra os links que existem no planejamento.
+ * Não é garantia contra ponto de montagem (bind, nullfs), que o `lstat` vê como
+ * pasta comum, nem contra troca concorrente entre esta conferência e o `rmSync`:
+ * os dois exigem quem controla a máquina ou escreve na árvore durante o update,
+ * que roda sob o bloqueio de operação. Fechar isso pediria `openat` com
+ * descritor de pasta, que o Node não oferece de forma portável.
  */
 function semLinkNoPercurso(raiz: string, segmentos: readonly string[]): boolean {
   try {
