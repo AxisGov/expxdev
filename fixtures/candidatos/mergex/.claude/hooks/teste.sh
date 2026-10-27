@@ -233,6 +233,20 @@ caso "chamada de funcao nao e credencial" comum/sem-segredo.sh "$(write_json 'co
 # ...mas valor com digito seguido de `(` continua credencial (CodeAnt no #53); o falso positivo
 # de uma funcao com digito e assumido, e valor sem digito seguido de `(` e o limite declarado.
 caso "literal com digito seguido de ( barra" comum/sem-segredo.sh "$(write_json "token: $(printf 'abcd1234efgh5678')(x)")" 2
+# Referencia de codigo nao e credencial (DM-283): sem aspas, so identificador ou cadeia a.b
+# sem digito, seguida de `,` `;` `)` ou `}`. As amostras saem de printf: a chave montada em
+# pedacos deixa este arquivo fora da propria regra.
+for t in ',' ';' ')' '}'; do
+  for v in hashedPassword dados.senha process.env.DB_PASS SENHA_PADRAO; do
+    caso "referencia $v seguida de $t passa" comum/sem-segredo.sh "$(write_json "$(printf 'pass%s: %s%s' word "$v" "$t")")" 0
+  done
+done
+caso "referencia no fim da linha barra"      comum/sem-segredo.sh "$(write_json "$(printf 'pass%s: hashedPassword' word)")" 2
+caso "referencia seguida de ] barra"         comum/sem-segredo.sh "$(write_json "$(printf 'pass%s: hashedPassword]' word)")" 2
+caso "valor entre aspas com virgula barra"   comum/sem-segredo.sh "$(write_json "$(printf "sen%s: 'hashedPassword'," ha)")" 2
+caso "valor com digito e virgula barra"      comum/sem-segredo.sh "$(write_json "$(printf 'tok%s: abcdefg1,' en)")" 2
+caso "valor com simbolo e virgula barra"     comum/sem-segredo.sh "$(write_json "$(printf 'pass%s: Abcdefg!,' word)")" 2
+caso "a segunda ocorrencia no fim da linha barra" comum/sem-segredo.sh "$(write_json "$(printf 'pass%s: hashedPassword; pass%s: hashedPassword' word word)")" 2
 FUNC2="getToken$(printf '2')"   # montada aqui: escrita no caso, o proprio teste.sh barraria no commit
 caso "funcao com digito barra (assumido)"   comum/sem-segredo.sh "$(write_json "token: $FUNC2()")" 2
 caso "valor sem digito seguido de ( passa (limite)" comum/sem-segredo.sh "$(write_json 'token: abcdefghijkl()')" 0

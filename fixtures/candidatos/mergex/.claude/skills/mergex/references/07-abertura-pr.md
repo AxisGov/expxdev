@@ -53,7 +53,7 @@ resolver_remoto_upstream() {
   printf '%s\n' "$remoto_atual"
 }
 remoto="$(resolver_remoto_upstream)" || exit 1
-# A URL pode trazer usuário e token (`https://usuario:token@...`): a saída vai para o transcript,
+# A URL pode trazer usuário e token (`https://<usuario>:<token>@...`): a saída vai para o transcript,
 # então o que fica entre `://` e `@` sai mascarado. Para detectar o serviço, o host basta.
 git remote get-url "$remoto" | sed -E 's#(://)[^/@]*@#\1***@#'
 ```

@@ -110,7 +110,9 @@ git clone https://github.com/AxisGov/mergex.git "$mergex_tmp/mergex"
 mkdir -p .claude/skills .claude/commands .claude/hooks .claude/agents .expx
 cp -r "$mergex_tmp/mergex/.claude/skills/mergex" .claude/skills/
 cp "$mergex_tmp"/mergex/.claude/commands/mergex*.md .claude/commands/
-cp -r "$mergex_tmp/mergex/.claude/hooks/." .claude/hooks/
+# os hooks, sem a suíte deles (teste.sh e testes/): ela carrega amostras de segredo de
+# propósito e barraria o push do projeto (DM-282)
+tar -C "$mergex_tmp/mergex/.claude/hooks" --exclude=./teste.sh --exclude=./testes -cf - . | tar -C .claude/hooks -xf -
 cp "$mergex_tmp"/mergex/.claude/agents/*.md .claude/agents/
 cp "$mergex_tmp/mergex/.expx/hooks.json" .expx/
 cp "$mergex_tmp/mergex/AGENTS.md" .
@@ -134,7 +136,9 @@ git clone https://github.com/AxisGov/mergex.git "$mergex_tmp/mergex"
 mkdir -p .claude/skills .claude/hooks .opencode/commands .opencode/plugin .opencode/agent .expx
 cp -r "$mergex_tmp/mergex/.claude/skills/mergex" .claude/skills/
 cp "$mergex_tmp"/mergex/.opencode/commands/mergex*.md .opencode/commands/
-cp -r "$mergex_tmp/mergex/.claude/hooks/." .claude/hooks/
+# os hooks, sem a suíte deles (teste.sh e testes/): ela carrega amostras de segredo de
+# propósito e barraria o push do projeto (DM-282)
+tar -C "$mergex_tmp/mergex/.claude/hooks" --exclude=./teste.sh --exclude=./testes -cf - . | tar -C .claude/hooks -xf -
 cp "$mergex_tmp/mergex/.opencode/plugin/mergex.ts" .opencode/plugin/
 cp "$mergex_tmp"/mergex/.opencode/agent/*.md .opencode/agent/
 cp "$mergex_tmp/mergex/.expx/hooks.json" .expx/
@@ -152,11 +156,12 @@ duplicada — só o registro difere.
 ```bash
 ls .claude/skills/mergex/SKILL.md
 ls .claude/commands/mergex*.md    # ou .opencode/commands/
-./.claude/hooks/teste.sh          # a suíte dos hooks: 48 casos
+ls .claude/hooks/comum/sem-segredo.sh .claude/hooks/mergex/git-perigoso.sh
 ```
 
-A suíte precisa de `bash`, `jq` e `git`. Se ela passar, os hooks estão no
-lugar e funcionando.
+A suíte dos hooks (`./.claude/hooks/teste.sh`) roda no checkout da própria
+mergex, não no projeto: ela carrega amostras de segredo de propósito e não é
+instalada (DM-282). Ela precisa de `bash`, `jq` e `git`.
 
 ---
 

@@ -266,7 +266,7 @@ describe("P0.2 — init real de SprintX + MergeX", () => {
   it("funcional: 8 — o catálogo de método da MergeX está instalado pelo mecanismo normal", () => {
     const rel = ".claude/skills/mergex/scripts/catalogo-de-metodo.sh";
     expect(CANDIDATOS.sprintx.sha).toBe("60d9cad434767cc26b52ac70ea3cddc352398075");
-    expect(CANDIDATOS.mergex.sha).toBe("6fb4ada2a787b8c15bdd7b93aef2034f7df58fdf");
+    expect(CANDIDATOS.mergex.sha).toBe("bef93f0100d5793892739cecde873a9c71d4fc14");
     expect(sha256(join(A, rel))).toBe(sha256(join(snapshot("mergex"), rel)));
     expect(readFileSync(join(A, rel), "utf8")).toContain("PREFLIGHT.md");
   });

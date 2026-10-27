@@ -46,17 +46,39 @@ eh_placeholder() {
   return 1
 }
 
+# eh_referencia_de_codigo <candidato com a chave> <texto da linha depois do valor>
+# Na credencial em atribuição, valor sem aspas que é só identificador ou cadeia
+# `a.b.c` sem dígito, seguido de `,` `;` `)` ou `}`, é referência de código
+# (`senha: SENHA_PADRAO,`, `password: process.env.DB_PASS)`), não credencial
+# (DM-283). No fim da linha (YAML, .env), entre aspas, com dígito ou símbolo,
+# continua credencial. Falso negativo assumido: senha sem dígito, sem símbolo e
+# sem aspas seguida de um desses terminadores (`password: SuperSecret,`).
+eh_referencia_de_codigo() {
+  local v="${1#*[:=]}" d="$2"
+  v="${v#"${v%%[![:space:]]*}"}"
+  case "$v" in \"*|\'*) return 1 ;; esac
+  printf '%s' "$v" | grep -aEq -e '^[A-Za-z_$][A-Za-z_$]*(\.[A-Za-z_$][A-Za-z_$]*)*$' || return 1
+  d="${d#"${d%%[![:space:]]*}"}"
+  case "$d" in ,*|\;*|\)*|\}*) return 0 ;; esac
+  return 1
+}
+
 achou() {
   # achou <categoria> <regex estendida> [limite a esquerda] [limite a direita]
   # Os limites (opcionais) exigem o que vem antes e depois do valor: prefixo de
   # chave no meio de um identificador nao e chave, nem chave de tamanho fixo
   # seguida de mais caracteres. Entram na busca, nunca no valor mostrado.
-  local cat="$1" re="${3:-}$2${4:-}" esq="${3:-}${4:-}" linha valor fim ph
+  # Bytes, não caracteres: o deslocamento do `grep -b` e o recorte do bash
+  # precisam contar igual numa linha com acento.
+  local LC_ALL=C
+  local cat="$1" re="${3:-}$2${4:-}" esq="${3:-}${4:-}" linha texto casou off valor fim ph
   # Examine todos os candidatos: placeholder anterior nunca dispensa segredo posterior.
   while IFS= read -r linha; do
     [ -n "$linha" ] || continue
-    while IFS= read -r valor; do
-      [ -n "$valor" ] || continue
+    texto="${linha#*:}"
+    while IFS= read -r casou; do
+      [ -n "$casou" ] || continue
+      off="${casou%%:*}"; valor="${casou#*:}"
       [ -n "$esq" ] && valor="$(printf '%s' "$valor" | grep -aEo -e "$2" | head -1)"
       [ -n "$valor" ] || continue
       # Placeholder dispensa somente este candidato. Na URL, só a senha decide:
@@ -64,11 +86,17 @@ achou() {
       ph="$valor"
       if [ "$cat" = "credencial em URL" ]; then ph="${valor#*://}"; ph="${ph#*:}"; ph="${ph%@}"; fi
       eh_placeholder "$ph" && continue
+      # A referência de código é julgada nesta ocorrência, pelo que vem logo depois
+      # dela: sem limite à esquerda, o valor começa no deslocamento do casamento.
+      if [ "$cat" = "credencial" ] && [ -z "${3:-}" ] \
+        && eh_referencia_de_codigo "$valor" "${texto:$((off + ${#valor}))}"; then
+        continue
+      fi
       fim="${valor: -4}"
       ACHADOS="${ACHADOS}  - ${cat}: …${fim} (linha ${linha%%:*})
 "
     done <<EXPX_MATCHES
-$(printf '%s' "${linha#*:}" | grep -aEo -e "$re")
+$(printf '%s' "$texto" | grep -aEbo -e "$re")
 EXPX_MATCHES
   done <<EXPX_LINHAS
 $(printf '%s' "$ALVO" | grep -aEn -e "$re")

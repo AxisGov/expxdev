@@ -257,7 +257,7 @@ Segue a convenção do ecossistema — a mesma da `stackx` e da `sprintx`:
 ```
 .claude/hooks/comum/     biblioteca e hooks compartilhados (base, segredo, branch)
 .claude/hooks/mergex/    hooks próprios da mergex
-.claude/hooks/teste.sh   a suíte
+.claude/hooks/teste.sh   a suíte (só no repositório da mergex; não é instalada no projeto)
 .claude/settings.json    o registro dos hooks no Claude Code
 .claude/agents/          os dois agentes
 .opencode/plugin/        a ponte para o OpenCode
@@ -329,6 +329,9 @@ Hook em execução de comando é o mais arriscado do ecossistema: intercepta
 
 ## Como testar
 
+No checkout da própria mergex — a suíte carrega amostras de segredo de propósito e
+não é instalada no projeto (DM-282):
+
 ```
 ./.claude/hooks/teste.sh
 ```
@@ -355,7 +358,7 @@ Quem mantém o contrato decide se acrescenta um `regra_avaliada` ao vocabulário
 
 Os scripts rodam em **bash 3.2**, que é o que o macOS ainda entrega. Isso
 exclui `mapfile`/`readarray` e outras construções de bash 4+. Ao editar um
-hook, rode `./hooks/teste.sh` — a suíte cobre exatamente os casos onde essas
+hook (no checkout da mergex), rode `./.claude/hooks/teste.sh` — a suíte cobre exatamente os casos onde essas
 diferenças aparecem.
 
 Dependências: `bash`, `jq`, `git`, e os utilitários POSIX (`grep`, `sed`,
