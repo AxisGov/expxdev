@@ -24,7 +24,8 @@ function git(cwd: string, ...args: string[]): void {
 }
 
 function repoComWorktree(principalTemMarketplace: boolean): { principal: string; worktree: string } {
-  const base = realpathSync(mkdtempSync(join(tmpdir(), "expx-mkt-")));
+  // `.native`: no Windows, expande o nome curto 8.3 (RUNNER~1), como o Git devolve.
+  const base = realpathSync.native(mkdtempSync(join(tmpdir(), "expx-mkt-")));
   pastas.push(base);
   const principal = join(base, "principal");
   mkdirSync(principal);
@@ -84,7 +85,7 @@ describe("marketplace a registrar no escopo do usuário", () => {
 describe("registro do plugin: substitui o registro anterior", () => {
   it("remove o expx-local antes de adicionar, para não preservar o caminho de uma worktree antiga", () => {
     const args = comandosDeInstalacao("/p/.expx/marketplace").map((c) => c.args.join(" "));
-    const remove = args.findIndex((a) => a === "plugin marketplace remove expx-local");
+    const remove = args.findIndex((a) => a === "plugin marketplace remove --scope user expx-local");
     const add = args.findIndex((a) => a.startsWith("plugin marketplace add"));
     expect(remove).toBeGreaterThanOrEqual(0);
     expect(remove).toBeLessThan(add);
@@ -92,8 +93,8 @@ describe("registro do plugin: substitui o registro anterior", () => {
 
   it("a instrução manual remove o registro anterior antes de adicionar o caminho escolhido", () => {
     const m = instrucaoManual("/principal/.expx/marketplace");
-    const remove = m.indexOf("claude plugin marketplace remove expx-local");
-    const add = m.indexOf("claude plugin marketplace add /principal/.expx/marketplace");
+    const remove = m.indexOf("claude plugin marketplace remove --scope user expx-local");
+    const add = m.indexOf("claude plugin marketplace add --scope user /principal/.expx/marketplace");
     expect(remove).toBeGreaterThanOrEqual(0);
     expect(remove).toBeLessThan(add);
   });
@@ -101,7 +102,8 @@ describe("registro do plugin: substitui o registro anterior", () => {
   it("o aviso da worktree sem marketplace no principal também manda remover antes de adicionar", async () => {
     const { worktree } = repoComWorktree(false);
     const alvo = await marketplaceParaRegistrar(worktree);
-    expect(alvo.aviso).toContain("claude plugin marketplace remove expx-local");
+    expect(alvo.aviso).toContain("claude plugin marketplace remove --scope user expx-local");
+    expect(alvo.aviso).toContain("claude plugin marketplace add --scope user ");
   });
 
   it("init e update registram pelo caminho resolvido e repassam o aviso", async () => {

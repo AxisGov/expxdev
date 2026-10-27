@@ -179,7 +179,13 @@ const EXECUTORES: Partial<Record<Subcomando, Executor>> = {
       const { avisos, instalacao } = await registrarPluginNoClaude(process.cwd());
       for (const a of avisos) saida.escrever(`aviso: ${a}\n`);
       if (instalacao.instrucao !== undefined) saida.escrever(`\n${instalacao.instrucao}\n`);
-      else if (instalacao.erro !== undefined) saida.escreverErro(`nao foi possivel registrar o plugin: ${instalacao.erro}\n`);
+      else if (instalacao.erro !== undefined) {
+        // Sem o registro, a sessão seguinte carrega a versão antiga do cache: o
+        // update não cumpriu o que prometia. (O init segue 0: lá o registro é o
+        // passo final, que a instrução manual completa.)
+        saida.escreverErro(`nao foi possivel registrar o plugin: ${instalacao.erro}\n`);
+        return 1;
+      }
     }
     return r.ok ? 0 : 1;
   },
