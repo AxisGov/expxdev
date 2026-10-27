@@ -1,11 +1,12 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { artefatosDeHooks, ehSuiteDeTesteDeHook } from "./hooks.js";
 import { planejarPlugin, type SkillMontavel } from "../plugin/montagem.js";
 import { planejarLimpeza } from "./agentes.js";
+import { suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
 
 /**
  * A suíte de teste dos hooks de uma skill (`teste.sh` e `testes/`) carrega
@@ -110,5 +111,27 @@ describe("o update tira do projeto o que saiu da instalação", () => {
     };
     const lim = planejarLimpeza(raiz, [], new Set(), anteriores);
     expect(lim.remover).toEqual([]);
+  });
+
+  it.skipIf(!suportaSymlinkDeDiretorio())("funcional: caminho do lock que passa por link simbólico nunca é removido, mesmo com o hash certo", () => {
+    const raiz = temporario("expx-limpeza-");
+    const fora = temporario("expx-fora-");
+    escreve(fora, "alvo.txt", "de fora\n");
+    escreve(raiz, ".claude/real/arquivo.txt", "de fora\n");
+    escreve(raiz, ".claude/hooks/velho.sh", "velho\n");
+    symlinkSync(fora, join(raiz, ".claude", "pasta-link"), "dir");
+    symlinkSync(join(fora, "alvo.txt"), join(raiz, ".claude", "real", "arquivo-link.txt"));
+    const anteriores = {
+      ".claude/pasta-link/alvo.txt": sha("de fora\n"),
+      ".claude/real/arquivo-link.txt": sha("de fora\n"),
+      ".claude/hooks/velho.sh": sha("velho\n"),
+    };
+    const lim = planejarLimpeza(raiz, [], new Set(), anteriores);
+    expect(lim.remover).toEqual([".claude/hooks/velho.sh"]);
+
+    // o próprio `.claude/` como link: nada dele é removido
+    const raiz2 = temporario("expx-limpeza-");
+    symlinkSync(join(raiz, ".claude"), join(raiz2, ".claude"), "dir");
+    expect(planejarLimpeza(raiz2, [], new Set(), { ".claude/hooks/velho.sh": sha("velho\n") }).remover).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { SkillMontavel } from "../plugin/montagem.js";
 import { artefato, artefatoComConteudo, emOrdemCanonica, hashDeBytes, type Artefato } from "../plugin/plano.js";
@@ -238,6 +238,23 @@ function hashDoArquivo(caminho: string): string | undefined {
 }
 
 /**
+ * Cada pasta do caminho, a partir da primeira, é pasta de verdade e o fim é
+ * arquivo comum — nenhum link simbólico no percurso. O `stat` e o `rm` seguem o
+ * link, e uma pasta-link levaria a remoção para fora do projeto.
+ */
+function semLinkNoPercurso(raiz: string, segmentos: readonly string[]): boolean {
+  try {
+    for (let i = 1; i <= segmentos.length; i++) {
+      const s = lstatSync(join(raiz, ...segmentos.slice(0, i)));
+      if (i < segmentos.length ? !s.isDirectory() : !s.isFile()) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * O que o plano de agentes faz com o que JÁ está em `.claude/agents/`.
  *
  * - Destino que existe, tem bytes diferentes e NÃO é do lock anterior é arquivo
@@ -276,8 +293,10 @@ export function planejarLimpeza(
     // O lock é do projeto e pode ter sido editado: caminho com segmento vazio, `.`
     // ou `..` não é destino que a instalação gravou, e o `join` o levaria para
     // fora de `.claude/`. Nunca é removido.
-    if (destino.split("/").some((p) => p === "" || p === "." || p === "..")) continue;
-    const atual = hashDoArquivo(join(raiz, ...destino.split("/")));
+    const segmentos = destino.split("/");
+    if (segmentos.some((p) => p === "" || p === "." || p === "..")) continue;
+    if (!semLinkNoPercurso(raiz, segmentos)) continue;
+    const atual = hashDoArquivo(join(raiz, ...segmentos));
     if (atual === undefined) continue;
     if (atual === hash) remover.push(destino);
     else avisos.push(`${destino} saiu da instalacao mas foi alterado a mao; nao foi removido`);
