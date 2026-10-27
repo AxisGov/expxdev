@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.12.6 — a distribuição passa pela varredura de segredo que ela instala
+
+- **Bloqueio da 0.12.5:** a varredura de segredo do pre-push da MergeX barrava o push do commit que instalava a própria 0.12.5 (relato do katosmv/login). As causas eram três:
+  - exemplos fictícios de credencial no texto da MergeX;
+  - a suíte de teste dos hooks instalada no projeto;
+  - a regra de credencial acusava referência de código. Isso pegava o template da BuildX, e um projeto novo seria barrado já no primeiro push.
+- Certifica a MergeX em AxisGov/mergex@bef93f0 (AxisGov/mergex#55):
+  - **DM-282:** os exemplos do texto distribuído viram placeholders inteiros, e a instalação manual do README deixa de copiar a suíte dos hooks;
+  - **DM-283:** na credencial em atribuição, valor sem aspas que é só identificador ou cadeia `a.b.c` sem dígito, seguido de `,` `;` `)` ou `}`, é referência de código (`senha: SENHA_PADRAO,`, `password: process.env.DB_PASS)`), não credencial. No fim da linha (YAML, `.env`), entre aspas, com dígito ou símbolo, continua barrando. Falso negativo assumido: `password: SuperSecret,`.
+- BuildX (AxisGov/buildx#15):
+  - o template distribuído usa senhas de teste nomeadas;
+  - as dependências do template passam a não ter vulnerabilidade alta: prisma 7.10.1, vitest 4.1.12, next 16.4.3, zod 4.6.7.
+- O `init` deixa de instalar a suíte de teste dos hooks (`hooks/teste.sh` e `hooks/testes/`) de cada skill, em `.claude/hooks` e no plugin.
+- **Mudança no `update`:** o que a instalação anterior gravou em `.claude/` e saiu do plano é removido, não só o que está em `.claude/agents`, desde que o arquivo esteja como o lock o gravou. Alterado à mão, fica e vira aviso.
+- Um teste offline e um portão na release (`scripts/ci/test-distribuicao-sem-segredo.sh`) rodam o `init` real e varrem inteiro cada arquivo instalado com a tabela da MergeX. O portão roda as nove skills no `main`. Release com achado não sai.
+- **Para quem tem a 0.12.5 instalada com um commit ainda não publicado:** a 0.12.6 sozinha não libera esse commit, porque o pre-push varre todos os commits que o remoto não tem. Refaça a instalação a partir da `main`, sem `--no-verify` e sem mudar o modo do hook.
+
 ## 0.12.5 — achados do conselhos #208 e #210, registro do plugin numa worktree e executor observado
 
 - Certifica a MergeX em AxisGov/mergex@6fb4ada (AxisGov/mergex#54), com os achados do CodeAnt nas instalações da 0.12.2 e da 0.12.4 (katosmv/conselhos-municipais#208 e #210, katosmv/login#30):
