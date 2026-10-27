@@ -13,8 +13,8 @@ import { perguntadorDeTerminal, type Perguntador } from "./perguntar.js";
 import { NOMES } from "../nucleo/catalogo.js";
 import { hero, sucesso, temCor } from "./visual.js";
 import { versaoDoCli } from "../nucleo/lock.js";
-import { instalarPlugin } from "../harness/instalar.js";
-import { join } from "node:path";
+import { registrarPluginNoClaude, deveRegistrarNoUpdate } from "../harness/registro.js";
+import { lerLock } from "../nucleo/lock.js";
 
 /**
  * O entrypoint do binário `expx`.
@@ -116,7 +116,8 @@ const EXECUTORES: Partial<Record<Subcomando, Executor>> = {
 
     const fecho = [`instaladas: ${r.instaladas.join(", ")}`];
     if (harness.includes("claude")) {
-      const inst = await instalarPlugin(join(process.cwd(), ".expx", "marketplace"));
+      const { avisos, instalacao: inst } = await registrarPluginNoClaude(process.cwd());
+      for (const a of avisos) saida.escrever(`aviso: ${a}\n`);
       if (inst.instrucao !== undefined) {
         saida.escrever(sucesso(fecho, temCor()));
         saida.escrever(`\n${inst.instrucao}\n`);
@@ -171,6 +172,21 @@ const EXECUTORES: Partial<Record<Subcomando, Executor>> = {
     for (const m of r.mensagens) saida.escrever(`${m}\n`);
     for (const b of r.bloqueadas) saida.escrever(`bloqueada ${b.nome}: ${b.motivo}\n`);
     if (r.emDia.length > 0) saida.escrever(`em dia: ${r.emDia.join(", ")}\n`);
+    // O Claude Code roda o plugin de um cache: sem reinstalar, a versão nova não
+    // carrega. O registro segue a mesma regra do init (worktree -> principal).
+    const lock = lerLock(process.cwd());
+    if (lock.ok && deveRegistrarNoUpdate(r, f.opcoes.check, lock.lock.harness)) {
+      const { avisos, instalacao } = await registrarPluginNoClaude(process.cwd());
+      for (const a of avisos) saida.escrever(`aviso: ${a}\n`);
+      if (instalacao.instrucao !== undefined) saida.escrever(`\n${instalacao.instrucao}\n`);
+      else if (instalacao.erro !== undefined) {
+        // Sem o registro, a sessão seguinte carrega a versão antiga do cache: o
+        // update não cumpriu o que prometia. (O init segue 0: lá o registro é o
+        // passo final, que a instrução manual completa.)
+        saida.escreverErro(`nao foi possivel registrar o plugin: ${instalacao.erro}\n`);
+        return 1;
+      }
+    }
     return r.ok ? 0 : 1;
   },
 

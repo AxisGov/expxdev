@@ -1,7 +1,14 @@
 import { execFile } from "node:child_process";
+import { realpathSync } from "node:fs";
+import { resolve } from "node:path";
 import { promisify } from "node:util";
 
 const exec = promisify(execFile);
+
+/** Quem roda o binário: o `execFile` de verdade, ou um falso nos testes. */
+export type Executor = (bin: string, args: string[]) => Promise<{ stdout: string }>;
+
+const executorPadrao: Executor = (bin, args) => exec(bin, args);
 
 /**
  * A instalação de fato do plugin no Claude Code.
@@ -39,7 +46,14 @@ export type ComandoExterno = { bin: string; args: string[] };
  */
 export function comandosDeInstalacao(caminhoMarketplace: string): ComandoExterno[] {
   return [
-    { bin: "claude", args: ["plugin", "marketplace", "add", caminhoMarketplace] },
+    // Remove antes de adicionar: com o `expx-local` já registrado em outro caminho
+    // (por exemplo, uma worktree antiga), o `add` falharia como "já conhecido" e o
+    // registro velho ficaria — o plugin deixaria de carregar quando ela sumisse.
+    // Só no escopo do usuário: sem `--scope`, o `remove` apaga a declaração de
+    // todos os escopos, inclusive a do projeto (`extraKnownMarketplaces` do
+    // `.claude/settings.json`, que vai no commit).
+    { bin: "claude", args: ["plugin", "marketplace", "remove", "--scope", "user", "expx-local"] },
+    { bin: "claude", args: ["plugin", "marketplace", "add", "--scope", "user", caminhoMarketplace] },
     { bin: "claude", args: ["plugin", "marketplace", "update", "expx-local"] },
     { bin: "claude", args: ["plugin", "uninstall", "expx@expx-local"] },
     { bin: "claude", args: ["plugin", "install", "expx@expx-local"] },
@@ -49,14 +63,15 @@ export function comandosDeInstalacao(caminhoMarketplace: string): ComandoExterno
 /**
  * Comandos cuja falha não interrompe a sequência.
  *
- * `marketplace add` falha quando o marketplace já é conhecido, e `uninstall`
- * falha quando não há o que desinstalar. Os dois são o caminho normal de uma
- * reinstalação e de uma primeira instalação, respectivamente — tratá-los como
- * erro faria o `init` parar justamente nos dois casos mais comuns.
+ * `marketplace remove` e `uninstall` falham quando não há o que remover (a
+ * primeira instalação), e `marketplace add` quando o marketplace já é conhecido.
+ * São o caminho normal de uma primeira instalação e de uma reinstalação —
+ * tratá-los como erro faria o `init` parar justamente nos casos mais comuns.
  */
 function tolerante(args: readonly string[]): boolean {
   const s = args.join(" ");
-  return s.startsWith("plugin uninstall") || s.startsWith("plugin marketplace add");
+  return s.startsWith("plugin uninstall") || s.startsWith("plugin marketplace add")
+    || s.startsWith("plugin marketplace remove");
 }
 
 /** O que dizer quando o binário `claude` não está disponível. */
@@ -65,7 +80,8 @@ export function instrucaoManual(caminhoMarketplace: string): string {
     "O binario `claude` nao foi encontrado no PATH.",
     "O .expx/ foi montado e esta pronto; falta apenas registrar o plugin:",
     "",
-    `  claude plugin marketplace add ${caminhoMarketplace}`,
+    "  claude plugin marketplace remove --scope user expx-local   (pode falhar na primeira vez: e esperado)",
+    `  claude plugin marketplace add --scope user ${caminhoMarketplace}`,
     "  claude plugin marketplace update expx-local",
     "  claude plugin uninstall expx@expx-local",
     "  claude plugin install expx@expx-local",
@@ -84,25 +100,77 @@ export type ResultadoInstalacao = {
   erro?: string;
 };
 
+/** O caminho como o sistema o vê: resolvido, sem link nem nome curto 8.3. */
+function normalizar(caminho: string): string {
+  let r = resolve(caminho);
+  try {
+    r = realpathSync.native(r);
+  } catch {
+    // inexistente: fica o resolvido
+  }
+  return process.platform === "win32" ? r.toLowerCase() : r;
+}
+
 /**
- * Roda os dois comandos. Binário ausente NÃO é falha fatal: o `.expx/` já está
- * montado e a instalação pode ser concluída à mão.
+ * A pós-condição do `add`: o `expx-local` registrado aponta para o caminho
+ * escolhido. O `remove` e o `add` são tolerantes, então o erro deles não prova
+ * nada — sem esta conferência, um registro velho (de uma worktree removida)
+ * sobreviveria com a instalação dizendo sucesso. A lista não traz o escopo;
+ * traz o caminho, que é o que importa.
  */
-export async function instalarPlugin(caminhoMarketplace: string): Promise<ResultadoInstalacao> {
+async function conferirRegistro(executar: Executor, caminhoMarketplace: string): Promise<string | undefined> {
+  let saida: string;
+  try {
+    saida = (await executar("claude", ["plugin", "marketplace", "list", "--json"])).stdout;
+  } catch (e: unknown) {
+    return `nao foi possivel conferir o registro do expx-local (claude plugin marketplace list --json): ${String(e)}`;
+  }
+  let lista: unknown;
+  try {
+    lista = JSON.parse(saida);
+  } catch {
+    return "nao foi possivel conferir o registro do expx-local: a saida de `claude plugin marketplace list --json` nao e JSON";
+  }
+  const item = Array.isArray(lista)
+    ? (lista as Array<Record<string, unknown>>).find((m) => m?.["name"] === "expx-local")
+    : undefined;
+  const registrado = item?.["path"];
+  if (typeof registrado !== "string") {
+    return `o expx-local nao ficou registrado com o caminho local ${caminhoMarketplace}`;
+  }
+  if (normalizar(registrado) !== normalizar(caminhoMarketplace)) {
+    return `o expx-local registrado aponta para ${registrado}, nao para ${caminhoMarketplace}`;
+  }
+  return undefined;
+}
+
+/**
+ * Roda a sequência. Binário ausente NÃO é falha fatal: o `.expx/` já está
+ * montado e a instalação pode ser concluída à mão. Depois do `add`, confere o
+ * registro; se ele não aponta para o caminho escolhido, para antes de
+ * reinstalar.
+ */
+export async function instalarPlugin(
+  caminhoMarketplace: string,
+  executar: Executor = executorPadrao,
+): Promise<ResultadoInstalacao> {
   const executados: string[] = [];
   for (const c of comandosDeInstalacao(caminhoMarketplace)) {
     try {
-      await exec(c.bin, c.args);
+      await executar(c.bin, c.args);
       executados.push(`${c.bin} ${c.args.join(" ")}`);
     } catch (e: unknown) {
       const msg = String(e);
       if (msg.includes("ENOENT")) {
         return { ok: false, executados, instrucao: instrucaoManual(caminhoMarketplace) };
       }
-      // Marketplace já conhecido, ou nada a desinstalar: é o caminho normal,
-      // não um defeito. Seguir é o que torna o `init` repetível.
-      if (tolerante(c.args)) continue;
-      return { ok: false, executados, erro: msg };
+      // Nada a remover, marketplace já conhecido, ou nada a desinstalar: é o
+      // caminho normal, não um defeito. Seguir é o que torna o `init` repetível.
+      if (!tolerante(c.args)) return { ok: false, executados, erro: msg };
+    }
+    if (c.args[1] === "marketplace" && c.args[2] === "add") {
+      const erro = await conferirRegistro(executar, caminhoMarketplace);
+      if (erro !== undefined) return { ok: false, executados, erro };
     }
   }
   return { ok: true, executados };

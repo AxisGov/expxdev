@@ -120,6 +120,8 @@ pelo nome do arquivo), e o que o projeto já tinha.
   conflito: falha, em vez de escolher.
 - O arquivo só é reescrito (e só ganha backup) quando o conteúdo muda.
 
+O registro do plugin no escopo do usuário (`claude plugin marketplace add`) grava um caminho absoluto. Rodado numa worktree, o `init` (e o `update` que aplicou algo) registra o `.expx/marketplace` do **checkout principal** quando ele existe, porque é contra ele que o Claude Code resolve o `./.expx/marketplace` do projeto, e ele sobrevive à remoção da worktree; sem ele, registra o da worktree e avisa que o registro quebra quando ela for removida. O registro anterior de `expx-local` é removido antes do novo, só no escopo do usuário (`--scope user`; sem ele, o `remove` apagaria também a declaração versionada do projeto), para não ficar apontando para uma worktree antiga. Depois do `add`, `claude plugin marketplace list --json` precisa mostrar o `expx-local` com o caminho escolhido; senão a instalação para com erro antes de reinstalar. No `update`, essa falha faz o comando sair 1; no `init`, o registro é o passo final e a saída segue 0, com o motivo.
+
 ## 5. `.expx/hooks.json` — composição
 
 É o manifesto de modo (`aviso`, `bloqueio`, `desligado`) lido pelos hooks.
