@@ -105,10 +105,40 @@ sem_repositorio_git() {
   SEM_GIT_ERRO="o Git falhou: $saida"; return 1
 }
 
+raiz_leitura="${RAIZ:-.}"
+# 0. O ambiente do Git (GIT_DIR, GIT_WORK_TREE, GIT_COMMON_DIR, GIT_INDEX_FILE) vence o `-C`, e é
+# conferido antes da primeira operação do Git: apontando outro repositório, a V12 leria outro HEAD (conselhos#210, P1). Não se apaga o
+# ambiente: o Git o exporta nos hooks (pre-push), e ali ele é o mesmo repositório. Com qualquer
+# um definido, a árvore e o git-common-dir resolvidos com e sem ele têm de ser os mesmos.
+# `sem_repositorio_git`, acima, fica igual byte a byte às outras cópias (DM-186).
+if [ -n "${GIT_DIR:-}${GIT_WORK_TREE:-}${GIT_COMMON_DIR:-}${GIT_INDEX_FILE:-}" ]; then
+  identidade_git() { # <com|sem> — "<toplevel>|<git-common-dir>", absolutos e físicos
+    local saida topo comum
+    if [ "$1" = sem ]; then
+      saida="$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_INDEX_FILE \
+        git -C "$raiz_leitura" rev-parse --show-toplevel --git-common-dir 2>/dev/null)" || return 1
+    else
+      saida="$(git -C "$raiz_leitura" rev-parse --show-toplevel --git-common-dir 2>/dev/null)" || return 1
+    fi
+    topo="${saida%%$'\n'*}"; comum="${saida#*$'\n'}"
+    case "$comum" in /*) ;; *) comum="$raiz_leitura/$comum" ;; esac
+    topo="$(cd "$topo" 2>/dev/null && pwd -P)" && comum="$(cd "$comum" 2>/dev/null && pwd -P)" || return 1
+    printf '%s|%s\n' "$topo" "$comum"
+  }
+  # O Git que falha com o ambiente é o caso do item 1 (git-falhou, nunca n/a); o que
+  # resolve com ele e não sem ele, ou resolve outro repositório, é divergência.
+  com_ambiente="$(identidade_git com)" || {
+    printf 'portao-v12: o Git falhou com o ambiente definido (GIT_DIR, GIT_WORK_TREE, GIT_COMMON_DIR ou GIT_INDEX_FILE)\n' >&2
+    sem_prova 'git-falhou'
+  }
+  sem_ambiente="$(identidade_git sem)" && [ "$com_ambiente" = "$sem_ambiente" ] || {
+    printf 'portao-v12: o ambiente do Git (GIT_DIR, GIT_WORK_TREE, GIT_COMMON_DIR ou GIT_INDEX_FILE) aponta outro repositório que não o de --raiz\n' >&2
+    sem_prova 'ambiente-git-divergente'
+  }
+fi
 # 1. o repositório, antes de tudo. Fora de QUALQUER repositório Git não há HEAD de onde ler a
 # entrega: com `versionado: false` a V12 é `n/a` (não há commit de task), senão SEM_PROVA. O Git
 # que falha por outro motivo é sempre SEM_PROVA.
-raiz_leitura="${RAIZ:-.}"
 if ! git -C "$raiz_leitura" rev-parse --git-dir >/dev/null 2>&1; then
   cwd_v12="$PWD"
   cd "$raiz_leitura" 2>/dev/null || sem_prova 'raiz-inexistente'

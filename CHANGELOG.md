@@ -1,7 +1,39 @@
 # Changelog
 
-## Próxima versão — executor observado e resolução no rastro
+## 0.12.5 — achados do conselhos #208 e #210, registro do plugin numa worktree e executor observado
 
+- Certifica a MergeX em AxisGov/mergex@6fb4ada (AxisGov/mergex#54), com os achados do CodeAnt nas instalações da 0.12.2 e da 0.12.4 (katosmv/conselhos-municipais#208 e #210, katosmv/login#30):
+  - **Varredura de segredo no `pre-push` (P3):** o `portao-push.sh` varre o que o push publica — mensagens e linhas adicionadas dos commits que o servidor ainda não tem —, com a mesma tabela do hook `sem-segredo`, agora em `scripts/segredo-tabela.sh`. Numa branch nova, o que o servidor já tem é consultado com `ls-remote`; a ref de rastreio local não conta. Se a consulta falhar, o push é barrado.
+  - **Hook `sem-segredo`** (DM-273 a DM-278 e DM-281):
+    - varre a mensagem passada por arquivo (`-F`);
+    - varre os arquivos não rastreados de `git add … && git commit` e os ignorados de `git add -f`;
+    - varre o repositório que o comando realmente atinge (`git -C`, `cd <dir> &&`);
+    - deixa de ser enganado por `diff.external`, `textconv` ou atributo `-diff`;
+    - barra a troca de repositório, árvore ou índice por opção ou variável;
+    - julga o placeholder da URL só pela senha e só quando ele é o valor inteiro.
+  - **Portão V12:** comparado sem `GIT_DIR`, `GIT_WORK_TREE`, `GIT_COMMON_DIR` e `GIT_INDEX_FILE` (P1).
+  - **E9:** lê a URL do PR da sprint atual na entrega por sprint (M10).
+  - **E7:** confere `head` e `destino` na mesma shell e mascara a credencial da URL do remoto (P2, P6).
+  - **E3:** reconhece `00-PLANEJAMENTO.md`, `00-PREDECESSORES.md`, `PREFLIGHT.md` e `RECONCILIACAO-BASE-NNN.md` como artefatos de método (DM-280).
+  - **Comportamento novo:** no modo `bloqueio`, o primeiro push para um remoto vazio com mais de 300 commits é barrado. As saídas são dividir a publicação ou desligar o `sem-segredo` de forma consciente.
+- Certifica a SprintX em AxisGov/sprintx@60d9cad:
+  - **AxisGov/sprintx#54:** a F3 e a F5 seguem o `expx-fatiamento` v3 — sem teto de linhas; L1 de 40 arquivos por task, L2 de 5.000 linhas e 204.800 bytes por arquivo, L3 de 100 arquivos por PR. A auditoria feita sem o agente também confere o item 10. O achado de limite leva `[item 10][limite:Ln]`, é sempre ALTA, e o `planejamento.sh` recusa o relatório que não seguir isso (DS-189). `docs/eventos/` não entra na conta.
+  - **AxisGov/sprintx#53:** a espera da trava da bancada ganha prazo (M7), o limiar do `07-estimativa` passa a ser conferido (M14), e as sub-bancadas ganham a guarda do `$SK`.
+- Skills que o `init` e o `update` trazem pela ponta da `main`:
+  - **MemoX** (AxisGov/MemoX#3, #4 e #5):
+    - escapa o corpo do bloco injetado (M18);
+    - `--raiz` explícito vale como está e recusa valor vazio (M11);
+    - a coleta usa o `ignorar` da config (M12/M16);
+    - lê o `sempre_incluir` (M13/M17);
+    - valida a config chave a chave (M15);
+    - aceita fonte cujo nome começa com `..` (DM-28).
+  - **RunX** (AxisGov/runx#9):
+    - confere a ocorrência antes de gravar o estado (M8);
+    - aceita o término só no E5 (M9);
+    - trava a rotação do rastro (M3).
+  - **LegadoX** (AxisGov/legadox#4): os hooks acham o trabalho corrente nos artefatos das skills de origem, e não num `.expx/trabalho-atual.json` que ninguém gravava (M6).
+  - **StackX** (AxisGov/stackx#5): a apresentação de conflito admite dois ou mais dialetos (M2).
+  - **BuildX** (AxisGov/buildx#14): os candidatos a módulo viram coleção (`modulos_candidatos`, `fatias_candidatas`; D-23), o contrato do `MAPA.md` passa a onze campos, e entra o `premissas_realizadas`.
 - O `init` rodado numa worktree registrava o marketplace `expx-local` no settings do usuário com o caminho absoluto da worktree: removida a worktree, o plugin deixava de carregar (`cache-miss`) e os comandos `/expx:` sumiam (relato da janela do conselhos). Agora, numa worktree, o registro aponta para o `.expx/marketplace` do checkout principal quando ele existe, com aviso; sem ele, para o da worktree, com o aviso de que quebra ao removê-la. O registro anterior é removido antes do novo, só no escopo do usuário (sem `--scope`, o `remove` apagaria também a declaração do `.claude/settings.json` do projeto), e depois do `add` o registro é conferido: se o `expx-local` não aponta para o caminho escolhido, a instalação para com erro em vez de dizer sucesso. O `update` que aplicou algo também reinstala o plugin pela mesma regra, e sai 1 quando o registro falha.
 
 - O escritor comum do rastro grava `model` e `effort` só como executor observado (H10 de CONTRATO-expx-orquestracao): `EXPX_MODEL`/`EXPX_EFFORT` do chamador e, no Claude, `$CLAUDE_EFFORT` apenas para o principal. Deixa de completar o subagente do Claude com o frontmatter de `.claude/agents`, o que gravava configuração como execução e deixava de coincidir com `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, `CLAUDE_CODE_EFFORT_LEVEL` ou um `fallbackModel`. Sem observação, as duas chaves saem `null`. O escritor também grava o `harness` detectado.

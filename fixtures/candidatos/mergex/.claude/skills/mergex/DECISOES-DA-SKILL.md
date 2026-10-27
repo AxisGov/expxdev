@@ -479,3 +479,7 @@ Hardening do PR #1 (AxisGov/mergex), sobre dois findings de review automatizado 
 ## Revisão por task, entrega por sprint e merge automático (DM-235 em diante)
 
 Em [`decisoes/revisao-por-task-e-entrega-por-sprint.md`](decisoes/revisao-por-task-e-entrega-por-sprint.md) — o arquivo principal não cresce (F4 do contrato `expx-fatiamento`).
+
+## Endurecimento pelos achados do conselhos #208 e #210 (DM-271 em diante)
+
+Em [`decisoes/endurecimento-conselhos-208-210.md`](decisoes/endurecimento-conselhos-208-210.md) — o arquivo principal não cresce (F4 do contrato `expx-fatiamento`).

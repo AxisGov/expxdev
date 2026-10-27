@@ -266,6 +266,9 @@ o conteúdo dela (DM-242).
 | sprintx | `ORQUESTRADOR.md` | `orquestrador` | L4 | objetivo, mapa e rota do trabalho |
 | sprintx | `00-AUDITORIA.md` | - | L4 | veredito e achados da auditoria do plano |
 | sprintx | `FECHAMENTO.md` | `fechamento` | L4 | resumo, decisão principal e risco residual |
+| sprintx | `00-PLANEJAMENTO.md` | `planejamento` | L4 | estado do planejamento: reprovações, tetos e autorizações humanas |
+| sprintx | `00-PREDECESSORES.md` | `predecessores` | L4 | documentos de predecessores consumidos antes do planejamento |
+| sprintx | `PREFLIGHT.md` | - | L4 | preflight do trabalho |
 | sprintx | `sprint-NN/tasks.md` | `tasks,plano` | L4 | plano: tasks, testes e critérios de aceite |
 | sprintx | `sprint-NN/sprint.md` | `sprint` | L4 | plano: objetivo e critério de saída da sprint |
 | sprintx | `sprint-NN/fases.md` | `fases` | L4 | plano: fases e critérios de saída |
@@ -289,11 +292,15 @@ o conteúdo dela (DM-242).
 | mergex | `docs/entregas/<trabalho_id>/PR.md` | - | D4 | descrição do PR, regravada pelo E4 desta entrega |
 | mergex | `docs/entregas/<trabalho_id>/QA-PACOTE.md` | - | D4 | pacote de QA, regravado pelo E5 desta entrega |
 | mergex | `docs/entregas/<trabalho_id>/ATENCAO.md` | - | D4 | classificação, regravada pelo E3 desta entrega |
+| mergex | `docs/entregas/<trabalho_id>/RECONCILIACAO-BASE-NNN.md` | `reconciliacao_base` | D4:reconciliacao-verificada | registro da reconciliação de base |
 | mergex | `docs/entregas/<trabalho_id>/revisao/<T-NN.MM>.json` | - | L4 | evidência da revisão por task |
 
 Por que cada um está onde está:
 
-- **L4 — decisão, premissa, plano, base, auditoria, fechamento.** Carregam escolha, tradução de
+- **L4 — decisão, premissa, plano, base, auditoria, fechamento, planejamento, predecessores e
+  preflight.** O `00-PLANEJAMENTO.md` carrega a autorização humana tardia da F6; os três entram
+  no catálogo porque o checkpoint de método (`catalogo-de-metodo.sh`) os commita, e os dois
+  catálogos não podem divergir (DM-280). Todos carregam escolha, tradução de
   requisito ou leitura humana do trabalho, mesmo quando feitas por agente em modo autônomo. Não
   são implementação, então não pedem leitura linha a linha — **salvo** quando são a origem de uma
   decisão de risco (critério O, acima). Nada aqui é "gerado": escrito por agente não é D3.
@@ -309,6 +316,11 @@ Por que cada um está onde está:
   - `ENTREGA.md`, `PR.md`, `QA-PACOTE.md`, `ATENCAO.md` deste trabalho: a própria saída da
     mergex. O `ENTREGA.md` só com `kind: entrega`, este `trabalho_id` e a `branch:` atual; os
     outros três só aparecem no diff numa retomada, e são regravados nesta entrega.
+  - `RECONCILIACAO-BASE-NNN.md` deste trabalho (`NNN` de três dígitos; DM-280): D4 quando a lista
+    `--reconciliados` do E3 — as linhas `coberto` do `reconciliacao-base.sh --verificar` — tem
+    uma linha com caminho e o **mesmo** `NNN`: o verificador já recalculou a assinatura e a
+    cadeia. Sem a lista, ou sem linha desse `NNN` (como na reconciliação com `arquivos: []`), é
+    L4. Nome fora da forma não é reconhecido.
 - **L4 — a evidência da revisão por task** (`revisao/<T-NN.MM>.json`, ou o id legado `<T-N>.json`,
   deste trabalho; DM-242): é LEITURA RÁPIDA, nunca DISPENSÁVEL. O reconhecimento só confere o
   caminho e que é arquivo comum; o conteúdo é do núcleo do expx, e a mergex não o lê (nem o

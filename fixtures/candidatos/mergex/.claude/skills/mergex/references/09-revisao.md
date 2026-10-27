@@ -90,7 +90,8 @@ Nunca decida o trabalho atual por:
 O E9 é o **único** que registra o merge do PR de planejamento (DM-260) e o do PR de cada sprint
 da entrega por sprint (DM-264), inclusive o feito fora dele, pelo botão do serviço. Com trabalho
 atual, quando `entrega-de-planejamento.sh` diz `sprint_atual=planejamento` ou `sprint_atual=<NN>`
-com o item dela ainda não `merged` (`atual_estado=`) e a `pr_url` preenchida, o E9 lê esse PR no
+com o item dela ainda não `merged` (`atual_estado=`) e a URL desse item preenchida (`atual_url=`,
+nunca o `pr_url` do topo, que fica `null` na entrega por sprint), o E9 lê esse PR no
 serviço e, se ele já foi mergeado, grava o registro com `merge_sha` = o commit de merge:
 
 ```bash
@@ -109,7 +110,7 @@ else
   alvo="$(printf '%s\n' "$marca" | sed -n 's/^sprint_atual=//p')"
   case "$alvo" in planejamento|[0-9][0-9]) ;; *) exit 0 ;; esac
   case "$(printf '%s\n' "$marca" | sed -n 's/^atual_estado=//p')" in merged) exit 0 ;; esac
-  pr_url="$(awk 'NR == 1 { next } /^---/ { exit } /^pr_url:/ { sub(/^pr_url:[[:space:]]*/, ""); sub(/[[:space:]]+$/, ""); if ($0 ~ /^".*"$/ || $0 ~ /^\047.*\047$/) $0 = substr($0, 2, length($0) - 2); print; exit }' "$entrega")"
+  pr_url="$(printf '%s\n' "$marca" | sed -n 's/^atual_url=//p')"
 fi
 case "$pr_url" in ''|null) echo "PR atual sem pr_url: nada a ler no serviço"; exit 0 ;; esac
 case "$pr_url" in

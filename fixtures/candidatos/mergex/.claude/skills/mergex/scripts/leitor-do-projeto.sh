@@ -73,9 +73,12 @@ if [ -n "$rev" ]; then
 fi
 
 config='.expx/fatiamento.json'
-# presente e qualquer entrada, como o `lstat` do leitor do nucleo: link quebrado, pasta e
-# gitlink sem objeto sao presentes (e invalidos); `.expx` que nao e pasta (ENOTDIR) ou
-# que nao se atravessa (EACCES) tambem
+# `.expx/fatiamento.json` presente e qualquer entrada, como o `lstat` do leitor do nucleo:
+# o proprio fatiamento.json como link quebrado, pasta ou gitlink sem objeto e presente (e
+# invalido); `.expx` que nao e pasta (ENOTDIR) ou que nao se atravessa (EACCES) tambem.
+# Ja o `.expx` como link quebrado e AUSENCIA (`[ -e ]` falso, expx_pasta fica 1) e da os
+# padroes — em paridade com o nucleo, conferida rodando os dois (conselhos#208, M4: o
+# "link quebrado" da primeira linha e o do fatiamento.json, nao o da pasta)
 expx_pasta=1
 if [ -n "$rev" ]; then
   entrada="$(git -C "$raiz" ls-tree --full-tree "$commit" -- "$config")" \

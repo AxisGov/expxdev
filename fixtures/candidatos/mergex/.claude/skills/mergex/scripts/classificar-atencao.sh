@@ -75,6 +75,9 @@ sprintx|00-ESTIMATIVA.md|estimativa|L4|estimativa com premissas e invalidadores
 sprintx|ORQUESTRADOR.md|orquestrador|L4|objetivo, mapa e rota do trabalho
 sprintx|00-AUDITORIA.md|-|L4|veredito e achados da auditoria do plano
 sprintx|FECHAMENTO.md|fechamento|L4|resumo, decisão principal e risco residual
+sprintx|00-PLANEJAMENTO.md|planejamento|L4|estado do planejamento: reprovações, tetos e autorizações humanas
+sprintx|00-PREDECESSORES.md|predecessores|L4|documentos de predecessores consumidos antes do planejamento
+sprintx|PREFLIGHT.md|-|L4|preflight do trabalho
 sprintx|sprint-NN/tasks.md|tasks,plano|L4|plano: tasks, testes e critérios de aceite
 sprintx|sprint-NN/sprint.md|sprint|L4|plano: objetivo e critério de saída da sprint
 sprintx|sprint-NN/fases.md|fases|L4|plano: fases e critérios de saída
@@ -98,6 +101,7 @@ mergex|docs/entregas/<trabalho_id>/ENTREGA.md|entrega|D4|registro da entrega, gr
 mergex|docs/entregas/<trabalho_id>/PR.md|-|D4|descrição do PR, regravada pelo E4 desta entrega
 mergex|docs/entregas/<trabalho_id>/QA-PACOTE.md|-|D4|pacote de QA, regravado pelo E5 desta entrega
 mergex|docs/entregas/<trabalho_id>/ATENCAO.md|-|D4|classificação, regravada pelo E3 desta entrega
+mergex|docs/entregas/<trabalho_id>/RECONCILIACAO-BASE-NNN.md|reconciliacao_base|D4:reconciliacao-verificada|registro da reconciliação de base
 mergex|docs/entregas/<trabalho_id>/revisao/<T-NN.MM>.json|-|L4|evidência da revisão por task'
 
 BASE_REF=""
@@ -243,6 +247,22 @@ areas_do_indice() {
   ' "$1" 2>/dev/null
 }
 
+# reconciliacao-verificada: o E3 rodou `reconciliacao-base.sh --verificar`, e uma linha
+# `coberto` dele cita ESTA reconciliação — a lista `--reconciliados` tem uma linha
+# `<caminho> TAB <NNN>` com caminho não vazio e o mesmo NNN do nome do arquivo. A
+# assinatura e a cadeia já foram recalculadas pelo verificador (DM-280). Reconciliação
+# com `arquivos: []` não produz linha `coberto`, e fica em L4.
+prova_reconciliacao_verificada() {
+  local nnn="${1##*/RECONCILIACAO-BASE-}"; nnn="${nnn%.md}"
+  if [ -z "$RECONC_ARQ" ]; then
+    PROVA_MOTIVO="sem --reconciliados: o --verificar da reconciliação não foi informado"; return 1
+  fi
+  if printf '%s\n' "$RECONC_RAW" | awk -F'\t' -v n="$nnn" '$1 != "" && $2 == n { achou = 1 } END { exit !achou }'; then
+    PROVA_MOTIVO="o reconciliacao-base.sh --verificar cobriu a RECONCILIACAO-BASE-$nnn.md"; return 0
+  fi
+  PROVA_MOTIVO="nenhuma linha do --verificar cobre a RECONCILIACAO-BASE-$nnn.md"; return 1
+}
+
 prova_indice_consistente() {
   local arq="$RAIZ/$1" dir area n=0
   dir="$(dirname "$arq")"
@@ -361,6 +381,9 @@ reconhece() {
           nome_de_evidencia "${nome#revisao/}" || { nao_reconhecido "fora do catálogo"; return; }
           chave="$CHAVE_EVIDENCIA" ;;
         */*) nao_reconhecido "fora do catálogo"; return ;;
+        # o artefato da reconciliação tem nome numerado: a linha do catálogo é uma só
+        RECONCILIACAO-BASE-[0-9][0-9][0-9].md) chave="docs/entregas/<trabalho_id>/RECONCILIACAO-BASE-NNN.md" ;;
+        RECONCILIACAO-BASE-*) nao_reconhecido "nome de reconciliação fora da forma RECONCILIACAO-BASE-NNN.md"; return ;;
         *) chave="docs/entregas/<trabalho_id>/$nome" ;;
       esac
       origem_linha=mergex ;;
