@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { basename, dirname, isAbsolute, join } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { promisify } from "node:util";
 
 const exec = promisify(execFile);
@@ -46,7 +46,9 @@ export async function marketplaceParaRegistrar(
   }
   if (gitDir === comum || basename(comum) !== ".git") return { caminho: local };
 
-  const principal = dirname(comum);
+  // `resolve` normaliza as barras: no Windows o Git devolve `C:/...`, e o aviso
+  // precisa citar o caminho na forma do sistema, como o `join` já faz no destino.
+  const principal = dirname(resolve(comum));
   const doPrincipal = join(principal, ".expx", "marketplace");
   if (existsSync(join(doPrincipal, ".claude-plugin", "marketplace.json"))) {
     return {
