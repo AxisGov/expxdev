@@ -97,6 +97,17 @@ function artefatosDoNucleo(comLembrete: boolean): Artefato[] {
   return saida;
 }
 
+/**
+ * A suíte de teste dos hooks de uma skill: o `teste.sh` do topo da árvore e o que
+ * está sob `testes/`. Ela carrega amostras de segredo de propósito e fica no
+ * repositório da skill — instalada, ia para o commit do projeto, e o pre-push da
+ * MergeX (DM-279) barrava o push (relato do katosmv/login na 0.12.5). Vale para as
+ * duas cópias: `.claude/hooks` e o plugin.
+ */
+export function ehSuiteDeTesteDeHook(rel: string): boolean {
+  return rel === "teste.sh" || rel.startsWith("testes/");
+}
+
 /** Os artefatos de `.claude/` para o harness Claude Code. */
 export function artefatosDeHooks(skills: readonly SkillMontavel[]): Artefato[] {
   const alvos = emOrdemCanonica(comHooks(skills));
@@ -105,7 +116,9 @@ export function artefatosDeHooks(skills: readonly SkillMontavel[]): Artefato[] {
     // a skill vai junto: é o que o hook procura ao lado de si mesmo
     saida.push(...artefatosDaArvore(s.raizSkill, `.claude/skills/${s.nome}`, s.nome, "skill"));
     if (s.arvoreHooks !== undefined && existsSync(s.arvoreHooks)) {
-      saida.push(...artefatosDaArvore(s.arvoreHooks, ".claude/hooks", s.nome, "hook", (rel) => rel !== "hooks.json"));
+      saida.push(
+        ...artefatosDaArvore(s.arvoreHooks, ".claude/hooks", s.nome, "hook", (rel) => rel !== "hooks.json" && !ehSuiteDeTesteDeHook(rel)),
+      );
     }
     // arquivo solto fora de uma árvore detectada (não acontece com os layouts
     // atuais, mas a detecção os devolve separados)

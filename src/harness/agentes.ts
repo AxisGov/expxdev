@@ -224,7 +224,7 @@ export function planejarAgentes(skills: readonly SkillMontavel[], overrides: Ove
 export type Limpeza = {
   erros: string[];
   avisos: string[];
-  /** Agentes que a instalação anterior gravou e que saíram do plano. */
+  /** Arquivos de `.claude/` que a instalação anterior gravou e que saíram do plano. */
   remover: string[];
 };
 
@@ -243,9 +243,10 @@ function hashDoArquivo(caminho: string): string | undefined {
  * - Destino que existe, tem bytes diferentes e NÃO é do lock anterior é arquivo
  *   do projeto (ou de uma instalação manual): sobrescrevê-lo destruiria o
  *   trabalho da pessoa. Falha antes de qualquer escrita.
- * - Agente que o lock anterior gravou e que saiu do plano (a skill foi removida,
- *   ou deixou de publicá-lo) é removido — mas só se o arquivo ainda tem o hash
- *   do lock. Editado à mão, fica e vira aviso.
+ * - Arquivo de `.claude/` que o lock anterior gravou e que saiu do plano (a skill
+ *   foi removida, deixou de publicá-lo, ou ele deixou de ser instalado, como a
+ *   suíte de teste dos hooks) é removido — mas só se ainda tem o hash do lock.
+ *   Editado à mão, fica e vira aviso.
  */
 export function planejarLimpeza(
   raiz: string,
@@ -266,8 +267,16 @@ export function planejarLimpeza(
       );
     }
   }
+  // Tudo o que a instalação anterior gravou em `.claude/` e saiu do plano — agente,
+  // hook, arquivo de skill — sai do projeto se ainda está como o lock o gravou; o
+  // alterado à mão fica, com aviso. Arquivo, nunca pasta. O `.expx/marketplace` é
+  // trocado inteiro pela montagem e não passa por aqui.
   for (const [destino, hash] of Object.entries(anteriores).sort()) {
-    if (!destino.startsWith(".claude/agents/") || destinosDoPlano.has(destino)) continue;
+    if (!destino.startsWith(".claude/") || destinosDoPlano.has(destino)) continue;
+    // O lock é do projeto e pode ter sido editado: caminho com segmento vazio, `.`
+    // ou `..` não é destino que a instalação gravou, e o `join` o levaria para
+    // fora de `.claude/`. Nunca é removido.
+    if (destino.split("/").some((p) => p === "" || p === "." || p === "..")) continue;
     const atual = hashDoArquivo(join(raiz, ...destino.split("/")));
     if (atual === undefined) continue;
     if (atual === hash) remover.push(destino);

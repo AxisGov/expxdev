@@ -2,6 +2,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { montarPluginJson, montarMarketplaceJson, ORIGEM_DO_PLUGIN } from "./manifestos.js";
+import { ehSuiteDeTesteDeHook } from "../harness/hooks.js";
 import {
   aplicarArtefatos,
   artefato,
@@ -116,7 +117,7 @@ export function planejarPlugin(skills: readonly SkillMontavel[]): PlanoDoPlugin 
 
     if (s.arvoreHooks === undefined || !existsSync(s.arvoreHooks)) continue;
     artefatos.push(
-      ...artefatosDaArvore(s.arvoreHooks, "hooks", s.nome, "hook", (rel) => rel !== MANIFESTO_HOOKS),
+      ...artefatosDaArvore(s.arvoreHooks, "hooks", s.nome, "hook", (rel) => rel !== MANIFESTO_HOOKS && !ehSuiteDeTesteDeHook(rel)),
     );
 
     const manifesto = join(s.arvoreHooks, MANIFESTO_HOOKS);
