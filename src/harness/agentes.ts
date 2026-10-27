@@ -255,6 +255,19 @@ function semLinkNoPercurso(raiz: string, segmentos: readonly string[]): boolean 
 }
 
 /**
+ * Um segmento do lock que nenhum sistema reescreve. O Win32 lê `\` e `/` como
+ * separador, `:` como unidade ou fluxo alternativo, tira ponto e espaço do fim
+ * (`.. ` vira `..`) e desvia os nomes de dispositivo; `*`, `?`, `"`, `<`, `>`,
+ * `|` e os de controle ele não aceita. Fora disso o nome é literal nos três
+ * sistemas. Recusar só deixa o arquivo órfão, nunca remove o que não devia.
+ */
+function segmentoLiteral(p: string): boolean {
+  if (p === "" || p === "." || p === "..") return false;
+  if (/[\\/:*?"<>|\x00-\x1f]/.test(p) || /[. ]$/.test(p)) return false;
+  return !/^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])(\..*)?$/i.test(p);
+}
+
+/**
  * O que o plano de agentes faz com o que JÁ está em `.claude/agents/`.
  *
  * - Destino que existe, tem bytes diferentes e NÃO é do lock anterior é arquivo
@@ -290,12 +303,11 @@ export function planejarLimpeza(
   // trocado inteiro pela montagem e não passa por aqui.
   for (const [destino, hash] of Object.entries(anteriores).sort()) {
     if (!destino.startsWith(".claude/") || destinosDoPlano.has(destino)) continue;
-    // O lock é do projeto e pode ter sido editado: caminho com segmento vazio, `.`
-    // ou `..` não é destino que a instalação gravou, e o `join` o levaria para
-    // fora de `.claude/`. Nunca é removido. `\` e `:` também não: no Windows o
-    // `join` lê `\` como separador, e `:` é letra de unidade ou fluxo alternativo.
+    // O lock é do projeto e pode ter sido editado: caminho com segmento que o
+    // sistema reescreve (`..`, `.. `, `x\..\..`) não é destino que a instalação
+    // gravou, e o `join` o levaria para fora de `.claude/`. Nunca é removido.
     const segmentos = destino.split("/");
-    if (segmentos.some((p) => p === "" || p === "." || p === ".." || /[\\:]/.test(p))) continue;
+    if (!segmentos.every(segmentoLiteral)) continue;
     if (!semLinkNoPercurso(raiz, segmentos)) continue;
     const atual = hashDoArquivo(join(raiz, ...segmentos));
     if (atual === undefined) continue;

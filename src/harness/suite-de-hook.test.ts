@@ -128,6 +128,36 @@ describe("o update tira do projeto o que saiu da instalação", () => {
     expect(planejarLimpeza(raiz, [], new Set(), { [rel]: sha("do projeto\n") }).remover).toEqual([]);
   });
 
+  it("funcional: segmento com ponto ou espaço no fim nunca é removido — no Windows `.. ` vira `..`", () => {
+    const raiz = temporario("expx-limpeza-");
+    // no Windows `.. ` e `x.` são normalizados; no Linux são nomes literais dentro de `.claude/`
+    const anteriores = {
+      ".claude/.. /fora.txt": sha("do projeto\n"),
+      ".claude/hooks/velho.sh.": sha("do projeto\n"),
+      ".claude/hooks/velho.sh ": sha("do projeto\n"),
+    };
+    for (const rel of Object.keys(anteriores)) escreve(raiz, rel, "do projeto\n");
+    expect(planejarLimpeza(raiz, [], new Set(), anteriores).remover).toEqual([]);
+  });
+
+  it.skipIf(!suportaNomeComCaractereReservado())("funcional: nome de dispositivo do Windows nunca é removido", () => {
+    const raiz = temporario("expx-limpeza-");
+    const anteriores = { ".claude/hooks/nul.txt": sha("x\n"), ".claude/hooks/COM1": sha("x\n") };
+    for (const rel of Object.keys(anteriores)) escreve(raiz, rel, "x\n");
+    expect(planejarLimpeza(raiz, [], new Set(), anteriores).remover).toEqual([]);
+  });
+
+  it("funcional: nome com parênteses, colchetes e espaço no meio continua sendo removido", () => {
+    const raiz = temporario("expx-limpeza-");
+    const anteriores = {
+      ".claude/skills/buildx/template/src/app/(sistema)/page.tsx": sha("x\n"),
+      ".claude/skills/buildx/template/src/app/[id]/meu arquivo.tsx": sha("x\n"),
+      ".claude/skills/buildx/.gitkeep": sha("x\n"),
+    };
+    for (const rel of Object.keys(anteriores)) escreve(raiz, rel, "x\n");
+    expect([...planejarLimpeza(raiz, [], new Set(), anteriores).remover].sort()).toEqual(Object.keys(anteriores).sort());
+  });
+
   it.skipIf(!suportaSymlinkDeDiretorio())("funcional: caminho do lock que passa por link simbólico nunca é removido, mesmo com o hash certo", () => {
     const raiz = temporario("expx-limpeza-");
     const fora = temporario("expx-fora-");
