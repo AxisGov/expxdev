@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { artefatosDeHooks, ehSuiteDeTesteDeHook } from "./hooks.js";
 import { planejarPlugin, type SkillMontavel } from "../plugin/montagem.js";
 import { planejarLimpeza } from "./agentes.js";
-import { suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
+import { suportaNomeComCaractereReservado, suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
 
 /**
  * A suíte de teste dos hooks de uma skill (`teste.sh` e `testes/`) carrega
@@ -111,6 +111,21 @@ describe("o update tira do projeto o que saiu da instalação", () => {
     };
     const lim = planejarLimpeza(raiz, [], new Set(), anteriores);
     expect(lim.remover).toEqual([]);
+  });
+
+  it("funcional: segmento com `\\` nunca é removido — no Windows o `join` o lê como separador", () => {
+    const raiz = temporario("expx-limpeza-");
+    // no Windows resolve para `<raiz>/fora.txt`; no Linux é um nome literal dentro de `.claude/`
+    const rel = ".claude/x\\..\\..\\fora.txt";
+    escreve(raiz, rel, "do projeto\n");
+    expect(planejarLimpeza(raiz, [], new Set(), { [rel]: sha("do projeto\n") }).remover).toEqual([]);
+  });
+
+  it.skipIf(!suportaNomeComCaractereReservado())("funcional: segmento com `:` nunca é removido — letra de unidade e fluxo alternativo no Windows", () => {
+    const raiz = temporario("expx-limpeza-");
+    const rel = ".claude/hooks/C:fora.txt";
+    escreve(raiz, rel, "do projeto\n");
+    expect(planejarLimpeza(raiz, [], new Set(), { [rel]: sha("do projeto\n") }).remover).toEqual([]);
   });
 
   it.skipIf(!suportaSymlinkDeDiretorio())("funcional: caminho do lock que passa por link simbólico nunca é removido, mesmo com o hash certo", () => {

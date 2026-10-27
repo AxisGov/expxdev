@@ -292,9 +292,10 @@ export function planejarLimpeza(
     if (!destino.startsWith(".claude/") || destinosDoPlano.has(destino)) continue;
     // O lock é do projeto e pode ter sido editado: caminho com segmento vazio, `.`
     // ou `..` não é destino que a instalação gravou, e o `join` o levaria para
-    // fora de `.claude/`. Nunca é removido.
+    // fora de `.claude/`. Nunca é removido. `\` e `:` também não: no Windows o
+    // `join` lê `\` como separador, e `:` é letra de unidade ou fluxo alternativo.
     const segmentos = destino.split("/");
-    if (segmentos.some((p) => p === "" || p === "." || p === "..")) continue;
+    if (segmentos.some((p) => p === "" || p === "." || p === ".." || /[\\:]/.test(p))) continue;
     if (!semLinkNoPercurso(raiz, segmentos)) continue;
     const atual = hashDoArquivo(join(raiz, ...segmentos));
     if (atual === undefined) continue;
