@@ -53,7 +53,9 @@ resolver_remoto_upstream() {
   printf '%s\n' "$remoto_atual"
 }
 remoto="$(resolver_remoto_upstream)" || exit 1
-git remote get-url "$remoto"
+# A URL pode trazer usuário e token (`https://usuario:token@...`): a saída vai para o transcript,
+# então o que fica entre `://` e `@` sai mascarado. Para detectar o serviço, o host basta.
+git remote get-url "$remoto" | sed -E 's#(://)[^/@]*@#\1***@#'
 ```
 
 | Serviço no remoto | Ferramenta | Verificação de presença | Verificação de autenticação |
@@ -367,9 +369,11 @@ Não adicione revisor, etiqueta, marco ou responsável por conta própria: nada 
 
 Qualquer falha — sem permissão, PR já existe, base inválida, rede fora — **não interrompe a entrega**. Vá para o passo 3, registre o erro literal do comando, e siga.
 
-Se a falha for "PR já existe para esta branch" no GitHub, recupere uma URL escalar no **projeto de destino** e exija exatamente uma linha:
+Se a falha for "PR já existe para esta branch" no GitHub, recupere uma URL escalar no **projeto de destino** e exija exatamente uma linha. Rode na **mesma shell** do bloco do comando acima, que define `head` e `destino`: sozinho, o bloco falha em vez de consultar com valores vazios.
 
 ```bash
+: "${head:?rode na mesma shell do bloco do comando (passo 2), que define head}" \
+  "${destino:?rode na mesma shell do bloco do comando (passo 2), que define destino}"
 pr_url="$(gh pr view "$head" --repo "$destino" --json url --jq '.url')" || { echo "PR existente não recuperado no destino"; exit 1; }
 linhas_url="$(printf '%s\n' "$pr_url" | awk 'END { print NR }')"
 [ -n "$pr_url" ] && [ "$linhas_url" = 1 ] || { echo "recuperação do PR retornou zero ou múltiplas URLs"; exit 1; }

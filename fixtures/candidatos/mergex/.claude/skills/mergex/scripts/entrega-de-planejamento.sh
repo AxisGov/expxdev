@@ -254,7 +254,7 @@ proxima() { printf '%02d' "$((10#$1 + 1))"; }
 # Todo item: enums; o de planejamento só na primeira posição; as sprints em
 # sequência (01, 02, ...), depois do planejamento; todo item antes do último merged.
 p_sprint=""; p_url=""; p_estado=""; p_sha=""; p_merge=""; p_base=""
-u_pos=0; u_sprint=""; u_estado=""; u_sha=""; u_base=""; u_merge=""
+u_pos=0; u_sprint=""; u_estado=""; u_sha=""; u_base=""; u_merge=""; u_url=""
 a_pos=0; a_sprint=""; a_estado=""; a_sha=""; a_base=""; a_merge=""
 f_sprint=""; f_sha=""; n_itens=0; ultima_nn=""; prs_linhas=""
 while IFS="$TAB" read -r _ pos s_item url_item estado sha merge base; do
@@ -285,7 +285,7 @@ while IFS="$TAB" read -r _ pos s_item url_item estado sha merge base; do
   if [ -n "$ALVO_SPRINT" ] && [ "$s_item" = "$ALVO_SPRINT" ]; then
     a_pos="$pos"; a_sprint="$s_item"; a_estado="$estado"; a_sha="$sha"; a_merge="$merge"; a_base="$base"
   fi
-  u_pos="$pos"; u_sprint="$s_item"; u_estado="$estado"; u_sha="$sha"; u_base="$base"; u_merge="$merge"
+  u_pos="$pos"; u_sprint="$s_item"; u_estado="$estado"; u_sha="$sha"; u_base="$base"; u_merge="$merge"; u_url="$url_item"
   [ "$estado" != merged ] || { f_sprint="$s_item"; f_sha="$sha"; }
   n_itens="$pos"
   prs_linhas="$prs_linhas$(printf 'pr=%s\t%s\t%s\t%s' "$s_item" "$estado" "$sha" "$base")
@@ -315,8 +315,11 @@ case "$sprint" in
 esac
 
 MODO_EF="$modo"; [ "$tem_m" = 1 ] || MODO_EF=por_trabalho
-ATUAL_ESTADO=""
-case "$sprint" in planejamento|[0-9][0-9]) ATUAL_ESTADO="$u_estado" ;; esac
+ATUAL_ESTADO=""; ATUAL_URL=""
+# A URL do PR atual vive no item dele em `prs` (o E8 a grava ali, e o --abrir-sprint
+# deixa `pr_url: null` no topo): quem le o PR da sprint, como o E9, le esta chave,
+# nunca o topo (conselhos#208, M10).
+case "$sprint" in planejamento|[0-9][0-9]) ATUAL_ESTADO="$u_estado"; ATUAL_URL="${u_url:-null}" ;; esac
 
 saida() {
   if [ "$PLANEJAMENTO" = sim ]; then
@@ -327,7 +330,7 @@ saida() {
     printf 'planejamento=nao\n'
   fi
   printf 'entrega=%s\nentrega_origem=%s\nsprint_atual=%s\n' "$MODO_EF" "$([ "$tem_m" = 1 ] && echo registrada || echo padrao)" "${sprint:-null}"
-  [ -z "$ATUAL_ESTADO" ] || printf 'atual_estado=%s\n' "$ATUAL_ESTADO"
+  [ -z "$ATUAL_ESTADO" ] || printf 'atual_estado=%s\natual_url=%s\n' "$ATUAL_ESTADO" "$ATUAL_URL"
   [ -z "$f_sprint" ] || printf 'fechada=%s\nfechada_merge_sha=%s\n' "$f_sprint" "$f_sha"
   printf '%s' "$prs_linhas"
 }

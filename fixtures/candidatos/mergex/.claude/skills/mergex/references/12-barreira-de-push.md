@@ -11,6 +11,17 @@ pelo que o Git entrega (refs e SHAs), chamando o validador de push da skill
 Este reference cobre como o E0 o ativa, como o E2 prova que ele está ativo, como compô-lo com um
 hook que já existe, como revertê-lo, como as entregas são selecionadas e o que o CI confere.
 
+**O `pre-push` também varre segredo** (DM-279). Com a mesma tabela do hook `sem-segredo`
+(`scripts/segredo-tabela.sh`), ele lê o que o push publica: a mensagem e as linhas adicionadas de
+cada commit que o remoto ainda não tem (contra o primeiro pai, inclusive em merge) e a mensagem da
+tag anotada. "O que o remoto tem" é o SHA remoto do protocolo; na branch nova, o que o servidor
+anuncia na hora (`ls-remote` na URL do push), e a consulta que falha barra. A ref de rastreio
+(`refs/remotes/<remoto>`) não conta: é cache local (DM-281). O modo é o do `sem-segredo` em `.expx/hooks.json` (nasce `bloqueio`): achado barra a
+ref; em `aviso`, diagnostica e o push segue; em `desligado`, não varre. Qualquer falha de leitura
+não libera. Acima de 300 commits a varredura não roda e, em `bloqueio`, o push é barrado: divida a
+publicação, ou desligue conscientemente — nenhuma varredura manual libera o push. É a segunda
+camada: pega o segredo que o próprio comando gerou e o commit feito por fora do PreToolUse.
+
 O executável é um só: `scripts/ativacao-pre-push.sh <--instalar|--provar|--reverter> --entrega
 docs/entregas/<trabalho_id>/ENTREGA.md`. Códigos: `0` ok; `1` prova reprovada; `3` pré-requisito
 ausente (hook de terceiro que não passa na prova); `64` uso. Não existe opção de força.
