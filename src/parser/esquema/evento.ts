@@ -167,6 +167,17 @@ export const TimestampUtc = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/, "ts deve ser AAAA-MM-DDTHH:MM:SSZ");
 
+/**
+ * Os agentes de aprovação da lista transitória (CONTRATO-expx-orquestracao
+ * §12.2) e a ferramenta com que o hook grava cada um. A F4 troca a lista pelo
+ * `papel` da política.
+ */
+export const APROVADORES_INTEGRIDADE: Readonly<Record<string, string>> = {
+  "revisor-diff": "mergex",
+  qa: "runx",
+  "runx-revisor-testes": "runx",
+};
+
 /** As partes da foto, na ordem em que `diferencas` as lista. */
 export const PARTES_INTEGRIDADE = ["head", "status", "arvore"] as const;
 
@@ -235,6 +246,16 @@ export const LinhaEvento = z
   .refine((l) => (l.evento === "integridade_final_verificada") === (l.integridade_final !== undefined), {
     message: "integridade_final é obrigatória em integridade_final_verificada e só existe nele",
     path: ["integridade_final"],
+  })
+  // §12.3: `igual` é `ok`; `divergente` e `ausente` são `falha`, que invalida o veredito.
+  .refine(
+    (l) => l.integridade_final === undefined || l.resultado === (l.integridade_final.estado === "igual" ? "ok" : "falha"),
+    { message: "resultado de integridade_final_verificada: ok com igual, falha com divergente ou ausente", path: ["resultado"] },
+  )
+  // §12.2: só os aprovadores da lista, cada um com a ferramenta dele.
+  .refine((l) => l.evento !== "integridade_final_verificada" || APROVADORES_INTEGRIDADE[l.agente] === l.ferramenta, {
+    message: "integridade_final_verificada só para revisor-diff (mergex), qa e runx-revisor-testes (runx)",
+    path: ["agente"],
   });
 
 export type LinhaEvento = z.infer<typeof LinhaEvento>;

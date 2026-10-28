@@ -59,10 +59,32 @@ SESSAO="$(expx_json_get "$ENTRADA" session_id)"
 CWD="$(expx_json_get "$ENTRADA" cwd)"
 [ -n "$CWD" ] || CWD="$PWD"
 
+# Variaveis locais do Git herdadas do ambiente (GIT_DIR, GIT_WORK_TREE,
+# GIT_INDEX_FILE...) apontariam a foto para outro repositorio, e o fim daria
+# `igual` com a worktree do payload alterada. A lista vem do proprio git; a fixa
+# cobre o git que nao responde.
+for v in $(git rev-parse --local-env-vars 2>/dev/null) GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE \
+  GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_NAMESPACE GIT_PREFIX; do
+  unset "$v"
+done
 # O status e a foto nao podem refrescar o indice real.
 export GIT_OPTIONAL_LOCKS=0
 
 RAIZ="$(git -C "$CWD" rev-parse --show-toplevel 2>/dev/null)" || RAIZ=""
+
+# caminho_git <relativo> — `git rev-parse --git-path`, absoluto. Sem o
+# `--path-format=absolute`, que so existe a partir do git 2.31: o relativo que o
+# git devolve e relativo ao `-C`, a raiz.
+caminho_git() {
+  local p
+  p="$(git -C "$RAIZ" rev-parse --git-path "$1" 2>/dev/null)" || return 1
+  [ -n "$p" ] || return 1
+  case "$p" in
+    /*|[A-Za-z]:[\\/]*) ;;
+    *) p="$RAIZ/$p" ;;
+  esac
+  printf '%s' "$p"
+}
 
 # grava <estado> <diferencas, separadas por espaco>
 grava() {
@@ -84,7 +106,7 @@ foto() {
   local d="$1" idx
   git -C "$RAIZ" rev-parse -q --verify 'HEAD^{commit}' > "$d/head" 2>/dev/null || return 1
   git -C "$RAIZ" status --porcelain -z --untracked-files=all > "$d/status.z" 2>/dev/null || return 1
-  idx="$(git -C "$RAIZ" rev-parse --path-format=absolute --git-path index 2>/dev/null)" || return 1
+  idx="$(caminho_git index)" || return 1
   rm -f "$d/indice" "$d/indice.lock"
   if [ -f "$idx" ]; then cp "$idx" "$d/indice" 2>/dev/null || return 1; fi
   GIT_INDEX_FILE="$d/indice" git -C "$RAIZ" -c core.fsmonitor=false add -A -- . >/dev/null 2>&1 || return 1
@@ -95,7 +117,7 @@ foto() {
 
 INSTANCIA=""
 if [ -n "$RAIZ" ] && [ -n "$AGENT_ID" ]; then
-  BASE="$(git -C "$RAIZ" rev-parse --path-format=absolute --git-path expx/integridade-final/v1 2>/dev/null)" || BASE=""
+  BASE="$(caminho_git expx/integridade-final/v1)" || BASE=""
   HS="$(hash_id "$SESSAO")"
   HA="$(hash_id "$AGENT_ID")"
   [ -n "$BASE" ] && [ -n "$HS" ] && [ -n "$HA" ] && INSTANCIA="$BASE/$HS/$HA"

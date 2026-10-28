@@ -415,7 +415,10 @@ não na `arvore`.
 
 Aceita-se o nome exato, ou o nome depois de **um** prefixo literal `expx:`.
 Substring, outro prefixo ou nome parecido não viram aprovador. Fora da lista, o
-hook sai sem rodar Git e sem gravar nada. A lista é transitória: a F4 a troca
+hook sai sem rodar Git e sem gravar nada. As variáveis locais do Git herdadas
+do ambiente (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE` e as demais de
+`git rev-parse --local-env-vars`) são descartadas antes da foto: com elas, a foto
+seria de outro repositório. A lista é transitória: a F4 a troca
 pelo `papel` declarado e projetado da política, sem inferi-lo do nome. O
 `auditor-plano` e o `sprintx-revisor-testes` não estão nela porque já são
 `estrutural` (sem ferramenta de escrita nem `Bash`).
@@ -437,7 +440,8 @@ No `SubagentStop` de um aprovador, o hook grava `integridade_final_verificada`
 
 `ausente` nunca vira `igual`: timeout, truncamento ou erro invalidam. A extra é
 obrigatória nesse evento e vedada nos demais; linhas antigas, sem ela,
-continuam válidas. O evento é próprio, e não `agente_concluido`, porque a
+continuam válidas. O esquema também amarra o `resultado` ao `estado` e o
+`agente` à `ferramenta` da tabela 12.2: linha incoerente é defeito do rastro. O evento é próprio, e não `agente_concluido`, porque a
 SprintX já grava `agente_concluido` para todo subagente, e o aprovador ficaria
 com duas conclusões. O `SubagentStart` não grava evento.
 
@@ -459,7 +463,9 @@ regime. Nesta versão isso é registrado e mostrado, não executado:
 O rastro (`docs/eventos/`) é ignorado pelo versionador por padrão
 (`CONTRATO-expx-eventos.md`). Fora disso, cada linha que um hook grava durante
 o subagente entra no `status` da foto, e a verificação dá `divergente` sem o
-aprovador ter tocado em nada. Com a integridade instalada, o `doctor` avisa
-`rastro-nao-ignorado`. A comparação não exclui `docs/eventos/` por conta
+aprovador ter tocado em nada. O mesmo vale para arquivo do rastro que
+já está versionado: a regra do `.gitignore` não alcança o que está no índice.
+Com a integridade instalada, o `doctor` avisa `rastro-nao-ignorado` nos dois
+casos. A comparação não exclui `docs/eventos/` por conta
 própria: o que ela mede é o que o Git vê.
 

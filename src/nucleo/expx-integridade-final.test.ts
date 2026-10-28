@@ -46,9 +46,9 @@ function repo(): string {
 type Payload = { evento: "SubagentStart" | "SubagentStop"; agente: string; id: string; sessao?: string };
 
 /** Roda o hook com o payload no stdin. O hook sempre sai 0 (falha aberta). */
-function hook(raiz: string, p: Payload): { status: number | null; stdout: string; stderr: string } {
+function hook(raiz: string, p: Payload, extra: Record<string, string> = {}): { status: number | null; stdout: string; stderr: string } {
   const env: NodeJS.ProcessEnv = {};
-  for (const [k, v] of Object.entries(process.env)) if (!k.startsWith("EXPX_") && k !== "CLAUDECODE") env[k] = v;
+  for (const [k, v] of Object.entries(process.env)) if (!k.startsWith("EXPX_") && !k.startsWith("GIT_") && k !== "CLAUDECODE") env[k] = v;
   const payload = JSON.stringify({
     session_id: p.sessao ?? "sessao-1",
     hook_event_name: p.evento,
@@ -56,7 +56,7 @@ function hook(raiz: string, p: Payload): { status: number | null; stdout: string
     agent_type: p.agente,
     cwd: raiz,
   });
-  const r = spawnSync(BASH, [HOOK], { cwd: raiz, input: payload, encoding: "utf8", env: { ...env, CLAUDECODE: "1" } });
+  const r = spawnSync(BASH, [HOOK], { cwd: raiz, input: payload, encoding: "utf8", env: { ...env, CLAUDECODE: "1", ...extra } });
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 
@@ -269,6 +269,36 @@ describe("expx-integridade-final: a foto do início contra o fim, por instância
       expect(r.defeitos).toEqual([]);
       expect(r.desconhecidas).toEqual([]);
     }
+  });
+
+  it("funcional: GIT_DIR, GIT_WORK_TREE e GIT_INDEX_FILE herdados não desviam a foto para outro repositório", () => {
+    const raiz = repo();
+    const outro = repo();
+    const herdado = { GIT_DIR: join(outro, ".git"), GIT_WORK_TREE: outro, GIT_INDEX_FILE: join(outro, ".git", "index") };
+    hook(raiz, { evento: "SubagentStart", agente: "qa", id: "ag-1" }, herdado);
+    writeFileSync(join(raiz, "a.txt"), "mudou no repositorio do payload\n");
+    hook(raiz, { evento: "SubagentStop", agente: "qa", id: "ag-1" }, herdado);
+    expect(verificacoes(raiz)[0]?.integridade_final).toEqual({ estado: "divergente", diferencas: ["status", "arvore"] });
+    expect(existsSync(join(outro, "docs", "eventos"))).toBe(false);
+  });
+
+  // O wrapper é script sh no PATH: no Windows o Git Bash do teste resolveria o git.exe antes dele.
+  it.skipIf(process.platform === "win32")("funcional: com um git anterior ao --path-format (2.31), a foto ainda funciona", () => {
+    const raiz = repo();
+    const bin = mkdtempSync(join(tmpdir(), "expx-git-antigo-"));
+    criados.push(bin);
+    const real = spawnSync(BASH, ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+    writeFileSync(
+      join(bin, "git"),
+      `#!/bin/sh\nfor a in "$@"; do case "$a" in --path-format*) echo "unknown option: $a" >&2; exit 129;; esac; done\nexec "${real}" "$@"\n`,
+      { mode: 0o755 },
+    );
+    const antigo = { PATH: `${bin}:${process.env["PATH"] ?? ""}` };
+    hook(raiz, { evento: "SubagentStart", agente: "qa", id: "ag-1" }, antigo);
+    writeFileSync(join(raiz, "a.txt"), "x\n");
+    hook(raiz, { evento: "SubagentStop", agente: "qa", id: "ag-1" }, antigo);
+    expect(verificacoes(raiz)[0]?.integridade_final).toEqual({ estado: "divergente", diferencas: ["status", "arvore"] });
+    expect(arquivosDoEstado(raiz)).toEqual([]);
   });
 
   it("funcional: o hook não escreve na árvore de trabalho além do rastro ignorado", () => {

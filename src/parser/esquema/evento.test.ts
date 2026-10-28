@@ -499,8 +499,10 @@ describe("chaves da resolução (CONTRATO-expx-orquestracao §11.1)", () => {
 });
 
 describe("integridade_final (F3c, CONTRATO-expx-orquestracao §12)", () => {
+  const resultadoDe = (i: unknown) =>
+    typeof i === "object" && i !== null && (i as { estado?: unknown }).estado === "igual" ? "ok" : "falha";
   const verificada = (integridade: unknown, extra: Record<string, unknown> = {}) =>
-    linha({ evento: "integridade_final_verificada", agente: "qa", resultado: "ok", integridade_final: integridade, ...extra });
+    linha({ evento: "integridade_final_verificada", agente: "qa", resultado: resultadoDe(integridade), integridade_final: integridade, ...extra });
 
   it("funcional: as três formas válidas passam, sem chave desconhecida", () => {
     for (const ok of [
@@ -538,6 +540,21 @@ describe("integridade_final (F3c, CONTRATO-expx-orquestracao §12)", () => {
     expect(validarRastro(j(sem)).defeitos).toHaveLength(1);
     const fora = linha({ evento: "agente_concluido", agente: "qa", integridade_final: { estado: "igual", diferencas: [] } });
     expect(validarRastro(j(fora)).defeitos).toHaveLength(1);
+  });
+
+  it("funcional: o resultado acompanha o estado — igual é ok, divergente e ausente são falha", () => {
+    expect(validarRastro(j(verificada({ estado: "igual", diferencas: [] }, { resultado: "falha" }))).defeitos).toHaveLength(1);
+    expect(validarRastro(j(verificada({ estado: "divergente", diferencas: ["head"] }, { resultado: "ok" }))).defeitos).toHaveLength(1);
+    expect(validarRastro(j(verificada({ estado: "ausente", diferencas: [] }, { resultado: "ok" }))).defeitos).toHaveLength(1);
+  });
+
+  it("funcional: o aprovador vem com a ferramenta dele, e só os três da lista transitória", () => {
+    const igual = { estado: "igual", diferencas: [] };
+    expect(validarRastro(j(verificada(igual, { agente: "revisor-diff", ferramenta: "mergex" }))).defeitos).toEqual([]);
+    expect(validarRastro(j(verificada(igual, { agente: "runx-revisor-testes", ferramenta: "runx" }))).defeitos).toEqual([]);
+    expect(validarRastro(j(verificada(igual, { agente: "revisor-diff", ferramenta: "runx" }))).defeitos).toHaveLength(1);
+    expect(validarRastro(j(verificada(igual, { agente: "qa", ferramenta: "mergex" }))).defeitos).toHaveLength(1);
+    expect(validarRastro(j(verificada(igual, { agente: "auditor-plano", ferramenta: "sprintx" }))).defeitos).toHaveLength(1);
   });
 
   it("funcional: linha antiga sem a chave continua válida", () => {

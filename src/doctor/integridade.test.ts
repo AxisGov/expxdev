@@ -92,6 +92,18 @@ describe("doctor: integridade final", () => {
     expect(ids(p.raiz)).not.toContain("rastro-nao-ignorado");
   });
 
+  it("funcional: rastro já versionado avisa mesmo com o .gitignore certo — o arquivo rastreado continua mudando o status", async () => {
+    p = await projeto();
+    mkdirSync(join(p.raiz, ".claude", "hooks"), { recursive: true });
+    writeFileSync(join(p.raiz, ".claude", "hooks", "expx-integridade-final.sh"), "#!/usr/bin/env bash\n");
+    rastro(p.raiz, [linha("agente_concluido")]);
+    const add = spawnSync("git", ["add", "-f", "docs/eventos/F-1.jsonl"], { cwd: p.raiz, encoding: "utf8" });
+    expect(add.status, add.stderr).toBe(0);
+    writeFileSync(join(p.raiz, ".gitignore"), "docs/eventos/\n");
+    const achado = diagnosticar(p.raiz, {}).achados.find((a) => a.id === "rastro-nao-ignorado");
+    expect(achado?.problema).toContain("docs/eventos/F-1.jsonl");
+  });
+
   it("funcional: sem o hook da integridade, ou fora de um repositório git, não avisa rastro-nao-ignorado", async () => {
     p = await projeto();
     expect(ids(p.raiz)).not.toContain("rastro-nao-ignorado");

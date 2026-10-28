@@ -653,12 +653,24 @@ function verificarRastroIgnorado(raiz: string, push: (a: Achado) => void): void 
   const r = spawnSync("git", ["-C", raiz, "check-ignore", "-q", "--no-index", "docs/eventos/.expx-integridade-final-sonda.jsonl"], {
     encoding: "utf8",
   });
-  if (r.status === 0) return;
+  // A regra não alcança o que já está no índice: arquivo do rastro versionado
+  // continua mudando o status a cada linha gravada.
+  const versionados =
+    r.status === 0 ? spawnSync("git", ["-C", raiz, "ls-files", "-z", "--", "docs/eventos"], { encoding: "utf8" }) : undefined;
+  const lista = versionados?.status === 0 ? versionados.stdout.split("\0").filter((c) => c !== "") : [];
+  if (r.status === 0 && lista.length === 0) return;
   push({
     id: "rastro-nao-ignorado",
     severidade: "aviso",
-    problema: "docs/eventos/ nao esta ignorado pelo git: o rastro gravado durante um subagente de aprovacao muda o git status, e a integridade final da divergente",
-    correcao: "acrescente docs/eventos/ ao .gitignore do projeto",
+    problema:
+      r.status !== 0
+        ? "docs/eventos/ nao esta ignorado pelo git: o rastro gravado durante um subagente de aprovacao muda o git status, e a integridade final da divergente"
+        : `docs/eventos/ esta no .gitignore, mas ${String(lista.length)} arquivo(s) do rastro ja estao versionados ` +
+          `(${amostra(lista)}): cada linha gravada muda o git status, e a integridade final da divergente`,
+    correcao:
+      r.status !== 0
+        ? "acrescente docs/eventos/ ao .gitignore do projeto"
+        : "tire-os do indice sem apagar do disco: git rm --cached -r docs/eventos",
   });
 }
 
