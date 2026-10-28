@@ -472,4 +472,3 @@ já está versionado: a regra do `.gitignore` não alcança o que está no índi
 Com a integridade instalada, o `doctor` avisa `rastro-nao-ignorado` nos dois
 casos. A comparação não exclui `docs/eventos/` por conta
 própria: o que ela mede é o que o Git vê.
-
