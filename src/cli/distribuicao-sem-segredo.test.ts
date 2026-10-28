@@ -105,9 +105,11 @@ describe("a distribuição instalada passa pela varredura de segredo da MergeX",
     expect(instalados.some((r) => r.startsWith(".expx/marketplace/plugins/expx/nucleo/"))).toBe(true);
   });
 
+  // A tabela roda um `grep` por regra em cada arquivo; no Git Bash do Windows,
+  // onde criar processo custa caro, a árvore inteira levou 142 s no CI.
   it("funcional: nenhum arquivo instalado tem achado, varrido inteiro", () => {
     expect(varre(instalados.map((rel) => join(produto, ...rel.split("/"))))).toBe("");
-  });
+  }, 600000);
 
   it("funcional: a suíte de teste dos hooks não chega ao projeto", () => {
     const suite = instalados.filter((c) => /(^|\/)hooks\/(teste\.sh$|testes\/)/.test(c));
