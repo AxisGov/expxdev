@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.12.8 — os achados de segredo do conselhos #211
+
+- Certifica a MergeX em AxisGov/mergex@26df2d0 (AxisGov/mergex#57, **DM-285**), com os achados do CodeAnt na instalação da 0.12.5 no katosmv/conselhos-municipais#211 que seguiam abertos na 0.12.7:
+  - **A1 e A5 (regressão da 0.12.5):** na senha de URL, só o valor inteiro é placeholder. Uma senha real seguida de `:placeholder` ou `=placeholder` passava. A senha vai até o último `@` antes do host, e `changeme@` seguido da senha real também barra.
+  - **A2:** o valor sem aspa aceita `:` depois do primeiro caractere, e `password=ab:` seguido de uma senha barra. Também barra a senha que começa com `:` depois de `=` ou de `:` com espaço.
+  - **A4:** o pre-push lê cada commit no Git uma vez por push. Antes, com achado, a segunda fase relia tudo, chegando a cerca de 1.800 processos em 300 commits.
+- **Falsos positivos assumidos** com o `:` no valor, registrados na DM-285 e testados:
+  - uma URL como valor da chave;
+  - a chave Redis com `secret:` no meio;
+  - o exemplo YAML com dois-pontos no valor;
+  - a hora como valor da senha;
+  - a atribuição em Rust, C++ e PHP com `A::B` seguida de `,` ou `;`.
+  O caminho `Token::Nome` solto continua fora. Se a varredura acusar um valor que não é credencial, troque-o por um placeholder inteiro (`<senha>`, `${VAR}`) em vez de desligar o hook.
+
 ## 0.12.7 — achados da instalação da 0.12.6 no Login e a integridade final dos aprovadores
 
 - **Achados do katosmv/login#34:** o CodeAnt e o CodeRabbit revisaram a instalação da 0.12.6 no Login. Dos 25 achados, 19 procedem e entram aqui; os 6 que não procedem foram reproduzidos e respondidos lá.
