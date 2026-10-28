@@ -5,6 +5,7 @@ import { artefato, artefatoComConteudo, emOrdemCanonica, hashDeBytes, type Artef
 import { lerAgenteDaSkill, reescreverModeloEsforco } from "../orquestracao/materializar.js";
 import { resolver, sobreporV1, type Resolucao } from "../orquestracao/resolver.js";
 import type { Politica } from "../orquestracao/tipos.js";
+import { NOMES } from "../nucleo/catalogo.js";
 
 /**
  * Agentes das skills em `.claude/agents/`, com o modelo e o esforço que o
@@ -262,6 +263,21 @@ function semLinkNoPercurso(raiz: string, segmentos: readonly string[]): boolean 
 }
 
 /**
+ * O destino está numa pasta que a instalação grava em `.claude/`: hooks, agentes
+ * e a cópia de cada skill do catálogo. O hash protege o conteúdo alterado, não a
+ * autoria — o lock é editável, e `settings.json`, comando ou skill da pessoa não
+ * podem ficar ao alcance dele. Os comandos não moram em `.claude/`: vão para o
+ * plugin e para `.opencode/commands/`.
+ */
+function daInstalacao(destino: string): boolean {
+  return (
+    destino.startsWith(".claude/hooks/") ||
+    destino.startsWith(".claude/agents/") ||
+    NOMES.some((id) => destino.startsWith(`.claude/skills/${id}/`))
+  );
+}
+
+/**
  * Um segmento do lock que nenhum sistema reescreve. O Win32 lê `\` e `/` como
  * separador, `:` como unidade ou fluxo alternativo, tira ponto e espaço do fim
  * (`.. ` vira `..`) e desvia os nomes de dispositivo; `*`, `?`, `"`, `<`, `>`,
@@ -309,7 +325,7 @@ export function planejarLimpeza(
   // alterado à mão fica, com aviso. Arquivo, nunca pasta. O `.expx/marketplace` é
   // trocado inteiro pela montagem e não passa por aqui.
   for (const [destino, hash] of Object.entries(anteriores).sort()) {
-    if (!destino.startsWith(".claude/") || destinosDoPlano.has(destino)) continue;
+    if (!daInstalacao(destino) || destinosDoPlano.has(destino)) continue;
     // O lock é do projeto e pode ter sido editado: caminho com segmento que o
     // sistema reescreve (`..`, `.. `, `x\..\..`) não é destino que a instalação
     // gravou, e o `join` o levaria para fora de `.claude/`. Nunca é removido.

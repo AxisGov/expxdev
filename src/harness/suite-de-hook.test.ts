@@ -100,6 +100,25 @@ describe("o update tira do projeto o que saiu da instalação", () => {
     expect(lim.avisos.join("\n")).toContain(".claude/skills/mergex/antigo.md");
   });
 
+  it("funcional: só o que a instalação grava em .claude/ é removido — o lock forjado não alcança o resto", () => {
+    const raiz = temporario("expx-limpeza-");
+    const da = [".claude/hooks/velho.sh", ".claude/agents/velho.md", ".claude/skills/mergex/velho.md"];
+    const alheios = [
+      ".claude/settings.json",
+      ".claude/settings.local.json",
+      ".claude/commands/meu.md",
+      ".claude/skills/minha-skill/SKILL.md",
+      ".claude/skills/mergexx/SKILL.md",
+      ".claude/outra/coisa.md",
+    ];
+    const anteriores: Record<string, string> = {};
+    for (const rel of [...da, ...alheios]) {
+      escreve(raiz, rel, "x\n");
+      anteriores[rel] = sha("x\n");
+    }
+    expect([...planejarLimpeza(raiz, [], new Set(), anteriores).remover].sort()).toEqual([...da].sort());
+  });
+
   it("funcional: caminho do lock com `.`, `..` ou vazio nunca é removido, mesmo com o hash certo", () => {
     const raiz = temporario("expx-limpeza-");
     escreve(raiz, "fora.txt", "do projeto\n");
