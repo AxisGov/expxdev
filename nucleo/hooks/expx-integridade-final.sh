@@ -118,14 +118,22 @@ foto() {
   # A copia leva os bits `assume-unchanged` e `skip-worktree` do indice real, e
   # com eles o `git add` nao le o arquivo: a edicao escondida do status passaria
   # como `igual`. Limpos so na copia, um bit por vez: numa chamada so, o
-  # `update-index` aplica apenas uma das duas opcoes.
-  local bit
-  for bit in --no-assume-unchanged --no-skip-worktree; do
-    GIT_INDEX_FILE="$d/indice" git -C "$RAIZ" ls-files -z 2>/dev/null \
-      | GIT_INDEX_FILE="$d/indice" git -C "$RAIZ" update-index -z "$bit" --stdin >/dev/null 2>&1 \
-      || return 1
-  done
-  GIT_INDEX_FILE="$d/indice" git -C "$RAIZ" -c core.fsmonitor=false add -A -- . >/dev/null 2>&1 || return 1
+  # `update-index` aplica apenas uma das duas opcoes. O `skip-worktree` sai so de
+  # quem esta no disco: num sparse checkout, o que ficou fora do cone continua
+  # marcado e fora da foto, e o `add` roda com o sparse desligado na copia — ha
+  # versoes do git que recusam o `add -A` com entrada fora da definicao.
+  GIT_INDEX_FILE="$d/indice" git -C "$RAIZ" ls-files -z 2>/dev/null \
+    | GIT_INDEX_FILE="$d/indice" git -C "$RAIZ" update-index -z --no-assume-unchanged --stdin >/dev/null 2>&1 \
+    || return 1
+  local f
+  GIT_INDEX_FILE="$d/indice" git -C "$RAIZ" ls-files -z 2>/dev/null \
+    | while IFS= read -r -d '' f; do
+        if [ -e "$RAIZ/$f" ] || [ -L "$RAIZ/$f" ]; then printf '%s\0' "$f"; fi
+      done \
+    | GIT_INDEX_FILE="$d/indice" git -C "$RAIZ" update-index -z --no-skip-worktree --stdin >/dev/null 2>&1 \
+    || return 1
+  GIT_INDEX_FILE="$d/indice" git -C "$RAIZ" -c core.fsmonitor=false -c core.sparseCheckout=false -c index.sparse=false \
+    add -A -- . >/dev/null 2>&1 || return 1
   GIT_INDEX_FILE="$d/indice" git -C "$RAIZ" write-tree > "$d/arvore" 2>/dev/null || return 1
   rm -f "$d/indice" "$d/indice.lock"
   return 0

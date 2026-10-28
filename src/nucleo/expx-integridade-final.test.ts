@@ -188,6 +188,31 @@ describe("expx-integridade-final: a foto do início contra o fim, por instância
     }
   });
 
+  it("funcional: sparse checkout real (cone e sparse index) — sem mudança é igual, e a edição dentro do cone diverge", () => {
+    for (const indice of ["--no-sparse-index", "--sparse-index"]) {
+      const raiz = repo();
+      mkdirSync(join(raiz, "dentro"));
+      mkdirSync(join(raiz, "fora"));
+      writeFileSync(join(raiz, "dentro", "d.txt"), "d\n");
+      writeFileSync(join(raiz, "fora", "f.txt"), "f\n");
+      git(raiz, "add", "-A");
+      git(raiz, "commit", "-q", "-m", "pastas");
+      git(raiz, "sparse-checkout", "init", "--cone", indice);
+      git(raiz, "sparse-checkout", "set", "dentro");
+      expect(existsSync(join(raiz, "fora", "f.txt")), indice).toBe(false);
+
+      inicio(raiz, "qa", "ag-1");
+      fim(raiz, "qa", "ag-1");
+      inicio(raiz, "qa", "ag-2");
+      writeFileSync(join(raiz, "dentro", "d.txt"), "editado\n");
+      fim(raiz, "qa", "ag-2");
+      expect(verificacoes(raiz).map((v) => v.integridade_final), indice).toEqual([
+        { estado: "igual", diferencas: [] },
+        { estado: "divergente", diferencas: ["status", "arvore"] },
+      ]);
+    }
+  });
+
   it("funcional: fim sem início — ausente, falha; nunca vira igual", () => {
     const raiz = repo();
     expect(fim(raiz, "qa", "ag-sem-inicio").status).toBe(0);

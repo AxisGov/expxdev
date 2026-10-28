@@ -403,7 +403,10 @@ paralelas não colidem. O fim remove o diretório da instância em qualquer
 resultado. Os filtros `clean` (LFS) e o `core.autocrlf` valem no `git add`: a
 `arvore` compara a representação Git, não necessariamente os bytes físicos. Um
 submódulo entra só pelo gitlink; a sujeira interna dele aparece no `status`,
-não na `arvore`.
+não na `arvore`. Na cópia do índice, `assume-unchanged` sai de todas as
+entradas e `skip-worktree` de todo arquivo presente no disco: a edição escondida
+do `status` por esses bits entra na `arvore`. Num sparse checkout, o que está
+fora do cone continua fora da foto.
 
 ### 12.2 Os agentes de aprovação (lista transitória)
 
