@@ -223,9 +223,17 @@ $corpo_tag"
     return 0
   fi
   # Uma varredura do intervalo inteiro; só com achado, commit a commit, para dizer onde.
+  # Cada commit é lido no Git uma vez por push e guardado por SHA (que não muda): a
+  # segunda fase e as outras refs do mesmo push leem dali (A4 no conselhos#211).
+  mkdir -p "$TMP_DIR/seg-commit" || { SEG_RES=erro; SEG_DIAG="o cache dos commits não se cria"; return 0; }
   ALVO="$texto_tag"
   for c in $lista; do
-    texto="$(_seg_commit "$c")" || { SEG_RES=erro; SEG_DIAG="o commit $c não se lê"; return 0; }
+    if [ ! -f "$TMP_DIR/seg-commit/$c" ]; then
+      _seg_commit "$c" > "$TMP_DIR/seg-commit/$c.parcial" \
+        && mv "$TMP_DIR/seg-commit/$c.parcial" "$TMP_DIR/seg-commit/$c" \
+        || { SEG_RES=erro; SEG_DIAG="o commit $c não se lê ou não se guarda no diretório temporário (${TMPDIR:-/tmp} cheio?)"; return 0; }
+    fi
+    texto="$(cat "$TMP_DIR/seg-commit/$c")" || { SEG_RES=erro; SEG_DIAG="o commit $c não se lê"; return 0; }
     ALVO="$ALVO
 $texto"
   done
@@ -237,7 +245,7 @@ $texto"
 $ACHADOS"
   fi
   for c in $lista; do
-    ALVO="$(_seg_commit "$c")"; segredo_varrer
+    ALVO="$(cat "$TMP_DIR/seg-commit/$c")"; segredo_varrer
     curto="${c:0:12}"
     [ -z "$ACHADOS" ] || achados_ref="${achados_ref}  no commit ${curto}:
 $ACHADOS"

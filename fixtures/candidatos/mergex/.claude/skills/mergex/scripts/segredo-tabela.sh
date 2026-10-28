@@ -26,6 +26,9 @@ eh_placeholder() {
   # traz a chave junto), sem aspas: variável de shell sem chaves, formatação e
   # máscara são referência, não valor (conselhos#210, P8).
   local cauda="${v#*[:=]}"
+  # Com `inteiro`, o valor já chega sem a chave (a senha da URL, o valor antes do `(`)
+  # e não é cortado: `S:placeholder` não é `placeholder` (A1 e A5 no conselhos#211).
+  [ "${2:-}" = inteiro ] && cauda="$v"
   cauda="${cauda#"${cauda%%[![:space:]\'\"]*}"}"; cauda="${cauda%[\'\"]}"
   # as aspas tipográficas também envolvem o valor
   cauda="${cauda#“}"; cauda="${cauda%”}"; cauda="${cauda#‘}"; cauda="${cauda%’}"
@@ -56,7 +59,8 @@ eh_placeholder() {
 # Na credencial em atribuição, valor sem aspas que é só identificador ou cadeia
 # `a.b.c` sem dígito, seguido de `,` `;` `)` ou `}`, é referência de código
 # (`senha: SENHA_PADRAO,`, `password: process.env.DB_PASS)`), não credencial
-# (DM-283). No fim da linha (YAML, .env), entre aspas, com dígito ou símbolo,
+# (DM-283). `A::B` não entra: é indistinguível de uma senha com `::` (DM-285).
+# No fim da linha (YAML, .env), entre aspas, com dígito ou símbolo,
 # continua credencial. Falso negativo assumido: senha sem dígito, sem símbolo e
 # sem aspas seguida de um desses terminadores (`password: SuperSecret,`).
 eh_referencia_de_codigo() {
@@ -90,8 +94,12 @@ achou() {
       # Placeholder dispensa somente este candidato. Na URL, só a senha decide:
       # um `${USER}` no usuário não torna placeholder a senha real (conselhos#210, P5).
       ph="$valor"
-      if [ "$cat" = "credencial em URL" ]; then ph="${valor#*://}"; ph="${ph#*:}"; ph="${ph%@}"; fi
-      eh_placeholder "$ph" && continue
+      if [ "$cat" = "credencial em URL" ]; then
+        ph="${valor#*://}"; ph="${ph#*:}"; ph="${ph%@}"
+        eh_placeholder "$ph" inteiro && continue
+      else
+        eh_placeholder "$ph" && continue
+      fi
       # A referência de código é julgada nesta ocorrência, pelo que vem logo depois
       # dela: sem limite à esquerda, o valor começa no deslocamento do casamento.
       if [ "$cat" = "credencial" ] && [ -z "${3:-}" ] \
@@ -139,8 +147,13 @@ segredo_varrer() {
   # aspas vence a sem aspas quando existe, e a credencial conta uma vez só. Espaço fica
   # fora: prosa entre aspas não é senha. A chave pode vir entre aspas, como no JSON
   # (`"password": ...`), e o literal entre aspas seguido de `(` não é chamada de função.
-  CREDENCIAL='([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Nn][Hh][Aa]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii]_?[Kk][Ee][Yy])("|'"'"'|”|’)?[[:space:]]*[:=][[:space:]]*("[^"[:space:]]{8,}"|'"'"'[^'"'"'[:space:]]{8,}'"'"'|“[^”[:space:]]{8,}”|‘[^’[:space:]]{8,}’|("|'"'"'|“|‘)[A-Za-z0-9/+_.=!@#$%^&*~?,;:-]{8,}|("|'"'"')?[A-Za-z0-9/+_.=!@#$%^&*~?-]{8,})'
-  achou "credencial"          "$CREDENCIAL" '' '($|[^A-Za-z0-9/+_.=!@#$%^&*~?(-])'
+  # Sem aspa, o valor aceita `:` depois do primeiro caractere: `password=ab:S` parava no
+  # `:` e passava (A2 no conselhos#211). Uma URL como valor da chave passa a ser
+  # acusada, falso positivo assumido; o primeiro caractere sem `:` deixa
+  # `Token::Identifier` fora. Senha que começa com `:` só depois de `=` ou de `:` com
+  # espaço: colado na chave, `Token::Nome` é caminho, não atribuição.
+  CREDENCIAL='([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Nn][Hh][Aa]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii]_?[Kk][Ee][Yy])("|'"'"'|”|’)?[[:space:]]*([:=][[:space:]]*("[^"[:space:]]{8,}"|'"'"'[^'"'"'[:space:]]{8,}'"'"'|“[^”[:space:]]{8,}”|‘[^’[:space:]]{8,}’|("|'"'"'|“|‘)[A-Za-z0-9/+_.=!@#$%^&*~?,;:-]{8,}|("|'"'"')?[A-Za-z0-9/+_.=!@#$%^&*~?-][A-Za-z0-9/+_.=!@#$%^&*~?:-]{7,})|(=[[:space:]]*|:[[:space:]]+):[A-Za-z0-9/+_.=!@#$%^&*~?:-]{7,})'
+  achou "credencial"          "$CREDENCIAL" '' '($|[^A-Za-z0-9/+_.=!@#$%^&*~?(:-])'
   # ...salvo quando o valor tem dígito: identificador de função comum não tem
   # (`randomUUID`, `getToken`), e um valor aleatório quase sempre tem. Uma função
   # com dígito (`getToken2()`) barra — falso positivo assumido; valor sem dígito
@@ -149,7 +162,7 @@ segredo_varrer() {
     [ -n "$chamada" ] || continue
     valor="${chamada%(}"; valor="${valor#*[:=]}"; valor="${valor#"${valor%%[![:space:]\'\"]*}"}"
     case "$valor" in *[0-9]*) ;; *) continue ;; esac
-    eh_placeholder "$valor" && continue
+    eh_placeholder "$valor" inteiro && continue
     ACHADOS="${ACHADOS}  - credencial: …${valor: -4}
 "
   done <<EXPX_CHAMADAS
@@ -157,8 +170,10 @@ $(printf '%s' "$ALVO" | grep -aEo -e "$CREDENCIAL\(")
 EXPX_CHAMADAS
   # 3. Chave privada
   achou "chave privada"       '-----BEGIN [A-Z ]*PRIVATE KEY-----'
-  # 4. Conexão com credencial embutida
-  achou "credencial em URL"   '[a-zA-Z][a-zA-Z0-9+.-]*://[^/[:space:]:]+:[^@[:space:]]{4,}@'
+  # 4. Conexão com credencial embutida. A senha vai até o último `@` antes do host: com
+  # `@` cru, o parser de URL fica com o último, e parar no primeiro julgava só o começo
+  # (`changeme@` seguido da senha real; CodeAnt no mergex#57). `/`, `?` e `#` fecham.
+  achou "credencial em URL"   '[a-zA-Z][a-zA-Z0-9+.-]*://[^/[:space:]:]+:[^/?#[:space:]]{4,}@'
   # 5. Dado real de cliente — CPF/CNPJ formatado
   achou "dado real de cliente" '([0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2}|[0-9]{2}\.[0-9]{3}\.[0-9]{3}/[0-9]{4}-[0-9]{2})'
   return 0
