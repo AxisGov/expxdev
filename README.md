@@ -537,16 +537,16 @@ Requisitos para os comandos abaixo: Node ≥ 20.19.0, `git`, GitHub CLI (`gh`) a
 `sha256sum` (Linux) ou `shasum` (macOS) para conferir o pacote antes de executá-lo.
 
 ```bash
-gh release download v0.12.6 -R AxisGov/expxdev -D ~/expx-cli/v0.12.6
+gh release download v0.12.7 -R AxisGov/expxdev -D ~/expx-cli/v0.12.7
 (
-  cd ~/expx-cli/v0.12.6
+  cd ~/expx-cli/v0.12.7
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.12.6.tgz.sha256
+    sha256sum -c expxdev-0.12.7.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.12.6.tgz.sha256
+    shasum -a 256 -c expxdev-0.12.7.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.12.6/expxdev-0.12.6.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.12.7/expxdev-0.12.7.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -555,7 +555,7 @@ npx --yes --package ~/expx-cli/v0.12.6/expxdev-0.12.6.tgz expx init --skills bui
 - O preflight recusa divergência entre `package.json`, `package-lock.json` e metadata do tarball,
   bem como tag ou release já existente. O pacote é gerado duas vezes e os hashes devem coincidir.
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.12.6 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.12.7 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -594,6 +594,10 @@ npx --yes --package ~/expx-cli/v0.12.6/expxdev-0.12.6.tgz expx init --skills bui
   instala (exemplos da MergeX como placeholders, suíte de teste dos hooks fora do projeto,
   referência de código fora da regra de credencial, template da BuildX corrigido), com um portão
   na release.
+- `0.12.7` traz os achados da instalação da `0.12.6` no katosmv/login#34: regra de credencial mais
+  larga na MergeX, auditoria da SprintX mais estrita no item 10, seed da BuildX só com
+  `--demonstracao`, e a SprintX gravando só o executor observado no rastro (H10). Registra também
+  a integridade final dos agentes de aprovação (F3c).
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

@@ -1,11 +1,25 @@
 # Changelog
 
-## Próxima versão — a integridade final dos agentes de aprovação (F3c)
+## 0.12.7 — achados da instalação da 0.12.6 no Login e a integridade final dos aprovadores
 
-- O `init` instala o hook do núcleo `expx-integridade-final.sh`, registrado no `SubagentStart` e no `SubagentStop`, com a biblioteca do rastro ao lado (CONTRATO-expx-orquestracao §12). No início de um agente de aprovação — `revisor-diff`, `qa` e `runx-revisor-testes`, lista transitória até a F4 —, ele fotografa a árvore: o `HEAD`, os bytes do `git status --porcelain -z --untracked-files=all` e o tree id da árvore inteira, montado num índice temporário, que cobre também o conteúdo de arquivo não rastreado. No fim, compara as três partes e grava o evento novo `integridade_final_verificada`, com a extra `integridade_final` (`igual`, `divergente` ou `ausente`). A foto mora no git-dir da worktree, nunca na árvore de trabalho, e o índice real não é tocado.
-- `divergente` e `ausente` invalidam o veredito do aprovador: o evento sai `falha`, o painel o destaca e o `doctor` avisa `integridade-final-invalida`. A recusa operacional do veredito depende do envelope da invocação e entra na F3b. É o nível fraco da separação de papéis: não pega editar e reverter, nem arquivo ignorado alterado.
-- O `doctor` ganha também `rastro-nao-ignorado`: com a integridade instalada, `docs/eventos/` fora do `.gitignore` faz a verificação dar `divergente` sem o aprovador ter tocado em nada.
-- O contrato de eventos corrige quem grava `agente_concluido` (o hook `SubagentStop` da SprintX) e marca `agente_iniciado` como reservado: nenhum escritor o grava.
+- **Achados do katosmv/login#34:** o CodeAnt e o CodeRabbit revisaram a instalação da 0.12.6 no Login. Dos 25 achados, 19 procedem e entram aqui; os 6 que não procedem foram reproduzidos e respondidos lá.
+- Certifica a MergeX em AxisGov/mergex@ae256a8 (AxisGov/mergex#56, **DM-284**):
+  - **Regra de credencial mais larga:** entre aspas duplas, simples ou tipográficas (`“”`, `‘’`), o valor vai até a aspa de fechamento, e a vírgula deixa de cortar a senha. A regra também acusa a aspa aberta e não fechada, a chave entre aspas (JSON) e o literal entre aspas seguido de `(`. A substituição de comando (`$(...)`, crase) só é referência quando é o valor inteiro: senha colada depois dela barra.
+  - **Portão do pre-push:** a identidade do ambiente Git inclui o git-dir, e o `GIT_DIR` de uma worktree irmã deixa de passar. Em branch nova acima do limite de 300 commits, a dica de `git fetch` só aparece quando falta localmente alguma ref do servidor. Ela nunca repete uma URL de remoto.
+  - **E7:** só a falha "already exists" do `gh pr create` recupera o PR existente; outra falha sai com o código e o erro literal do `gh`.
+  - **E9 e E10:** o PR atual é a `pr_url` na entrega por trabalho e a `atual_url` do item na entrega por sprint.
+- Certifica a SprintX em AxisGov/sprintx@69c0d23:
+  - **H10 (AxisGov/sprintx#55, DS-190):** os escritores próprios da SprintX gravam `model` e `effort` só como executor observado, como o escritor comum. Sem observação, `null`, nunca o frontmatter. A exceção transitória sai do `CONTRATO-expx-eventos` e do `CONTRATO-expx-orquestracao` §11.1.
+  - **Auditoria da F5 (AxisGov/sprintx#56, DS-191):** na migração legada, a linha fora das quatro colunas recusa a auditoria. Todo achado do item 10 declara `[limite:Ln]` ou `[granularidade]`; sem marcador, a F5 recusa. O número do item não aceita zero à esquerda. A tabela lê `\\|` como barra literal seguida do delimitador.
+- BuildX (AxisGov/buildx#16, **D-25**):
+  - **Seed de demonstração:** só roda com o argumento explícito `--demonstracao`, que nenhum `.env` carrega, e nunca com `NODE_ENV=production`. Antes, rodada de um shell sem `NODE_ENV` contra o banco de produção, criava o admin de demonstração com senha pública.
+  - O briefing do B4 normaliza o mapa anterior à D-23. A premissa criada no degrau 4 da F2 entra em `premissas_realizadas`. `consulta_modulex` é o 12º campo do contrato da feature.
+- **Integridade final dos agentes de aprovação (F3c, expxdev#104):**
+  - O `init` instala o hook do núcleo `expx-integridade-final.sh`, registrado no `SubagentStart` e no `SubagentStop`, com a biblioteca do rastro ao lado (CONTRATO-expx-orquestracao §12). No início de um agente de aprovação — `revisor-diff`, `qa` e `runx-revisor-testes`, lista transitória até a F4 —, ele fotografa a árvore: o `HEAD`, os bytes do `git status --porcelain -z --untracked-files=all` e o tree id da árvore inteira, montado num índice temporário, que cobre também o conteúdo de arquivo não rastreado. No fim, compara as três partes e grava o evento novo `integridade_final_verificada`, com a extra `integridade_final` (`igual`, `divergente` ou `ausente`). A foto mora no git-dir da worktree, nunca na árvore de trabalho, e o índice real não é tocado.
+  - `divergente` e `ausente` invalidam o veredito do aprovador: o evento sai `falha`, o painel o destaca e o `doctor` avisa `integridade-final-invalida`. A recusa operacional do veredito depende do envelope da invocação e entra na F3b. É o nível fraco da separação de papéis: não pega editar e reverter, nem arquivo ignorado alterado.
+  - O `doctor` ganha também `rastro-nao-ignorado`: com a integridade instalada, `docs/eventos/` fora do `.gitignore` faz a verificação dar `divergente` sem o aprovador ter tocado em nada.
+  - O contrato de eventos corrige quem grava `agente_concluido` (o hook `SubagentStop` da SprintX) e marca `agente_iniciado` como reservado: nenhum escritor o grava.
+- **Para quem tem a 0.12.6 instalada:** a regra de credencial ficou mais larga e pode acusar texto que antes passava. Se a varredura acusar um valor que não é credencial, troque-o por um placeholder inteiro (`<senha>`, `${VAR}`) em vez de desligar o hook.
 
 ## 0.12.6 — a distribuição passa pela varredura de segredo que ela instala
 
