@@ -30,7 +30,7 @@ import {
   type Artefato,
 } from "../plugin/plano.js";
 import { artefatosOpenCode, pontesDeHooks } from "../harness/opencode.js";
-import { entradaPorNome, formaSemAspas, gravarSettings, planejarSettings, type PlanoSettings } from "../harness/settings.js";
+import { entradasPorNome, formaSemAspas, gravarSettings, planejarSettings, type PlanoSettings } from "../harness/settings.js";
 import { verificarModificacaoLocal } from "../update/modificacao.js";
 import { artefatosDeHooks, comHooks, hooksPorNome } from "../harness/hooks.js";
 import {
@@ -346,11 +346,11 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
   const entradas: EntradaHook[] = [];
   const legadas: EntradaGerenciada[] = [];
   for (const h of hooksPorNome(c.artefatos, montaveis)) {
-    const e = entradaPorNome(h);
-    if (e === null) continue;
-    entradas.push(e);
-    const l = formaSemAspas(e);
-    if (l !== null) legadas.push(l);
+    for (const e of entradasPorNome(h)) {
+      entradas.push(e);
+      const l = formaSemAspas(e);
+      if (l !== null) legadas.push(l);
+    }
   }
   const comHook = comHooks(montaveis);
   for (const s of comHook) {

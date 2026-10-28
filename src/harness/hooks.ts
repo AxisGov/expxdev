@@ -63,6 +63,9 @@ const PASTA_DO_NUCLEO = join(dirname(fileURLToPath(import.meta.url)), "..", ".."
 /**
  * Os hooks do núcleo.
  *
+ * A integridade final (`expx-integridade-final.sh`, CONTRATO-expx-orquestracao
+ * §12.1) vai com o lembrete: os agentes de aprovação são de skills com hook.
+ *
  * O lembrete NÃO pertence a nenhuma skill: é do método. Uma descrição de skill
  * só compete depois que o modelo decide procurar uma, e quando ele forma
  * hipótese técnica direto do relato essa decisão não acontece — a descrição,
@@ -82,6 +85,10 @@ function artefatosDoNucleo(comLembrete: boolean): Artefato[] {
       { nome: "expx-lembrete.sh", executavel: true },
       { nome: "expx-lembrete.mjs", executavel: false },
       { nome: "expx-lembrete-estado.mjs", executavel: false },
+      // a integridade final (F3c) e a biblioteca do rastro, que ela carrega com
+      // `source` do próprio diretório
+      { nome: "expx-integridade-final.sh", executavel: true },
+      { nome: "expx-rastro.sh", executavel: false },
     ] as const;
     for (const { nome, executavel } of arquivos) {
       const origem = join(PASTA_DO_NUCLEO, nome);

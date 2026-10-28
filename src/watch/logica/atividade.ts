@@ -31,6 +31,7 @@ export const ROTULO_EVENTO: Record<string, string> = {
   pr_aberto: "pr aberto",
   artefato_gravado: "artefato gravado",
   invocacao_abandonada: "invocação abandonada",
+  integridade_final_verificada: "integridade final",
 };
 
 /**

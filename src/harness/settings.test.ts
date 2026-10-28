@@ -212,6 +212,28 @@ describe("hook de lembrete das skills", () => {
     }
   });
 
+  it("funcional: expx-integridade-final é registrado em SubagentStart e SubagentStop, sem matcher, timeout 30, sem duplicar", () => {
+    const p = projetoTemporario();
+    try {
+      const h = [{ skill: "expx", relativo: ".claude/hooks/expx-integridade-final.sh" }];
+      expect(mesclarSettings(p.raiz, "/tmp/mkt", h).ok).toBe(true);
+      expect(mesclarSettings(p.raiz, "/tmp/mkt", h).ok).toBe(true);
+      const s = JSON.parse(readFileSync(caminhoDoSettings(p.raiz), "utf8")) as {
+        hooks: Record<string, Array<{ matcher?: string; hooks: Array<Record<string, unknown>> }>>;
+      };
+      for (const evento of ["SubagentStart", "SubagentStop"]) {
+        const grupos = (s.hooks[evento] ?? []).filter((g) => g.hooks.some((x) => String(x["command"]).includes("expx-integridade-final.sh")));
+        expect(grupos, evento).toHaveLength(1);
+        expect(grupos[0]?.matcher, evento).toBeUndefined();
+        expect(grupos[0]?.hooks).toEqual([
+          { type: "command", command: '"$CLAUDE_PROJECT_DIR/.claude/hooks/expx-integridade-final.sh"', timeout: 30 },
+        ]);
+      }
+    } finally {
+      p.descartar();
+    }
+  });
+
   it("funcional: expx-session-sync é registrado em SessionStart sem duplicar", () => {
     const p = projetoTemporario();
     try {

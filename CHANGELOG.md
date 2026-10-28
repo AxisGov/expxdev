@@ -1,5 +1,12 @@
 # Changelog
 
+## Próxima versão — a integridade final dos agentes de aprovação (F3c)
+
+- O `init` instala o hook do núcleo `expx-integridade-final.sh`, registrado no `SubagentStart` e no `SubagentStop`, com a biblioteca do rastro ao lado (CONTRATO-expx-orquestracao §12). No início de um agente de aprovação — `revisor-diff`, `qa` e `runx-revisor-testes`, lista transitória até a F4 —, ele fotografa a árvore: o `HEAD`, os bytes do `git status --porcelain -z --untracked-files=all` e o tree id da árvore inteira, montado num índice temporário, que cobre também o conteúdo de arquivo não rastreado. No fim, compara as três partes e grava o evento novo `integridade_final_verificada`, com a extra `integridade_final` (`igual`, `divergente` ou `ausente`). A foto mora no git-dir da worktree, nunca na árvore de trabalho, e o índice real não é tocado.
+- `divergente` e `ausente` invalidam o veredito do aprovador: o evento sai `falha`, o painel o destaca e o `doctor` avisa `integridade-final-invalida`. A recusa operacional do veredito depende do envelope da invocação e entra na F3b. É o nível fraco da separação de papéis: não pega editar e reverter, nem arquivo ignorado alterado.
+- O `doctor` ganha também `rastro-nao-ignorado`: com a integridade instalada, `docs/eventos/` fora do `.gitignore` faz a verificação dar `divergente` sem o aprovador ter tocado em nada.
+- O contrato de eventos corrige quem grava `agente_concluido` (o hook `SubagentStop` da SprintX) e marca `agente_iniciado` como reservado: nenhum escritor o grava.
+
 ## 0.12.6 — a distribuição passa pela varredura de segredo que ela instala
 
 - **Bloqueio da 0.12.5:** a varredura de segredo do pre-push da MergeX barrava o push do commit que instalava a própria 0.12.5 (relato do katosmv/login). As causas eram três:

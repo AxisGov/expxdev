@@ -35,34 +35,38 @@ export type ResultadoMerge =
 
 export type Habilitados = Record<string, boolean>;
 
-/** O evento de cada hook do núcleo ou de skill sem manifesto, deduzido do nome do arquivo. */
-function eventoDoHook(relativo: string): "UserPromptSubmit" | "Stop" | "SessionStart" | null {
-  if (relativo.includes("expx-session-sync")) return "SessionStart";
-  if (relativo.includes("injetar")) return "UserPromptSubmit";
+/** Os eventos de cada hook do núcleo ou de skill sem manifesto, deduzidos do nome do arquivo. */
+function eventosDoHook(relativo: string): string[] {
+  if (relativo.includes("expx-session-sync")) return ["SessionStart"];
+  // A integridade final (CONTRATO-expx-orquestracao §12.1): a foto no início do
+  // subagente e a comparação no fim. Sem matcher: o hook decide quem é aprovador.
+  if (relativo.endsWith("expx-integridade-final.sh")) return ["SubagentStart", "SubagentStop"];
+  if (relativo.includes("injetar")) return ["UserPromptSubmit"];
   // O lembrete de skill: `UserPromptSubmit` é o único evento que roda ANTES
   // da primeira ação do modelo, e é disso que ele depende — o problema que ele
   // resolve é a etapa de escolher o processo simplesmente não acontecer
   // quando já existe uma hipótese técnica formada.
-  if (relativo.includes("lembrete")) return "UserPromptSubmit";
-  if (relativo.includes("reindexar")) return "Stop";
-  return null;
+  if (relativo.includes("lembrete")) return ["UserPromptSubmit"];
+  if (relativo.includes("reindexar")) return ["Stop"];
+  return [];
 }
 
 /**
- * A entrada de um hook do núcleo, ou de skill que não publica
+ * As entradas de um hook do núcleo, ou de skill que não publica
  * `.claude/settings.json` (o memox, com hooks soltos `memox-*.sh`): o evento
  * sai do nome do arquivo. O caminho vai entre aspas: `$CLAUDE_PROJECT_DIR`
  * com espaço quebraria a palavra e o hook não rodaria.
  */
-export function entradaPorNome(h: HookInstalado): EntradaHook | null {
-  const evento = eventoDoHook(h.relativo);
-  if (evento === null) return null;
+export function entradasPorNome(h: HookInstalado): EntradaHook[] {
   const hook = h.relativo.endsWith("expx-session-sync.mjs")
     ? { type: "command", command: "node", args: [`\${CLAUDE_PROJECT_DIR}/${h.relativo}`] }
     : h.relativo.endsWith("expx-lembrete.sh")
       ? { type: "command", command: `"$CLAUDE_PROJECT_DIR/${h.relativo}"`, timeout: 1 }
-      : { type: "command", command: `"$CLAUDE_PROJECT_DIR/${h.relativo}"` };
-  return { skill: h.skill, evento, hook };
+      : h.relativo.endsWith("expx-integridade-final.sh")
+        ? // três comandos git por foto; sem a foto, o fim registra `ausente`
+          { type: "command", command: `"$CLAUDE_PROJECT_DIR/${h.relativo}"`, timeout: 30 }
+        : { type: "command", command: `"$CLAUDE_PROJECT_DIR/${h.relativo}"` };
+  return eventosDoHook(h.relativo).map((evento) => ({ skill: h.skill, evento, hook }));
 }
 
 /**
@@ -188,7 +192,7 @@ export function mesclarSettings(
   caminhoMarketplace: string,
   hooks: readonly HookInstalado[] = [],
 ): ResultadoMerge {
-  const entradas = hooks.map(entradaPorNome).filter((e): e is EntradaHook => e !== null);
+  const entradas = hooks.flatMap(entradasPorNome);
   const legadas = entradas.map(formaSemAspas).filter((e): e is EntradaGerenciada => e !== null);
   const p = planejarSettings(raizProjeto, caminhoMarketplace, entradas, legadas);
   if (!p.ok) return p;

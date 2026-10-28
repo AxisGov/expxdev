@@ -55,6 +55,8 @@ export const EXTRAS_EVENTO = [
   "invocacao",
   "modelos_observados",
   "fora_da_politica",
+  // CONTRATO-expx-orquestracao §12.3 (F3c): só em `integridade_final_verificada`.
+  "integridade_final",
 ] as const;
 
 /**
@@ -136,6 +138,11 @@ export const EventoNome = z.enum([
   // CONTRATO-expx-orquestracao §8.2, passo 3: o envelope de uma invocação de
   // agente que nunca fechou. Declarado na F3a; quem o emite é a F3b.
   "invocacao_abandonada",
+  // CONTRATO-expx-orquestracao §12 (F3c): o hook do núcleo
+  // `expx-integridade-final.sh` compara a foto do início de um agente de
+  // aprovação com a do fim. Evento próprio, e não `agente_concluido`: esse já é
+  // gravado pela SprintX para todo subagente, e o aprovador ficaria com dois.
+  "integridade_final_verificada",
 ]);
 
 export const Agente = z.enum([
@@ -159,6 +166,39 @@ export const Agente = z.enum([
 export const TimestampUtc = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/, "ts deve ser AAAA-MM-DDTHH:MM:SSZ");
+
+/**
+ * Os agentes de aprovação da lista transitória (CONTRATO-expx-orquestracao
+ * §12.2) e a ferramenta com que o hook grava cada um. A F4 troca a lista pelo
+ * `papel` da política.
+ */
+export const APROVADORES_INTEGRIDADE: Readonly<Record<string, string>> = {
+  "revisor-diff": "mergex",
+  qa: "runx",
+  "runx-revisor-testes": "runx",
+};
+
+/** As partes da foto, na ordem em que `diferencas` as lista. */
+export const PARTES_INTEGRIDADE = ["head", "status", "arvore"] as const;
+
+/**
+ * A extra `integridade_final` (CONTRATO-expx-orquestracao §12.3). `igual` e
+ * `ausente` não têm diferença; `divergente` tem ao menos uma, sem repetição e na
+ * ordem de `PARTES_INTEGRIDADE` — duas linhas do mesmo fato saem iguais.
+ */
+export const IntegridadeFinal = z
+  .strictObject({
+    estado: z.enum(["igual", "divergente", "ausente"]),
+    diferencas: z.array(z.enum(PARTES_INTEGRIDADE)),
+  })
+  .refine(
+    (i) => {
+      const canonica = PARTES_INTEGRIDADE.filter((p) => i.diferencas.includes(p));
+      const ordenada = canonica.length === i.diferencas.length && canonica.every((p, n) => i.diferencas[n] === p);
+      return i.estado === "divergente" ? i.diferencas.length > 0 && ordenada : i.diferencas.length === 0;
+    },
+    { message: "diferencas: vazia em igual e ausente; em divergente, head, status, arvore nessa ordem e sem repetir" },
+  );
 
 export const LinhaEvento = z
   .object({
@@ -191,6 +231,7 @@ export const LinhaEvento = z
     modelos_observados: z.array(z.string().min(1)).optional(),
     // presente só quando o executor saiu da cadeia; ausente nos demais casos
     fora_da_politica: z.literal(true).optional(),
+    integridade_final: IntegridadeFinal.optional(),
   })
   // Extras declaradas passam; o que não é declarado é reportado por
   // `chavesDesconhecidas`, não rejeitado — o rastro nunca trava trabalho.
@@ -200,6 +241,21 @@ export const LinhaEvento = z
   .refine((l) => l.materializado === undefined || l.origem_alternativa === "agentes-json-v1", {
     message: "materializado só com origem_alternativa agentes-json-v1",
     path: ["materializado"],
+  })
+  // A verificação sem o resultado não diz nada; o resultado fora dela não tem dono.
+  .refine((l) => (l.evento === "integridade_final_verificada") === (l.integridade_final !== undefined), {
+    message: "integridade_final é obrigatória em integridade_final_verificada e só existe nele",
+    path: ["integridade_final"],
+  })
+  // §12.3: `igual` é `ok`; `divergente` e `ausente` são `falha`, que invalida o veredito.
+  .refine(
+    (l) => l.integridade_final === undefined || l.resultado === (l.integridade_final.estado === "igual" ? "ok" : "falha"),
+    { message: "resultado de integridade_final_verificada: ok com igual, falha com divergente ou ausente", path: ["resultado"] },
+  )
+  // §12.2: só os aprovadores da lista, cada um com a ferramenta dele.
+  .refine((l) => l.evento !== "integridade_final_verificada" || APROVADORES_INTEGRIDADE[l.agente] === l.ferramenta, {
+    message: "integridade_final_verificada só para revisor-diff (mergex), qa e runx-revisor-testes (runx)",
+    path: ["agente"],
   });
 
 export type LinhaEvento = z.infer<typeof LinhaEvento>;
