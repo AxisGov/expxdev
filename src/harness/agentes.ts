@@ -1,10 +1,11 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { SkillMontavel } from "../plugin/montagem.js";
 import { artefato, artefatoComConteudo, emOrdemCanonica, hashDeBytes, type Artefato } from "../plugin/plano.js";
 import { lerAgenteDaSkill, reescreverModeloEsforco } from "../orquestracao/materializar.js";
 import { resolver, sobreporV1, type Resolucao } from "../orquestracao/resolver.js";
 import type { Politica } from "../orquestracao/tipos.js";
+import { NOMES } from "../nucleo/catalogo.js";
 
 /**
  * Agentes das skills em `.claude/agents/`, com o modelo e o esforço que o
@@ -224,7 +225,7 @@ export function planejarAgentes(skills: readonly SkillMontavel[], overrides: Ove
 export type Limpeza = {
   erros: string[];
   avisos: string[];
-  /** Agentes que a instalação anterior gravou e que saíram do plano. */
+  /** Arquivos de `.claude/` que a instalação anterior gravou e que saíram do plano. */
   remover: string[];
 };
 
@@ -238,14 +239,67 @@ function hashDoArquivo(caminho: string): string | undefined {
 }
 
 /**
+ * Cada pasta do caminho, a partir da primeira, é pasta de verdade e o fim é
+ * arquivo comum — nenhum link simbólico no percurso. O `stat` e o `rm` seguem o
+ * link, e uma pasta-link levaria a remoção para fora do projeto.
+ *
+ * Protege contra o lock editado e contra os links que existem no planejamento.
+ * Não é garantia contra ponto de montagem (bind, nullfs), que o `lstat` vê como
+ * pasta comum, nem contra troca concorrente entre esta conferência e o `rmSync`:
+ * os dois exigem quem controla a máquina ou escreve na árvore durante o update,
+ * que roda sob o bloqueio de operação. Fechar isso pediria `openat` com
+ * descritor de pasta, que o Node não oferece de forma portável.
+ */
+function semLinkNoPercurso(raiz: string, segmentos: readonly string[]): boolean {
+  try {
+    for (let i = 1; i <= segmentos.length; i++) {
+      const s = lstatSync(join(raiz, ...segmentos.slice(0, i)));
+      if (i < segmentos.length ? !s.isDirectory() : !s.isFile()) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * O destino está numa pasta que a instalação grava em `.claude/`: hooks, agentes
+ * e a cópia de cada skill do catálogo. O hash protege o conteúdo alterado, não a
+ * autoria — o lock é editável, e `settings.json`, comando ou skill da pessoa não
+ * podem ficar ao alcance dele. Os comandos não moram em `.claude/`: vão para o
+ * plugin e para `.opencode/commands/`.
+ */
+function daInstalacao(destino: string): boolean {
+  return (
+    destino.startsWith(".claude/hooks/") ||
+    destino.startsWith(".claude/agents/") ||
+    NOMES.some((id) => destino.startsWith(`.claude/skills/${id}/`))
+  );
+}
+
+/**
+ * Um segmento do lock que nenhum sistema reescreve. O Win32 lê `\` e `/` como
+ * separador, `:` como unidade ou fluxo alternativo, tira ponto e espaço do fim
+ * (`.. ` vira `..`) e desvia os nomes de dispositivo; `*`, `?`, `"`, `<`, `>`,
+ * `|` e os de controle ele não aceita. Fora disso o nome é literal nos três
+ * sistemas. Recusar só deixa o arquivo órfão, nunca remove o que não devia.
+ */
+function segmentoLiteral(p: string): boolean {
+  if (p === "" || p === "." || p === "..") return false;
+  if (/[\\/:*?"<>|\x00-\x1f]/.test(p) || /[. ]$/.test(p)) return false;
+  return !/^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])(\..*)?$/i.test(p);
+}
+
+/**
  * O que o plano de agentes faz com o que JÁ está em `.claude/agents/`.
  *
  * - Destino que existe, tem bytes diferentes e NÃO é do lock anterior é arquivo
  *   do projeto (ou de uma instalação manual): sobrescrevê-lo destruiria o
  *   trabalho da pessoa. Falha antes de qualquer escrita.
- * - Agente que o lock anterior gravou e que saiu do plano (a skill foi removida,
- *   ou deixou de publicá-lo) é removido — mas só se o arquivo ainda tem o hash
- *   do lock. Editado à mão, fica e vira aviso.
+ * - Arquivo de `.claude/` que o lock anterior gravou e que saiu do plano (a skill
+ *   foi removida, deixou de publicá-lo, ou ele deixou de ser instalado, como a
+ *   suíte de teste dos hooks) é removido — mas só se ainda tem o hash do lock.
+ *   Editado à mão, fica e vira aviso.
  */
 export function planejarLimpeza(
   raiz: string,
@@ -266,9 +320,19 @@ export function planejarLimpeza(
       );
     }
   }
+  // Tudo o que a instalação anterior gravou em `.claude/` e saiu do plano — agente,
+  // hook, arquivo de skill — sai do projeto se ainda está como o lock o gravou; o
+  // alterado à mão fica, com aviso. Arquivo, nunca pasta. O `.expx/marketplace` é
+  // trocado inteiro pela montagem e não passa por aqui.
   for (const [destino, hash] of Object.entries(anteriores).sort()) {
-    if (!destino.startsWith(".claude/agents/") || destinosDoPlano.has(destino)) continue;
-    const atual = hashDoArquivo(join(raiz, ...destino.split("/")));
+    if (!daInstalacao(destino) || destinosDoPlano.has(destino)) continue;
+    // O lock é do projeto e pode ter sido editado: caminho com segmento que o
+    // sistema reescreve (`..`, `.. `, `x\..\..`) não é destino que a instalação
+    // gravou, e o `join` o levaria para fora de `.claude/`. Nunca é removido.
+    const segmentos = destino.split("/");
+    if (!segmentos.every(segmentoLiteral)) continue;
+    if (!semLinkNoPercurso(raiz, segmentos)) continue;
+    const atual = hashDoArquivo(join(raiz, ...segmentos));
     if (atual === undefined) continue;
     if (atual === hash) remover.push(destino);
     else avisos.push(`${destino} saiu da instalacao mas foi alterado a mao; nao foi removido`);

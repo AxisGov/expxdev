@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { ehSuiteDeTesteDeHook } from "../harness/hooks.js";
 import {
   ambienteCom,
   arvore,
@@ -206,12 +207,17 @@ describe("P0.2 — init real de SprintX + MergeX", () => {
     expect(existsSync(join(lar, ".claude"))).toBe(false);
   });
 
-  it("funcional: 1-2 — a árvore de hooks de cada skill está inteira, byte a byte", () => {
+  it("funcional: 1-2 — a árvore de hooks de cada skill está inteira, byte a byte, menos a suíte de teste", () => {
     for (const nome of Object.keys(CANDIDATOS) as Array<keyof typeof CANDIDATOS>) {
       const fonte = join(snapshot(nome), ".claude", "hooks");
       const arquivos = arvore(fonte).filter((r) => r !== "hooks.json");
       expect(arquivos.length).toBeGreaterThan(3);
       for (const rel of arquivos) {
+        // a suíte (teste.sh, testes/) carrega amostras de segredo e não é instalada
+        if (ehSuiteDeTesteDeHook(rel)) {
+          expect(existsSync(join(A, ".claude", "hooks", rel)), `${nome}: ${rel} instalado`).toBe(false);
+          continue;
+        }
         expect(sha256(join(A, ".claude", "hooks", rel)), `${nome}: ${rel}`).toBe(sha256(join(fonte, rel)));
       }
     }
@@ -260,7 +266,7 @@ describe("P0.2 — init real de SprintX + MergeX", () => {
   it("funcional: 8 — o catálogo de método da MergeX está instalado pelo mecanismo normal", () => {
     const rel = ".claude/skills/mergex/scripts/catalogo-de-metodo.sh";
     expect(CANDIDATOS.sprintx.sha).toBe("60d9cad434767cc26b52ac70ea3cddc352398075");
-    expect(CANDIDATOS.mergex.sha).toBe("6fb4ada2a787b8c15bdd7b93aef2034f7df58fdf");
+    expect(CANDIDATOS.mergex.sha).toBe("bef93f0100d5793892739cecde873a9c71d4fc14");
     expect(sha256(join(A, rel))).toBe(sha256(join(snapshot("mergex"), rel)));
     expect(readFileSync(join(A, rel), "utf8")).toContain("PREFLIGHT.md");
   });
