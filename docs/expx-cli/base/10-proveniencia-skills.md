@@ -8,11 +8,11 @@ Os repositórios abaixo foram confirmados na organização AxisGov em 2026-10-28
 
 | Repositório | `origin/main` confirmado |
 |---|---|
-| `AxisGov/expxdev` | `d1cc40346f1567d3c00cfd4841adff13cc0c55f7` |
+| `AxisGov/expxdev` | `0e72b20d3beee2bfa035126a620ea3aece6c2950` |
 | `AxisGov/runx` | `5de15a9d48ca3aa30be433201103cd1a23e6474b` |
 | `AxisGov/legadox` | `4b92ec47da1d075224f74aa8c3fc928fdb72230d` |
 | `AxisGov/stackx` | `79200ec5761f26adef1f9b3cf66ec039f031e163` |
-| `AxisGov/mergex` | `ae256a8c6073122b6265af2aecc4fa5233183d5b` |
+| `AxisGov/mergex` | `26df2d0a3c70e348e540589a59feea15612d9901` |
 | `AxisGov/sprintx` | `69c0d23db7e1b6f4d26f269b30f91e5405d077bd` |
 | `AxisGov/MemoX` | `897408f6bf60d0c9f4c0ed6b5cb12d6db8e8cdd4` |
 | `AxisGov/prodx` | `7539db41013585d31b79ef21afd07268bd99d0c1` |
