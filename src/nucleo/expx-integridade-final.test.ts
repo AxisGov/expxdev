@@ -175,6 +175,19 @@ describe("expx-integridade-final: a foto do início contra o fim, por instância
     expect(verificacoes(raiz)[0]?.integridade_final).toEqual({ estado: "igual", diferencas: [] });
   });
 
+  it("funcional: arquivo marcado assume-unchanged ou skip-worktree no índice real, editado — a arvore diverge", () => {
+    for (const marca of ["--assume-unchanged", "--skip-worktree"]) {
+      const raiz = repo();
+      git(raiz, "update-index", marca, "a.txt");
+      inicio(raiz, "qa", "ag-1");
+      writeFileSync(join(raiz, "a.txt"), "editado escondido do status\n");
+      fim(raiz, "qa", "ag-1");
+      expect(verificacoes(raiz)[0]?.integridade_final, marca).toEqual({ estado: "divergente", diferencas: ["arvore"] });
+      // o bit do índice real continua lá
+      expect(git(raiz, "ls-files", "-v", "a.txt").slice(0, 1), marca).toBe(marca === "--assume-unchanged" ? "h" : "S");
+    }
+  });
+
   it("funcional: fim sem início — ausente, falha; nunca vira igual", () => {
     const raiz = repo();
     expect(fim(raiz, "qa", "ag-sem-inicio").status).toBe(0);

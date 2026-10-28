@@ -131,3 +131,28 @@ describe("progresso estimado da task", () => {
     expect(p.iniciadaEm).toBeNull();
   });
 });
+
+describe("integridade final no agrupamento (CONTRATO-expx-orquestracao §12.4)", () => {
+  const verificacao = (ts: string, agente: LinhaEvento["agente"], resultado: string) =>
+    evento({ ts, evento: "integridade_final_verificada", fase: null, task: null, agente, resultado, ferramenta: agente === "revisor-diff" ? "mergex" : "runx" });
+
+  it("funcional: uma verificação que falhou nunca é absorvida por outra que passou — cada veredito inválido fica com o seu !", () => {
+    // do mais recente para o mais antigo
+    const grupos = agrupar([
+      verificacao("2026-10-28T10:03:00Z", "qa", "ok"),
+      verificacao("2026-10-28T10:02:00Z", "revisor-diff", "falha"),
+      verificacao("2026-10-28T10:01:00Z", "qa", "falha"),
+    ], 10);
+    const falhas = grupos.filter((g) => g.evento === "integridade_final_verificada" && g.houveFalha);
+    expect(falhas).toHaveLength(2);
+    expect(grupos.filter((g) => g.evento === "integridade_final_verificada")).toHaveLength(3);
+  });
+
+  it("funcional: aprovadores diferentes não dividem a mesma linha, e o alvo diz quem", () => {
+    const grupos = agrupar([
+      verificacao("2026-10-28T10:02:00Z", "qa", "ok"),
+      verificacao("2026-10-28T10:01:00Z", "revisor-diff", "ok"),
+    ], 10);
+    expect(grupos.map((g) => g.alvo).sort()).toEqual(["qa", "revisor-diff"]);
+  });
+});

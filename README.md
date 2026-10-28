@@ -683,7 +683,7 @@ Trinta e duas verificações, cada uma com severidade e correção sugerida. Ach
 | rastro dentro do contrato `expx-eventos` | aviso |
 | rastro sem chave não declarada | aviso |
 | nenhuma integridade final de agente de aprovação divergente ou ausente no rastro | aviso |
-| com a integridade final instalada, `docs/eventos/` ignorado pelo git | aviso |
+| com a integridade final instalada, `docs/eventos/` ignorado pelo git e sem arquivo versionado | aviso |
 
 > **Os três achados de modo executável, e por que são três.** Os reparos são diferentes, e um
 > reparo errado não conserta nada. `100644` no índice → `git update-index --chmod=+x`, com a

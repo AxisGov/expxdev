@@ -145,7 +145,7 @@ Quem valida uma linha verifica que as doze estão **contidas** nela — nunca ig
 | `acao_bloqueada` | hook, em modo bloqueio |
 | `agente_concluido` | hook `SubagentStop` da sprintx (`rastro-subagente.sh`), para todo subagente |
 | `agente_iniciado` | reservado: nenhum escritor o grava hoje |
-| `integridade_final_verificada` | hook do núcleo `expx-integridade-final.sh`, no `SubagentStop` de um agente de aprovação (CONTRATO-expx-orquestracao §12): `resultado` `ok` quando `integridade_final.estado` é `igual`, `falha` quando é `divergente` ou `ausente`, e `agente` é o aprovador. Evento próprio, e não `agente_concluido`, para o aprovador não ter duas conclusões |
+| `integridade_final_verificada` | hook do núcleo `expx-integridade-final.sh`, no `SubagentStop` de um agente de aprovação (CONTRATO-expx-orquestracao §12): `resultado` `ok` quando `integridade_final.estado` é `igual`, `falha` quando é `divergente` ou `ausente`, e `agente` é o aprovador. É um fato diferente da conclusão: o núcleo não grava `agente_concluido`, e o da SprintX continua sendo o único, também para o aprovador |
 | `veredito_emitido` | agente auditor ou QA |
 | `commit_criado` · `pr_aberto` | mergex |
 | `artefato_gravado` | mergex, quando a gravação de um artefato derivado (`.expx/estado.json`) falha: sai com `resultado: falha` e `agente: principal`, no rastro do trabalho ou em `docs/eventos/sem-trabalho.jsonl` no E9 sem trabalho atual. Nunca interrompe a etapa |

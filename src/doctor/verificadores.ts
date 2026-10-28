@@ -638,6 +638,24 @@ function integridadesInvalidas(conteudo: string): { total: number; invalidas: nu
   return { total, invalidas };
 }
 
+/** As variáveis do Git que escolhem repositório, índice ou árvore (`git rev-parse --local-env-vars`, sem a configuração). */
+const GIT_LOCAIS = new Set([
+  "GIT_DIR",
+  "GIT_WORK_TREE",
+  "GIT_INDEX_FILE",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  "GIT_COMMON_DIR",
+  "GIT_NAMESPACE",
+  "GIT_PREFIX",
+  "GIT_GRAFT_FILE",
+  "GIT_IMPLICIT_WORK_TREE",
+  "GIT_INTERNAL_SUPER_PREFIX",
+  "GIT_SHALLOW_FILE",
+  "GIT_NO_REPLACE_OBJECTS",
+  "GIT_REPLACE_REF_BASE",
+]);
+
 /**
  * Com a integridade final instalada, o rastro precisa estar ignorado pelo Git
  * (CONTRATO-expx-eventos: "ignorado pelo versionador por padrão"). Fora disso,
@@ -647,16 +665,21 @@ function integridadesInvalidas(conteudo: string): { total: number; invalidas: nu
  */
 function verificarRastroIgnorado(raiz: string, push: (a: Achado) => void): void {
   if (!existsSync(join(raiz, ".claude", "hooks", "expx-integridade-final.sh"))) return;
-  const dentro = spawnSync("git", ["-C", raiz, "rev-parse", "--is-inside-work-tree"], { encoding: "utf8" });
+  // `GIT_DIR`/`GIT_WORK_TREE` herdados do shell vencem o `-C`, e a sonda
+  // responderia por outro repositório. Fora delas, o ambiente fica como está.
+  const env: NodeJS.ProcessEnv = {};
+  for (const [k, v] of Object.entries(process.env)) if (!GIT_LOCAIS.has(k)) env[k] = v;
+  const dentro = spawnSync("git", ["-C", raiz, "rev-parse", "--is-inside-work-tree"], { encoding: "utf8", env });
   if (dentro.status !== 0 || dentro.stdout.trim() !== "true") return;
   // uma sonda que não existe: `--no-index` responde pelas regras, não pelo índice
   const r = spawnSync("git", ["-C", raiz, "check-ignore", "-q", "--no-index", "docs/eventos/.expx-integridade-final-sonda.jsonl"], {
     encoding: "utf8",
+    env,
   });
   // A regra não alcança o que já está no índice: arquivo do rastro versionado
   // continua mudando o status a cada linha gravada.
   const versionados =
-    r.status === 0 ? spawnSync("git", ["-C", raiz, "ls-files", "-z", "--", "docs/eventos"], { encoding: "utf8" }) : undefined;
+    r.status === 0 ? spawnSync("git", ["-C", raiz, "ls-files", "-z", "--", "docs/eventos"], { encoding: "utf8", env }) : undefined;
   const lista = versionados?.status === 0 ? versionados.stdout.split("\0").filter((c) => c !== "") : [];
   if (r.status === 0 && lista.length === 0) return;
   push({

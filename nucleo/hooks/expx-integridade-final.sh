@@ -115,6 +115,16 @@ foto() {
   idx="$(caminho_git index)" || return 1
   rm -f "$d/indice" "$d/indice.lock"
   if [ -f "$idx" ]; then cp "$idx" "$d/indice" 2>/dev/null || return 1; fi
+  # A copia leva os bits `assume-unchanged` e `skip-worktree` do indice real, e
+  # com eles o `git add` nao le o arquivo: a edicao escondida do status passaria
+  # como `igual`. Limpos so na copia, um bit por vez: numa chamada so, o
+  # `update-index` aplica apenas uma das duas opcoes.
+  local bit
+  for bit in --no-assume-unchanged --no-skip-worktree; do
+    GIT_INDEX_FILE="$d/indice" git -C "$RAIZ" ls-files -z 2>/dev/null \
+      | GIT_INDEX_FILE="$d/indice" git -C "$RAIZ" update-index -z "$bit" --stdin >/dev/null 2>&1 \
+      || return 1
+  done
   GIT_INDEX_FILE="$d/indice" git -C "$RAIZ" -c core.fsmonitor=false add -A -- . >/dev/null 2>&1 || return 1
   GIT_INDEX_FILE="$d/indice" git -C "$RAIZ" write-tree > "$d/arvore" 2>/dev/null || return 1
   rm -f "$d/indice" "$d/indice.lock"

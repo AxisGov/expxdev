@@ -104,6 +104,31 @@ describe("doctor: integridade final", () => {
     expect(achado?.problema).toContain("docs/eventos/F-1.jsonl");
   });
 
+  it("funcional: GIT_DIR e GIT_WORK_TREE herdados do shell não desviam a sonda para outro repositório", async () => {
+    p = await projeto();
+    mkdirSync(join(p.raiz, ".claude", "hooks"), { recursive: true });
+    writeFileSync(join(p.raiz, ".claude", "hooks", "expx-integridade-final.sh"), "#!/usr/bin/env bash\n");
+    // outro repositório, em que docs/eventos/ está ignorado: a sonda nele diria "tudo certo"
+    const outro = projetoTemporario();
+    try {
+      spawnSync("git", ["init", "-q", "-b", "main"], { cwd: outro.raiz });
+      writeFileSync(join(outro.raiz, ".gitignore"), "docs/eventos/\n");
+      const antes = { dir: process.env["GIT_DIR"], arvore: process.env["GIT_WORK_TREE"] };
+      process.env["GIT_DIR"] = join(outro.raiz, ".git");
+      process.env["GIT_WORK_TREE"] = outro.raiz;
+      try {
+        expect(ids(p.raiz)).toContain("rastro-nao-ignorado");
+      } finally {
+        if (antes.dir === undefined) delete process.env["GIT_DIR"];
+        else process.env["GIT_DIR"] = antes.dir;
+        if (antes.arvore === undefined) delete process.env["GIT_WORK_TREE"];
+        else process.env["GIT_WORK_TREE"] = antes.arvore;
+      }
+    } finally {
+      outro.descartar();
+    }
+  });
+
   it("funcional: sem o hook da integridade, ou fora de um repositório git, não avisa rastro-nao-ignorado", async () => {
     p = await projeto();
     expect(ids(p.raiz)).not.toContain("rastro-nao-ignorado");
