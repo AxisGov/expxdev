@@ -418,7 +418,8 @@ Substring, outro prefixo ou nome parecido não viram aprovador. Fora da lista, o
 hook sai sem rodar Git e sem gravar nada. As variáveis locais do Git herdadas
 do ambiente (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE` e as demais de
 `git rev-parse --local-env-vars`) são descartadas antes da foto: com elas, a foto
-seria de outro repositório. A lista é transitória: a F4 a troca
+seria de outro repositório. A configuração passada pelo ambiente (`GIT_CONFIG*`)
+fica, porque não escolhe repositório. A lista é transitória: a F4 a troca
 pelo `papel` declarado e projetado da política, sem inferi-lo do nome. O
 `auditor-plano` e o `sprintx-revisor-testes` não estão nela porque já são
 `estrutural` (sem ferramenta de escrita nem `Bash`).

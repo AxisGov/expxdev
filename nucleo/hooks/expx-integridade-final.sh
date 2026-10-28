@@ -62,10 +62,16 @@ CWD="$(expx_json_get "$ENTRADA" cwd)"
 # Variaveis locais do Git herdadas do ambiente (GIT_DIR, GIT_WORK_TREE,
 # GIT_INDEX_FILE...) apontariam a foto para outro repositorio, e o fim daria
 # `igual` com a worktree do payload alterada. A lista vem do proprio git; a fixa
-# cobre o git que nao responde.
+# cobre o git que nao responde. A configuracao passada pelo ambiente
+# (`GIT_CONFIG`, `GIT_CONFIG_PARAMETERS`, `GIT_CONFIG_COUNT`/`_KEY_n`/`_VALUE_n`)
+# fica: ela nao escolhe repositorio, e sem ela a foto ignoraria `safe.directory`,
+# `core.excludesFile` ou filtro que o projeto depende.
 for v in $(git rev-parse --local-env-vars 2>/dev/null) GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE \
   GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_NAMESPACE GIT_PREFIX; do
-  unset "$v"
+  case "$v" in
+    GIT_CONFIG*) ;;
+    *) unset "$v" ;;
+  esac
 done
 # O status e a foto nao podem refrescar o indice real.
 export GIT_OPTIONAL_LOCKS=0

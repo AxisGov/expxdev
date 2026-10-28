@@ -282,6 +282,18 @@ describe("expx-integridade-final: a foto do início contra o fim, por instância
     expect(existsSync(join(outro, "docs", "eventos"))).toBe(false);
   });
 
+  it("funcional: a configuração do Git passada pelo ambiente (GIT_CONFIG_COUNT) continua valendo na foto", () => {
+    const raiz = repo();
+    const fora = mkdtempSync(join(tmpdir(), "expx-excludes-"));
+    criados.push(fora);
+    writeFileSync(join(fora, "excludes"), "gerado.txt\n");
+    const config = { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "core.excludesFile", GIT_CONFIG_VALUE_0: join(fora, "excludes").replace(/\\/g, "/") };
+    hook(raiz, { evento: "SubagentStart", agente: "qa", id: "ag-1" }, config);
+    writeFileSync(join(raiz, "gerado.txt"), "ignorado pela configuracao do ambiente\n");
+    hook(raiz, { evento: "SubagentStop", agente: "qa", id: "ag-1" }, config);
+    expect(verificacoes(raiz)[0]?.integridade_final).toEqual({ estado: "igual", diferencas: [] });
+  });
+
   // O wrapper é script sh no PATH: no Windows o Git Bash do teste resolveria o git.exe antes dele.
   it.skipIf(process.platform === "win32")("funcional: com um git anterior ao --path-format (2.31), a foto ainda funciona", () => {
     const raiz = repo();
