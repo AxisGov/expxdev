@@ -27,11 +27,17 @@ eh_placeholder() {
   # máscara são referência, não valor (conselhos#210, P8).
   local cauda="${v#*[:=]}"
   cauda="${cauda#"${cauda%%[![:space:]\'\"]*}"}"; cauda="${cauda%[\'\"]}"
+  # as aspas tipográficas também envolvem o valor
+  cauda="${cauda#“}"; cauda="${cauda%”}"; cauda="${cauda#‘}"; cauda="${cauda%’}"
   # `${...}`, `{{...}}` e `<...>` só são referência quando são o valor inteiro: um
   # `${X}` no meio de uma senha real não a dispensa (CodeAnt no mergex#54).
   printf '%s\n%s\n' "$v" "$cauda" \
     | grep -aEq -e '^(\$\{[^}]*\}|\{\{[^}]*\}\}|<[^<>]*>)$' && return 0
   case "$cauda" in '%s'|'%('*')s') return 0 ;; esac
+  # Substituição de comando do shell (`SENHA="$(cat arquivo)"`, crase) é código, não valor:
+  # com a aspa que não fecha, a forma entre aspas a pegava (revisão do Codex no login#34).
+  # Só a substituição inteira: senha colada depois dela é credencial (CodeAnt no mergex#56).
+  case "$cauda" in '$('*')'|'`'*'`') printf '%s' "$cauda" | grep -aEq -e '^(\$\([^()]*\)|`[^`]*`)$' && return 0 ;; esac
   printf '%s' "$cauda" | grep -aEq -e '^(\$[A-Za-z_][A-Za-z0-9_]*|[*]+|[?]+)$' && return 0
   # Palavras reservadas só dispensam o valor inteiro, não uma credencial real
   # que por acaso contenha "example", "sample" ou outro fragmento. O valor pode
@@ -92,7 +98,8 @@ achou() {
         && eh_referencia_de_codigo "$valor" "${texto:$((off + ${#valor}))}"; then
         continue
       fi
-      fim="${valor: -4}"
+      # os quatro últimos caracteres do valor, sem a aspa de fechamento
+      fim="$valor"; fim="${fim%\"}"; fim="${fim%\'}"; fim="${fim%”}"; fim="${fim%’}"; fim="${fim: -4}"
       ACHADOS="${ACHADOS}  - ${cat}: …${fim} (linha ${linha%%:*})
 "
     done <<EXPX_MATCHES
@@ -122,7 +129,17 @@ segredo_varrer() {
   # O alfabeto do valor e o do limite a direita sao o mesmo, com os simbolos que
   # senha tem (`!@#$%^&*~?`): sem eles uma senha que começa com `!` passava, e com o
   # limite diferente o valor seria cortado no meio (conselhos#210, P8).
-  CREDENCIAL='([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Nn][Hh][Aa]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii]_?[Kk][Ee][Yy])[[:space:]]*[:=][[:space:]]*['"'"'"]?[A-Za-z0-9/+_.=!@#$%^&*~?-]{8,}'
+  # Entre aspas — duplas, simples ou tipográficas —, o valor vai até a aspa de fechamento,
+  # com qualquer símbolo menos espaço. Aberta e não fechada, só o alfabeto de senha e os
+  # separadores `,` `;` `:`: com qualquer símbolo, código como `"$(date ...)` virava valor;
+  # sem aspa nenhuma, só o alfabeto, como antes (a vírgula depois de um identificador é a
+  # referência de código da DM-283). Sem
+  # isso, uma senha entre aspas com vírgula era cortada abaixo de oito caracteres e passava
+  # (katosmv/login#34). O `grep -E` fica com o casamento mais longo, então a forma entre
+  # aspas vence a sem aspas quando existe, e a credencial conta uma vez só. Espaço fica
+  # fora: prosa entre aspas não é senha. A chave pode vir entre aspas, como no JSON
+  # (`"password": ...`), e o literal entre aspas seguido de `(` não é chamada de função.
+  CREDENCIAL='([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Nn][Hh][Aa]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii]_?[Kk][Ee][Yy])("|'"'"'|”|’)?[[:space:]]*[:=][[:space:]]*("[^"[:space:]]{8,}"|'"'"'[^'"'"'[:space:]]{8,}'"'"'|“[^”[:space:]]{8,}”|‘[^’[:space:]]{8,}’|("|'"'"'|“|‘)[A-Za-z0-9/+_.=!@#$%^&*~?,;:-]{8,}|("|'"'"')?[A-Za-z0-9/+_.=!@#$%^&*~?-]{8,})'
   achou "credencial"          "$CREDENCIAL" '' '($|[^A-Za-z0-9/+_.=!@#$%^&*~?(-])'
   # ...salvo quando o valor tem dígito: identificador de função comum não tem
   # (`randomUUID`, `getToken`), e um valor aleatório quase sempre tem. Uma função

@@ -109,21 +109,25 @@ raiz_leitura="${RAIZ:-.}"
 # 0. O ambiente do Git (GIT_DIR, GIT_WORK_TREE, GIT_COMMON_DIR, GIT_INDEX_FILE) vence o `-C`, e é
 # conferido antes da primeira operação do Git: apontando outro repositório, a V12 leria outro HEAD (conselhos#210, P1). Não se apaga o
 # ambiente: o Git o exporta nos hooks (pre-push), e ali ele é o mesmo repositório. Com qualquer
-# um definido, a árvore e o git-common-dir resolvidos com e sem ele têm de ser os mesmos.
+# um definido, a árvore, o git-common-dir e o git-dir resolvidos com e sem ele têm de ser os
+# mesmos. O git-dir separa as worktrees ligadas: uma irmã tem o mesmo common-dir e, com
+# GIT_DIR sem GIT_WORK_TREE, o mesmo toplevel, mas outro HEAD (katosmv/login#34).
 # `sem_repositorio_git`, acima, fica igual byte a byte às outras cópias (DM-186).
 if [ -n "${GIT_DIR:-}${GIT_WORK_TREE:-}${GIT_COMMON_DIR:-}${GIT_INDEX_FILE:-}" ]; then
-  identidade_git() { # <com|sem> — "<toplevel>|<git-common-dir>", absolutos e físicos
-    local saida topo comum
+  identidade_git() { # <com|sem> — "<toplevel>|<git-common-dir>|<git-dir>", absolutos e físicos
+    local saida topo comum dir
     if [ "$1" = sem ]; then
       saida="$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_INDEX_FILE \
-        git -C "$raiz_leitura" rev-parse --show-toplevel --git-common-dir 2>/dev/null)" || return 1
+        git -C "$raiz_leitura" rev-parse --show-toplevel --git-common-dir --git-dir 2>/dev/null)" || return 1
     else
-      saida="$(git -C "$raiz_leitura" rev-parse --show-toplevel --git-common-dir 2>/dev/null)" || return 1
+      saida="$(git -C "$raiz_leitura" rev-parse --show-toplevel --git-common-dir --git-dir 2>/dev/null)" || return 1
     fi
-    topo="${saida%%$'\n'*}"; comum="${saida#*$'\n'}"
+    topo="${saida%%$'\n'*}"; saida="${saida#*$'\n'}"; comum="${saida%%$'\n'*}"; dir="${saida#*$'\n'}"
     case "$comum" in /*) ;; *) comum="$raiz_leitura/$comum" ;; esac
-    topo="$(cd "$topo" 2>/dev/null && pwd -P)" && comum="$(cd "$comum" 2>/dev/null && pwd -P)" || return 1
-    printf '%s|%s\n' "$topo" "$comum"
+    case "$dir" in /*) ;; *) dir="$raiz_leitura/$dir" ;; esac
+    topo="$(cd "$topo" 2>/dev/null && pwd -P)" && comum="$(cd "$comum" 2>/dev/null && pwd -P)" \
+      && dir="$(cd "$dir" 2>/dev/null && pwd -P)" || return 1
+    printf '%s|%s|%s\n' "$topo" "$comum" "$dir"
   }
   # O Git que falha com o ambiente é o caso do item 1 (git-falhou, nunca n/a); o que
   # resolve com ele e não sem ele, ou resolve outro repositório, é divergência.

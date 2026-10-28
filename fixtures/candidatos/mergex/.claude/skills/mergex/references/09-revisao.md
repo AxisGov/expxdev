@@ -55,7 +55,7 @@ Para cada PR, junte **o que estiver disponível**. Fonte ausente vira "não disp
 | Resultado da integração contínua | `statusCheckRollup` do HEAD autoritativo (GitHub); `head_pipeline` do merge request (GitLab) | Resultado ausente **não** é CI ausente. Com configuração de CI no HEAD (`.github/workflows/*.yml` ou `*.yaml`, `.gitlab-ci.yml`), o CI está configurado: `head_pipeline` nulo ou rollup vazio é pipeline que ainda não anexou, e R1 é `NÃO VERIFICÁVEL`, nunca `n/a`. Check reportado é CI configurado: CI externo (Jenkins, CircleCI, app de checks) não deixa arquivo no HEAD, mas aparece no rollup/pipeline, e check não verde ali é R1 `FALHOU`. "sem integração contínua configurada" (`n/a`) só sem nenhuma configuração de CI no HEAD, sem nenhum check reportado para ele **e** sem check obrigatório na proteção da base. CI externo que ainda não reportou é visível só por ali, e no GitHub são dois mecanismos, lidos os dois: a proteção clássica da branch (`gh api repos/<dono>/<repo>/branches/<base>`, `protection.required_status_checks`: `contexts` e `checks`) e os rulesets (`gh api repos/<dono>/<repo>/rules/branches/<base>`, regra `required_status_checks`); um só não basta, porque cada endpoint ignora o outro mecanismo; check obrigatório sem resultado no HEAD é R1 `NÃO VERIFICÁVEL`, e leitura de qualquer dos dois que falha também é R1 `NÃO VERIFICÁVEL`, nunca `n/a`: sem ela, a ausência de check obrigatório não está provada |
 | Conflito com a base | `mergeable` do PR | Verifique localmente (passo 5) |
 | Arquivos tocados | `files` do PR | `git diff --name-only <base>...<head>` |
-| Aberto pela mergex nesta máquina | `pr_url` do `ENTREGA.md` local casa com a URL do PR | Assuma que não |
+| Aberto pela mergex nesta máquina | a URL de algum PR de um `ENTREGA.md` local casa com a URL do PR: a `pr_url` na entrega por trabalho; as URLs dos itens de `prs` na entrega por sprint | Assuma que não |
 | Reviews, requested changes, comentários e threads | API do serviço — ver "Operações de review por plataforma", abaixo | Trate como fonte ausente para o REVIEW EVIDENCE GATE — ver "Quando falha" |
 | HEAD autoritativo do PR | `headRefOid` do PR (GitHub); `sha` do merge request (GitLab) — ver "HEAD autoritativo", abaixo | R4 não pode ser `OK`. R1 segue a própria regra: sem CI configurado continua `n/a`; com CI configurado, o resultado do HEAD atual não é obtível e R1 é `NÃO VERIFICÁVEL` |
 
@@ -105,14 +105,16 @@ if [ -n "$p_merge" ] && [ "$p_base" = null ]; then
   # Registro anterior à DM-269: o planejamento já é histórico, mas o E9 ainda
   # consegue completar exclusivamente a base ausente pelo PR gravado no item.
   reparo=sim; alvo=planejamento; merge_esperado="$p_merge"
+  campo_url=planejamento_url
   pr_url="$(printf '%s\n' "$marca" | sed -n 's/^planejamento_url=//p')"
 else
   alvo="$(printf '%s\n' "$marca" | sed -n 's/^sprint_atual=//p')"
   case "$alvo" in planejamento|[0-9][0-9]) ;; *) exit 0 ;; esac
   case "$(printf '%s\n' "$marca" | sed -n 's/^atual_estado=//p')" in merged) exit 0 ;; esac
+  campo_url=atual_url
   pr_url="$(printf '%s\n' "$marca" | sed -n 's/^atual_url=//p')"
 fi
-case "$pr_url" in ''|null) echo "PR atual sem pr_url: nada a ler no serviço"; exit 0 ;; esac
+case "$pr_url" in ''|null) echo "PR atual sem $campo_url: nada a ler no serviço"; exit 0 ;; esac
 case "$pr_url" in
   */-/merge_requests/*)   # GitLab: a API do projeto do remoto, como no passo 1
     iid="${pr_url##*/-/merge_requests/}"; iid="${iid%%[!0-9]*}"
@@ -244,7 +246,7 @@ ficam fora da revisão por desenho e são conferidos pelos portões das skills.
 
 ### A marcação de trabalho próprio
 
-Se o PR foi aberto pela mergex **na mesma máquina** — a `pr_url` de algum `ENTREGA.md` local casa com a URL do PR —, marque-o na lista:
+Se o PR foi aberto pela mergex **na mesma máquina** — a URL de algum PR de um `ENTREGA.md` local casa com a URL do PR —, marque-o na lista. Na entrega por trabalho, essa URL é a `pr_url`; na entrega por sprint, a `pr_url` do topo fica `null`, e valem as URLs dos itens de `prs` (o de planejamento e o de cada sprint):
 
 ```
 [aberto por esta instalação da mergex — a skill não aprova o próprio trabalho]
@@ -1262,7 +1264,9 @@ Sem essa confirmação, **não ofereça o merge** deste PR. Passe para o próxim
    PR de outro trabalho não muda o estado do seu.
 
    O PR é do trabalho atual quando existe trabalho atual (ver "Trabalho atual no E9", no
-   passo 2) e a URL do PR mergeado casa com a `pr_url` do `ENTREGA.md` desse trabalho. Sem
+   passo 2) e a URL do PR mergeado casa com a URL do PR atual desse trabalho: a `pr_url` do
+   `ENTREGA.md` na entrega por trabalho; na entrega por sprint, onde a `pr_url` do topo fica
+   `null`, a `atual_url` que o `entrega-de-planejamento.sh` devolve (o item da `sprint_atual`). Sem
    trabalho atual, ou se a correspondência não for certa, **não grave nada** — na dúvida,
    deixe a barra como está. O `estado.json` só é escrito depois dessa decisão; nunca é lido
    para tomá-la.

@@ -86,7 +86,8 @@ O E9 percorre pull requests de **vários** trabalhos, inclusive de outras pessoa
 `pr_estado: merged` **somente quando o PR mergeado for o do trabalho atual**. Quem decide
 isso é o versionador e o registro da entrega, nunca este arquivo: o trabalho atual é o único
 `ENTREGA.md` cujo `branch` é igual a `git branch --show-current`, e o PR é dele quando a URL
-casa com a `pr_url` desse `ENTREGA.md` (definição completa em "Trabalho atual no E9", em
+casa com a do PR atual desse `ENTREGA.md` — a `pr_url` na entrega por trabalho, a `atual_url`
+do item da sprint na entrega por sprint (definição completa em "Trabalho atual no E9", em
 `references/09-revisao.md`).
 
 Mergear o PR de outro trabalho não muda o estado do seu. Sem trabalho atual — branch
