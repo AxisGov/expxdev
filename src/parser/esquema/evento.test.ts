@@ -497,3 +497,54 @@ describe("chaves da resolução (CONTRATO-expx-orquestracao §11.1)", () => {
     }
   });
 });
+
+describe("integridade_final (F3c, CONTRATO-expx-orquestracao §12)", () => {
+  const verificada = (integridade: unknown, extra: Record<string, unknown> = {}) =>
+    linha({ evento: "integridade_final_verificada", agente: "qa", resultado: "ok", integridade_final: integridade, ...extra });
+
+  it("funcional: as três formas válidas passam, sem chave desconhecida", () => {
+    for (const ok of [
+      { estado: "igual", diferencas: [] },
+      { estado: "ausente", diferencas: [] },
+      { estado: "divergente", diferencas: ["head"] },
+      { estado: "divergente", diferencas: ["status", "arvore"] },
+      { estado: "divergente", diferencas: ["head", "status", "arvore"] },
+    ]) {
+      const r = validarRastro(j(verificada(ok)));
+      expect(r.defeitos, JSON.stringify(ok)).toEqual([]);
+      expect(r.desconhecidas).toEqual([]);
+    }
+  });
+
+  it("funcional: forma incoerente é defeito", () => {
+    for (const ruim of [
+      { estado: "igual", diferencas: ["head"] },
+      { estado: "ausente", diferencas: ["status"] },
+      { estado: "divergente", diferencas: [] },
+      { estado: "divergente", diferencas: ["arvore", "head"] },
+      { estado: "divergente", diferencas: ["head", "head"] },
+      { estado: "divergente", diferencas: ["diff"] },
+      { estado: "talvez", diferencas: [] },
+      { estado: "igual" },
+      { estado: "igual", diferencas: [], extra: 1 },
+      "igual",
+    ]) {
+      expect(validarRastro(j(verificada(ruim))).defeitos, JSON.stringify(ruim)).toHaveLength(1);
+    }
+  });
+
+  it("funcional: a verificação sem integridade_final é defeito, e integridade_final em outro evento também", () => {
+    const sem = linha({ evento: "integridade_final_verificada", agente: "qa" });
+    expect(validarRastro(j(sem)).defeitos).toHaveLength(1);
+    const fora = linha({ evento: "agente_concluido", agente: "qa", integridade_final: { estado: "igual", diferencas: [] } });
+    expect(validarRastro(j(fora)).defeitos).toHaveLength(1);
+  });
+
+  it("funcional: linha antiga sem a chave continua válida", () => {
+    expect(validarRastro(j(linha({ evento: "agente_concluido", agente: "qa" }))).defeitos).toEqual([]);
+  });
+
+  it("unitário: integridade_final é extra declarada", () => {
+    expect(EXTRAS_EVENTO).toContain("integridade_final");
+  });
+});

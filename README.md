@@ -647,7 +647,7 @@ skill encolhe entre versões.
 npx expxdev doctor
 ```
 
-Trinta verificações, cada uma com severidade e correção sugerida. Achado de severidade
+Trinta e duas verificações, cada uma com severidade e correção sugerida. Achado de severidade
 `aviso` não derruba a saída; `erro` sim.
 
 | Verificação | Severidade |
@@ -682,6 +682,8 @@ Trinta verificações, cada uma com severidade e correção sugerida. Achado de 
 | consulta do modo commitado ao `HEAD` respondeu | aviso |
 | rastro dentro do contrato `expx-eventos` | aviso |
 | rastro sem chave não declarada | aviso |
+| nenhuma integridade final de agente de aprovação divergente ou ausente no rastro | aviso |
+| com a integridade final instalada, `docs/eventos/` ignorado pelo git | aviso |
 
 > **Os três achados de modo executável, e por que são três.** Os reparos são diferentes, e um
 > reparo errado não conserta nada. `100644` no índice → `git update-index --chmod=+x`, com a

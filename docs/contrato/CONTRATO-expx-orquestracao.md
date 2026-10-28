@@ -14,8 +14,10 @@ o `doctor` diagnostica (`CONTRATO-expx-instalacao.md` §5.3). **Desde a F3a**,
 o rastro grava `model`/`effort` só como executor observado (H10) e, com a
 política ativa, as chaves da resolução no evento do subagente, a partir da
 projeção `.expx/orquestracao-rastro.tsv`; o painel mostra a resolução como
-configuração não observada (seção 11 e `CONTRATO-expx-eventos.md`). `integridade_final`
-(F3c) e o envelope da invocação (F3b) ainda não existem.
+configuração não observada (seção 11 e `CONTRATO-expx-eventos.md`). **Desde a
+F3c**, o hook do núcleo registra a `integridade_final` dos agentes de aprovação
+(seção 12). O envelope da invocação e a recusa operacional do veredito (F3b)
+ainda não existem.
 
 ## 1. Três coisas separadas
 
@@ -370,3 +372,94 @@ O painel mostra a configuração quando não há observação, e só ele:
    formato, e o arquivo precisa ser regular e passar pela leitura do registro;
 4. sem `resolucao_id`: o fallback anterior — a configuração instalada, só
    quando o evento não identifica outro harness.
+
+## 12. Separação de papéis: a integridade final (F3c)
+
+O desenho (§12) exige, de um papel `revisar` ou `testar`, a impossibilidade de
+escrever no projeto em um de três níveis: `estrutural`, `isolado` ou
+`integridade_final`. Esta seção fixa o terceiro, o **fraco**. Ele prova só que
+o estado final da árvore de trabalho é igual ao inicial: não pega editar e
+reverter, nem arquivo ignorado alterado que mude o resultado de um comando.
+Sozinho, nunca sustenta o papel (H8).
+
+### 12.1 O que é comparado, e onde
+
+O hook do núcleo `expx-integridade-final.sh`, registrado no `SubagentStart` e
+no `SubagentStop` (sem matcher, `timeout` 30), age só nos agentes de
+aprovação. No início, fotografa a árvore; no fim, fotografa de novo e compara
+as três partes, byte a byte:
+
+| Parte | O que é |
+|---|---|
+| `head` | `git rev-parse HEAD^{commit}` |
+| `status` | os bytes de `git status --porcelain -z --untracked-files=all` |
+| `arvore` | o tree id da árvore inteira — rastreado e não rastreado não ignorado — montado com `git add -A` e `git write-tree` num índice **temporário**, copiado do real. O `git diff HEAD` não vê o conteúdo de arquivo não rastreado, e editar o arquivo novo que o implementador ainda não adicionou é o caso comum de revisão. O índice real nunca é tocado |
+
+A foto mora no git-dir da worktree
+(`git rev-parse --git-path expx/integridade-final/v1`), nunca na árvore de
+trabalho, num diretório por sessão (`session_id`) e por instância (`agent_id`)
+cujos nomes são o hash do id: id do payload nunca vira caminho, e instâncias
+paralelas não colidem. O fim remove o diretório da instância em qualquer
+resultado. Os filtros `clean` (LFS) e o `core.autocrlf` valem no `git add`: a
+`arvore` compara a representação Git, não necessariamente os bytes físicos. Um
+submódulo entra só pelo gitlink; a sujeira interna dele aparece no `status`,
+não na `arvore`.
+
+### 12.2 Os agentes de aprovação (lista transitória)
+
+| `agent_type` | `ferramenta` do evento |
+|---|---|
+| `revisor-diff` | `mergex` |
+| `qa` | `runx` |
+| `runx-revisor-testes` | `runx` |
+
+Aceita-se o nome exato, ou o nome depois de **um** prefixo literal `expx:`.
+Substring, outro prefixo ou nome parecido não viram aprovador. Fora da lista, o
+hook sai sem rodar Git e sem gravar nada. A lista é transitória: a F4 a troca
+pelo `papel` declarado e projetado da política, sem inferi-lo do nome. O
+`auditor-plano` e o `sprintx-revisor-testes` não estão nela porque já são
+`estrutural` (sem ferramenta de escrita nem `Bash`).
+
+### 12.3 O evento
+
+No `SubagentStop` de um aprovador, o hook grava `integridade_final_verificada`
+(`CONTRATO-expx-eventos.md`) com a extra `integridade_final`:
+
+```json
+{"integridade_final": {"estado": "divergente", "diferencas": ["status", "arvore"]}}
+```
+
+| `estado` | Quando | `resultado` | `diferencas` |
+|---|---|---|---|
+| `igual` | as três partes iguais | `ok` | `[]` |
+| `divergente` | ao menos uma parte diferente | `falha` | as partes, na ordem `head`, `status`, `arvore`, sem repetir |
+| `ausente` | sem foto do início, foto ilegível ou incompleta, Git falhou, repositório sem commit, payload sem `agent_id` | `falha` | `[]` |
+
+`ausente` nunca vira `igual`: timeout, truncamento ou erro invalidam. A extra é
+obrigatória nesse evento e vedada nos demais; linhas antigas, sem ela,
+continuam válidas. O evento é próprio, e não `agente_concluido`, porque a
+SprintX já grava `agente_concluido` para todo subagente, e o aprovador ficaria
+com duas conclusões. O `SubagentStart` não grava evento.
+
+### 12.4 O que `divergente` e `ausente` invalidam, nesta fase
+
+Divergência ou ausência **invalidam o veredito** daquele aprovador, em qualquer
+regime. Nesta versão isso é registrado e mostrado, não executado:
+
+- o evento sai `falha`, e o painel o destaca;
+- o `doctor` avisa `integridade-final-invalida`, com a contagem por arquivo do
+  rastro;
+- a **recusa operacional** do veredito fica para a F3b. Hoje o
+  `veredito_emitido` não carrega `agent_id` nem `invocacao`, e recusar por nome
+  de agente associaria aprovadores paralelos errado. O envelope da F3b
+  correlaciona invocação, instância, término e veredito.
+
+### 12.5 Pré-condição: o rastro ignorado
+
+O rastro (`docs/eventos/`) é ignorado pelo versionador por padrão
+(`CONTRATO-expx-eventos.md`). Fora disso, cada linha que um hook grava durante
+o subagente entra no `status` da foto, e a verificação dá `divergente` sem o
+aprovador ter tocado em nada. Com a integridade instalada, o `doctor` avisa
+`rastro-nao-ignorado`. A comparação não exclui `docs/eventos/` por conta
+própria: o que ela mede é o que o Git vê.
+

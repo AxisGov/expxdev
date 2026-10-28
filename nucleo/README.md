@@ -9,6 +9,7 @@ foram selecionadas.
 | Arquivo | O que é |
 |---|---|
 | `hooks/expx-rastro.sh` | O rastro de eventos, os modos de hook e o `trabalho_id` |
+| `hooks/expx-integridade-final.sh` | `SubagentStart`/`SubagentStop`: a integridade final dos agentes de aprovação (CONTRATO-expx-orquestracao §12). Carrega o `expx-rastro.sh` do próprio diretório, por isso os dois são instalados lado a lado em `.claude/hooks/` |
 | `scripts/expx-fatiamento.mjs` | O leitor único de `.expx/fatiamento.json` (seção `scripts/` abaixo) |
 | `scripts/expx-limites.mjs` | As exclusões do núcleo, a gramática de `excluir_da_revisao` e a regra dos nomes `FATIA_*` reservados |
 | `scripts/expx-revisao.mjs` | A revisão por task pela CLI do CodeAnt: `revisar`, `conferir`, `rejeitar`, `listar` (seção `scripts/` abaixo) |

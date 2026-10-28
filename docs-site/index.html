@@ -129,8 +129,8 @@
   <div class="cartoes">
     <div class="cartao"><div class="cartao__num">9</div><div class="cartao__rot">skills no catálogo</div></div>
     <div class="cartao"><div class="cartao__num">8</div><div class="cartao__rot">subcomandos do CLI</div></div>
-    <div class="cartao"><div class="cartao__num">1775</div><div class="cartao__rot">testes aprovados</div></div>
-    <div class="cartao"><div class="cartao__num">30</div><div class="cartao__rot">verificações do doctor</div></div>
+    <div class="cartao"><div class="cartao__num">1803</div><div class="cartao__rot">testes aprovados</div></div>
+    <div class="cartao"><div class="cartao__num">32</div><div class="cartao__rot">verificações do doctor</div></div>
   </div>
 
   <p style="margin-top:8px">
@@ -1712,7 +1712,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
 <section class="secao" id="doctor">
   <p class="eyebrow">Referência do CLI</p>
   <h1>O que o doctor verifica</h1>
-  <p class="lede">Trinta verificações, cada uma com severidade e correção sugerida. Achado de severidade
+  <p class="lede">Trinta e duas verificações, cada uma com severidade e correção sugerida. Achado de severidade
   <code>aviso</code> não derruba a saída; <code>erro</code> sim.</p>
 
   <div class="codigo" data-copiar>
@@ -1753,6 +1753,8 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
       <tr><td><code>modo-executavel-head-indisponivel</code></td><td><span class="selo selo--aviso">aviso</span></td><td>a consulta do modo commitado ao <code>HEAD</code> falhou: a verificação ficou inconclusiva</td></tr>
       <tr><td><code>rastro-fora-do-contrato</code></td><td><span class="selo selo--aviso">aviso</span></td><td>linhas do rastro fora do contrato <code>expx-eventos</code></td></tr>
       <tr><td><code>rastro-chave-nao-declarada</code></td><td><span class="selo selo--aviso">aviso</span></td><td>chaves não declaradas no rastro</td></tr>
+      <tr><td><code>integridade-final-invalida</code></td><td><span class="selo selo--aviso">aviso</span></td><td>verificação de integridade final de um agente de aprovação deu <code>divergente</code> ou <code>ausente</code>: o veredito dele é inválido</td></tr>
+      <tr><td><code>rastro-nao-ignorado</code></td><td><span class="selo selo--aviso">aviso</span></td><td>com a integridade final instalada, <code>docs/eventos/</code> não está ignorado pelo git</td></tr>
     </tbody>
   </table></div>
 
@@ -2242,7 +2244,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
     <span class="selo">origem</span><span class="selo">evento</span><span class="selo">fase</span><span class="selo">task</span>
     <span class="selo">agente</span><span class="selo">resultado</span><span class="selo">detalhe</span><span class="selo">arquivos</span>
   </div>
-  <p>Dezesseis chaves extras são permitidas depois das doze: <code>hook</code> (o nome do hook que decidiu, quando
+  <p>Dezessete chaves extras são permitidas depois das doze: <code>hook</code> (o nome do hook que decidiu, quando
   a origem é <code>hook</code>), <code>faixa</code> (a faixa de atenção do arquivo tocado), o par
   <code>sessao</code> · <code>harness</code> (a identidade da sessão), <code>model</code> · <code>effort</code>
   (o executor <strong>observado</strong> naquela execução, nunca a configuração), as chaves da resolução da
@@ -2250,7 +2252,8 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
   <code>origem_classe</code>, <code>alternativa</code>, <code>origem_alternativa</code> e, na exceção do
   <code>agentes.json</code> v1, <code>materializado</code> — e três declaradas para o envelope da invocação, que
   ainda nenhum escritor grava: <code>invocacao</code>, <code>modelos_observados</code> e
-  <code>fora_da_politica</code>. O gravador comum inclui <code>model</code>/<code>effort</code> nas linhas que
+  <code>fora_da_politica</code> — e <code>integridade_final</code>, o resultado da comparação do início com o
+  fim de um agente de aprovação, que só existe em <code>integridade_final_verificada</code>. O gravador comum inclui <code>model</code>/<code>effort</code> nas linhas que
   ele escreve, inclusive as de hook, só com o que o runtime informou (no Claude, <code>effort.level</code> pelo
   chamador e <code>$CLAUDE_EFFORT</code> apenas para o principal); sem observação, <code>null</code>. Com a
   política de orquestração ativa, a linha do subagente no Claude leva também a resolução vigente. Hooks com
@@ -2284,7 +2287,9 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
       <tr><td><code>arquivo_alterado</code></td><td>hook <code>PostToolUse</code></td></tr>
       <tr><td><code>regra_violada</code></td><td>hook em modo <code>aviso</code></td></tr>
       <tr><td><code>acao_bloqueada</code></td><td>hook em modo <code>bloqueio</code></td></tr>
-      <tr><td><code>agente_iniciado</code> · <code>agente_concluido</code></td><td>hook <code>SubagentStop</code> e a skill</td></tr>
+      <tr><td><code>agente_concluido</code></td><td>hook <code>SubagentStop</code> da sprintx, para todo subagente</td></tr>
+      <tr><td><code>agente_iniciado</code></td><td>reservado; nenhum escritor o grava hoje</td></tr>
+      <tr><td><code>integridade_final_verificada</code></td><td>hook do núcleo no <code>SubagentStop</code> de um agente de aprovação: compara a árvore do fim com a do início; <code>falha</code> invalida o veredito</td></tr>
       <tr><td><code>veredito_emitido</code></td><td>o agente auditor ou o QA</td></tr>
       <tr><td><code>commit_criado</code> · <code>pr_aberto</code></td><td>a mergex</td></tr>
       <tr><td><code>artefato_gravado</code></td><td>a mergex, quando a gravação de um artefato derivado (<code>estado.json</code>) falha</td></tr>
@@ -2519,7 +2524,7 @@ docs/contrato/  <span class="tok-com">os contratos compartilhados pelas nove ski
   </div>
 
   <div class="cartoes">
-    <div class="cartao"><div class="cartao__num">1775</div><div class="cartao__rot">testes aprovados</div></div>
+    <div class="cartao"><div class="cartao__num">1803</div><div class="cartao__rot">testes aprovados</div></div>
     <div class="cartao"><div class="cartao__num">143</div><div class="cartao__rot">arquivos aprovados</div></div>
     <div class="cartao"><div class="cartao__num">4</div><div class="cartao__rot">projetos no runner</div></div>
     <div class="cartao"><div class="cartao__num">0</div><div class="cartao__rot">testes que dependem de rede</div></div>
