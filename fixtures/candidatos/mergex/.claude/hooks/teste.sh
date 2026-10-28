@@ -246,6 +246,39 @@ caso "referencia seguida de ] barra"         comum/sem-segredo.sh "$(write_json 
 caso "valor entre aspas com virgula barra"   comum/sem-segredo.sh "$(write_json "$(printf "sen%s: 'hashedPassword'," ha)")" 2
 caso "valor com digito e virgula barra"      comum/sem-segredo.sh "$(write_json "$(printf 'tok%s: abcdefg1,' en)")" 2
 caso "valor com simbolo e virgula barra"     comum/sem-segredo.sh "$(write_json "$(printf 'pass%s: Abcdefg!,' word)")" 2
+# Valor entre aspas com virgula ou outro simbolo fora do alfabeto (katosmv/login#34): a virgula
+# cortava o valor abaixo de oito caracteres, e a senha passava. Entre aspas, o valor vai ate a
+# aspa de fechamento; espaco continua fora (prosa entre aspas nao e senha).
+caso "senha entre aspas com virgula barra"   comum/sem-segredo.sh "$(write_json "$(printf 'pass%s: "abc,defgh"' word)")" 2
+caso "senha entre aspas simples com ; e : barra" comum/sem-segredo.sh "$(write_json "$(printf "sen%s = 'a,b;c:d=e'" ha)")" 2
+caso "placeholder <...> entre aspas com virgula passa" comum/sem-segredo.sh "$(write_json "$(printf 'pass%s: "<senha,nova>"' word)")" 0
+caso "prosa entre aspas com espaco passa"    comum/sem-segredo.sh "$(write_json "$(printf 'sen%s: "nao use a mesma senha"' ha)")" 0
+# Revisao do Codex: aspa que nao fecha, aspas tipograficas, chave entre aspas (JSON) e o literal
+# entre aspas seguido de `(`, que nao e chamada de funcao.
+caso "senha entre aspas que nao fecham barra"  comum/sem-segredo.sh "$(write_json "$(printf 'pass%s: "abc,defgh' word)")" 2
+caso "senha entre aspas tipograficas barra"    comum/sem-segredo.sh "$(write_json "$(printf 'pass%s: \xe2\x80\x9cabc,defgh\xe2\x80\x9d' word)")" 2
+caso "aspa tipografica aberta e nao fechada barra" comum/sem-segredo.sh "$(write_json "$(printf 'pass%s: \xe2\x80\x9cabc,defgh' word)")" 2
+caso "chave entre aspas tipograficas barra"   comum/sem-segredo.sh "$(write_json "$(printf '\xe2\x80\x9cpass%s\xe2\x80\x9d: "abc,defgh"' word)")" 2
+caso "aspas simples tipograficas barra"       comum/sem-segredo.sh "$(write_json "$(printf 'pass%s: \xe2\x80\x98abc,defgh\xe2\x80\x99' word)")" 2
+caso "placeholder entre aspas tipograficas passa" comum/sem-segredo.sh "$(write_json "$(printf 'pass%s: \xe2\x80\x9cchangeme\xe2\x80\x9d' word)")" 0
+caso "chave JSON entre aspas barra"            comum/sem-segredo.sh "$(write_json "$(printf '{"pass%s": "abc,defgh"}' word)")" 2
+caso "substituicao de comando passa"         comum/sem-segredo.sh "$(write_json "$(printf 'SEN%s="$(cat /run/secrets/x)"' HA)")" 0
+# ...mas so quando ela e o valor inteiro: senha colada depois da substituicao barra (CodeAnt no mergex#56).
+caso "senha depois de substituicao de comando barra" comum/sem-segredo.sh "$(write_json "$(printf 'SEN%s="$(cat/x)S3nh4Real9"' HA)")" 2
+caso "senha depois de crase barra"           comum/sem-segredo.sh "$(write_json "$(printf 'SEN%s="`cat/x`S3nh4Real9"' HA)")" 2
+caso "substituicao por crase passa"          comum/sem-segredo.sh "$(write_json "$(printf 'SEN%s="`cat /run/secrets/x`"' HA)")" 0
+caso "chave JSON com placeholder passa"        comum/sem-segredo.sh "$(write_json "$(printf '{"pass%s": "<senha>"}' word)")" 0
+caso "literal entre aspas seguido de ( barra"  comum/sem-segredo.sh "$(write_json "$(printf 'pass%s: "abc,defgh"(x)' word)")" 2
+# A mascara mostra os quatro ultimos caracteres do VALOR, sem a aspa de fechamento.
+MASC_T="$(printf 'pass%s: "abc,defgh"' word)"
+MASC="$(bash -c '. "$1"; ALVO="$2"; segredo_varrer; printf "%s" "$ACHADOS"' _ "$H/../skills/mergex/scripts/segredo-tabela.sh" "$MASC_T")"
+case "$MASC" in *'…efgh '*) OK=$((OK+1)); printf '  ok    %s\n' "mascara sem a aspa final" ;;
+  *) FALHOU=$((FALHOU+1)); printf '  FALHA %s (%s)\n' "mascara sem a aspa final" "$MASC" ;; esac
+# Um achado por credencial: a forma entre aspas e a sem aspas nao contam duas vezes.
+UMA_T="$(printf 'pass%s: "abcdefgh123"' word)"
+UMA_N="$(bash -c '. "$1"; ALVO="$2"; segredo_varrer; printf "%s" "$ACHADOS" | grep -c "credencial"' _ "$H/../skills/mergex/scripts/segredo-tabela.sh" "$UMA_T")"
+if [ "$UMA_N" = 1 ]; then OK=$((OK+1)); printf '  ok    %s\n' "senha entre aspas: um achado so"
+else FALHOU=$((FALHOU+1)); printf '  FALHA %s (esperava 1, obteve %s)\n' "senha entre aspas: um achado so" "$UMA_N"; fi
 caso "a segunda ocorrencia no fim da linha barra" comum/sem-segredo.sh "$(write_json "$(printf 'pass%s: hashedPassword; pass%s: hashedPassword' word word)")" 2
 FUNC2="getToken$(printf '2')"   # montada aqui: escrita no caso, o proprio teste.sh barraria no commit
 caso "funcao com digito barra (assumido)"   comum/sem-segredo.sh "$(write_json "token: $FUNC2()")" 2

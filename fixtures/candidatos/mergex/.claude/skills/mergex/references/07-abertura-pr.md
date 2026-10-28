@@ -293,7 +293,21 @@ if [ "$fonte" != "$destino" ]; then
   [ -n "$dono_fonte" ] && [ "${projeto_fonte#*/}" != "$projeto_fonte" ] || { echo "projeto da origem inválido: o E7 não abre o PR"; exit 1; }
   head="$dono_fonte:$head"
 fi
-gh pr create --repo "$destino" --base "$bb" --head "$head" --title "$titulo" --body-file docs/entregas/<trabalho_id>/PR.md "${opcao_rascunho[@]}"
+saida_pr="$(gh pr create --repo "$destino" --base "$bb" --head "$head" --title "$titulo" --body-file docs/entregas/<trabalho_id>/PR.md "${opcao_rascunho[@]}" 2>&1)"; rc_pr=$?
+printf '%s\n' "$saida_pr"
+if [ "$rc_pr" != 0 ]; then
+  # Só "PR já existe para esta branch" vira retomada, e aqui mesmo, onde `head` e `destino`
+  # existem — numa chamada de shell separada eles não sobrevivem (katosmv/login#34). Outra
+  # falha (rede, permissão, base) sai com o código e o erro literal do gh, para o passo 3.
+  case "$saida_pr" in
+    *"already exists"*) ;;
+    *) echo "gh pr create falhou (rc $rc_pr): registre o erro literal acima no passo 3 e siga"; exit "$rc_pr" ;;
+  esac
+  pr_url="$(gh pr view "$head" --repo "$destino" --json url --jq '.url')" || { echo "PR existente não recuperado no destino"; exit 1; }
+  linhas_url="$(printf '%s\n' "$pr_url" | awk 'END { print NR }')"
+  [ -n "$pr_url" ] && [ "$linhas_url" = 1 ] || { echo "recuperação do PR retornou zero ou múltiplas URLs"; exit 1; }
+  echo "PR existente retomado: $pr_url"
+fi
 ```
 
 No GitLab (`glab`, do passo 1), o equivalente é o merge request; o `--yes` pula a confirmação
@@ -369,15 +383,7 @@ Não adicione revisor, etiqueta, marco ou responsável por conta própria: nada 
 
 Qualquer falha — sem permissão, PR já existe, base inválida, rede fora — **não interrompe a entrega**. Vá para o passo 3, registre o erro literal do comando, e siga.
 
-Se a falha for "PR já existe para esta branch" no GitHub, recupere uma URL escalar no **projeto de destino** e exija exatamente uma linha. Rode na **mesma shell** do bloco do comando acima, que define `head` e `destino`: sozinho, o bloco falha em vez de consultar com valores vazios.
-
-```bash
-: "${head:?rode na mesma shell do bloco do comando (passo 2), que define head}" \
-  "${destino:?rode na mesma shell do bloco do comando (passo 2), que define destino}"
-pr_url="$(gh pr view "$head" --repo "$destino" --json url --jq '.url')" || { echo "PR existente não recuperado no destino"; exit 1; }
-linhas_url="$(printf '%s\n' "$pr_url" | awk 'END { print NR }')"
-[ -n "$pr_url" ] && [ "$linhas_url" = 1 ] || { echo "recuperação do PR retornou zero ou múltiplas URLs"; exit 1; }
-```
+Se a falha for "PR já existe para esta branch" no GitHub (a saída do `gh pr create` diz `already exists`), o próprio bloco do passo 2 recupera a URL escalar no **projeto de destino**, exigindo exatamente uma linha: a recuperação mora no mesmo bloco que tenta criar, porque `head` e `destino` só existem ali. Qualquer outra falha sai do bloco com o erro literal do `gh pr create`, sem consultar o PR, e esse erro vai para o passo 3.
 
 No GitLab, a consulta exata por projeto fonte e branch já ocorre antes do `glab mr create`: zero cria, uma retoma e mais de uma falha fechado. É uma retomada, não uma falha. É o caso normal depois de uma reconciliação de base (`references/11-reconciliacao-base.md`): a solicitação existente é retomada, **nunca uma segunda solicitação**.
 

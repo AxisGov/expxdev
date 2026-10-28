@@ -17,9 +17,10 @@ cada commit que o remoto ainda não tem (contra o primeiro pai, inclusive em mer
 tag anotada. "O que o remoto tem" é o SHA remoto do protocolo; na branch nova, o que o servidor
 anuncia na hora (`ls-remote` na URL do push), e a consulta que falha barra. A ref de rastreio
 (`refs/remotes/<remoto>`) não conta: é cache local (DM-281). O modo é o do `sem-segredo` em `.expx/hooks.json` (nasce `bloqueio`): achado barra a
-ref; em `aviso`, diagnostica e o push segue; em `desligado`, não varre. Qualquer falha de leitura
-não libera. Acima de 300 commits a varredura não roda e, em `bloqueio`, o push é barrado: divida a
-publicação, ou desligue conscientemente — nenhuma varredura manual libera o push. É a segunda
+ref; em `aviso`, diagnostica e o push segue; em `desligado`, não varre. A falha de leitura nunca conta como limpo:
+em `bloqueio` ela barra, e em `aviso` vira diagnóstico e o push segue, como o achado. Acima de 300
+commits a varredura não roda e, em `bloqueio`, o push é barrado: busque o remoto (`git fetch`) se
+for branch nova, divida a publicação, ou desligue conscientemente — nenhuma varredura manual libera o push. É a segunda
 camada: pega o segredo que o próprio comando gerou e o commit feito por fora do PreToolUse.
 
 O executável é um só: `scripts/ativacao-pre-push.sh <--instalar|--provar|--reverter> --entrega

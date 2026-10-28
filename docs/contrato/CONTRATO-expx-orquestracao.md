@@ -312,9 +312,10 @@ H10 (o escritor do rastro sem configuração em `model`/`effort`). As demais
 
 `model` e `effort` do rastro são **só o executor observado** (H10): nenhum
 escritor deve preenchê-los com configuração — frontmatter, resolução ou
-alternativa. O escritor comum já cumpre a regra; os escritores próprios da
-SprintX ainda completam o subagente do Claude com o frontmatter, exceção
-transitória até receberem a mesma mudança. O escritor comum (`nucleo/hooks/expx-rastro.sh`) os tira de
+alternativa. O escritor comum cumpre a regra, e os escritores próprios da
+SprintX também, desde AxisGov/sprintx@80d2e9b (DS-190); linhas anteriores, em
+que eles completavam o subagente do Claude com o frontmatter, continuam
+válidas. O escritor comum (`nucleo/hooks/expx-rastro.sh`) os tira de
 `EXPX_MODEL`/`EXPX_EFFORT`, que o chamador lê do payload do runtime para o
 executor `EXPX_AGENTE` (no Claude, `effort.level`), e, no contexto Claude, de
 `$CLAUDE_EFFORT` apenas para `principal`. Sem observação, `null`. O `harness`
