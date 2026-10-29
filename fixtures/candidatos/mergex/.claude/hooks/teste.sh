@@ -464,6 +464,99 @@ caso "git add -Af && git commit: barra"             comum/sem-segredo.sh "$(bash
 caso "git add -A com ignorado (sem -f): passa"      comum/sem-segredo.sh "$(bash_json 'git add -A && git commit -m x')" 0
 rm -f "$SEG_T/.gitignore" "$SEG_T/ignorado.env"
 HOOK_CWD="$HOOK_CWD_ANTES"; rm -rf "$SEG_T"
+# O arquivo do framework que o lock da instalacao confere por hash nao e varrido no commit:
+# a atualizacao do framework barrava no proprio hook (conselhos, 0.12.5 para 0.12.8; DM-286).
+# Vale so para o blob preparado, com o lock v2 do indice, nas pastas do framework.
+LCK_T="$(mktemp -d)"
+git -C "$LCK_T" init -q -b feature/lock
+lck_git() { git -C "$LCK_T" -c user.email=t@t -c user.name=t -c commit.gpgsign=false "$@"; }
+lck_sha() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | awk '{print $1}'; }
+# lck_lock <versao> <caminho> <hash> — grava o lock com uma entrada em instalacao.arquivos
+lck_lock() { mkdir -p "$LCK_T/.expx"; jq -n --argjson v "$1" --arg p "$2" --arg h "$3" \
+  '{lock_version:$v,cli_version:"0.12.9",harness:["claude"],skills:{},instalacao:{arquivos:{($p):$h}}}' > "$LCK_T/.expx/expx-lock.json"; }
+printf 'base\n' > "$LCK_T/base.txt"; lck_git add base.txt; lck_git commit -q -m base
+HOOK_CWD_ANTES="$HOOK_CWD"; HOOK_CWD="$LCK_T"
+FW=".claude/hooks/fw.sh"; mkdir -p "$LCK_T/.claude/hooks"
+printf 'K=%s\n' "$SK" > "$LCK_T/$FW"
+lck_lock 2 "$FW" "$(lck_sha "$LCK_T/$FW")"; lck_git add -A
+caso "lock: arquivo do framework com o hash do lock: passa"     comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 0
+caso "lock: segredo na mensagem continua barrando"              comum/sem-segredo.sh "$(bash_json "git commit -m 'chave $SK'")" 2
+printf 'K=%s\nT=%s\n' "$SK" "$SK" > "$LCK_T/$FW"
+caso "lock: alteracao nao preparada no mesmo arquivo: barra"    comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+lck_git add -A
+caso "lock: hash que nao bate: barra"                           comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+lck_lock 2 "$FW" "$(lck_sha "$LCK_T/$FW")"
+caso "lock: o lock certo so na arvore, nao no indice: barra"    comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+lck_git add -A; lck_lock 1 "$FW" "$(lck_sha "$LCK_T/$FW")"; lck_git add -A
+caso "lock: versao 1 nao dispensa: barra"                       comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+printf '{ nao e json' > "$LCK_T/.expx/expx-lock.json"; lck_git add -A
+caso "lock: malformado nao dispensa: barra"                     comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+printf 'K=%s\n' "$SK" > "$LCK_T/app.env"; lck_lock 2 "app.env" "$(lck_sha "$LCK_T/app.env")"; lck_git add -A
+caso "lock: caminho fora das pastas do framework: barra"        comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+lck_git rm -q --cached app.env; rm -f "$LCK_T/app.env"
+printf 'ok\n' > "$LCK_T/$FW"; lck_lock 2 "$FW" "$(lck_sha "$LCK_T/$FW")"
+jq --arg n "$SK" '.nota = $n' "$LCK_T/.expx/expx-lock.json" > "$LCK_T/l.tmp" && mv "$LCK_T/l.tmp" "$LCK_T/.expx/expx-lock.json"; lck_git add -A
+caso "lock: segredo dentro do proprio lock: barra"              comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+lck_git reset -q --hard; lck_git clean -qfd; mkdir -p "$LCK_T/.claude/hooks"
+printf 'K=%s\n' "$SK" > "$LCK_T/$FW"; lck_lock 2 "$FW" "$(lck_sha "$LCK_T/$FW")"
+caso "lock: add e commit no mesmo comando nao dispensa: barra"  comum/sem-segredo.sh "$(bash_json 'git add -A && git commit -m x')" 2
+ln -s "K=$SK" "$LCK_T/.claude/hooks/link"; printf 'K=%s' "$SK" > "$LCK_T/alvo.txt"
+lck_lock 2 ".claude/hooks/link" "$(lck_sha "$LCK_T/alvo.txt")"; rm -f "$LCK_T/alvo.txt" "$LCK_T/$FW"; lck_git add -A
+caso "lock: link simbolico nao dispensa: barra"                 comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+# lck_novo <arquivos...> — indice limpo, cada arquivo com um segredo, lock com o hash de cada um
+lck_novo() {
+  local a; lck_git reset -q --hard; lck_git clean -qfd; mkdir -p "$LCK_T/.expx"
+  local ent='{}'
+  for a in "$@"; do mkdir -p "$LCK_T/$(dirname "$a")"; printf 'K=%s\n' "$SK" > "$LCK_T/$a"
+    ent="$(jq -c --arg p "$a" --arg h "$(lck_sha "$LCK_T/$a")" '. + {($p): $h}' <<<"$ent")"; done
+  jq -n --argjson e "$ent" '{lock_version:2,cli_version:"0.12.9",harness:["claude"],skills:{},instalacao:{arquivos:$e}}' > "$LCK_T/.expx/expx-lock.json"
+}
+# Uma chave malformada invalida o lock inteiro, inclusive a entrada valida ao lado (Codex).
+for ruim in $'.claude/hooks/a\nb' $'.claude/hooks/a\tb' '.claude/hooks/a\b' '.claude/hooks/./a' \
+            '.claude/hooks/../a' '.claude/hooks//a' '/abs/a'; do
+  lck_novo "$FW"
+  jq --arg k "$ruim" --arg h "$(printf '%064d' 0)" '.instalacao.arquivos[$k] = $h' "$LCK_T/.expx/expx-lock.json" > "$LCK_T/l.tmp" \
+    && mv "$LCK_T/l.tmp" "$LCK_T/.expx/expx-lock.json"; lck_git add -A
+  caso "lock: chave malformada $(printf '%q' "$ruim") invalida o lock: barra" comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+done
+# O caminho e literal na exclusao: `*` e `[` nao alcancam outro arquivo.
+ESTR='.claude/hooks/a b"[1]*.sh'
+lck_novo "$ESTR"; lck_git add -A
+caso "lock: caminho com espaco, aspas, [ e *: passa"            comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 0
+printf 'K=%s\n' "$SK" > "$LCK_T/.claude/hooks/a b\"1-outro.sh"; lck_git add -A
+caso "lock: o * do caminho nao dispensa outro arquivo: barra"   comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+# Os limites, baixados pelas variaveis: acima deles, nada e dispensado.
+lck_novo "$FW" ".claude/hooks/fw2.sh"; lck_git add -A
+caso "lock: dois arquivos dentro dos limites: passa"            comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 0
+export EXPX_SEGREDO_DISP_MAX_ENTRADAS=1
+caso "lock: mais entradas que o limite: barra"                  comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+unset EXPX_SEGREDO_DISP_MAX_ENTRADAS; export EXPX_SEGREDO_DISP_MAX_ARQUIVOS=1
+caso "lock: mais arquivos dispensaveis que o limite: barra"     comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+unset EXPX_SEGREDO_DISP_MAX_ARQUIVOS; export EXPX_SEGREDO_DISP_MAX_BYTES=10
+caso "lock: mais bytes que o limite: barra"                     comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+unset EXPX_SEGREDO_DISP_MAX_BYTES; export EXPX_SEGREDO_DISP_MAX_LOCK=10
+caso "lock: lock maior que o limite: barra"                     comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+unset EXPX_SEGREDO_DISP_MAX_LOCK; export EXPX_SEGREDO_DISP_MAX_ARQUIVOS=99999
+caso "lock: variavel nao sobe o limite (99999 ainda e 1024): passa" comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 0
+unset EXPX_SEGREDO_DISP_MAX_ARQUIVOS
+# Sem sha256 que funcione, nada e dispensado.
+SEMSHA_T="$(mktemp -d)"; printf '#!/bin/sh\nexit 1\n' > "$SEMSHA_T/sha256sum"; cp "$SEMSHA_T/sha256sum" "$SEMSHA_T/shasum"
+chmod +x "$SEMSHA_T/sha256sum" "$SEMSHA_T/shasum"
+PATH_ANTES="$PATH"; export PATH="$SEMSHA_T:$PATH"
+caso "lock: sem sha256 que funcione: barra"                     comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+export PATH="$PATH_ANTES"; rm -rf "$SEMSHA_T"
+# O hash certo com saida de erro tambem nao vale: so o exito do executavel conta (Codex).
+SHAERR_T="$(mktemp -d)"
+printf '#!/bin/sh\n"%s" "$@"\nexit 1\n' "$(command -v sha256sum || command -v shasum)" > "$SHAERR_T/sha256sum"
+cp "$SHAERR_T/sha256sum" "$SHAERR_T/shasum"; chmod +x "$SHAERR_T/sha256sum" "$SHAERR_T/shasum"
+export PATH="$SHAERR_T:$PATH"
+caso "lock: sha256 que imprime o hash mas sai com erro: barra"  comum/sem-segredo.sh "$(bash_json 'git commit -m x')" 2
+# ...nem num chamador sem pipefail: o helper exige o exito por conta propria.
+SHA_RC="$(set +o pipefail; . "$H/../skills/mergex/scripts/segredo-dispensa.sh"; printf 'x' | _disp_sha256 >/dev/null 2>&1; echo $?)"
+if [ "$SHA_RC" != 0 ]; then OK=$((OK+1)); printf '  ok    %s\n' "lock: _disp_sha256 sem pipefail devolve o erro do executavel"
+else FALHOU=$((FALHOU+1)); printf '  FALHA %s (rc %s)\n' "lock: _disp_sha256 sem pipefail devolve o erro do executavel" "$SHA_RC"; fi
+export PATH="$PATH_ANTES"; rm -rf "$SHAERR_T"
+HOOK_CWD="$HOOK_CWD_ANTES"; rm -rf "$LCK_T"
 # Prefixo de chave no meio de um identificador nao e chave. Falso positivo do
 # conselho #204: "ta" + "sk-fora-do-plano-..." (nome de um caso da bancada da
 # sprintx) casava com sk-, e barrou os commits de instalacao do framework. O

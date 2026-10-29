@@ -130,11 +130,24 @@ EXPX_DIRS
     # configurado trocaria o texto do diff (com /bin/true, por nada) e o segredo
     # passaria sem ser visto (conselhos#210, P7). --text: arquivo binário ou com
     # atributo -diff sairia como "Binary files differ", sem bloco @@ (login#30).
+    # O arquivo do framework cujo blob preparado bate com o lock v2 do índice não é
+    # varrido no `--cached` (DM-286, segredo-dispensa.sh). O não preparado, sempre.
+    # Sem o helper, nada é dispensado.
+    DISPENSA="$DIR/../../skills/mergex/scripts/segredo-dispensa.sh"
+    DISP_OK=0
+    # shellcheck source=../../skills/mergex/scripts/segredo-dispensa.sh
+    { [ -r "$DISPENSA" ] && . "$DISPENSA" && command -v segredo_dispensaveis_indice >/dev/null 2>&1; } && DISP_OK=1
     ALVO=""
     while IFS= read -r repo; do
       [ -n "$repo" ] || continue
+      ESCOPO=()
+      if [ "$DISP_OK" = 1 ]; then
+        while IFS= read -r ps; do ESCOPO+=("$ps"); done \
+          < <(cd "$repo" 2>/dev/null && segredo_dispensaveis_indice | segredo_pathspec_excluir)
+        [ "${#ESCOPO[@]}" -gt 0 ] && ESCOPO=(-- ":(top)" "${ESCOPO[@]}")
+      fi
       ALVO="$ALVO
-$( { git -C "$repo" diff --cached --text --no-ext-diff --no-textconv --no-color -U0
+$( { git -C "$repo" diff --cached --text --no-ext-diff --no-textconv --no-color -U0 ${ESCOPO[@]+"${ESCOPO[@]}"}
      git -C "$repo" diff --text --no-ext-diff --no-textconv --no-color -U0; } 2>/dev/null \
       | awk '/^diff --git / { h = 0; next } /^@@/ { h = 1; next } h && /^\+/ { print substr($0, 2) }')"
     done <<EXPX_REPOS

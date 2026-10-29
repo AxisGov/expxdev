@@ -266,9 +266,45 @@ describe("P0.2 — init real de SprintX + MergeX", () => {
   it("funcional: 8 — o catálogo de método da MergeX está instalado pelo mecanismo normal", () => {
     const rel = ".claude/skills/mergex/scripts/catalogo-de-metodo.sh";
     expect(CANDIDATOS.sprintx.sha).toBe("69c0d23db7e1b6f4d26f269b30f91e5405d077bd");
-    expect(CANDIDATOS.mergex.sha).toBe("26df2d0a3c70e348e540589a59feea15612d9901");
+    expect(CANDIDATOS.mergex.sha).toBe("015d846a93cc215857bd6f8f05f5cff0cb2fdb1f");
     expect(sha256(join(A, rel))).toBe(sha256(join(snapshot("mergex"), rel)));
     expect(readFileSync(join(A, rel), "utf8")).toContain("PREFLIGHT.md");
+  });
+
+  it("integração: a dispensa da DM-286 instalada lê o lock que o init grava", () => {
+    // O commit da própria atualização: o `sem-segredo` deixa de varrer o arquivo
+    // do framework cujo blob preparado bate com o sha256 do lock. A prova é que o
+    // formato que o init escreve é o que o helper da MergeX lê.
+    const p = produto();
+    expect(init(p, "mergex").status).toBe(0);
+    gitEm(p, "add", "-A");
+    const dispensaveis = (): string[] =>
+      spawnSync(
+        bashDosHooks(),
+        ["-c", ". .claude/skills/mergex/scripts/segredo-dispensa.sh && segredo_dispensaveis_indice"],
+        { cwd: p, encoding: "utf8", env: ambienteCom(pathDosHooks(), {}) },
+      )
+        .stdout.split("\n")
+        .filter((l) => l !== "")
+        .sort();
+    const arquivos = (json(join(p, ".expx", "expx-lock.json"))["instalacao"] as Json)["arquivos"] as Record<string, string>;
+    const elegiveis = Object.keys(arquivos)
+      .filter((c) => /^(\.claude\/(hooks|skills|commands|agents)|\.expx\/marketplace)\/./.test(c))
+      .sort();
+    const antes = dispensaveis();
+    expect(antes.length).toBeGreaterThan(0);
+    expect(antes).toEqual(elegiveis);
+    expect(antes).toContain(".claude/hooks/comum/sem-segredo.sh");
+    expect(antes).not.toContain(".expx/expx-lock.json");
+
+    // Alterado depois do init: o blob não bate mais com o lock e volta a ser varrido.
+    const tabela = ".claude/skills/mergex/scripts/segredo-tabela.sh";
+    appendFileSync(join(p, tabela), "# alterado no produto\n");
+    gitEm(p, "add", "-A");
+    const depois = dispensaveis();
+    expect(depois).not.toContain(tabela);
+    expect(depois).toEqual(antes.filter((c) => c !== tabela));
+    expect(rodarHook(p, "sem-segredo.sh", "git commit -m atualizacao").status).toBe(0);
   });
 
   it("integração: o produtor SprintX instalado gera predecessores que a MergeX instalada prova", () => {

@@ -119,23 +119,41 @@ if [ -r "$BASE_SH" ]; then
   case "$SEG_MODO" in aviso|bloqueio|desligado) ;; *) SEG_MODO=bloqueio ;; esac
 fi
 SEG_TABELA_OK=1
+SEG_DISP_OK=0
 if [ "$SEG_MODO" != desligado ]; then
   # shellcheck source=segredo-tabela.sh
   { [ -r "$AQUI/segredo-tabela.sh" ] && . "$AQUI/segredo-tabela.sh" && command -v segredo_varrer >/dev/null 2>&1; } \
     || SEG_TABELA_OK=0
+  # O arquivo do framework que o lock v2 do próprio commit confere não é varrido
+  # (DM-286). Sem o helper, nada é dispensado.
+  # shellcheck source=segredo-dispensa.sh
+  { [ -r "$AQUI/segredo-dispensa.sh" ] && . "$AQUI/segredo-dispensa.sh" \
+    && command -v segredo_dispensaveis_commit >/dev/null 2>&1; } && SEG_DISP_OK=1
+fi
+# O saldo de bytes conferidos pela dispensa vale para o push inteiro (CodeAnt no mergex#58).
+# Sem gravar o saldo, nada é dispensado.
+SEG_DISP_ORCAMENTO=""
+if [ "$SEG_DISP_OK" = 1 ]; then
+  SEG_DISP_ORCAMENTO="$TMP_DIR/disp-orcamento"
+  _disp_lim 67108864 "${EXPX_SEGREDO_DISP_MAX_PUSH:-}" > "$SEG_DISP_ORCAMENTO" 2>/dev/null || SEG_DISP_OK=0
 fi
 _seg_nulo() { case "$1" in *[!0]*) return 1 ;; esac; return 0; }
 _seg_mais() { awk '/^diff --git / { h = 0; next } /^@@/ { h = 1; next } h && /^\+/ { print substr($0, 2) }'; }
 # _seg_commit <sha> — mensagem e linhas adicionadas do commit, contra o primeiro pai
 _seg_commit() {
-  local c="$1" pai
+  local c="$1" pai ps escopo=()
   git log -1 --format=%B "$c" -- 2>/dev/null || return 1
   pai="$(git rev-list --parents -n 1 "$c" 2>/dev/null)" || return 1
   pai="$(printf '%s' "$pai" | awk '{ print $2 }')"
+  if [ "$SEG_DISP_OK" = 1 ]; then
+    while IFS= read -r ps; do escopo+=("$ps"); done \
+      < <(segredo_dispensaveis_commit "$c" "$pai" | segredo_pathspec_excluir)
+    [ "${#escopo[@]}" -gt 0 ] && escopo=(":(top)" "${escopo[@]}")
+  fi
   if [ -n "$pai" ]; then
-    git diff --text --no-ext-diff --no-textconv --no-color -U0 "$pai" "$c" -- 2>/dev/null | _seg_mais
+    git diff --text --no-ext-diff --no-textconv --no-color -U0 "$pai" "$c" -- ${escopo[@]+"${escopo[@]}"} 2>/dev/null | _seg_mais
   else
-    git diff-tree --root -p --text --no-ext-diff --no-textconv --no-color -U0 "$c" -- 2>/dev/null | _seg_mais
+    git diff-tree --root -p --text --no-ext-diff --no-textconv --no-color -U0 "$c" -- ${escopo[@]+"${escopo[@]}"} 2>/dev/null | _seg_mais
   fi
   [ "${PIPESTATUS[0]}" = 0 ]
 }

@@ -23,6 +23,15 @@ commits a varredura não roda e, em `bloqueio`, o push é barrado: busque o remo
 for branch nova, divida a publicação, ou desligue conscientemente — nenhuma varredura manual libera o push. É a segunda
 camada: pega o segredo que o próprio comando gerou e o commit feito por fora do PreToolUse.
 
+**O arquivo que o lock da instalação confere não é varrido** (DM-286). Um arquivo do framework
+(em `.claude/hooks/`, `.claude/skills/`, `.claude/commands/`, `.claude/agents/` ou
+`.expx/marketplace/`) cujo blob bate com o sha256 que o `.expx/expx-lock.json` v2 registra é o que
+o ExpxDev instalou. No commit, contam o blob preparado e o lock do índice; no pre-push, o blob e o
+lock do próprio commit. A mensagem, o lock, o que não está preparado e qualquer outro caminho
+continuam varridos. Para a atualização do framework passar, prepare os arquivos e o lock num
+comando (`git add`) e commite em outro: no mesmo comando, o índice ainda não tem o que o lock
+confere.
+
 O executável é um só: `scripts/ativacao-pre-push.sh <--instalar|--provar|--reverter> --entrega
 docs/entregas/<trabalho_id>/ENTREGA.md`. Códigos: `0` ok; `1` prova reprovada; `3` pré-requisito
 ausente (hook de terceiro que não passa na prova); `64` uso. Não existe opção de força.
