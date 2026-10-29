@@ -1,5 +1,9 @@
 # Changelog
 
+## Próxima versão
+
+- **Limite de migração registrado:** o commit que instala uma versão nova é julgado pelo `sem-segredo` da versão antiga, ainda instalado. Da 0.12.5 para a 0.12.8, no katosmv/conselhos-municipais, ele acusou 38 valores em arquivos do próprio framework, que a tabela nova não acusa. O README descreve a exceção estrita: conferir que só os arquivos do `expx update` mudaram, com o hash do lock, e que a tabela nova não acusa nada; então fazer o commit à mão, fora do agente, sem mexer em `.expx/hooks.json` e sem `git push --no-verify`, porque o `pre-push` da versão nova continua varrendo o que o push publica. A dispensa dos arquivos que o lock confere por hash está no AxisGov/mergex#58 (DM-286) e entra numa versão seguinte; ela só vale a partir dessa versão.
+
 ## 0.12.8 — os achados de segredo do conselhos #211
 
 - Certifica a MergeX em AxisGov/mergex@26df2d0 (AxisGov/mergex#57, **DM-285**), com os achados do CodeAnt na instalação da 0.12.5 no katosmv/conselhos-municipais#211 que seguiam abertos na 0.12.7:
