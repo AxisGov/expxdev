@@ -645,6 +645,25 @@ skill encolhe entre versões.
 > **Rollback.** Como `.expx/` é commitado, desfazer uma atualização é revertê-lo pelo
 > versionador (`git checkout -- .expx`). O `update` diz isso em toda execução que aplica.
 
+> **O commit da atualização e a varredura de segredo.** Quem julga o commit que instala a versão
+> nova é o hook `sem-segredo` da versão **antiga** (um hook do agente, `PreToolUse`), ainda
+> instalado. Quando a tabela de segredo mudou entre as duas versões, ele pode acusar arquivos que
+> a própria instalação escreve. Foi o caso da migração da 0.12.5 para a 0.12.8 no
+> katosmv/conselhos-municipais: 38 achados, todos em arquivos do framework, e nenhum com a tabela
+> nova. A exceção é estrita e vale só para essa situação:
+>
+> 1. `git status` mostra **apenas** os arquivos que o `expx update` escreveu, e o hash de cada um
+>    bate com o que o `.expx/expx-lock.json` registra (`expx doctor` sem divergência);
+> 2. a tabela da versão nova, já instalada, não acusa nada nesse diff.
+>
+> Se tudo confere, o commit é feito à mão, fora do agente: ele não passa pelo `sem-segredo`
+> antigo, e o `--no-verify` não muda nada nesse caso. Não altere `.expx/hooks.json` e **não use
+> `git push --no-verify`**: o `pre-push` da versão nova continua varrendo o que o push publica, e é
+> ele o controle efetivo. Qualquer arquivo, alteração ou achado fora do conjunto esperado
+> interrompe o procedimento. Não o classifique como inofensivo nem como segredo por exclusão:
+> investigue antes de commitar. O lock prova que o arquivo é o instalado, não que o conteúdo seja
+> inofensivo.
+
 ---
 
 ## O que o `doctor` verifica
