@@ -678,7 +678,7 @@ skill encolhe entre versões.
 > confere então contra o lock do próprio commit. Quem julga o commit da atualização
 > continua sendo o hook da versão instalada antes dela: a exceção acima ainda vale para sair de uma
 > versão anterior à 0.12.9. Nas atualizações seguintes, os arquivos dessas pastas que o lock confere
-deixam de ser motivo de bloqueio; um achado em qualquer outro arquivo continua barrando.
+> deixam de ser motivo de bloqueio; um achado em qualquer outro arquivo continua barrando.
 
 ---
 
