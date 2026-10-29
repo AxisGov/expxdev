@@ -671,9 +671,11 @@ skill encolhe entre versões.
 >
 > A partir da 0.12.9, o `sem-segredo` e o `pre-push` instalados não varrem o arquivo do framework
 > (em `.claude/hooks`, `.claude/skills`, `.claude/commands`, `.claude/agents` ou
-> `.expx/marketplace`) cujo conteúdo que vai no commit bate com o sha256 do lock que vai junto
-> (DM-286 da MergeX). Arquivo alterado no produto volta a ser varrido, e a mensagem do commit, o
-> que está fora do índice e o próprio lock são sempre varridos. Quem julga o commit da atualização
+> `.expx/marketplace`) cujo conteúdo preparado bate com o sha256 do lock preparado; no push, os
+> dois do próprio commit (DM-286 da MergeX). Arquivo alterado no produto volta a ser varrido, e a
+> mensagem do commit, o que está fora do índice e o próprio lock são sempre varridos. Com
+> `git commit -o` ou pathspec, o commit pode levar o arquivo sem o lock preparado; o `pre-push` o
+> confere então contra o lock do próprio commit. Quem julga o commit da atualização
 > continua sendo o hook da versão instalada antes dela: a exceção acima ainda vale para sair de uma
 > versão anterior à 0.12.9. Nas atualizações seguintes, os arquivos dessas pastas que o lock confere
 deixam de ser motivo de bloqueio; um achado em qualquer outro arquivo continua barrando.
