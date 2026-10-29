@@ -652,8 +652,10 @@ skill encolhe entre versões.
 > katosmv/conselhos-municipais: 38 achados, todos em arquivos do framework, e nenhum com a tabela
 > nova. A exceção é estrita e vale só para essa situação:
 >
-> 1. `git status` mostra **apenas** os arquivos que o `expx update` escreveu, e o hash de cada um
->    bate com o que o `.expx/expx-lock.json` registra (`expx doctor` sem divergência);
+> 1. depois do `expx update`, `git add -A`; `git diff` vazio (nada fora do índice, então o disco é
+>    o que vai no commit); `git status` mostra **apenas** os arquivos que o `expx update` escreveu;
+>    e o hash de cada um bate com o que o `.expx/expx-lock.json` registra (`expx doctor` sem
+>    divergência);
 > 2. a tabela da versão nova, já instalada, não acusa nada nesse diff.
 >
 > Se tudo confere, o commit é feito à mão, fora do agente: ele não passa pelo `sem-segredo`
