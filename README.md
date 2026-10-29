@@ -537,16 +537,16 @@ Requisitos para os comandos abaixo: Node ≥ 20.19.0, `git`, GitHub CLI (`gh`) a
 `sha256sum` (Linux) ou `shasum` (macOS) para conferir o pacote antes de executá-lo.
 
 ```bash
-gh release download v0.12.8 -R AxisGov/expxdev -D ~/expx-cli/v0.12.8
+gh release download v0.12.9 -R AxisGov/expxdev -D ~/expx-cli/v0.12.9
 (
-  cd ~/expx-cli/v0.12.8
+  cd ~/expx-cli/v0.12.9
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.12.8.tgz.sha256
+    sha256sum -c expxdev-0.12.9.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.12.8.tgz.sha256
+    shasum -a 256 -c expxdev-0.12.9.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.12.8/expxdev-0.12.8.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.12.9/expxdev-0.12.9.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -555,7 +555,7 @@ npx --yes --package ~/expx-cli/v0.12.8/expxdev-0.12.8.tgz expx init --skills bui
 - O preflight recusa divergência entre `package.json`, `package-lock.json` e metadata do tarball,
   bem como tag ou release já existente. O pacote é gerado duas vezes e os hashes devem coincidir.
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.12.8 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.12.9 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -600,6 +600,9 @@ npx --yes --package ~/expx-cli/v0.12.8/expxdev-0.12.8.tgz expx init --skills bui
   a integridade final dos agentes de aprovação (F3c).
 - `0.12.8` fecha os achados de segredo do conselhos#211 que seguiam abertos: senha de URL com `:`,
   `=` ou `@` no meio, valor sem aspa com `:`, e o pre-push lendo cada commit uma vez.
+- `0.12.9` faz o `sem-segredo` e o `pre-push` dispensarem o arquivo do framework cujo conteúdo
+  bate com o hash do lock (DM-286): o commit de uma atualização futura deixa de ser barrado pelos
+  arquivos que a própria instalação escreve.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -665,6 +668,15 @@ skill encolhe entre versões.
 > interrompe o procedimento. Não o classifique como inofensivo nem como segredo por exclusão:
 > investigue antes de commitar. O lock prova que o arquivo é o instalado, não que o conteúdo seja
 > inofensivo.
+>
+> A partir da 0.12.9, o `sem-segredo` e o `pre-push` instalados não varrem o arquivo do framework
+> (em `.claude/hooks`, `.claude/skills`, `.claude/commands`, `.claude/agents` ou
+> `.expx/marketplace`) cujo conteúdo que vai no commit bate com o sha256 do lock que vai junto
+> (DM-286 da MergeX). Arquivo alterado no produto volta a ser varrido, e a mensagem do commit, o
+> que está fora do índice e o próprio lock são sempre varridos. Quem julga o commit da atualização
+> continua sendo o hook da versão instalada antes dela: a exceção acima ainda vale para sair de uma
+> versão anterior à 0.12.9. Nas atualizações seguintes, os arquivos dessas pastas que o lock confere
+deixam de ser motivo de bloqueio; um achado em qualquer outro arquivo continua barrando.
 
 ---
 

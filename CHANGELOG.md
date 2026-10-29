@@ -1,8 +1,14 @@
 # Changelog
 
-## Próxima versão
+## 0.12.9 — a varredura de segredo dispensa o que o lock confere
 
-- **Limite de migração registrado:** o commit que instala uma versão nova é julgado pelo `sem-segredo` da versão antiga, ainda instalado. Da 0.12.5 para a 0.12.8, no katosmv/conselhos-municipais, ele acusou 38 valores em arquivos do próprio framework, que a tabela nova não acusa. O README descreve a exceção estrita: conferir que só os arquivos do `expx update` mudaram, com o hash do lock, e que a tabela nova não acusa nada; então fazer o commit à mão, fora do agente, sem mexer em `.expx/hooks.json` e sem `git push --no-verify`, porque o `pre-push` da versão nova continua varrendo o que o push publica. A dispensa dos arquivos que o lock confere por hash está no AxisGov/mergex#58 (DM-286) e entra numa versão seguinte; ela só vale a partir dessa versão.
+- Certifica a MergeX em AxisGov/mergex@015d846 (AxisGov/mergex#58, **DM-286**): o `sem-segredo` e o `pre-push` deixam de varrer o arquivo do framework cujo blob bate com o sha256 que o lock v2 registra em `instalacao.arquivos`. É o que barrava o commit da própria atualização: a tabela da versão instalada acusava arquivos que a instalação nova escrevia.
+  - **Estreita:** só em `.claude/hooks`, `.claude/skills`, `.claude/commands`, `.claude/agents` e `.expx/marketplace`, só blob regular, e o lock e o blob vêm do mesmo estado que vai para o histórico: o índice no commit, o próprio commit no push. Qualquer dúvida desliga a dispensa, e a varredura segue normal: lock fora do contrato, chave malformada, `jq` ou `sha256sum` ausente, limites de tamanho e de quantidade.
+  - **Sempre varridos:** a mensagem do commit, o que não foi preparado com `git add`, o próprio lock e qualquer arquivo alterado depois da instalação.
+  - O lock é declaração local, não prova de procedência: quem o falsifica para casar com um segredo passa. O hook existe contra o vazamento acidental.
+- Teste novo de contrato na certificação: o helper da MergeX instalado pelo `init` lê o lock que o `init` grava e dispensa exatamente as entradas elegíveis dele.
+- **Limite de migração registrado** (expxdev#107): o commit que instala uma versão nova é julgado pelo `sem-segredo` da versão antiga, ainda instalado. Da 0.12.5 para a 0.12.8, no katosmv/conselhos-municipais, ele acusou 38 valores em arquivos do próprio framework, que a tabela nova não acusa. O README descreve a exceção estrita: conferir que só os arquivos do `expx update` mudaram, com o hash do lock, e que a tabela nova não acusa nada; então fazer o commit à mão, fora do agente, sem mexer em `.expx/hooks.json` e sem `git push --no-verify`, porque o `pre-push` da versão nova continua varrendo o que o push publica.
+- **Para quem atualiza para a 0.12.9:** a dispensa só vale quando a 0.12.9 já está instalada. O commit que a instala ainda é julgado pelo hook anterior e pode precisar da exceção do README; as atualizações seguintes já contam com a dispensa.
 
 ## 0.12.8 — os achados de segredo do conselhos #211
 
