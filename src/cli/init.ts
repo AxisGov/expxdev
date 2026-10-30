@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { repositorioCanonico, resolverOrigem } from "../nucleo/catalogo.js";
+import { certificadoDa, repositorioCanonico, resolverOrigem } from "../nucleo/catalogo.js";
 import { resolverAlvo } from "../nucleo/versao.js";
 import { buscarSkill } from "../nucleo/busca.js";
 import { detectarLayout } from "../nucleo/layout.js";
@@ -100,6 +100,11 @@ export type OpcoesInit = {
    * novo na ponta e andaria junto. A `referencia` gravada no lock não muda.
    */
   commits?: Record<string, string>;
+  /**
+   * O commit certificado por skill, no lugar do catálogo. Só a bancada usa: a
+   * fixture não tem o commit real. Vale apenas para a origem canônica.
+   */
+  certificados?: Record<string, string>;
   /**
    * Recusa a escrita se alguma skill do lock anterior diverge do disco. O
    * `update` passa: a checagem dele roda antes da busca, e esta, sob a trava.
@@ -466,7 +471,11 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
       continue;
     }
 
-    const alvo = await resolverAlvo(repositorio, op.referencias?.[nome]);
+    const certificado = certificadoDa(nome, repositorio, op.certificados?.[nome]);
+    const alvo = await resolverAlvo(repositorio, {
+      ...(op.referencias?.[nome] !== undefined ? { forcar: op.referencias[nome] } : {}),
+      ...(certificado !== undefined ? { certificado } : {}),
+    });
     if (!alvo.ok) {
       falhas.push({ nome, erro: alvo.erro ?? "nao foi possivel resolver a versao" });
       continue;
@@ -476,7 +485,8 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     // Origem em disco (EXPX_SKILLS_LOCAIS, ou `--origem` apontando para uma
     // pasta) é COPIADA, não clonada: o clone traria só o commitado, e o ciclo
     // de desenvolvimento de skill deixaria de ser curto.
-    const commit = op.commits?.[nome];
+    // Alvo fixado por SHA (certificado ou `--to`) é buscado como commit.
+    const commit = op.commits?.[nome] ?? (alvo.commit !== undefined && alvo.commit === alvo.referencia ? alvo.commit : undefined);
     const local = ehCaminhoLocal(repositorio);
     // a pasta local é copiada como está: o commit travado não vale, e isso é dito
     if (local && commit !== undefined) {

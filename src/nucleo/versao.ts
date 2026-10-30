@@ -6,13 +6,10 @@ const exec = promisify(execFile);
 /**
  * Resolução de versão alvo de uma skill.
  *
- * A regra do método: por padrão, a MAIOR tag de versão semântica do
- * repositório. Sem nenhuma tag, cai para a branch padrão e avisa
- * explicitamente que a skill não está travada em versão publicada — nunca
- * segue a branch em silêncio quando existe tag.
- *
- * Hoje NENHUMA das sete skills tem tag (`base/08-repositorios-reais.md`), então
- * o caminho de fallback é o corrente na prática, não a exceção.
+ * Da origem canônica, o alvo é o commit que a release do CLI certifica (o
+ * `certificado` do catálogo). Fora dela — a pasta local, a origem que a
+ * pessoa configurou —, a MAIOR tag de versão semântica do repositório e, sem
+ * nenhuma tag, a branch padrão, marcada como não travada.
  */
 
 export type Alvo = {
@@ -81,16 +78,39 @@ export async function commitRemotoDaBranch(repositorio: string, branch: string):
   return linha?.split("\t")[0]?.trim();
 }
 
+export type OpcoesAlvo = {
+  /** A referência pedida (`--to`): tag, branch ou SHA. Vence tudo. */
+  forcar?: string;
+  /**
+   * O commit que esta versão do CLI certifica para a skill, quando a origem é a
+   * canônica do catálogo. Vence a tag e a `main`: andar para a frente é uma
+   * release nova do expxdev, nunca um merge na skill.
+   */
+  certificado?: string;
+};
+
+/** Um SHA-1 completo: pedido assim, é um commit, sem ambiguidade com tag ou branch. */
+const SHA_COMPLETO = /^[0-9a-f]{40}$/i;
+
 /**
  * A referência que deve ser instalada.
+ *
+ * Fixada por SHA (o `--to` com SHA, ou o certificado), a referência é o próprio
+ * commit, e o `init` o busca como commit: `git clone --branch` não aceita SHA.
  *
  * Repositório inacessível NÃO lança: devolve `ok: false` com o motivo, porque o
  * método exige que uma skill inacessível não aborte a instalação das demais.
  */
-export async function resolverAlvo(repositorio: string, forcar?: string): Promise<Alvo> {
+export async function resolverAlvo(repositorio: string, op: OpcoesAlvo = {}): Promise<Alvo> {
+  const { forcar, certificado } = op;
   if (forcar !== undefined && forcar !== "") {
+    if (SHA_COMPLETO.test(forcar)) {
+      const sha = forcar.toLowerCase();
+      return { ok: true, referencia: sha, travado: true, commit: sha };
+    }
     return { ok: true, referencia: forcar, travado: !forcar.includes(BRANCH_PADRAO) };
   }
+  if (certificado !== undefined) return { ok: true, referencia: certificado, travado: true, commit: certificado };
   try {
     const tags = await listarTags(repositorio);
     const maior = maiorTagSemver(tags);

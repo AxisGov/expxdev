@@ -198,6 +198,17 @@ export function resolverOrigem(
   return origemDoCatalogo(skill);
 }
 
+/**
+ * O commit certificado da skill, quando `origem` é a canônica do catálogo. A
+ * pasta local e a origem customizada não têm certificado: o que vem delas não é
+ * o que a release provou. `substituto` troca o valor, nunca a regra (bancada).
+ */
+export function certificadoDa(nome: string, origem: string, substituto?: string): string | undefined {
+  const skill = CATALOGO.find((x) => x.nome === nome);
+  if (skill === undefined || normalizarOrigem(origem) !== normalizarOrigem(skill.repositorio)) return undefined;
+  return substituto ?? skill.certificado;
+}
+
 export function buscarNoCatalogo(nome: string): Skill | undefined {
   const s = CATALOGO.find((x) => x.nome === nome);
   if (s === undefined) return undefined;

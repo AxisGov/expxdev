@@ -32,6 +32,25 @@ describe("resolução de versão alvo", () => {
     expect(maiorTagSemver([])).toBeUndefined();
   });
 
+  it("funcional: com certificado, o alvo é o commit, travado, sem consultar o remoto", async () => {
+    // O commit certificado pela release do CLI vence a tag e a main da skill: um
+    // remoto inacessível prova que a resolução nem foi ao repositório.
+    const sha = "0123456789abcdef0123456789abcdef01234567";
+    const r = await resolverAlvo("/caminho/que/nao/existe/repo.git", { certificado: sha });
+    expect(r).toEqual({ ok: true, referencia: sha, travado: true, commit: sha });
+  });
+
+  it("funcional: --to vence o certificado, e o SHA completo pedido vira o commit", async () => {
+    const sha = "0123456789abcdef0123456789abcdef01234567";
+    const outro = "fedcba9876543210fedcba9876543210fedcba98";
+    expect(await resolverAlvo("/nao/existe", { forcar: outro, certificado: sha })).toEqual({
+      ok: true, referencia: outro, travado: true, commit: outro,
+    });
+    expect(await resolverAlvo("/nao/existe", { forcar: "v1.0.0", certificado: sha })).toEqual({
+      ok: true, referencia: "v1.0.0", travado: true,
+    });
+  });
+
   it("funcional: repositório inacessível devolve falha sem lançar", async () => {
     const r = await resolverAlvo("/caminho/que/nao/existe/repo.git");
     expect(r.ok).toBe(false);

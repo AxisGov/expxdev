@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { executarUpdate } from "./flags.js";
@@ -92,7 +92,7 @@ describe("migracao idempotente de proveniencia", () => {
     const bloqueio = caminhoDoBloqueioOperacao(projeto.raiz);
     writeFileSync(bloqueio, "outra operacao\n");
 
-    const resultado = await executarUpdate({ raiz: projeto.raiz, sim: true });
+    const resultado = await executarUpdate({ raiz: projeto.raiz, sim: true, certificados: { [nome]: commit } });
 
     expect(resultado.ok).toBe(false);
     expect(resultado.aplicou).toBe(false);
@@ -116,11 +116,14 @@ describe("migracao idempotente de proveniencia", () => {
       escreverLock(projeto.raiz, anterior);
       const caminho = join(projeto.raiz, ".expx", "expx-lock.json");
 
-      const check = await executarUpdate({ raiz: projeto.raiz, check: true });
+      // O commit da fixture faz o papel do certificado (o real ela não tem): o
+      // conteúdo já é o certificado, e o lock só muda de origem e de referência.
+      const certificados = { [nome]: commit };
+      const check = await executarUpdate({ raiz: projeto.raiz, check: true, certificados });
       expect(check.aplicou).toBe(false);
       expect(JSON.parse(readFileSync(caminho, "utf8"))).toEqual(anterior);
 
-      const primeira = await executarUpdate({ raiz: projeto.raiz, sim: true });
+      const primeira = await executarUpdate({ raiz: projeto.raiz, sim: true, certificados });
       expect(primeira.ok).toBe(true);
       expect(primeira.aplicou).toBe(true);
       expect(primeira.atualizadas).toEqual([nome]);
@@ -132,17 +135,18 @@ describe("migracao idempotente de proveniencia", () => {
           [nome]: {
             ...anterior.skills[nome],
             repositorio: canonica,
+            referencia: commit,
           },
         },
       });
       const bytesDepois = readFileSync(caminho, "utf8");
 
-      const segunda = await executarUpdate({ raiz: projeto.raiz, sim: true });
+      const segunda = await executarUpdate({ raiz: projeto.raiz, sim: true, certificados });
       expect(segunda.aplicou).toBe(false);
       expect(readFileSync(caminho, "utf8")).toBe(bytesDepois);
 
-      const operacoesGit = readFileSync(trace, "utf8");
-      expect(operacoesGit).toContain(canonica);
+      // No certificado, o commit decide sem rede; se o git rodou, não foi na legada.
+      const operacoesGit = existsSync(trace) ? readFileSync(trace, "utf8") : "";
       expect(operacoesGit).not.toContain(legada);
     },
   );
