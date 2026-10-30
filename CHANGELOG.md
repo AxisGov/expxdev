@@ -1,7 +1,9 @@
 # Changelog
 
-## Próxima versão
+## 0.12.9 — a SprintX sob pipefail e o limite de migração
 
+- Certifica a SprintX em AxisGov/sprintx@e3852dc (AxisGov/sprintx#57, **DS-192**). Corrige o "task não está no plano" que o katosmv/login encontrou na 0.12.7. Sob `pipefail`, um consumidor que decide cedo (`grep -q`, `head`) fechava o pipe enquanto o produtor ainda escrevia; acima de 64 KB o produtor levava SIGPIPE (141) e o pipeline falhava, ao contrário do que o consumidor tinha achado. Os scripts e hooks da SprintX passam a usar here-string, `case`, a ferramenta lendo o arquivo direto e `awk 'NR <= n'` no lugar de `head`. No repositório da SprintX, um lint no CI recusa o padrão de volta, com o alcance declarado na DS-192.
+- Certifica a MergeX em AxisGov/mergex@307c938 (AxisGov/mergex#60): a mesma árvore da 0.12.8, mais o registro da DM-287.
 - **Limite de migração registrado:** o commit que instala uma versão nova é julgado pelo `sem-segredo` da versão antiga, ainda instalado. Da 0.12.5 para a 0.12.8, no katosmv/conselhos-municipais, ele acusou 38 valores em arquivos do próprio framework, que a tabela nova não acusa. O README descreve a exceção estrita: depois de `git add -A`, conferir que o `git diff` está vazio (o índice é o disco conferido), que só os arquivos do `expx update` mudaram, que o `expx doctor` não acusa divergência com o hash do lock e que a tabela nova não acusa nada; então fazer o commit à mão, fora do agente, sem mexer em `.expx/hooks.json` e sem `git push --no-verify`, porque o `pre-push` da versão nova continua varrendo o que o push publica. A dispensa dos arquivos que o lock confere por hash entrou na MergeX (AxisGov/mergex#58, DM-286) e foi revertida antes de qualquer release do expxdev (AxisGov/mergex#60, DM-287): o helper abria cerca de dez processos por arquivo, e num commit com 266 arquivos do framework o `sem-segredo` passava de 3 s para 11 s, acima do timeout de 10 s do hook. Hook morto por timeout não bloqueia, então o commit passaria sem varredura. Até um redesenho com orçamento de tempo, a migração segue a exceção do README.
 
 ## 0.12.8 — os achados de segredo do conselhos #211
