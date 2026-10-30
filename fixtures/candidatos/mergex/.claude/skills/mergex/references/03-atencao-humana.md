@@ -251,7 +251,8 @@ A lista é **fechada**. Arquivo fora dela não é artefato de método para o E3,
 pasta **deste** trabalho: `docs/sprintx/features/<slug>/` (ou `docs/<slug>/` no formato antigo)
 na sprintx, `docs/manutencao/<OC-ID>-<slug>/` na runx. Nos caminhos relativos, o único segmento
 variável é `sprint-NN` (`sprint-` e dígitos). `base/<area>.md` só vale para arquivo listado no
-`base/00-INDICE.md` do mesmo trabalho. Nos caminhos da mergex, `<trabalho_id>` é sempre o
+`base/00-INDICE.md` do mesmo trabalho; `<area>` é o caminho relativo a `base/` e pode ter subpastas
+(`base/dominio/regras.md`), sem segmento vazio, `.` ou `..`, sem `\` e sem link simbólico. Nos caminhos da mergex, `<trabalho_id>` é sempre o
 trabalho corrente, e a evidência da revisão por task tem mais um segmento variável: o nome
 `<T-NN.MM>.json` (ou o id legado `<T-N>.json`), o mesmo que o E1 commita. Kind `-` quer dizer
 que o contrato de origem não define frontmatter, e o arquivo **não pode** declarar um, **salvo**

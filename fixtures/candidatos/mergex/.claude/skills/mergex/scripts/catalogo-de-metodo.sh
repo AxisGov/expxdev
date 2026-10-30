@@ -103,7 +103,7 @@ catalogo_areas_do_indice() {
 }
 
 catalogo_base() { # <raiz> <trabalho> <pasta>
-  local raiz="$1" trabalho="$2" pasta="$3" indice area
+  local raiz="$1" trabalho="$2" pasta="$3" indice area parte resto
   indice="$pasta/base/00-INDICE.md"
   printf '%s\n' "$pasta/base/00-LACUNAS.md"
   [ -f "$raiz/$indice" ] || return 0
@@ -115,16 +115,21 @@ catalogo_base() { # <raiz> <trabalho> <pasta>
   printf '%s\n' "$indice"
   while IFS= read -r area; do
     [ -n "$area" ] || continue
+    # A área pode estar numa subpasta da base (DM-288). Fora dela: caminho absoluto,
+    # `\`, segmento vazio, `.` ou `..`, e link simbólico em qualquer ponto do caminho.
     case "$area" in
-      */*|*\\*|*..*|00-INDICE.md|00-LACUNAS.md|*.md) ;;
-      *) CATALOGO_ERRO="$indice enumera nome inválido: $area"; return 1 ;;
-    esac
-    case "$area" in
-      */*|*\\*|*..*|00-INDICE.md|00-LACUNAS.md)
+      /*|*\\*|*//*|.|./*|*/.|*/./*|..|../*|*/..|*/../*|00-INDICE.md|00-LACUNAS.md)
         CATALOGO_ERRO="$indice enumera caminho fora da base: $area"; return 1 ;;
       *.md) ;;
       *) CATALOGO_ERRO="$indice enumera arquivo que não é Markdown: $area"; return 1 ;;
     esac
+    parte="$raiz/$pasta/base"; resto="$area"
+    while :; do
+      parte="$parte/${resto%%/*}"
+      [ ! -L "$parte" ] || { CATALOGO_ERRO="$indice enumera área atrás de link simbólico: $area"; return 1; }
+      [ "${resto#*/}" != "$resto" ] || break
+      resto="${resto#*/}"
+    done
     printf '%s\n' "$pasta/base/$area"
   done <<EOF
 $(catalogo_areas_do_indice "$raiz/$indice")

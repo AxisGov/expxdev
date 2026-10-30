@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { executarInit } from "./init.js";
+import { buscarNoCatalogo } from "../nucleo/catalogo.js";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
 
@@ -127,6 +128,6 @@ describe("o commit certificado na instalacao", () => {
 
     expect(r.ok).toBe(false);
     expect(r.instaladas).toEqual([]);
-    expect(JSON.stringify(r.falhas)).toContain("e3852dcb6ecec9715ab17617d1cd648fb3df06fc");
+    expect(JSON.stringify(r.falhas)).toContain(buscarNoCatalogo("sprintx")?.certificado);
   });
 });

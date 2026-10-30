@@ -172,8 +172,10 @@ EXPX_CHAMADAS
   achou "chave privada"       '-----BEGIN [A-Z ]*PRIVATE KEY-----'
   # 4. Conexão com credencial embutida. A senha vai até o último `@` antes do host: com
   # `@` cru, o parser de URL fica com o último, e parar no primeiro julgava só o começo
-  # (`changeme@` seguido da senha real; CodeAnt no mergex#57). `/`, `?` e `#` fecham.
-  achou "credencial em URL"   '[a-zA-Z][a-zA-Z0-9+.-]*://[^/[:space:]:]+:[^/?#[:space:]]{4,}@'
+  # (`changeme@` seguido da senha real; CodeAnt no mergex#57). `/`, `?` e `#` fecham. O
+  # usuário pode ser vazio (`://:<senha>@`); a senha com menos de quatro caracteres fica fora,
+  # contra placeholder curto (DM-288, falso negativo assumido).
+  achou "credencial em URL"   '[a-zA-Z][a-zA-Z0-9+.-]*://[^/[:space:]:]*:[^/?#[:space:]]{4,}@'
   # 5. Dado real de cliente — CPF/CNPJ formatado
   achou "dado real de cliente" '([0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2}|[0-9]{2}\.[0-9]{3}\.[0-9]{3}/[0-9]{4}-[0-9]{2})'
   return 0
