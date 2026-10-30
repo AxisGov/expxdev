@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Documentação do método Expx</title>
-<meta name="description" content="Referência da linha AxisGov v0.12.8 do CLI expxdev e das nove skills do método Expx: instalação, contratos, grafo, painel, watch e arquitetura interna.">
+<meta name="description" content="Referência da linha AxisGov v0.12.9 do CLI expxdev e das nove skills do método Expx: instalação, contratos, grafo, painel, watch e arquitetura interna.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -24,7 +24,7 @@
       <path d="M7.6 7.4 L16.4 16.6 M16.4 7.4 L7.6 16.6" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/>
     </svg>
     <span class="marca__nome">expx<b>dev</b></span>
-    <span class="marca__versao" id="versao">v0.12.8</span>
+    <span class="marca__versao" id="versao">v0.12.9</span>
   </a>
 
   <div class="busca">
@@ -115,15 +115,15 @@
     o bastante para o agente decidir sozinho no meio da implementação, e ele decide: escolhe um padrão
     que não é o do projeto, escreve o teste na pasta que o runner não olha, refatora três arquivos que
     ninguém pediu. O método Expx é o conjunto das restrições que evitam isso, escrito. Este site é a
-    referência da linha <strong>AxisGov v0.12.8</strong> do <code>expxdev</code> — o CLI que instala e
+    referência da linha <strong>AxisGov v0.12.9</strong> do <code>expxdev</code> — o CLI que instala e
     mantém as nove skills — e de cada contrato que permite a elas cooperarem.
   </p>
 
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
-    <pre><code><span class="tok-cmd">gh</span> release download v0.12.8 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
-(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-com">if command -v sha256sum &gt;/dev/null 2&gt;&amp;1; then</span> <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.12.8.tgz.sha256<span class="tok-com">; else</span> <span class="tok-cmd">shasum</span> <span class="tok-flag">-a 256 -c</span> expxdev-0.12.8.tgz.sha256<span class="tok-com">; fi</span>) &amp;&amp;
-<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.12.8.tgz expx <span class="tok-flag">--version</span></code></pre>
+    <pre><code><span class="tok-cmd">gh</span> release download v0.12.9 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
+(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-com">if command -v sha256sum &gt;/dev/null 2&gt;&amp;1; then</span> <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.12.9.tgz.sha256<span class="tok-com">; else</span> <span class="tok-cmd">shasum</span> <span class="tok-flag">-a 256 -c</span> expxdev-0.12.9.tgz.sha256<span class="tok-com">; fi</span>) &amp;&amp;
+<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.12.9.tgz expx <span class="tok-flag">--version</span></code></pre>
   </div>
 
   <div class="cartoes">
@@ -210,9 +210,9 @@
   não executa <code>npm publish</code>: baixe o tarball e o checksum da GitHub Release explícita.</p>
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
-    <pre><code><span class="tok-cmd">gh</span> release download v0.12.8 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
-(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-com">if command -v sha256sum &gt;/dev/null 2&gt;&amp;1; then</span> <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.12.8.tgz.sha256<span class="tok-com">; else</span> <span class="tok-cmd">shasum</span> <span class="tok-flag">-a 256 -c</span> expxdev-0.12.8.tgz.sha256<span class="tok-com">; fi</span>) &amp;&amp;
-<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.12.8.tgz expx init <span class="tok-flag">--skills</span> sprintx,runx,mergex <span class="tok-flag">--harness</span> claude,opencode <span class="tok-flag">--yes</span></code></pre>
+    <pre><code><span class="tok-cmd">gh</span> release download v0.12.9 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
+(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-com">if command -v sha256sum &gt;/dev/null 2&gt;&amp;1; then</span> <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.12.9.tgz.sha256<span class="tok-com">; else</span> <span class="tok-cmd">shasum</span> <span class="tok-flag">-a 256 -c</span> expxdev-0.12.9.tgz.sha256<span class="tok-com">; fi</span>) &amp;&amp;
+<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.12.9.tgz expx init <span class="tok-flag">--skills</span> sprintx,runx,mergex <span class="tok-flag">--harness</span> claude,opencode <span class="tok-flag">--yes</span></code></pre>
   </div>
 
   <div class="tabela-caixa"><table>
@@ -237,7 +237,7 @@
   <div class="terminal">
     <div class="terminal__barra"><span class="terminal__bolha" style="background:#ff5f57"></span><span class="terminal__bolha" style="background:#febc2e"></span><span class="terminal__bolha" style="background:#28c840"></span><span class="terminal__titulo">expx init</span></div>
     <pre><code><span class="t-ciano">  ███████ ██   ██ ██████  ██   ██</span>   <span class="t-cinza">dev</span>
-<span class="t-cinza">  o metodo Expx no seu projeto  v0.12.8</span>
+<span class="t-cinza">  o metodo Expx no seu projeto  v0.12.9</span>
 
 <span class="t-verde">?</span> <span class="t-azul">Quais skills instalar?</span> <span class="t-cinza">(espaço marca, enter confirma)</span>
  <span class="t-verde">◉</span> sprintx   <span class="t-cinza">planeja e executa features novas</span>
@@ -1647,7 +1647,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
     <div class="codigo__topo"><span class="codigo__rotulo">.expx/expx-lock.json</span><button class="codigo__copiar">Copiar</button></div>
     <pre><code>{
   <span class="tok-key">"lock_version"</span>: <span class="tok-num">2</span>,
-  <span class="tok-key">"cli_version"</span>: <span class="tok-str">"0.12.8"</span>,
+  <span class="tok-key">"cli_version"</span>: <span class="tok-str">"0.12.9"</span>,
   <span class="tok-key">"harness"</span>: [<span class="tok-str">"claude"</span>],
   <span class="tok-key">"skills"</span>: {
     <span class="tok-key">"sprintx"</span>: {
@@ -2565,7 +2565,7 @@ docs/contrato/  <span class="tok-com">os contratos compartilhados pelas nove ski
 <footer class="rodape">
   <p>Documentação do método <strong>Expx</strong> · gerada a partir do código-fonte do
   <a href="https://github.com/AxisGov/expxdev">expxdev</a>
-  <a href="https://github.com/AxisGov/expxdev/releases/tag/v0.12.8">v0.12.8</a>.</p>
+  <a href="https://github.com/AxisGov/expxdev/releases/tag/v0.12.9">v0.12.9</a>.</p>
   <p>
     <a href="https://github.com/AxisGov/sprintx">sprintx</a> ·
     <a href="https://github.com/AxisGov/runx">runx</a> ·
