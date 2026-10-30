@@ -1,8 +1,9 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CATALOGO, buscarNoCatalogo, ehCamada, NOMES, resolverOrigem } from "./catalogo.js";
+import { CANDIDATOS, RAIZ_DO_REPO } from "../teste/candidatos.js";
 
 const SKILLS_AXISGOV = [
   ["runx", "https://github.com/AxisGov/runx", "https://github.com/bittencourtthulio/runx"],
@@ -124,6 +125,33 @@ describe("catálogo das skills", () => {
  * `git clone` aceita caminho de sistema de arquivos como origem, então o
  * override não precisa de nenhum caminho de código novo na busca.
  */
+describe("commit certificado de cada skill", () => {
+  // A release do expxdev certifica um commit de cada skill, e o init e o update
+  // instalam esse commit: um merge na main da skill só chega ao projeto pela
+  // próxima release (o katosmv/login recebeu na 0.12.8 o conteúdo da 0.12.9).
+  it("integração: as nove têm um SHA-1 completo, em minúsculas e distinto", () => {
+    for (const s of CATALOGO) expect(s.certificado, s.nome).toMatch(/^[0-9a-f]{40}$/);
+    expect(new Set(CATALOGO.map((s) => s.certificado)).size).toBe(9);
+  });
+
+  it("integração: as candidatas da bancada são os certificados do catálogo", () => {
+    for (const nome of ["sprintx", "mergex"] as const) {
+      const certificado = buscarNoCatalogo(nome)?.certificado;
+      expect(CANDIDATOS[nome].sha, nome).toBe(certificado);
+      const fixture = readFileSync(join(RAIZ_DO_REPO, "fixtures", "candidatos", `${nome}.sha`), "utf8").trim();
+      expect(fixture, nome).toBe(certificado);
+    }
+  });
+
+  it("integração: a tabela pública de proveniência lista exatamente os certificados", () => {
+    const doc = readFileSync(join(RAIZ_DO_REPO, "docs", "expx-cli", "base", "10-proveniencia-skills.md"), "utf8");
+    const linhas = [...doc.matchAll(/^\| `AxisGov\/([^`]+)` \| `([0-9a-f]{40})` \|$/gm)];
+    const tabela = new Map(linhas.map((m) => [`https://github.com/AxisGov/${m[1] ?? ""}`, m[2]]));
+    expect(tabela.size).toBe(9);
+    for (const s of CATALOGO) expect(tabela.get(s.repositorio), s.nome).toBe(s.certificado);
+  });
+});
+
 describe("origem local das skills", () => {
   const salvo = process.env["EXPX_SKILLS_LOCAIS"];
   const criados: string[] = [];

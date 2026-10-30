@@ -20,6 +20,12 @@ export type Skill = {
   nome: string;
   repositorio: string;
   origensLegadas?: readonly string[];
+  /**
+   * O commit da skill que esta versão do CLI certifica, e que o `init` e o
+   * `update` instalam da origem canônica. Andar para a frente é uma release nova
+   * do expxdev, nunca um merge na `main` da skill.
+   */
+  certificado: string;
   papel: string;
   camada: boolean;
 };
@@ -29,6 +35,7 @@ export const CATALOGO: readonly Skill[] = [
     nome: "sprintx",
     repositorio: "https://github.com/AxisGov/sprintx",
     origensLegadas: ["https://github.com/bittencourtthulio/sprintx"],
+    certificado: "e3852dcb6ecec9715ab17617d1cd648fb3df06fc",
     papel: "planeja e executa features novas",
     camada: false,
   },
@@ -36,6 +43,7 @@ export const CATALOGO: readonly Skill[] = [
     nome: "runx",
     repositorio: "https://github.com/AxisGov/runx",
     origensLegadas: ["https://github.com/bittencourtthulio/runx"],
+    certificado: "5de15a9d48ca3aa30be433201103cd1a23e6474b",
     papel: "ocorrencias de manutencao do dia a dia",
     camada: false,
   },
@@ -43,6 +51,7 @@ export const CATALOGO: readonly Skill[] = [
     nome: "legadox",
     repositorio: "https://github.com/AxisGov/legadox",
     origensLegadas: ["https://github.com/bittencourtthulio/legadox"],
+    certificado: "4b92ec47da1d075224f74aa8c3fc928fdb72230d",
     papel: "camada para projetos legados",
     camada: true,
   },
@@ -50,6 +59,7 @@ export const CATALOGO: readonly Skill[] = [
     nome: "stackx",
     repositorio: "https://github.com/AxisGov/stackx",
     origensLegadas: ["https://github.com/bittencourtthulio/stackx"],
+    certificado: "79200ec5761f26adef1f9b3cf66ec039f031e163",
     papel: "descobre o dialeto tecnico do repositorio",
     camada: true,
   },
@@ -57,6 +67,7 @@ export const CATALOGO: readonly Skill[] = [
     nome: "mergex",
     repositorio: "https://github.com/AxisGov/mergex",
     origensLegadas: ["https://github.com/bittencourtthulio/mergex"],
+    certificado: "307c938195fb639d6af1da62d94a2a80bf9bb470",
     papel: "versionamento, entrega e revisao de pull requests",
     camada: false,
   },
@@ -64,6 +75,7 @@ export const CATALOGO: readonly Skill[] = [
     nome: "memox",
     repositorio: "https://github.com/AxisGov/MemoX",
     origensLegadas: ["https://github.com/bittencourtthulio/MemoX"],
+    certificado: "897408f6bf60d0c9f4c0ed6b5cb12d6db8e8cdd4",
     papel: "memoria do projeto, indexa os artefatos ja fechados",
     camada: true,
   },
@@ -71,6 +83,7 @@ export const CATALOGO: readonly Skill[] = [
     nome: "prodx",
     repositorio: "https://github.com/AxisGov/prodx",
     origensLegadas: ["https://github.com/bittencourtthulio/prodx"],
+    certificado: "7539db41013585d31b79ef21afd07268bd99d0c1",
     papel: "camada de produto, decide se o pedido vira trabalho",
     camada: true,
   },
@@ -78,6 +91,7 @@ export const CATALOGO: readonly Skill[] = [
     nome: "buildx",
     repositorio: "https://github.com/AxisGov/buildx",
     origensLegadas: ["https://github.com/bittencourtthulio/buildx"],
+    certificado: "caf4fbe9dfac60a0ae8f34d7a36e9eb779c3cb0b",
     papel: "orquestra um projeto inteiro, da descricao ao sistema pronto",
     camada: false,
   },
@@ -85,6 +99,7 @@ export const CATALOGO: readonly Skill[] = [
     nome: "designx",
     repositorio: "https://github.com/AxisGov/designx",
     origensLegadas: ["https://github.com/bittencourtthulio/designx"],
+    certificado: "389a42897dff438152b06d8054d00c9490c46c87",
     papel: "camada de design, cartografa e audita o design system",
     camada: true,
   },
@@ -181,6 +196,17 @@ export function resolverOrigem(
   const resolvida = repositorioCanonico(nome, origemAtual);
   if (resolvida !== skill.repositorio) return resolvida;
   return origemDoCatalogo(skill);
+}
+
+/**
+ * O commit certificado da skill, quando `origem` é a canônica do catálogo. A
+ * pasta local e a origem customizada não têm certificado: o que vem delas não é
+ * o que a release provou. `substituto` troca o valor, nunca a regra (bancada).
+ */
+export function certificadoDa(nome: string, origem: string, substituto?: string): string | undefined {
+  const skill = CATALOGO.find((x) => x.nome === nome);
+  if (skill === undefined || normalizarOrigem(origem) !== normalizarOrigem(skill.repositorio)) return undefined;
+  return substituto ?? skill.certificado;
 }
 
 export function buscarNoCatalogo(nome: string): Skill | undefined {

@@ -1,4 +1,4 @@
-import { caminhoDoLock, lerLock, type Lock } from "../nucleo/lock.js";
+import { caminhoDoLock, lerLock, versaoDoCli, type Lock } from "../nucleo/lock.js";
 import { repositorioCanonico, resolverOrigem } from "../nucleo/catalogo.js";
 import { ehCaminhoLocal, executarInit } from "../cli/init.js";
 import { compararComRemoto, type ItemComparacao } from "./comparar.js";
@@ -82,6 +82,8 @@ export type OpcoesUpdate = {
   sim?: boolean;
   interativo?: boolean;
   origens?: Record<string, string>;
+  /** O certificado por skill no lugar do catálogo (bancada; ver `OpcoesInit`). */
+  certificados?: Record<string, string>;
 };
 
 export type ResultadoUpdate = {
@@ -93,9 +95,15 @@ export type ResultadoUpdate = {
   mensagens: string[];
 };
 
+/**
+ * O que muda só no lock, sem remontar nada: a origem legada que vira a
+ * canônica, e a skill já no commit certificado cujo lock é de antes dele
+ * (`normalizar`: `main` não travada, ou uma tag) e passa a dizer o certificado.
+ */
 function migrarProveniencias(
   lock: Lock,
   somente?: readonly string[],
+  normalizar: Readonly<Record<string, string>> = {},
 ): { lock: Lock; migradas: string[] } {
   const filtro = somente !== undefined && somente.length > 0 ? new Set(somente) : undefined;
   let skills = lock.skills;
@@ -104,14 +112,21 @@ function migrarProveniencias(
   for (const [nome, travada] of Object.entries(lock.skills)) {
     if (filtro !== undefined && !filtro.has(nome)) continue;
     const canonica = repositorioCanonico(nome, travada.repositorio);
-    if (canonica === undefined || canonica === travada.repositorio) continue;
+    const certificado = normalizar[nome];
+    const migrar = canonica !== undefined && canonica !== travada.repositorio;
+    const fixar = certificado !== undefined && travada.commit === certificado && (travada.referencia !== certificado || !travada.travado);
+    if (!migrar && !fixar) continue;
     if (skills === lock.skills) skills = { ...lock.skills };
-    skills[nome] = { ...travada, repositorio: canonica };
+    skills[nome] = {
+      ...travada,
+      ...(migrar ? { repositorio: canonica } : {}),
+      ...(fixar ? { referencia: certificado, travado: true } : {}),
+    };
     migradas.push(nome);
   }
 
   return {
-    lock: skills === lock.skills ? lock : { ...lock, skills },
+    lock: skills === lock.skills ? lock : { ...lock, skills, ...(migradas.length > 0 ? { cli_version: versaoDoCli() } : {}) },
     migradas,
   };
 }
@@ -124,8 +139,6 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   if (!l.ok) {
     return { ok: false, aplicou: false, atualizadas: [], emDia: [], bloqueadas: [], mensagens: [l.erro] };
   }
-  const migracao = migrarProveniencias(l.lock, op.skills);
-
   // o git aceita SHA em maiúsculas, mas devolve e grava em minúsculas: sem
   // normalizar, o lock e a conferência do commit buscado divergiriam
   const to = op.to !== undefined && SHA_COMPLETO.test(op.to) ? op.to.toLowerCase() : op.to;
@@ -154,10 +167,15 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
     ...(op.skills !== undefined ? { somente: op.skills } : {}),
     origens,
     ...(referencias !== undefined ? { referencias } : {}),
+    ...(op.certificados !== undefined ? { certificados: op.certificados } : {}),
   });
   if (!comparacao.ok) {
     return { ok: false, aplicou: false, atualizadas: [], emDia: [], bloqueadas: [], mensagens: [comparacao.erro] };
   }
+  const normalizar: Record<string, string> = {};
+  for (const i of comparacao.itens) if (i.normalizar === true) normalizar[i.nome] = i.nova;
+  const migracao = migrarProveniencias(l.lock, op.skills, normalizar);
+  const proveniencias = migrarProveniencias(l.lock, op.skills).migradas;
 
   const emDia = comparacao.itens.filter((i) => i.emDia).map((i) => i.nome);
   const candidatas: ItemComparacao[] = [];
@@ -195,12 +213,22 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
       i.commitAtual !== undefined && i.commitNovo !== undefined
         ? `${i.atual} (${i.commitAtual.slice(0, 9)}) → ${i.commitNovo.slice(0, 9)}`
         : `${i.atual} → ${i.nova}`;
-    mensagens.push(`${i.nome}: ${versoes}${i.mudancas.length > 0 ? ` (${String(i.mudancas.length)} mudanca(s))` : ""}`);
+    // O lock adiante do certificado (instalado da ponta da main antes desta
+    // release) volta para ele: a saída diz que é recuo, e o que ele desfaz.
+    const detalhe =
+      i.recuo === true
+        ? ` (recuo para o certificado; ${String(i.mudancas.length)} mudanca(s) desfeita(s))`
+        : i.mudancas.length > 0 ? ` (${String(i.mudancas.length)} mudanca(s))` : "";
+    mensagens.push(`${i.nome}: ${versoes}${detalhe}`);
   }
 
   const podeAplicar = (op.sim ?? false) || (op.interativo ?? false);
-  if (migracao.migradas.length > 0) {
-    mensagens.push(`proveniencia canonica pendente: ${migracao.migradas.join(", ")}`);
+  if (proveniencias.length > 0) {
+    mensagens.push(`proveniencia canonica pendente: ${proveniencias.join(", ")}`);
+  }
+  const normalizadas = Object.keys(normalizar).filter((n) => !candidatas.some((c) => c.nome === n));
+  if (normalizadas.length > 0) {
+    mensagens.push(`normalizacao pendente: ${normalizadas.join(", ")} (ja no commit certificado; o lock passa a dize-lo)`);
   }
   if (op.check === true || !podeAplicar) {
     if (op.check !== true && (candidatas.length > 0 || migracao.migradas.length > 0) && !podeAplicar) {
@@ -232,7 +260,7 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
       if (!atual.ok) {
         return { ok: false, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens: [...mensagens, atual.erro] };
       }
-      migracaoAtual = migrarProveniencias(atual.lock, op.skills);
+      migracaoAtual = migrarProveniencias(atual.lock, op.skills, normalizar);
       if (migracaoAtual.migradas.length === 0) {
         return {
           ok: true,
@@ -240,7 +268,7 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
           atualizadas: [],
           emDia,
           bloqueadas,
-          mensagens: mensagens.filter((m) => !m.startsWith("proveniencia canonica pendente:")),
+          mensagens: mensagens.filter((m) => !m.startsWith("proveniencia canonica pendente:") && !m.startsWith("normalizacao pendente:")),
         };
       }
       escreverArquivoAtomico(
@@ -270,7 +298,8 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   for (const c of candidatas) alvos[c.nome] = c.nova;
   for (const [nome, travada] of Object.entries(l.lock.skills)) {
     if (alvos[nome] !== undefined) continue;
-    alvos[nome] = travada.referencia;
+    // a normalizada é remontada no mesmo commit, e o lock passa a dizer o certificado
+    alvos[nome] = normalizar[nome] ?? travada.referencia;
     // origem em disco grava `local` ou `<sha>-local`: não há commit a buscar
     if (travada.commit !== "local" && !travada.commit.endsWith("-local")) commits[nome] = travada.commit;
   }

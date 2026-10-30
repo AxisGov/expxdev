@@ -6,7 +6,8 @@
 #   bash scripts/ci/test-distribuicao-sem-segredo.sh
 #
 # O `init` real (o binário do `dist/`) instala as nove skills do catálogo, cada
-# uma do `main` dela, num projeto descartável. Cada arquivo que o lock registra é
+# uma no commit que o catálogo certifica, num projeto descartável, e o lock tem de
+# dizer exatamente esses commits. Cada arquivo que o lock registra é
 # conferido contra o hash, e cada arquivo que a instalação deixou na árvore —
 # `.claude/`, `.expx/marketplace/` e `.expx/hooks.json`, inclusive o que o lock não
 # registra (núcleo, manifestos do plugin, `hooks.json` consolidado) — é varrido
@@ -44,6 +45,25 @@ if ! (cd "$produto" && HOME="$aux/lar" USERPROFILE="$aux/lar" PATH="$aux/bin:$PA
   node "$BIN" init --skills "$skills" --yes) > "$aux/init.out" 2>&1; then
   echo "ERRO: o init das nove skills falhou:" >&2
   cat "$aux/init.out" >&2
+  exit 1
+fi
+
+# o lock trava cada skill no commit que o catálogo certifica, e não na ponta da main
+if ! (cd "$raiz" && node --input-type=module -e "
+  import { readFileSync } from 'node:fs';
+  import { CATALOGO } from './dist/nucleo/catalogo.js';
+  const lock = JSON.parse(readFileSync(process.argv[1], 'utf8'));
+  let ok = true;
+  for (const s of CATALOGO) {
+    const t = lock.skills[s.nome];
+    if (t?.commit !== s.certificado || t?.referencia !== s.certificado || t?.travado !== true) {
+      console.error('FALHA ' + s.nome + ': lock em ' + t?.referencia + ' (' + t?.commit + '), certificado ' + s.certificado);
+      ok = false;
+    }
+  }
+  process.exit(ok ? 0 : 1);
+" "$produto/.expx/expx-lock.json"); then
+  echo "ERRO: o init nao instalou os commits certificados" >&2
   exit 1
 fi
 

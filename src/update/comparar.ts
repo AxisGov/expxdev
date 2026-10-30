@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolverOrigem } from "../nucleo/catalogo.js";
+import { certificadoDa, resolverOrigem } from "../nucleo/catalogo.js";
 import { lerLock } from "../nucleo/lock.js";
 import { resolverAlvo } from "../nucleo/versao.js";
 
@@ -25,9 +25,19 @@ export type ItemComparacao = {
   travado: boolean;
   /** CHANGELOG quando existir; senão, títulos dos commits entre as referências. */
   mudancas: string[];
-  /** Presentes só quando `!travado`: o commit é quem decidiu `emDia`, não o nome da branch. */
+  /**
+   * Presentes quando o commit decidiu `emDia`, e não o nome: a skill segue a
+   * branch (`!travado`) ou o certificado do catálogo.
+   */
   commitAtual?: string;
   commitNovo?: string;
+  /**
+   * No certificado, mas o lock é de antes dele (`main`, não travado, ou uma tag):
+   * só o lock é regravado, a árvore instalada já é a certificada.
+   */
+  normalizar?: true;
+  /** O certificado é mais velho que o instalado: `mudancas` são as que o recuo desfaz. */
+  recuo?: true;
   erro?: string;
 };
 
@@ -41,6 +51,8 @@ export type OpcoesComparar = {
   somente?: readonly string[];
   origens?: Record<string, string>;
   referencias?: Record<string, string>;
+  /** O certificado por skill no lugar do catálogo (bancada; ver `OpcoesInit`). */
+  certificados?: Record<string, string>;
 };
 
 function origemDe(nome: string, lockRepo: string, origens?: Record<string, string>): string {
@@ -75,6 +87,27 @@ async function mudancasEntre(repositorio: string, de: string, para: string): Pro
   }
 }
 
+/**
+ * Os dois sentidos entre o instalado e o certificado, num clone só: o que o
+ * certificado traz (`avanca`) e o que ele desfaz (`recua`, quando o lock está
+ * adiante — instalado da ponta da main antes desta release).
+ */
+async function historicoEntre(repositorio: string, de: string, para: string): Promise<{ avanca: string[]; recua: string[] }> {
+  const destino = mkdtempSync(join(tmpdir(), "expx-mudancas-"));
+  const titulos = async (intervalo: string): Promise<string[]> => {
+    const { stdout } = await exec("git", ["-c", "core.pager=cat", "log", "--format=%s", intervalo], { cwd: destino });
+    return stdout.split("\n").map((l) => l.trim()).filter((l) => l !== "");
+  };
+  try {
+    await exec("git", ["clone", "--quiet", repositorio, destino]);
+    return { avanca: await titulos(`${de}..${para}`), recua: await titulos(`${para}..${de}`) };
+  } catch {
+    return { avanca: [], recua: [] };
+  } finally {
+    rmSync(destino, { recursive: true, force: true });
+  }
+}
+
 export async function compararComRemoto(op: OpcoesComparar): Promise<Comparacao> {
   const l = lerLock(op.raiz);
   if (!l.ok) return { ok: false, erro: l.erro };
@@ -92,7 +125,31 @@ export async function compararComRemoto(op: OpcoesComparar): Promise<Comparacao>
 
   for (const [nome, travada] of alvos) {
     const repositorio = origemDe(nome, travada.repositorio, op.origens);
-    const alvo = await resolverAlvo(repositorio, op.referencias?.[nome]);
+    const certificado = certificadoDa(nome, repositorio, op.certificados?.[nome]);
+    // Da origem canônica e sem `--to`, o alvo é o certificado, e o commit decide.
+    if (certificado !== undefined && op.referencias?.[nome] === undefined) {
+      const emDia = travada.commit === certificado;
+      const normalizar = emDia && (travada.referencia !== certificado || !travada.travado);
+      const historico = emDia ? { avanca: [], recua: [] } : await historicoEntre(repositorio, travada.commit, certificado);
+      const recuo = historico.avanca.length === 0 && historico.recua.length > 0;
+      itens.push({
+        nome,
+        atual: travada.referencia,
+        nova: certificado,
+        emDia,
+        travado: true,
+        commitAtual: travada.commit,
+        commitNovo: certificado,
+        mudancas: recuo ? historico.recua : historico.avanca,
+        ...(normalizar ? { normalizar: true as const } : {}),
+        ...(recuo ? { recuo: true as const } : {}),
+      });
+      continue;
+    }
+    const alvo = await resolverAlvo(repositorio, {
+      ...(op.referencias?.[nome] !== undefined ? { forcar: op.referencias[nome] } : {}),
+      ...(certificado !== undefined ? { certificado } : {}),
+    });
     if (!alvo.ok) {
       itens.push({
         nome,

@@ -4,11 +4,17 @@ Esta é a fonte pública para origem, instalação e proteção de proveniência
 nove skills registradas no ExpxDev. O catálogo executável continua em
 `src/nucleo/catalogo.ts`.
 
-Os repositórios abaixo foram confirmados na organização AxisGov em 2026-10-30:
+Cada versão do ExpxDev certifica um commit de cada skill, gravado no campo
+`certificado` do catálogo. O `expx init` e o `expx update` instalam esse commit da
+origem canônica; um merge na `main` de uma skill só chega aos projetos pela
+próxima release do ExpxDev. `--to <ref>` sai do certificado de propósito, uma
+skill por vez. O portão da release confere que cada certificado é ancestral da
+`main` da skill, e `catalogo.test.ts` confere esta tabela contra o catálogo.
 
-| Repositório | `origin/main` confirmado |
+Commits certificados (confirmados na organização AxisGov em 2026-10-30):
+
+| Repositório | Commit certificado |
 |---|---|
-| `AxisGov/expxdev` | `f0872828b17186cc959790c3587da238c203f5fe` |
 | `AxisGov/runx` | `5de15a9d48ca3aa30be433201103cd1a23e6474b` |
 | `AxisGov/legadox` | `4b92ec47da1d075224f74aa8c3fc928fdb72230d` |
 | `AxisGov/stackx` | `79200ec5761f26adef1f9b3cf66ec039f031e163` |

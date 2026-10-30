@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // @ts-expect-error The runtime helper is intentionally shipped as a Node module beside the harness adapters.
-import { AXIS_REPOSITORIO, bootstrapAxis, construirComandoNpm, sincronizarSessao } from "../../nucleo/hooks/expx-session-sync.mjs";
+import { AXIS_REPOSITORIO, bootstrapAxis, construirComandoNpm, maiorRelease, sincronizarSessao } from "../../nucleo/hooks/expx-session-sync.mjs";
 
 function ambiente(raiz: string): Record<string, string> {
   return { EXPX_AXIS_CACHE: join(raiz, "cache"), HOME: raiz };
@@ -36,6 +37,7 @@ describe("sincronização Axis no SessionStart", () => {
     mkdirSync(join(cache, ".git"), { recursive: true });
     const chamadas: Array<{ arquivo: string; argumentos: string[] }> = [];
     const executar = (arquivo: string, argumentos: string[]) => {
+      if (argumentos.includes("tag")) return "v0.12.9\n";
       chamadas.push({ arquivo, argumentos });
       if (argumentos.includes("remote")) return `${AXIS_REPOSITORIO}\n`;
       if (argumentos.includes("rev-parse")) return "mesmo\n";
@@ -46,7 +48,9 @@ describe("sincronização Axis no SessionStart", () => {
     writeFileSync(join(cache, ".axis-build-sha"), "mesmo\n");
     bootstrapAxis(cache, executar);
     expect(chamadas.some((c) => c.argumentos.includes(AXIS_REPOSITORIO))).toBe(false);
-    expect(chamadas).toContainEqual({ arquivo: "git", argumentos: ["-C", cache, "fetch", "origin", "main"] });
+    // A refspec explícita atualiza origin/main sempre: a guarda de commit local
+    // compara o HEAD com ela, e uma origin/main velha recusaria o cache à toa.
+    expect(chamadas).toContainEqual({ arquivo: "git", argumentos: ["-C", cache, "fetch", "--tags", "origin", "+refs/heads/main:refs/remotes/origin/main"] });
     expect(AXIS_REPOSITORIO).toBe("https://github.com/AxisGov/expxdev.git");
     rmSync(raiz, { recursive: true, force: true });
   });
@@ -56,6 +60,7 @@ describe("sincronização Axis no SessionStart", () => {
     const cache = join(raiz, "cache", "axisgov", "expxdev");
     const chamadas: Array<{ arquivo: string; argumentos: string[] }> = [];
     const executar = (arquivo: string, argumentos: string[]) => {
+      if (argumentos.includes("tag")) return "v0.12.9\n";
       chamadas.push({ arquivo, argumentos });
       if (argumentos[0] === "clone") mkdirSync(join(argumentos.at(-1)!, "dist", "cli"), { recursive: true });
       return "";
@@ -69,11 +74,171 @@ describe("sincronização Axis no SessionStart", () => {
     rmSync(raiz, { recursive: true, force: true });
   });
 
+  // O CLI do SessionStart é o da última release, e não a ponta da main do
+  // expxdev: é a release que certifica os commits das skills.
+  it("funcional: a maior release é escolhida número a número, sem pré-lançamento", () => {
+    expect(maiorRelease(["v0.9.9", "v0.12.9", "v0.12.10-rc.1", "nao-release", "v0.10.0", ""])).toBe("v0.12.9");
+    expect(maiorRelease(["main", ""])).toBeUndefined();
+  });
+
+  it("integração: cache que seguia a main vai para a maior release, e o build é refeito", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-bootstrap-release-"));
+    const cache = join(raiz, "cache");
+    mkdirSync(join(cache, ".git"), { recursive: true });
+    mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+    writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
+    writeFileSync(join(cache, ".axis-build-sha"), "ponta\n");
+    const chamadas: string[][] = [];
+    const executar = (_arquivo: string, argumentos: string[]) => {
+      chamadas.push(argumentos);
+      if (argumentos.includes("remote")) return `${AXIS_REPOSITORIO}\n`;
+      if (argumentos.includes("tag")) return "v0.9.9\nv0.12.9\nv0.12.10-rc.1\n";
+      if (argumentos.includes("v0.12.9^{commit}")) return "release\n";
+      if (argumentos.includes("rev-parse")) return "ponta\n";
+      if (argumentos.includes("branch")) return "main\n";
+      return "";
+    };
+    bootstrapAxis(cache, executar);
+    expect(chamadas).toContainEqual(["-C", cache, "reset", "--hard", "release"]);
+    expect(chamadas.some((a) => a.includes("origin/main") && a.includes("reset"))).toBe(false);
+    expect(chamadas.some((a) => a.includes("build:server"))).toBe(true);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it.each([
+    ["o cache atrás da main", false],
+    // Sem a refspec configurada, só a refspec explícita do fetch atualiza origin/main;
+    // com ela velha, o HEAD publicado à frente seria recusado como commit local.
+    ["o cache sem refspec configurada, com o HEAD publicado à frente de origin/main", true],
+  ] as const)("integração: com git real, %s vai para a maior release, e origin/main é atualizada", (_caso, semRefspec) => {
+    // O git roda de verdade; só a URL do remoto (o cache aponta para um repositório
+    // local, não para o GitHub) e o npm (o build) são simulados.
+    const raiz = mkdtempSync(join(tmpdir(), "expx-bootstrap-git-real-"));
+    const fonte = join(raiz, "fonte");
+    const cache = join(raiz, "cache");
+    const ambienteGit = { ...process.env, GIT_AUTHOR_NAME: "a", GIT_AUTHOR_EMAIL: "a@a.invalid", GIT_COMMITTER_NAME: "a", GIT_COMMITTER_EMAIL: "a@a.invalid", GIT_CONFIG_NOSYSTEM: "1" };
+    const git = (cwd: string, ...args: string[]): string => execFileSync("git", args, { cwd, env: ambienteGit, encoding: "utf8" }).trim();
+    try {
+      mkdirSync(fonte);
+      git(fonte, "init", "-q", "-b", "main");
+      const commit = (msg: string): string => { git(fonte, "commit", "-q", "--allow-empty", "-m", msg); return git(fonte, "rev-parse", "HEAD"); };
+      // como no expxdev, o build fica fora do versionamento
+      writeFileSync(join(fonte, ".gitignore"), "dist/\nnode_modules/\n");
+      git(fonte, "add", ".gitignore");
+      commit("1");
+      git(fonte, "tag", "v0.1.0");
+      const doisNoCache = commit("2");
+      execFileSync("git", ["clone", "-q", "--branch", "main", "--single-branch", fonte, cache], { env: ambienteGit });
+      mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+      writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
+      writeFileSync(join(cache, ".axis-build-sha"), `${doisNoCache}\n`);
+      // depois do cache: a release v0.2.0 e mais um commit na main, ainda não liberado
+      const release = commit("3");
+      git(fonte, "tag", "v0.2.0");
+      const ponta = commit("4");
+      // uma tag de release fora da main revisada (branch lateral): nunca é escolhida
+      git(fonte, "checkout", "-q", "-b", "lateral", release);
+      commit("lateral");
+      git(fonte, "tag", "v0.3.0");
+      git(fonte, "checkout", "-q", "main");
+      if (semRefspec) {
+        git(cache, "config", "--unset", "remote.origin.fetch");
+        git(cache, "fetch", "-q", "origin", "main");
+        git(cache, "reset", "-q", "--hard", "FETCH_HEAD");
+        writeFileSync(join(cache, ".axis-build-sha"), `${ponta}\n`);
+      }
+      expect(git(cache, "rev-parse", "origin/main")).toBe(doisNoCache);
+
+      const executar = (arquivo: string, argumentos: string[], opcoes: { cwd?: string } = {}): string => {
+        if (argumentos.includes("remote") && argumentos.includes("get-url")) return `${AXIS_REPOSITORIO}\n`;
+        if (arquivo !== "git") {
+          // o build: o CLI montado aparece no cache
+          mkdirSync(join(opcoes.cwd ?? cache, "dist", "cli"), { recursive: true });
+          writeFileSync(join(opcoes.cwd ?? cache, "dist", "cli", "expx-bin.js"), "");
+          return "";
+        }
+        return execFileSync("git", argumentos, { env: ambienteGit, encoding: "utf8", ...opcoes });
+      };
+      bootstrapAxis(cache, executar);
+
+      expect(git(cache, "rev-parse", "HEAD")).toBe(release);
+      expect(git(cache, "rev-parse", "origin/main")).toBe(ponta);
+      expect(git(cache, "tag", "--list").split("\n").sort()).toEqual(["v0.1.0", "v0.2.0", "v0.3.0"]);
+      expect(readFileSync(join(cache, ".axis-build-sha"), "utf8").trim()).toBe(release);
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
+  });
+
+  it("funcional: a maior release fora da main é ignorada, e vale a maior que está nela", () => {
+    // CodeAnt no expxdev#111: o `fetch --tags` traz qualquer tag vX.Y.Z, inclusive de
+    // commit que nunca entrou na main revisada.
+    const raiz = mkdtempSync(join(tmpdir(), "expx-bootstrap-release-fora-"));
+    const cache = join(raiz, "cache");
+    mkdirSync(join(cache, ".git"), { recursive: true });
+    mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+    writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
+    writeFileSync(join(cache, ".axis-build-sha"), "ponta\n");
+    const chamadas: string[][] = [];
+    const executar = (_arquivo: string, argumentos: string[]) => {
+      chamadas.push(argumentos);
+      if (argumentos.includes("remote")) return `${AXIS_REPOSITORIO}\n`;
+      if (argumentos.includes("tag")) return "v0.12.9\nv0.13.0\n";
+      if (argumentos.includes("v0.13.0^{commit}")) return "fora\n";
+      if (argumentos.includes("v0.12.9^{commit}")) return "release\n";
+      if (argumentos.includes("merge-base") && argumentos.includes("fora")) throw new Error("nao e ancestral");
+      if (argumentos.includes("rev-parse")) return "ponta\n";
+      if (argumentos.includes("branch")) return "main\n";
+      return "";
+    };
+    bootstrapAxis(cache, executar);
+    expect(chamadas).toContainEqual(["-C", cache, "reset", "--hard", "release"]);
+    expect(chamadas.some((a) => a.includes("reset") && a.includes("fora"))).toBe(false);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("funcional: clone novo vai para a release antes do build", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-bootstrap-release-novo-"));
+    const cache = join(raiz, "cache");
+    const chamadas: string[][] = [];
+    const executar = (_arquivo: string, argumentos: string[]) => {
+      chamadas.push(argumentos);
+      if (argumentos[0] === "clone") mkdirSync(join(argumentos.at(-1)!, "dist", "cli"), { recursive: true });
+      if (argumentos.includes("tag")) return "v0.12.8\nv0.12.9\n";
+      if (argumentos.includes("v0.12.9^{commit}")) return "release\n";
+      return "";
+    };
+    bootstrapAxis(cache, executar);
+    const reset = chamadas.findIndex((a) => a.includes("reset") && a.includes("release"));
+    const build = chamadas.findIndex((a) => a.includes("ci"));
+    expect(reset).toBeGreaterThan(0);
+    expect(build).toBeGreaterThan(reset);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("funcional: sem release publicada, o cache não muda e a sincronização adia", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-bootstrap-sem-release-"));
+    const cache = join(raiz, "cache");
+    mkdirSync(join(cache, ".git"), { recursive: true });
+    const chamadas: string[][] = [];
+    const executar = (_arquivo: string, argumentos: string[]) => {
+      chamadas.push(argumentos);
+      if (argumentos.includes("remote")) return `${AXIS_REPOSITORIO}\n`;
+      if (argumentos.includes("tag")) return "";
+      if (argumentos.includes("rev-parse")) return "ponta\n";
+      return "";
+    };
+    expect(() => bootstrapAxis(cache, executar)).toThrow("nenhuma release do expxdev");
+    expect(chamadas.some((a) => a.includes("reset"))).toBe(false);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
   it("funcional: existência do cache é observada depois do lock", () => {
     const raiz = mkdtempSync(join(tmpdir(), "expx-cache-lock-"));
     const cache = join(raiz, "cache");
     let clones = 0;
     const executar = (_arquivo: string, argumentos: string[]) => {
+      if (argumentos.includes("tag")) return "v0.12.9\n";
       if (argumentos[0] === "clone") {
         clones++;
         mkdirSync(join(argumentos.at(-1)!, ".git", "refs"), { recursive: true });
@@ -107,6 +272,7 @@ describe("sincronização Axis no SessionStart", () => {
     const cache = join(raiz, "cache");
     let primeira = true;
     const executar = (_arquivo: string, argumentos: string[]) => {
+      if (argumentos.includes("tag")) return "v0.12.9\n";
       if (argumentos[0] === "clone") {
         mkdirSync(argumentos.at(-1)!, { recursive: true });
         if (primeira) {
@@ -140,6 +306,7 @@ describe("sincronização Axis no SessionStart", () => {
     mkdirSync(cache, { recursive: true });
     writeFileSync(join(cache, ".axis-cache-owner"), "AxisGov/expxdev\n");
     const executar = (_arquivo: string, argumentos: string[]) => {
+      if (argumentos.includes("tag")) return "v0.12.9\n";
       if (argumentos[0] === "clone") mkdirSync(join(argumentos.at(-1)!, "dist", "cli"), { recursive: true });
       return "commit\n";
     };
@@ -154,6 +321,7 @@ describe("sincronização Axis no SessionStart", () => {
     mkdirSync(join(cache, ".git"), { recursive: true });
     writeFileSync(join(cache, "preservar.txt"), "nao apagar");
     const executar = (_arquivo: string, argumentos: string[]) => {
+      if (argumentos.includes("tag")) return "v0.12.9\n";
       if (argumentos.includes("remote")) return "https://example.invalid/outro.git\n";
       return "";
     };
@@ -170,6 +338,7 @@ describe("sincronização Axis no SessionStart", () => {
     const chamadas: string[][] = [];
     bootstrapAxis(cache, (_arquivo, argumentos) => {
       chamadas.push(argumentos);
+      if (argumentos.includes("tag")) return "v0.12.9\n";
       if (argumentos[0] === "clone") mkdirSync(join(argumentos.at(-1)!, "dist", "cli"), { recursive: true });
       return "";
     });
@@ -204,6 +373,7 @@ describe("sincronização Axis no SessionStart", () => {
     const antigo = new Date(Date.now() - 120_000);
     utimesSync(`${cache}.lock`, antigo, antigo);
     const executar = (_arquivo: string, argumentos: string[]) => {
+      if (argumentos.includes("tag")) return "v0.12.9\n";
       if (argumentos[0] === "clone") mkdirSync(join(argumentos.at(-1)!, "dist", "cli"), { recursive: true });
       return "commit\n";
     };
@@ -220,6 +390,7 @@ describe("sincronização Axis no SessionStart", () => {
     writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "old");
     writeFileSync(join(cache, ".axis-build-sha"), "old-commit\n");
     const executar = (arquivo: string, argumentos: string[]) => {
+      if (argumentos.includes("tag")) return "v0.12.9\n";
       if (argumentos.includes("remote")) return AXIS_REPOSITORIO;
       if (argumentos.includes("rev-parse")) return "new-commit\n";
       if (argumentos.includes("branch")) return "main\n";
@@ -239,6 +410,7 @@ describe("sincronização Axis no SessionStart", () => {
     writeFileSync(join(cache, "local.txt"), "preservar");
     const chamadas: string[][] = [];
     const executar = (_arquivo: string, argumentos: string[]) => {
+      if (argumentos.includes("tag")) return "v0.12.9\n";
       chamadas.push(argumentos);
       if (argumentos.includes("remote")) return AXIS_REPOSITORIO;
       if (argumentos.includes("rev-parse")) return "novo\n";
@@ -260,6 +432,7 @@ describe("sincronização Axis no SessionStart", () => {
     writeFileSync(join(cache, ".axis-build-sha"), "old\n");
     const chamadas: string[][] = [];
     const executar = (_arquivo: string, argumentos: string[]) => {
+      if (argumentos.includes("tag")) return "v0.12.9\n";
       chamadas.push(argumentos);
       if (argumentos.includes("remote")) return AXIS_REPOSITORIO;
       if (argumentos.includes("rev-parse")) return "new\n";
@@ -281,6 +454,7 @@ describe("sincronização Axis no SessionStart", () => {
     writeFileSync(join(cache, ".axis-build-sha"), "old\n");
     const chamadas: string[][] = [];
     const executar = (_arquivo: string, argumentos: string[]) => {
+      if (argumentos.includes("tag")) return "v0.12.9\n";
       chamadas.push(argumentos);
       if (argumentos.includes("remote")) return AXIS_REPOSITORIO;
       if (argumentos.includes("rev-parse")) return "new\n";
@@ -300,12 +474,13 @@ describe("sincronização Axis no SessionStart", () => {
     writeFileSync(join(cache, ".axis-build-sha"), "old\n");
     const chamadas: string[][] = [];
     const executar = (_arquivo: string, argumentos: string[]) => {
+      if (argumentos.includes("tag")) return "v0.12.9\n";
       chamadas.push(argumentos);
       if (argumentos.includes("remote")) return AXIS_REPOSITORIO;
       if (argumentos.includes("origin/main")) return "remote-commit\n";
       if (argumentos.includes("rev-parse")) return "local-commit\n";
       if (argumentos.includes("branch")) return "main\n";
-      if (argumentos.includes("merge-base")) throw new Error("divergente");
+      if (argumentos.includes("merge-base") && argumentos.includes("local-commit")) throw new Error("divergente");
       return "";
     };
     expect(() => bootstrapAxis(cache, executar)).toThrow("cache Axis possui commits locais");
@@ -336,6 +511,7 @@ describe("sincronização Axis no SessionStart", () => {
       writeFileSync(join(cache, ".axis-build-sha"), "same\n");
       const chamadas: string[][] = [];
       const executar = (_arquivo: string, argumentos: string[]) => {
+        if (argumentos.includes("tag")) return "v0.12.9\n";
         chamadas.push(argumentos);
         if (argumentos.includes("--show-toplevel")) return `${raiz}\n`;
         if (argumentos.includes("status")) return "";
@@ -360,6 +536,7 @@ describe("sincronização Axis no SessionStart", () => {
       writeFileSync(join(cache, ".axis-build-sha"), "same\n");
       const chamadas: string[][] = [];
       const executar = (_arquivo: string, argumentos: string[]) => {
+        if (argumentos.includes("tag")) return "v0.12.9\n";
         chamadas.push(argumentos);
         if (argumentos.includes("--show-toplevel")) return `${raiz}\n`;
         if (argumentos.includes("status")) return "";
@@ -386,6 +563,7 @@ describe("sincronização Axis no SessionStart", () => {
       writeFileSync(join(cache, ".axis-build-sha"), "same\n");
       const chamadas: string[][] = [];
       const executar = (_arquivo: string, argumentos: string[]) => {
+        if (argumentos.includes("tag")) return "v0.12.9\n";
         chamadas.push(argumentos);
         if (argumentos.includes("--show-toplevel")) return `${raiz}\n`;
         if (argumentos.includes("status")) return "";
@@ -413,6 +591,7 @@ describe("sincronização Axis no SessionStart", () => {
     try {
       const chamadas: string[][] = [];
       const executar = (_arquivo: string, argumentos: string[]) => {
+        if (argumentos.includes("tag")) return "v0.12.9\n";
         chamadas.push(argumentos);
         if (argumentos.includes("--show-toplevel")) return `${raiz}\n`;
         if (argumentos.includes("status")) return " M arquivo.txt\n";
@@ -430,6 +609,7 @@ describe("sincronização Axis no SessionStart", () => {
     const raiz = projeto();
     try {
       const executar = (_arquivo: string, argumentos: string[]) => {
+        if (argumentos.includes("tag")) return "v0.12.9\n";
         if (argumentos.includes("--show-toplevel")) return `${raiz}\n`;
         if (argumentos.includes("status")) return "";
         throw new Error("sem rede");
@@ -444,6 +624,7 @@ describe("sincronização Axis no SessionStart", () => {
     const raiz = projeto();
     try {
       const executar = (_arquivo: string, argumentos: string[]) => {
+        if (argumentos.includes("tag")) return "v0.12.9\n";
         if (argumentos.includes("--show-toplevel")) return `${raiz}\n`;
         if (argumentos.includes("status")) throw new Error("git indisponivel");
         throw new Error("nao deveria continuar");
@@ -471,6 +652,7 @@ describe("sincronização Axis no SessionStart", () => {
     try {
       const chamadas: string[][] = [];
       const executar = (_arquivo: string, argumentos: string[]) => {
+        if (argumentos.includes("tag")) return "v0.12.9\n";
         chamadas.push(argumentos);
         if (argumentos.includes("rev-parse")) return `${raiz}\n`;
         if (argumentos.includes("status")) return "?? arquivo-novo\n";
@@ -495,6 +677,7 @@ describe("sincronização Axis no SessionStart", () => {
       writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
       const chamadas: Array<{ arquivo: string; argumentos: string[] }> = [];
       const executar = (arquivo: string, argumentos: string[]) => {
+        if (argumentos.includes("tag")) return "v0.12.9\n";
         chamadas.push({ arquivo, argumentos });
         if (argumentos.includes("rev-parse") && argumentos.includes("--show-toplevel")) return `${raiz}\n`;
         if (argumentos.includes("status")) return "";
@@ -511,7 +694,8 @@ describe("sincronização Axis no SessionStart", () => {
       expect(saida).not.toContain("reloadSkills");
       const cli = chamadas.find((c) => c.argumentos.some((argumento) => argumento.endsWith("expx-bin.js")));
       expect(cli?.arquivo).toMatch(/node/);
-      expect(cli?.argumentos.slice(-3)).toEqual(["update", "--latest", "--yes"]);
+      expect(cli?.argumentos.slice(-2)).toEqual(["update", "--yes"]);
+      expect(cli?.argumentos).not.toContain("--latest");
       expect(cli?.argumentos[0]).toBe(join(cache, "dist", "cli", "expx-bin.js"));
       expect(saida).not.toContain("npx expxdev");
     } finally {
@@ -523,6 +707,7 @@ describe("sincronização Axis no SessionStart", () => {
     const raiz = projeto();
     try {
       const executar = (_arquivo: string, argumentos: string[]) => {
+        if (argumentos.includes("tag")) return "v0.12.9\n";
         if (argumentos.includes("rev-parse") && argumentos.includes("--show-toplevel")) return `${raiz}\n`;
         if (argumentos.includes("status")) return "";
         throw new Error("sem rede");

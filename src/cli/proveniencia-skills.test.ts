@@ -56,10 +56,14 @@ describe("proveniencia das skills AxisGov", () => {
       redirecionarGit(canonica, repo);
       projeto = projetoTemporario("fixtures/cli/projeto-limpo");
 
+      // O certificado do catálogo é um commit real da skill, que a fixture não tem:
+      // o da fixture faz o papel dele, e a origem segue sendo a canônica.
+      const certificado = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo }).toString().trim();
       const resultado = await executarInit({
         raiz: projeto.raiz,
         skills: [nome],
         harness: ["claude"],
+        certificados: { [nome]: certificado },
       });
 
       expect(resultado.ok, JSON.stringify(resultado)).toBe(true);
@@ -69,4 +73,60 @@ describe("proveniencia das skills AxisGov", () => {
       expect(lock.skills[nome]?.repositorio).toBe(canonica);
     },
   );
+});
+
+describe("o commit certificado na instalacao", () => {
+  // O katosmv/login recebeu na 0.12.8 o topo da main das skills, e não o que a
+  // release certificou. Da origem canônica, o init instala o certificado.
+  function cenario(): { repo: string; certificado: string; ponta: string } {
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0", "v2.0.0"] });
+    temporarios.push(repo);
+    redirecionarGit("https://github.com/AxisGov/sprintx", repo);
+    const sha = (ref: string): string => execFileSync("git", ["rev-parse", ref], { cwd: repo }).toString().trim();
+    return { repo, certificado: sha("v1.0.0"), ponta: sha("HEAD") };
+  }
+
+  type Travada = { repositorio: string; referencia: string; travado: boolean; commit: string };
+  function lockDe(raiz: string): Record<string, Travada> {
+    return (JSON.parse(readFileSync(join(raiz, ".expx", "expx-lock.json"), "utf8")) as { skills: Record<string, Travada> }).skills;
+  }
+
+  it("integracao: da origem canonica, instala o certificado e nao a maior tag nem a ponta", async () => {
+    const c = cenario();
+    projeto = projetoTemporario("fixtures/cli/projeto-limpo");
+    const r = await executarInit({ raiz: projeto.raiz, skills: ["sprintx"], harness: ["claude"], certificados: { sprintx: c.certificado } });
+
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    expect(r.naoTravadas).toEqual([]);
+    expect(lockDe(projeto.raiz)["sprintx"]).toMatchObject({
+      repositorio: "https://github.com/AxisGov/sprintx",
+      referencia: c.certificado,
+      travado: true,
+      commit: c.certificado,
+    });
+    const ref = readFileSync(join(projeto.raiz, ".expx/marketplace/plugins/expx/skills/sprintx/references/01.md"), "utf8");
+    expect(ref).toContain("em v1.0.0");
+  });
+
+  it("funcional: --to sai do certificado de proposito, e o SHA pedido e o instalado", async () => {
+    const c = cenario();
+    projeto = projetoTemporario("fixtures/cli/projeto-limpo");
+    const r = await executarInit({
+      raiz: projeto.raiz, skills: ["sprintx"], harness: ["claude"],
+      certificados: { sprintx: c.certificado }, referencias: { sprintx: c.ponta },
+    });
+
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    expect(lockDe(projeto.raiz)["sprintx"]).toMatchObject({ referencia: c.ponta, commit: c.ponta, travado: true });
+  });
+
+  it("funcional: sem certificado declarado, vale o do catalogo, que a fixture nao tem: falha, sem cair para a ponta", async () => {
+    cenario();
+    projeto = projetoTemporario("fixtures/cli/projeto-limpo");
+    const r = await executarInit({ raiz: projeto.raiz, skills: ["sprintx"], harness: ["claude"] });
+
+    expect(r.ok).toBe(false);
+    expect(r.instaladas).toEqual([]);
+    expect(JSON.stringify(r.falhas)).toContain("e3852dcb6ecec9715ab17617d1cd648fb3df06fc");
+  });
 });
