@@ -541,16 +541,16 @@ Requisitos para os comandos abaixo: Node ≥ 20.19.0, `git`, GitHub CLI (`gh`) a
 `sha256sum` (Linux) ou `shasum` (macOS) para conferir o pacote antes de executá-lo.
 
 ```bash
-gh release download v0.12.9 -R AxisGov/expxdev -D ~/expx-cli/v0.12.9
+gh release download v0.12.10 -R AxisGov/expxdev -D ~/expx-cli/v0.12.10
 (
-  cd ~/expx-cli/v0.12.9
+  cd ~/expx-cli/v0.12.10
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.12.9.tgz.sha256
+    sha256sum -c expxdev-0.12.10.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.12.9.tgz.sha256
+    shasum -a 256 -c expxdev-0.12.10.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.12.9/expxdev-0.12.9.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.12.10/expxdev-0.12.10.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -564,7 +564,7 @@ npx --yes --package ~/expx-cli/v0.12.9/expxdev-0.12.9.tgz expx init --skills bui
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.12.9 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.12.10 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -612,6 +612,9 @@ npx --yes --package ~/expx-cli/v0.12.9/expxdev-0.12.9.tgz expx init --skills bui
 - `0.12.9` corrige o "task não está no plano" do katosmv/login na `0.12.7`: sob `pipefail`, a
   SprintX deixa de usar `grep -q` e `head` depois de produtor grande. Registra também o limite
   de migração da varredura de segredo e a reversão da DM-286 na MergeX.
+- `0.12.10` fixa no catálogo o commit certificado de cada skill: o `init` e o `update` instalam
+  esse commit, e não o topo da `main`, e o SessionStart roda o CLI da última release. Traz também
+  os achados das instalações da `0.12.9` no katosmv/login#41 e no conselhos#216 e #217.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## Próxima versão
+## 0.12.10 — o commit certificado e os achados do Login e do conselhos
 
 - **O commit certificado de cada skill.** Até a 0.12.9, o `init` e o `update` instalavam a maior tag da skill e, sem tag (nenhuma das nove tem), o topo da `main` dela. O katosmv/login recebeu na 0.12.8 o conteúdo da 0.12.9, com o lock dizendo 0.12.8, e a DM-286 da MergeX chegou a projetos antes de qualquer release do expxdev. Agora o catálogo grava, em `certificado`, o commit de cada skill que a versão do CLI certifica, e da origem canônica é esse commit que se instala. Um merge na `main` de uma skill só chega aos projetos pela próxima release do expxdev.
   - O `update` decide pelo commit. Já no certificado, com lock de antes dele, regrava só o lock ("normalizacao pendente"); adiante do certificado, **recua** para ele e diz quantas mudanças desfaz. `--to <ref>` continua saindo do certificado de propósito.
@@ -8,6 +8,15 @@
   - O SessionStart (`expx-session-sync`) roda o CLI da **última release** do expxdev, e não a ponta da `main`, com `update --yes`. O `--latest`, que já não mudava nada, continua aceito: os hooks instalados antes seguem o catálogo.
   - A preparação da release confere que cada certificado é ancestral da `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init` instala exatamente esses commits.
   - O `doctor` passa a dizer, para a skill fora do certificado, que um `expx update` a leva ao commit certificado.
+- Certifica a SprintX em AxisGov/sprintx@46cbb60 (AxisGov/sprintx#58, **DS-193**), com os achados do CodeAnt no katosmv/login#41 e no katosmv/conselhos-municipais#217. Todos já existiam antes. Onde a regra recusava coisa legítima, ela foi afrouxada com segurança, sem validação nova:
+  - `arvore-limpa-antes-da-suite` compara o caminho declarado com `grep -qxF --`: o caminho que começa com `-` deixa de virar opção.
+  - `bloqueios.sh registrar` aceita `T-100.01`, como o plano.
+  - No item 10 da auditoria, `L1Cache` e `L1Árvore` numa `[granularidade]` não são o limite L1. O `L1` solto continua recusado, também colado a símbolo (`L1—acima`, `L1×acima`).
+  - A cláusula `base/<arquivo>` aceita espaço e acento. Continuam recusados `|`, `\`, controle e segmento `..`.
+  - `SPRINTX_RAIZ` relativa que começa com `-` funciona nos quatro leitores.
+- Certifica a MergeX em AxisGov/mergex@2f72aee (AxisGov/mergex#61, **DM-288**):
+  - A credencial em URL com **usuário vazio** passa a ser acusada (CodeAnt no katosmv/login#41). A senha com menos de quatro caracteres continua fora: falso negativo assumido, contra placeholder curto.
+  - A área da base pode estar numa **subpasta** de `base/`, no catálogo de método e no E3 (katosmv/conselhos-municipais#216). Continuam fora caminho absoluto, `\`, segmento vazio, `.`, `..` e link simbólico.
 
 ## 0.12.9 — a SprintX sob pipefail e o limite de migração
 
