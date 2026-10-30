@@ -423,12 +423,16 @@ simulação que protege o CI de uma instalação acidental.
 
 Para cada skill selecionada, em ordem:
 
-1. **Resolve a versão alvo.** Busca a **maior tag de versão semântica** do repositório —
-   comparando número a número, porque ordenar como texto colocaria `v1.10.0` antes de
-   `v1.2.0`. Pré-lançamento (`-rc.1`) é ignorado: não é versão publicada. Sem nenhuma tag, cai
-   para a branch padrão e **avisa explicitamente** que aquela skill não está travada.
-2. **Busca o conteúdo** com `git clone --depth 1 --branch <referência>` — clone raso, usando o
-   `git` do sistema. É de propósito: assim ele aproveita a credencial já configurada na
+1. **Resolve a versão alvo.** Da origem canônica, o alvo é o **commit certificado**: cada versão
+   do `expxdev` grava no catálogo (`src/nucleo/catalogo.ts`, campo `certificado`) o commit de
+   cada skill que ela certificou, e o `init` instala esse commit, não o topo da `main` da skill.
+   Um merge na `main` de uma skill só chega aos projetos pela próxima release do `expxdev`. O
+   `--to <ref>` sai do certificado de propósito. A pasta local (`EXPX_SKILLS_LOCAIS`) e a origem
+   customizada não têm certificado: nelas vale a **maior tag de versão semântica** (comparada
+   número a número; pré-lançamento ignorado) e, sem tag, a branch padrão, marcada como não
+   travada.
+2. **Busca o conteúdo** com o `git` do sistema: o commit fixado (certificado ou `--to` com SHA)
+   por `git fetch` do commit, e uma tag ou branch por `git clone --depth 1 --branch <referência>`. É de propósito: assim ele aproveita a credencial já configurada na
    máquina (repositório privado funciona sem CLI nenhum saber de token) e não esbarra em
    limite de requisição de API.
 3. **Detecta o layout.** Os repositórios das skills não têm todos a mesma forma: alguns trazem
@@ -554,6 +558,11 @@ npx --yes --package ~/expx-cli/v0.12.9/expxdev-0.12.9.tgz expx init --skills bui
   `main` cujos workflows `CI` e `proveniencia` estejam verdes.
 - O preflight recusa divergência entre `package.json`, `package-lock.json` e metadata do tarball,
   bem como tag ou release já existente. O pacote é gerado duas vezes e os hashes devem coincidir.
+- Cada release certifica um commit de cada skill: atualizar o `certificado` no catálogo (com a
+  tabela de `docs/expx-cli/base/10-proveniencia-skills.md` e, para SprintX e MergeX, os
+  fixtures da bancada) é um PR no `expxdev`. A preparação da release confere que cada
+  certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
+  instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
   `bash scripts/liberar-versao.sh 0.12.9 <sha-completo>`. O script não cria tag local e não
   publica no npm.
@@ -642,8 +651,16 @@ A aplicação **remonta o plugin do zero** com a seleção inteira do lock, em v
 árvore montada. É mais lento e é de propósito: editar no lugar deixa arquivo órfão quando uma
 skill encolhe entre versões.
 
-> `--latest` é aceito pelo parser mas hoje **não altera o comportamento** — a resolução segue
-> sempre a maior tag, ou a branch padrão quando não há tag.
+> `--latest` é aceito pelo parser mas **não altera o comportamento**: o alvo continua sendo o
+> commit certificado por esta versão do CLI. Os hooks instalados antes da 0.12.10 chamam
+> `update --latest --yes` e seguem, assim, o catálogo.
+
+> **Certificado, normalização e recuo.** O `update` compara o commit instalado com o
+> certificado. Já no certificado, com um lock de antes dele (`main` não travada, ou uma tag), só
+> o lock é regravado ("normalizacao pendente"), sem remontar a árvore. Instalado adiante do
+> certificado (o topo da `main` antes da release), a skill **recua** para ele, e a saída diz
+> "recuo para o certificado" e quantas mudanças desfaz. A sincronização do SessionStart roda o
+> CLI da **última release** do `expxdev`, nunca a ponta da `main`.
 
 > **Rollback.** Como `.expx/` é commitado, desfazer uma atualização é revertê-lo pelo
 > versionador (`git checkout -- .expx`). O `update` diz isso em toda execução que aplica.

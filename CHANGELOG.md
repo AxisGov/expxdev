@@ -1,5 +1,14 @@
 # Changelog
 
+## Próxima versão
+
+- **O commit certificado de cada skill.** Até a 0.12.9, o `init` e o `update` instalavam a maior tag da skill e, sem tag (nenhuma das nove tem), o topo da `main` dela. O katosmv/login recebeu na 0.12.8 o conteúdo da 0.12.9, com o lock dizendo 0.12.8, e a DM-286 da MergeX chegou a projetos antes de qualquer release do expxdev. Agora o catálogo grava, em `certificado`, o commit de cada skill que a versão do CLI certifica, e da origem canônica é esse commit que se instala. Um merge na `main` de uma skill só chega aos projetos pela próxima release do expxdev.
+  - O `update` decide pelo commit. Já no certificado, com lock de antes dele, regrava só o lock ("normalizacao pendente"); adiante do certificado, **recua** para ele e diz quantas mudanças desfaz. `--to <ref>` continua saindo do certificado de propósito.
+  - A pasta local (`EXPX_SKILLS_LOCAIS`) e a origem customizada seguem como antes: maior tag ou, sem tag, a branch padrão.
+  - O SessionStart (`expx-session-sync`) roda o CLI da **última release** do expxdev, e não a ponta da `main`, com `update --yes`. O `--latest`, que já não mudava nada, continua aceito: os hooks instalados antes seguem o catálogo.
+  - A preparação da release confere que cada certificado é ancestral da `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init` instala exatamente esses commits.
+  - O `doctor` passa a dizer, para a skill fora do certificado, que um `expx update` a leva ao commit certificado.
+
 ## 0.12.9 — a SprintX sob pipefail e o limite de migração
 
 - Certifica a SprintX em AxisGov/sprintx@e3852dc (AxisGov/sprintx#57, **DS-192**). Corrige o "task não está no plano" que o katosmv/login encontrou na 0.12.7. Sob `pipefail`, um consumidor que decide cedo (`grep -q`, `head`) fechava o pipe enquanto o produtor ainda escrevia; acima de 64 KB o produtor levava SIGPIPE (141) e o pipeline falhava, ao contrário do que o consumidor tinha achado. Os scripts e hooks da SprintX passam a usar here-string, `case`, a ferramenta lendo o arquivo direto e `awk 'NR <= n'` no lugar de `head`. No repositório da SprintX, um lint no CI recusa o padrão de volta, com o alcance declarado na DS-192.

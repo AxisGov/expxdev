@@ -173,8 +173,8 @@ export function diagnosticar(raiz: string, env: NodeJS.ProcessEnv = process.env)
       push({
         id: "skill-nao-travada",
         severidade: "aviso",
-        problema: `${nome} nao esta travada em versao publicada (segue a branch ${travada.referencia})`,
-        correcao: "quando o repositorio publicar uma tag, rode `expx update` para travar",
+        problema: `${nome} nao esta no commit certificado por esta versao do CLI (segue ${travada.referencia}: lock de antes do certificado, origem local ou --to)`,
+        correcao: "rode `expx update` para ir ao commit certificado; origem local ou --to e escolha sua",
       });
     }
   }

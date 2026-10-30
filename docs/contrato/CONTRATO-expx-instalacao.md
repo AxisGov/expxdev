@@ -455,6 +455,17 @@ uma resolução nova grava a data do dia, e repetir a instalação não suja a
 árvore porque o dia virou. `skills.<nome>.repositorio` é a origem usada e, para uma origem
 local, o caminho dela.
 
+**Commit certificado.** Da origem canônica do catálogo, `init` e `update` instalam o
+commit que a versão do CLI certifica (`certificado` em `src/nucleo/catalogo.ts`), e o
+lock grava `referencia` e `commit` iguais a ele, com `travado: true`. Um merge na `main`
+de uma skill só chega a um projeto por uma release nova do ExpxDev. `--to` vence o
+certificado; a origem local e a customizada seguem a maior tag ou, sem tag, a branch
+padrão (`travado: false`). O `update` decide pelo commit: no certificado com lock de antes
+dele, regrava só o lock (`referencia` e `travado`, e `cli_version`); adiante do
+certificado, recua para ele e diz que é recuo. O certificado que o remoto não tem falha,
+sem cair para a ponta. A preparação da release confere que cada certificado é ancestral da
+`main` da skill.
+
 O `expx doctor` confere o lock contra o disco: arquivo ausente ou alterado,
 hook gerenciado ausente ou alterado no settings, `.expx/hooks.json` diferente
 do composto — erro. Só o `modo` de um id alterado é aviso: é decisão da
@@ -464,8 +475,11 @@ pessoa, e rodar o `init` de novo trava o arquivo com a escolha dela.
 
 O hook do núcleo `expx-session-sync` roda no `startup`/`resume` e, numa
 instalação comum com árvore limpa, sincroniza a distribuição com o ExpxDev da
-AxisGov (`bootstrap` do cache a partir de `main` e `expx update --latest
---yes`). Essa sincronização é **conveniência**, e não pode romper uma
+AxisGov: o cache busca a `main` do ExpxDev com as tags, vai para a **última release**
+(a maior tag `vX.Y.Z`, nunca a ponta da `main`) e roda o CLI dela com `expx update
+--yes`, que segue os commits certificados dessa release. Sem release publicada, a
+sincronização adia. Os hooks de antes da 0.12.10 rodam `update --latest --yes` com o CLI
+da `main`, e o `--latest` não muda nada: seguem o catálogo da `main`. Essa sincronização é **conveniência**, e não pode romper uma
 instalação congelada.
 
 **SessionStart não aplica atualização automática a instalações que contenham
