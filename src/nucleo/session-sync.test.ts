@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -102,6 +103,66 @@ describe("sincronização Axis no SessionStart", () => {
     expect(chamadas.some((a) => a.includes("origin/main") && a.includes("reset"))).toBe(false);
     expect(chamadas.some((a) => a.includes("build:server"))).toBe(true);
     rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it.each([
+    ["o cache atrás da main", false],
+    // Sem a refspec configurada, só a refspec explícita do fetch atualiza origin/main;
+    // com ela velha, o HEAD publicado à frente seria recusado como commit local.
+    ["o cache sem refspec configurada, com o HEAD publicado à frente de origin/main", true],
+  ] as const)("integração: com git real, %s vai para a maior release, e origin/main é atualizada", (_caso, semRefspec) => {
+    // O git roda de verdade; só a URL do remoto (o cache aponta para um repositório
+    // local, não para o GitHub) e o npm (o build) são simulados.
+    const raiz = mkdtempSync(join(tmpdir(), "expx-bootstrap-git-real-"));
+    const fonte = join(raiz, "fonte");
+    const cache = join(raiz, "cache");
+    const ambienteGit = { ...process.env, GIT_AUTHOR_NAME: "a", GIT_AUTHOR_EMAIL: "a@a.invalid", GIT_COMMITTER_NAME: "a", GIT_COMMITTER_EMAIL: "a@a.invalid", GIT_CONFIG_NOSYSTEM: "1" };
+    const git = (cwd: string, ...args: string[]): string => execFileSync("git", args, { cwd, env: ambienteGit, encoding: "utf8" }).trim();
+    try {
+      mkdirSync(fonte);
+      git(fonte, "init", "-q", "-b", "main");
+      const commit = (msg: string): string => { git(fonte, "commit", "-q", "--allow-empty", "-m", msg); return git(fonte, "rev-parse", "HEAD"); };
+      // como no expxdev, o build fica fora do versionamento
+      writeFileSync(join(fonte, ".gitignore"), "dist/\nnode_modules/\n");
+      git(fonte, "add", ".gitignore");
+      commit("1");
+      git(fonte, "tag", "v0.1.0");
+      const doisNoCache = commit("2");
+      execFileSync("git", ["clone", "-q", "--branch", "main", "--single-branch", fonte, cache], { env: ambienteGit });
+      mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+      writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
+      writeFileSync(join(cache, ".axis-build-sha"), `${doisNoCache}\n`);
+      // depois do cache: a release v0.2.0 e mais um commit na main, ainda não liberado
+      const release = commit("3");
+      git(fonte, "tag", "v0.2.0");
+      const ponta = commit("4");
+      if (semRefspec) {
+        git(cache, "config", "--unset", "remote.origin.fetch");
+        git(cache, "fetch", "-q", "origin", "main");
+        git(cache, "reset", "-q", "--hard", "FETCH_HEAD");
+        writeFileSync(join(cache, ".axis-build-sha"), `${ponta}\n`);
+      }
+      expect(git(cache, "rev-parse", "origin/main")).toBe(doisNoCache);
+
+      const executar = (arquivo: string, argumentos: string[], opcoes: { cwd?: string } = {}): string => {
+        if (argumentos.includes("remote") && argumentos.includes("get-url")) return `${AXIS_REPOSITORIO}\n`;
+        if (arquivo !== "git") {
+          // o build: o CLI montado aparece no cache
+          mkdirSync(join(opcoes.cwd ?? cache, "dist", "cli"), { recursive: true });
+          writeFileSync(join(opcoes.cwd ?? cache, "dist", "cli", "expx-bin.js"), "");
+          return "";
+        }
+        return execFileSync("git", argumentos, { env: ambienteGit, encoding: "utf8", ...opcoes });
+      };
+      bootstrapAxis(cache, executar);
+
+      expect(git(cache, "rev-parse", "HEAD")).toBe(release);
+      expect(git(cache, "rev-parse", "origin/main")).toBe(ponta);
+      expect(git(cache, "tag", "--list").split("\n").sort()).toEqual(["v0.1.0", "v0.2.0"]);
+      expect(readFileSync(join(cache, ".axis-build-sha"), "utf8").trim()).toBe(release);
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
   });
 
   it("funcional: clone novo vai para a release antes do build", () => {
