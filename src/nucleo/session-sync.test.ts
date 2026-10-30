@@ -47,7 +47,9 @@ describe("sincronização Axis no SessionStart", () => {
     writeFileSync(join(cache, ".axis-build-sha"), "mesmo\n");
     bootstrapAxis(cache, executar);
     expect(chamadas.some((c) => c.argumentos.includes(AXIS_REPOSITORIO))).toBe(false);
-    expect(chamadas).toContainEqual({ arquivo: "git", argumentos: ["-C", cache, "fetch", "--tags", "origin", "main"] });
+    // A refspec explícita atualiza origin/main sempre: a guarda de commit local
+    // compara o HEAD com ela, e uma origin/main velha recusaria o cache à toa.
+    expect(chamadas).toContainEqual({ arquivo: "git", argumentos: ["-C", cache, "fetch", "--tags", "origin", "+refs/heads/main:refs/remotes/origin/main"] });
     expect(AXIS_REPOSITORIO).toBe("https://github.com/AxisGov/expxdev.git");
     rmSync(raiz, { recursive: true, force: true });
   });

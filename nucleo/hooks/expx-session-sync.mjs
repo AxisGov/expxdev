@@ -156,7 +156,7 @@ export function bootstrapAxis(cache, executar = comandoPadrao) {
     }
     const remoto = executar("git", ["-C", cache, "remote", "get-url", "origin"]).trim();
     if (remoto !== AXIS_REPOSITORIO) throw new Error("cache nao aponta para AxisGov/expxdev");
-    executar("git", ["-C", cache, "fetch", "--tags", "origin", "main"]);
+    executar("git", ["-C", cache, "fetch", "--tags", "origin", "+refs/heads/main:refs/remotes/origin/main"]);
     const local = executar("git", ["-C", cache, "rev-parse", "HEAD"]).trim();
     const alvo = commitDaRelease(cache, executar);
     let marcador = "";
