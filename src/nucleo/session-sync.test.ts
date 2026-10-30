@@ -136,6 +136,11 @@ describe("sincronização Axis no SessionStart", () => {
       const release = commit("3");
       git(fonte, "tag", "v0.2.0");
       const ponta = commit("4");
+      // uma tag de release fora da main revisada (branch lateral): nunca é escolhida
+      git(fonte, "checkout", "-q", "-b", "lateral", release);
+      commit("lateral");
+      git(fonte, "tag", "v0.3.0");
+      git(fonte, "checkout", "-q", "main");
       if (semRefspec) {
         git(cache, "config", "--unset", "remote.origin.fetch");
         git(cache, "fetch", "-q", "origin", "main");
@@ -158,11 +163,38 @@ describe("sincronização Axis no SessionStart", () => {
 
       expect(git(cache, "rev-parse", "HEAD")).toBe(release);
       expect(git(cache, "rev-parse", "origin/main")).toBe(ponta);
-      expect(git(cache, "tag", "--list").split("\n").sort()).toEqual(["v0.1.0", "v0.2.0"]);
+      expect(git(cache, "tag", "--list").split("\n").sort()).toEqual(["v0.1.0", "v0.2.0", "v0.3.0"]);
       expect(readFileSync(join(cache, ".axis-build-sha"), "utf8").trim()).toBe(release);
     } finally {
       rmSync(raiz, { recursive: true, force: true });
     }
+  });
+
+  it("funcional: a maior release fora da main é ignorada, e vale a maior que está nela", () => {
+    // CodeAnt no expxdev#111: o `fetch --tags` traz qualquer tag vX.Y.Z, inclusive de
+    // commit que nunca entrou na main revisada.
+    const raiz = mkdtempSync(join(tmpdir(), "expx-bootstrap-release-fora-"));
+    const cache = join(raiz, "cache");
+    mkdirSync(join(cache, ".git"), { recursive: true });
+    mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+    writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
+    writeFileSync(join(cache, ".axis-build-sha"), "ponta\n");
+    const chamadas: string[][] = [];
+    const executar = (_arquivo: string, argumentos: string[]) => {
+      chamadas.push(argumentos);
+      if (argumentos.includes("remote")) return `${AXIS_REPOSITORIO}\n`;
+      if (argumentos.includes("tag")) return "v0.12.9\nv0.13.0\n";
+      if (argumentos.includes("v0.13.0^{commit}")) return "fora\n";
+      if (argumentos.includes("v0.12.9^{commit}")) return "release\n";
+      if (argumentos.includes("merge-base") && argumentos.includes("fora")) throw new Error("nao e ancestral");
+      if (argumentos.includes("rev-parse")) return "ponta\n";
+      if (argumentos.includes("branch")) return "main\n";
+      return "";
+    };
+    bootstrapAxis(cache, executar);
+    expect(chamadas).toContainEqual(["-C", cache, "reset", "--hard", "release"]);
+    expect(chamadas.some((a) => a.includes("reset") && a.includes("fora"))).toBe(false);
+    rmSync(raiz, { recursive: true, force: true });
   });
 
   it("funcional: clone novo vai para a release antes do build", () => {
@@ -448,7 +480,7 @@ describe("sincronização Axis no SessionStart", () => {
       if (argumentos.includes("origin/main")) return "remote-commit\n";
       if (argumentos.includes("rev-parse")) return "local-commit\n";
       if (argumentos.includes("branch")) return "main\n";
-      if (argumentos.includes("merge-base")) throw new Error("divergente");
+      if (argumentos.includes("merge-base") && argumentos.includes("local-commit")) throw new Error("divergente");
       return "";
     };
     expect(() => bootstrapAxis(cache, executar)).toThrow("cache Axis possui commits locais");

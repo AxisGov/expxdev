@@ -95,27 +95,38 @@ function partesDaRelease(tag) {
   return m === null ? undefined : [Number(m[1]), Number(m[2]), Number(m[3])];
 }
 
-/** A maior tag de release, comparada número a número (`v0.10.0` vence `v0.9.9`). */
+/** As tags de release, da maior para a menor, comparadas número a número (`v0.10.0` vence `v0.9.9`). */
+function releasesEmOrdem(tags) {
+  return tags
+    .map((tag) => ({ tag: tag.trim(), p: partesDaRelease(tag) }))
+    .filter((r) => r.p !== undefined)
+    .sort((a, b) => b.p[0] - a.p[0] || b.p[1] - a.p[1] || b.p[2] - a.p[2])
+    .map((r) => r.tag);
+}
+
+/** A maior tag de release, comparada número a número. */
 export function maiorRelease(tags) {
-  let melhor;
-  for (const tag of tags) {
-    const p = partesDaRelease(tag);
-    if (p === undefined) continue;
-    const diferenca = melhor === undefined ? 1 : p[0] - melhor.p[0] || p[1] - melhor.p[1] || p[2] - melhor.p[2];
-    if (diferenca > 0) melhor = { tag: tag.trim(), p };
-  }
-  return melhor?.tag;
+  return releasesEmOrdem(tags)[0];
 }
 
 /**
  * O commit da última release do ExpxDev, no cache. O CLI que o SessionStart roda
  * é o da release, nunca a ponta da main: é a release que certifica os commits
- * das skills, e o que está na main ainda não foi liberado.
+ * das skills, e o que está na main ainda não foi liberado. Só vale a tag cujo
+ * commit está na main revisada: o `fetch --tags` traz também a tag de um commit
+ * que nunca entrou nela (CodeAnt no expxdev#111).
  */
 function commitDaRelease(cache, executar) {
-  const tag = maiorRelease(executar("git", ["-C", cache, "tag", "--list"]).split("\n"));
-  if (tag === undefined) throw new Error("nenhuma release do expxdev no cache Axis");
-  return executar("git", ["-C", cache, "rev-parse", `${tag}^{commit}`]).trim();
+  for (const tag of releasesEmOrdem(executar("git", ["-C", cache, "tag", "--list"]).split("\n"))) {
+    const commit = executar("git", ["-C", cache, "rev-parse", `${tag}^{commit}`]).trim();
+    try {
+      executar("git", ["-C", cache, "merge-base", "--is-ancestor", commit, "origin/main"]);
+      return commit;
+    } catch {
+      // tag fora da main: a próxima
+    }
+  }
+  throw new Error("nenhuma release do expxdev na main do cache Axis");
 }
 
 function clonarCache(cache, executar) {
