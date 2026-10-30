@@ -89,11 +89,41 @@ function buildCache(cache, executar) {
   writeFileSync(join(cache, ".axis-build-sha"), `${commit}\n`);
 }
 
+/** `v1.2.3` → [1,2,3]. Pré-lançamento e qualquer outro nome não são release. */
+function partesDaRelease(tag) {
+  const m = /^v(\d+)\.(\d+)\.(\d+)$/.exec(tag.trim());
+  return m === null ? undefined : [Number(m[1]), Number(m[2]), Number(m[3])];
+}
+
+/** A maior tag de release, comparada número a número (`v0.10.0` vence `v0.9.9`). */
+export function maiorRelease(tags) {
+  let melhor;
+  for (const tag of tags) {
+    const p = partesDaRelease(tag);
+    if (p === undefined) continue;
+    const diferenca = melhor === undefined ? 1 : p[0] - melhor.p[0] || p[1] - melhor.p[1] || p[2] - melhor.p[2];
+    if (diferenca > 0) melhor = { tag: tag.trim(), p };
+  }
+  return melhor?.tag;
+}
+
+/**
+ * O commit da última release do ExpxDev, no cache. O CLI que o SessionStart roda
+ * é o da release, nunca a ponta da main: é a release que certifica os commits
+ * das skills, e o que está na main ainda não foi liberado.
+ */
+function commitDaRelease(cache, executar) {
+  const tag = maiorRelease(executar("git", ["-C", cache, "tag", "--list"]).split("\n"));
+  if (tag === undefined) throw new Error("nenhuma release do expxdev no cache Axis");
+  return executar("git", ["-C", cache, "rev-parse", `${tag}^{commit}`]).trim();
+}
+
 function clonarCache(cache, executar) {
   const temporario = `${cache}.tmp-${process.pid}`;
   rmSync(temporario, { recursive: true, force: true });
   try {
     executar("git", ["clone", "--branch", "main", "--single-branch", AXIS_REPOSITORIO, temporario]);
+    executar("git", ["-C", temporario, "reset", "--hard", commitDaRelease(temporario, executar)]);
     writeFileSync(join(temporario, ".axis-cache-owner"), CACHE_OWNER);
     buildCache(temporario, executar);
     renameSync(temporario, cache);
@@ -126,21 +156,24 @@ export function bootstrapAxis(cache, executar = comandoPadrao) {
     }
     const remoto = executar("git", ["-C", cache, "remote", "get-url", "origin"]).trim();
     if (remoto !== AXIS_REPOSITORIO) throw new Error("cache nao aponta para AxisGov/expxdev");
-    executar("git", ["-C", cache, "fetch", "origin", "main"]);
+    executar("git", ["-C", cache, "fetch", "--tags", "origin", "main"]);
     const local = executar("git", ["-C", cache, "rev-parse", "HEAD"]).trim();
-    const remotoMain = executar("git", ["-C", cache, "rev-parse", "origin/main"]).trim();
+    const alvo = commitDaRelease(cache, executar);
     let marcador = "";
     try {
       marcador = readFileSync(join(cache, ".axis-build-sha"), "utf8").trim();
     } catch {
       // marcador ausente: o cache precisa ser reconstruido
     }
-    if (local !== remotoMain || marcador !== local || !existsSync(join(cache, "dist", "cli", "expx-bin.js"))) {
+    if (local !== alvo || marcador !== local || !existsSync(join(cache, "dist", "cli", "expx-bin.js"))) {
       if (cacheEstaSujo(cache, executar)) {
         throw new Error("cache Axis possui alteracoes nao commitadas");
       }
       const branch = executar("git", ["-C", cache, "branch", "--show-current"]).trim();
       if (branch !== "main") throw new Error("cache Axis nao esta na branch main");
+      // O HEAD tem de estar publicado na main: commit só local no cache não se perde.
+      // A release pode estar atrás do HEAD (cache de antes, que seguia a main).
+      const remotoMain = executar("git", ["-C", cache, "rev-parse", "origin/main"]).trim();
       if (local !== remotoMain) {
         try {
           executar("git", ["-C", cache, "merge-base", "--is-ancestor", local, remotoMain]);
@@ -148,7 +181,7 @@ export function bootstrapAxis(cache, executar = comandoPadrao) {
           throw new Error("cache Axis possui commits locais");
         }
       }
-      executar("git", ["-C", cache, "reset", "--hard", "origin/main"]);
+      executar("git", ["-C", cache, "reset", "--hard", alvo]);
       buildCache(cache, executar);
     }
     return cache;
@@ -253,7 +286,7 @@ export function sincronizarSessao({ entrada, plataforma = "claude", raiz, cwd, a
       return resposta("[Expx/Axis] Atualizacao automatica adiada porque o working tree possui alteracoes nao commitadas.");
     }
     const cache = bootstrapAxis(cachePadrao(ambiente), executar);
-    const saida = executar(process.execPath, [join(cache, "dist", "cli", "expx-bin.js"), "update", "--latest", "--yes"], { cwd: projeto });
+    const saida = executar(process.execPath, [join(cache, "dist", "cli", "expx-bin.js"), "update", "--yes"], { cwd: projeto });
     if (houveAtualizacao(saida)) {
       const nomes = nomesAtualizados(saida);
       const detalhe = nomes.length > 0 ? ` Skills atualizadas: ${nomes.join(", ")}.` : "";

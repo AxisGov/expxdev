@@ -53,6 +53,7 @@ function cenario(lock: Record<string, unknown> | string, opcoes: { sujo?: boolea
   const cache = join(raiz, "fora-do-projeto", "cache-axis");
   const chamadas: string[][] = [];
   const executar = (arquivo: string, argumentos: string[]): string => {
+    if (argumentos.includes("tag")) return "v0.12.9\n";
     chamadas.push([arquivo, ...argumentos]);
     if (argumentos.includes("--show-toplevel")) return `${raiz}\n`;
     if (argumentos.includes("status")) return opcoes.sujo === true ? " M arquivo.txt\n" : "";
@@ -293,7 +294,7 @@ describe("D-03: SessionStart não atualiza instalação com origem local", () =>
     }
   });
 
-  it("funcional: lock remoto normal mantém o fluxo legado — bootstrap Axis e update --latest --yes", () => {
+  it("funcional: lock remoto normal mantém o fluxo legado — bootstrap Axis e update --yes, sem --latest", () => {
     const c = cenario(lockCom({ sprintx: SPRINTX_REMOTA, mergex: MERGEX_REMOTA }));
     try {
       const saida = sessao(c, "startup");
@@ -302,7 +303,8 @@ describe("D-03: SessionStart não atualiza instalação com origem local", () =>
       expect(c.chamadas[1]).toEqual(["git", "-C", c.raiz, "status", "--porcelain"]);
       expect(c.chamadas.some((a) => a[1] === "clone" && a.includes(AXIS_REPOSITORIO))).toBe(true);
       const cli = c.chamadas.find((a) => a.some((v) => v.endsWith("expx-bin.js")));
-      expect(cli?.slice(-3)).toEqual(["update", "--latest", "--yes"]);
+      expect(cli?.slice(-2)).toEqual(["update", "--yes"]);
+      expect(cli).not.toContain("--latest");
     } finally {
       c.descartar();
     }
