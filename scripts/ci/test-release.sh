@@ -30,6 +30,12 @@ fi
 grep -Eq '^  workflow_dispatch:' "$release" || falha 'release não exige dispatch explícito'
 ! grep -Eq '^  push:|^  pull_request:' "$release" || falha 'release possui gatilho automático'
 grep -Fq 'node scripts/ci/preparar-release.mjs' "$release" || falha 'workflow não usa o preflight comum'
+# Os projetos instalam o `certificado` do catálogo: a preparação confere que cada um está
+# na main da skill e que o init instala exatamente esses commits, antes da tag.
+grep -Fq 'bash scripts/ci/test-certificados.sh' <<<"$(sed -n '/^  prepare:/,/^  publish:/p' "$release")" \
+  || falha 'a preparação não confere os commits certificados das skills'
+grep -Fq 'bash scripts/ci/test-distribuicao-sem-segredo.sh' <<<"$(sed -n '/^  prepare:/,/^  publish:/p' "$release")" \
+  || falha 'a preparação não instala a distribuição certificada'
 grep -Fq 'gh release create' "$release" || falha 'workflow não publica a GitHub Release validada'
 ! grep -R -E -n 'npm[[:space:]]+publish' "$raiz/.github/workflows" \
   || falha 'workflow não pode publicar no npm'

@@ -63,6 +63,9 @@ jobs:
       - name: Distribution passes MergeX secret scan
         run: bash scripts/ci/test-distribuicao-sem-segredo.sh
 
+      - name: Certified skill commits are on each skill main
+        run: bash scripts/ci/test-certificados.sh
+
       - name: Validate and pack twice
         id: release
         env:
