@@ -1,10 +1,12 @@
 # Changelog
 
-## Não publicado
+## 0.12.12 — a trava do SessionStart e o lembrete
 
-- **A trava do cache do SessionStart sem corrida.** Dois processos podiam ver a mesma trava velha, e um apagava a que o outro acabava de criar. A trava agora nasce inteira, com o dono dentro, e só quem detém `<trava>.recuperacao` remove uma trava velha. Dono vivo nunca perde a trava por idade.
+- **A trava do cache do SessionStart sem corrida.** Dois processos podiam ver a mesma trava velha, e um apagava a que o outro acabava de criar. A trava agora nasce inteira, com o dono dentro, e só quem detém `<trava>.recuperacao` remove uma trava velha. Dono vivo nunca perde a trava por idade, e só um processo limpa uma recuperação abandonada.
 - **O marcador do build atesta o `dist/`.** `.axis-build-sha` guarda o commit e a soma do `dist/`, que o Git não versiona: `dist/` alterado com o mesmo commit reconstrói o cache. O cache de versões anteriores reconstrói uma vez.
 - **O lock é conferido antes de cache e rede.** O hook passa a exigir os campos obrigatórios do esquema (`lock_version`, `cli_version`, `harness`, e `repositorio`, `referencia`, `travado`, `resolvido_em` e `arquivos` de cada skill). Lock fora de forma adia a sincronização sem tocar em cache nem rede.
+- **O lembrete descarta carimbo do futuro.** Com o relógio avançado e depois atrasado, um registro ficava além do limite de 24 horas ou 7 dias e suprimia o lembrete. Carimbos até 60 s à frente continuam valendo, para não duplicar o aviso entre processos simultâneos.
+- **Limite assumido:** um hook de antes da 0.12.12 parado entre o `mkdir` e a gravação do dono ainda pode dividir a trava com o novo. O pior caso é um build repetido ou que falha no cache, que se reconstrói na sessão seguinte.
 
 ## 0.12.11 — o repositório-fonte fora da atualização automática
 
