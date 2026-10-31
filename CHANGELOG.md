@@ -3,7 +3,7 @@
 ## 0.12.11 — o repositório-fonte fora da atualização automática
 
 - **O repositório-fonte do CLI não se atualiza nem troca o plugin global.** O SessionStart rodaria `update --yes` no expxdev a cada release e sujaria a `main`, e o `init` e o `update` trocariam o `expx-local` do escopo do usuário, que é único, por um marketplace com menos skills, afetando todas as sessões da máquina. Na raiz cujo `package.json` tem `name: expxdev` e `repository` em AxisGov/expxdev, o hook sai sem fazer nada e o registro não roda. O `expx update` explícito continua funcionando. Projetos consumidores não mudam.
-- O próprio expxdev atualiza a prodx instalada, que estava na 0.5.3, para o commit certificado. A sprintx e a runx ficam fora do lock daqui: a instalação delas passa de 100 arquivos e pede vários PRs.
+- O próprio expxdev atualiza a prodx instalada, que estava em `ed7c734` com lock da 0.5.3, para o commit certificado. A sprintx e a runx ficam fora do lock daqui: a instalação delas passa de 100 arquivos e pede vários PRs.
 - `session-freeze.test.ts` compara o comando, não o caminho temporário: o termo `npm` casou com a pasta sorteada e derrubou o Ubuntu no CI do merge da 0.12.10.
 
 ## 0.12.10 — o commit certificado e os achados do Login e do conselhos
