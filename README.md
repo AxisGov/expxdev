@@ -612,11 +612,11 @@ npx --yes --package ~/expx-cli/v0.12.11/expxdev-0.12.11.tgz expx init --skills b
 - `0.12.9` corrige o "task não está no plano" do katosmv/login na `0.12.7`: sob `pipefail`, a
   SprintX deixa de usar `grep -q` e `head` depois de produtor grande. Registra também o limite
   de migração da varredura de segredo e a reversão da DM-286 na MergeX.
-- `0.12.11` faz o repositório-fonte do CLI parar de se atualizar sozinho e de trocar o plugin
-  global. Projetos consumidores não mudam.
 - `0.12.10` fixa no catálogo o commit certificado de cada skill: o `init` e o `update` instalam
   esse commit, e não o topo da `main`, e o SessionStart roda o CLI da última release. Traz também
   os achados das instalações da `0.12.9` no katosmv/login#41 e no conselhos#216 e #217.
+- `0.12.11` faz o repositório-fonte do CLI parar de se atualizar sozinho e de trocar o plugin
+  global. Projetos consumidores não mudam.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

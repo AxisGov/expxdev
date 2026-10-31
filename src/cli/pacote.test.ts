@@ -39,7 +39,7 @@ describe("pacote publicável", () => {
     expect(p.files).toContain("CHANGELOG.md");
   });
 
-  it("integração: package, lock e linha AxisGov declaram 0.12.11", () => {
+  it("integração: package e lock declaram 0.12.11", () => {
     const p = pacote();
     const lock = JSON.parse(readFileSync("package-lock.json", "utf8")) as {
       version: string;
