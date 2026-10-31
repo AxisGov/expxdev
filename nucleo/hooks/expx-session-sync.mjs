@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -52,41 +53,110 @@ function cacheEstaSujo(cache, executar) {
   });
 }
 
-function adquirirLock(bloqueio) {
-  for (let tentativa = 0; tentativa < 2; tentativa++) {
-    try {
-      mkdirSync(bloqueio);
-      writeFileSync(join(bloqueio, "owner.json"), JSON.stringify({ pid: process.pid, timestamp: Date.now() }));
-      return;
-    } catch {
-      if (tentativa > 0) throw new Error("bootstrap em andamento");
-      let idade;
-      try {
-        idade = Date.now() - statSync(bloqueio).mtimeMs;
-      } catch {
-        throw new Error("bootstrap em andamento");
-      }
-      try {
-        const dono = JSON.parse(readFileSync(join(bloqueio, "owner.json"), "utf8"));
-        if (processoVivo(dono.pid)) throw new Error("bootstrap em andamento");
-      } catch (erro) {
-        if (erro instanceof Error && erro.message === "bootstrap em andamento") throw erro;
-        if (idade < LOCK_STALE_MS) throw new Error("bootstrap em andamento");
-      }
-      try {
-        rmSync(bloqueio, { recursive: true, force: true });
-      } catch {
-        throw new Error("bootstrap em andamento");
+/** A trava pertence a alguém: dono vivo ou, sem dono legível, criada há pouco. */
+function travaOcupada(trava) {
+  let idade;
+  try {
+    idade = Date.now() - statSync(trava).mtimeMs;
+  } catch {
+    return true;
+  }
+  try {
+    return processoVivo(JSON.parse(readFileSync(join(trava, "owner.json"), "utf8")).pid);
+  } catch {
+    return idade < LOCK_STALE_MS;
+  }
+}
+
+function removerSemFalhar(caminho) {
+  try {
+    rmSync(caminho, { recursive: true, force: true, maxRetries: 3 });
+  } catch {
+    // no Windows o arquivo pode estar em uso; o dono morto a libera depois
+  }
+}
+
+/**
+ * A trava nasce inteira: a pasta é montada ao lado, com o dono dentro, e entra no
+ * lugar por `rename`. Não há instante em que ela exista sem dono, nem trava parcial
+ * quando a gravação falha. Devolve false se o nome já estava ocupado.
+ *
+ * Limite assumido na transição: um hook de antes da 0.12.12 parado entre o `mkdir` e
+ * a gravação do dono ainda pode dividir a trava com este. A janela é mínima, o pior
+ * caso é um build repetido ou que falha no cache, que se reconstrói na sessão seguinte.
+ */
+function criarTrava(trava, gravar) {
+  if (existsSync(trava)) return false;
+  const montagem = `${trava}.novo-${process.pid}-${randomBytes(4).toString("hex")}`;
+  mkdirSync(montagem);
+  try {
+    gravar(join(montagem, "owner.json"), JSON.stringify({ pid: process.pid, timestamp: Date.now() }));
+    renameSync(montagem, trava);
+    return true;
+  } catch (erro) {
+    removerSemFalhar(montagem);
+    // No Windows o rename sobre pasta existente devolve EPERM: sem a trava, o erro é outro.
+    if (existsSync(trava)) return false;
+    throw erro;
+  }
+}
+
+/**
+ * Só quem detém `<trava>.recuperacao` remove uma trava velha, e decide isso já com
+ * ela nas mãos: enquanto a velha existe, ninguém cria a nova, e dois processos não
+ * veem a mesma trava velha para um apagar a que o outro acabou de criar. Recuperação
+ * de dono morto sai aqui, e quem a retoma é a sessão seguinte. Dono vivo nunca sai,
+ * mesmo parado: é a idade que abriria a corrida de novo.
+ */
+function recuperarTrava(trava, gravar) {
+  const recuperacao = `${trava}.recuperacao`;
+  if (!criarTrava(recuperacao, gravar)) {
+    if (!travaOcupada(recuperacao)) removerSemFalhar(recuperacao);
+    throw new Error("bootstrap em andamento");
+  }
+  try {
+    if (travaOcupada(trava)) throw new Error("bootstrap em andamento");
+    rmSync(trava, { recursive: true, force: true });
+    if (!criarTrava(trava, gravar)) throw new Error("bootstrap em andamento");
+  } finally {
+    removerSemFalhar(recuperacao);
+  }
+}
+
+export function adquirirLock(trava, gravar = writeFileSync) {
+  if (!criarTrava(trava, gravar)) recuperarTrava(trava, gravar);
+}
+
+/** Soma de `dist/`: caminhos em ordem e bytes, para valer igual em toda máquina. */
+function somaDoDist(cache) {
+  const soma = createHash("sha256");
+  const visitar = (pasta, prefixo) => {
+    const entradas = readdirSync(pasta, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    for (const entrada of entradas) {
+      const relativo = `${prefixo}${entrada.name}`;
+      if (entrada.isDirectory()) {
+        visitar(join(pasta, entrada.name), `${relativo}/`);
+      } else {
+        soma.update(`${relativo}\0`);
+        soma.update(readFileSync(join(pasta, entrada.name)));
+        soma.update("\0");
       }
     }
-  }
+  };
+  if (existsSync(join(cache, "dist"))) visitar(join(cache, "dist"), "");
+  return soma.digest("hex");
+}
+
+/** O commit do build e a soma do `dist/`, que o Git não versiona. */
+export function marcadorDoBuild(cache, commit) {
+  return `${commit} ${somaDoDist(cache)}`;
 }
 
 function buildCache(cache, executar) {
   executarNpm(cache, ["ci"], executar);
   executarNpm(cache, ["run", "build:server"], executar);
   const commit = executar("git", ["-C", cache, "rev-parse", "HEAD"]).trim();
-  writeFileSync(join(cache, ".axis-build-sha"), `${commit}\n`);
+  writeFileSync(join(cache, ".axis-build-sha"), `${marcadorDoBuild(cache, commit)}\n`);
 }
 
 /** `v1.2.3` → [1,2,3]. Pré-lançamento e qualquer outro nome não são release. */
@@ -176,7 +246,7 @@ export function bootstrapAxis(cache, executar = comandoPadrao) {
     } catch {
       // marcador ausente: o cache precisa ser reconstruido
     }
-    if (local !== alvo || marcador !== local || !existsSync(join(cache, "dist", "cli", "expx-bin.js"))) {
+    if (local !== alvo || !existsSync(join(cache, "dist", "cli", "expx-bin.js")) || marcador !== marcadorDoBuild(cache, local)) {
       if (cacheEstaSujo(cache, executar)) {
         throw new Error("cache Axis possui alteracoes nao commitadas");
       }
@@ -263,7 +333,10 @@ export function lerOrigemDoLock(caminho) {
   } catch {
     return invalido("lock ilegivel");
   }
-  const skills = lock?.skills;
+  if (!Number.isInteger(lock?.lock_version) || typeof lock?.cli_version !== "string" || lock.cli_version === "" || !Array.isArray(lock?.harness) || lock.harness.some((h) => typeof h !== "string")) {
+    return invalido("lock sem versao ou harness");
+  }
+  const skills = lock.skills;
   if (skills === null || typeof skills !== "object" || Array.isArray(skills)) {
     return invalido("lock sem mapa de skills");
   }
@@ -271,6 +344,12 @@ export function lerOrigemDoLock(caminho) {
   for (const [nome, skill] of Object.entries(skills)) {
     const commit = skill?.commit;
     if (typeof commit !== "string" || commit === "") return invalido(`lock sem commit legivel para ${nome}`);
+    const { repositorio, referencia, travado, resolvido_em: resolvido, arquivos } = skill;
+    const textos = [repositorio, referencia, resolvido].every((v) => typeof v === "string" && v !== "");
+    const mapa = arquivos !== null && typeof arquivos === "object" && !Array.isArray(arquivos) && Object.values(arquivos).every((v) => typeof v === "string");
+    if (!textos || typeof travado !== "boolean" || !mapa) {
+      return invalido(`lock fora de forma para ${nome}`);
+    }
     if (origemLocal(commit)) locais.push(nome);
   }
   return { ok: true, locais };

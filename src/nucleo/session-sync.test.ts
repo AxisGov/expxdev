@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { execFileSync, spawn } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // @ts-expect-error The runtime helper is intentionally shipped as a Node module beside the harness adapters.
-import { AXIS_REPOSITORIO, bootstrapAxis, construirComandoNpm, maiorRelease, sincronizarSessao } from "../../nucleo/hooks/expx-session-sync.mjs";
+import { AXIS_REPOSITORIO, adquirirLock, bootstrapAxis, construirComandoNpm, lerOrigemDoLock, maiorRelease, marcadorDoBuild, sincronizarSessao } from "../../nucleo/hooks/expx-session-sync.mjs";
 
 function ambiente(raiz: string): Record<string, string> {
   return { EXPX_AXIS_CACHE: join(raiz, "cache"), HOME: raiz };
@@ -29,6 +29,41 @@ function projeto(lock: Record<string, unknown> | string | null = LOCK_REMOTO): s
   }
   return raiz;
 }
+
+describe("lock válido antes de cache e rede", () => {
+  const skill = { repositorio: "https://github.com/AxisGov/SprintX", referencia: "main", travado: true, commit: "a".repeat(40), resolvido_em: "2026-10-31", arquivos: {} };
+  function ler(lock: unknown): { ok: boolean; motivo?: string } {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-lock-forma-"));
+    const caminho = join(raiz, "lock.json");
+    writeFileSync(caminho, JSON.stringify(lock));
+    const r = lerOrigemDoLock(caminho) as { ok: boolean; motivo?: string };
+    rmSync(raiz, { recursive: true, force: true });
+    return r;
+  }
+
+  it("funcional: lock completo passa", () => {
+    expect(ler({ lock_version: 2, cli_version: "0.12.11", harness: ["claude"], skills: { sprintx: skill } }).ok).toBe(true);
+  });
+
+  it("funcional: lock só com strings de commit é inválido", () => {
+    expect(ler({ lock_version: 2, cli_version: "0.12.11", harness: ["claude"], skills: { sprintx: { commit: "abc" } } }).ok).toBe(false);
+  });
+
+  it("funcional: sem lock_version ou harness é inválido", () => {
+    expect(ler({ cli_version: "0.12.11", harness: ["claude"], skills: { sprintx: skill } }).ok).toBe(false);
+    expect(ler({ lock_version: 2, harness: ["claude"], skills: { sprintx: skill } }).ok).toBe(false);
+    expect(ler({ lock_version: 2, cli_version: "0.12.11", skills: { sprintx: skill } }).ok).toBe(false);
+  });
+
+  it("funcional: `arquivos` fora de forma é inválido", () => {
+    const base = { lock_version: 2, cli_version: "0.12.11", harness: ["claude"] };
+    expect(ler({ ...base, skills: { sprintx: { ...skill, arquivos: [] } } }).ok).toBe(false);
+    expect(ler({ ...base, skills: { sprintx: { ...skill, travado: "sim" } } }).ok).toBe(false);
+    expect(ler({ ...base, skills: { sprintx: { ...skill, referencia: "" } } }).ok).toBe(false);
+    expect(ler({ ...base, skills: { sprintx: { ...skill, arquivos: { a: 42 } } } }).ok).toBe(false);
+    expect(ler({ ...base, harness: [42], skills: { sprintx: skill } }).ok).toBe(false);
+  });
+});
 
 describe("repositório-fonte do CLI no SessionStart", () => {
   const FONTE = { name: "expxdev", repository: { type: "git", url: "git+https://github.com/AxisGov/expxdev.git" } };
@@ -80,7 +115,7 @@ describe("sincronização Axis no SessionStart", () => {
     };
     mkdirSync(join(cache, "dist", "cli"), { recursive: true });
     writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
-    writeFileSync(join(cache, ".axis-build-sha"), "mesmo\n");
+    writeFileSync(join(cache, ".axis-build-sha"), `${marcadorDoBuild(cache, "mesmo")}\n`);
     bootstrapAxis(cache, executar);
     expect(chamadas.some((c) => c.argumentos.includes(AXIS_REPOSITORIO))).toBe(false);
     // A refspec explícita atualiza origin/main sempre: a guarda de commit local
@@ -122,7 +157,7 @@ describe("sincronização Axis no SessionStart", () => {
     mkdirSync(join(cache, ".git"), { recursive: true });
     mkdirSync(join(cache, "dist", "cli"), { recursive: true });
     writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
-    writeFileSync(join(cache, ".axis-build-sha"), "ponta\n");
+    writeFileSync(join(cache, ".axis-build-sha"), `${marcadorDoBuild(cache, "ponta")}\n`);
     const chamadas: string[][] = [];
     const executar = (_arquivo: string, argumentos: string[]) => {
       chamadas.push(argumentos);
@@ -166,7 +201,7 @@ describe("sincronização Axis no SessionStart", () => {
       execFileSync("git", ["clone", "-q", "--branch", "main", "--single-branch", fonte, cache], { env: ambienteGit });
       mkdirSync(join(cache, "dist", "cli"), { recursive: true });
       writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
-      writeFileSync(join(cache, ".axis-build-sha"), `${doisNoCache}\n`);
+      writeFileSync(join(cache, ".axis-build-sha"), `${marcadorDoBuild(cache, doisNoCache)}\n`);
       // depois do cache: a release v0.2.0 e mais um commit na main, ainda não liberado
       const release = commit("3");
       git(fonte, "tag", "v0.2.0");
@@ -180,7 +215,7 @@ describe("sincronização Axis no SessionStart", () => {
         git(cache, "config", "--unset", "remote.origin.fetch");
         git(cache, "fetch", "-q", "origin", "main");
         git(cache, "reset", "-q", "--hard", "FETCH_HEAD");
-        writeFileSync(join(cache, ".axis-build-sha"), `${ponta}\n`);
+        writeFileSync(join(cache, ".axis-build-sha"), `${marcadorDoBuild(cache, ponta)}\n`);
       }
       expect(git(cache, "rev-parse", "origin/main")).toBe(doisNoCache);
 
@@ -199,7 +234,7 @@ describe("sincronização Axis no SessionStart", () => {
       expect(git(cache, "rev-parse", "HEAD")).toBe(release);
       expect(git(cache, "rev-parse", "origin/main")).toBe(ponta);
       expect(git(cache, "tag", "--list").split("\n").sort()).toEqual(["v0.1.0", "v0.2.0", "v0.3.0"]);
-      expect(readFileSync(join(cache, ".axis-build-sha"), "utf8").trim()).toBe(release);
+      expect(readFileSync(join(cache, ".axis-build-sha"), "utf8").trim()).toBe(marcadorDoBuild(cache, release));
     } finally {
       rmSync(raiz, { recursive: true, force: true });
     }
@@ -213,7 +248,7 @@ describe("sincronização Axis no SessionStart", () => {
     mkdirSync(join(cache, ".git"), { recursive: true });
     mkdirSync(join(cache, "dist", "cli"), { recursive: true });
     writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
-    writeFileSync(join(cache, ".axis-build-sha"), "ponta\n");
+    writeFileSync(join(cache, ".axis-build-sha"), `${marcadorDoBuild(cache, "ponta")}\n`);
     const chamadas: string[][] = [];
     const executar = (_arquivo: string, argumentos: string[]) => {
       chamadas.push(argumentos);
@@ -365,6 +400,127 @@ describe("sincronização Axis no SessionStart", () => {
     rmSync(raiz, { recursive: true, force: true });
   });
 
+  it("funcional: dist alterado com o mesmo commit reconstrói o cache", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-dist-alterado-"));
+    const cache = join(raiz, "cache");
+    mkdirSync(join(cache, ".git"), { recursive: true });
+    mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+    writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "original");
+    writeFileSync(join(cache, ".axis-build-sha"), `${marcadorDoBuild(cache, "mesmo")}\n`);
+    writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "alterado");
+    const npm: string[][] = [];
+    bootstrapAxis(cache, (arquivo, argumentos) => {
+      if (arquivo === "npm") npm.push(argumentos);
+      if (argumentos.includes("tag")) return "v0.12.9\n";
+      if (argumentos.includes("remote")) return `${AXIS_REPOSITORIO}\n`;
+      if (argumentos.includes("rev-parse")) return "mesmo\n";
+      if (argumentos.includes("--show-current")) return "main\n";
+      return "";
+    });
+    expect(npm).toContainEqual(["run", "build:server"]);
+    expect(readFileSync(join(cache, ".axis-build-sha"), "utf8").trim()).toBe(marcadorDoBuild(cache, "mesmo"));
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("funcional: a recuperação em curso de outro processo não é atropelada", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-lock-recuperacao-"));
+    const cache = join(raiz, "cache");
+    mkdirSync(`${cache}.lock`, { recursive: true });
+    writeFileSync(join(`${cache}.lock`, "owner.json"), JSON.stringify({ pid: 999999, timestamp: 1 }));
+    mkdirSync(`${cache}.lock.recuperacao`);
+    expect(() => bootstrapAxis(cache, () => "")).toThrow("bootstrap em andamento");
+    expect(existsSync(`${cache}.lock`)).toBe(true);
+    expect(existsSync(`${cache}.lock.recuperacao`)).toBe(true);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("funcional: recuperação abandonada sai, e a sessão seguinte retoma", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-lock-recuperacao-velha-"));
+    const bloqueio = join(raiz, "cache.lock");
+    mkdirSync(bloqueio);
+    writeFileSync(join(bloqueio, "owner.json"), JSON.stringify({ pid: 999999, timestamp: 1 }));
+    mkdirSync(`${bloqueio}.recuperacao`);
+    const antigo = new Date(Date.now() - 120_000);
+    utimesSync(`${bloqueio}.recuperacao`, antigo, antigo);
+    expect(() => adquirirLock(bloqueio)).toThrow("bootstrap em andamento");
+    expect(existsSync(`${bloqueio}.recuperacao`)).toBe(false);
+    expect(() => adquirirLock(bloqueio)).not.toThrow();
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("funcional: recuperação de dono vivo não sai, mesmo velha", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-lock-recuperacao-viva-"));
+    const bloqueio = join(raiz, "cache.lock");
+    mkdirSync(bloqueio);
+    writeFileSync(join(bloqueio, "owner.json"), JSON.stringify({ pid: 999999, timestamp: 1 }));
+    mkdirSync(`${bloqueio}.recuperacao`);
+    writeFileSync(join(`${bloqueio}.recuperacao`, "owner.json"), JSON.stringify({ pid: process.pid, timestamp: 1 }));
+    const antigo = new Date(Date.now() - 120_000);
+    utimesSync(`${bloqueio}.recuperacao`, antigo, antigo);
+    expect(() => adquirirLock(bloqueio)).toThrow("bootstrap em andamento");
+    expect(existsSync(`${bloqueio}.recuperacao`)).toBe(true);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("funcional: recuperação de dono morto sai, e a sessão seguinte retoma", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-lock-recuperacao-morta-"));
+    const bloqueio = join(raiz, "cache.lock");
+    mkdirSync(bloqueio);
+    writeFileSync(join(bloqueio, "owner.json"), JSON.stringify({ pid: 999999, timestamp: 1 }));
+    mkdirSync(`${bloqueio}.recuperacao`);
+    writeFileSync(join(`${bloqueio}.recuperacao`, "owner.json"), JSON.stringify({ pid: 999999, timestamp: 1 }));
+    expect(() => adquirirLock(bloqueio)).toThrow("bootstrap em andamento");
+    expect(() => adquirirLock(bloqueio)).not.toThrow();
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("funcional: erro real no rename não vira bootstrap em andamento", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-lock-erro-"));
+    const bloqueio = join(raiz, "sem-pasta", "cache.lock");
+    expect(() => adquirirLock(bloqueio)).toThrow(/ENOENT/);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("funcional: a trava nasce com dono, sem pasta de montagem sobrando", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-lock-atomica-"));
+    const bloqueio = join(raiz, "cache.lock");
+    adquirirLock(bloqueio);
+    expect(JSON.parse(readFileSync(join(bloqueio, "owner.json"), "utf8")).pid).toBe(process.pid);
+    expect(readdirSync(raiz)).toEqual(["cache.lock"]);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("funcional: falha ao gravar o dono não deixa trava parcial", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-lock-parcial-"));
+    const bloqueio = join(raiz, "cache.lock");
+    const falhar = (): never => { throw new Error("disco cheio"); };
+    expect(() => adquirirLock(bloqueio, falhar)).toThrow("disco cheio");
+    expect(readdirSync(raiz)).toEqual([]);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("integração: processos simultâneos sobre trava velha não se sobrepõem", async () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-lock-corrida-"));
+    const bloqueio = join(raiz, "cache.lock");
+    mkdirSync(bloqueio);
+    writeFileSync(join(bloqueio, "owner.json"), JSON.stringify({ pid: 999999, timestamp: 1 }));
+    const hook = new URL("../../nucleo/hooks/expx-session-sync.mjs", import.meta.url).href;
+    const secao = join(raiz, "secao");
+    const script = `
+      import { mkdirSync, rmdirSync } from "node:fs";
+      const { adquirirLock } = await import(${JSON.stringify(hook)});
+      try { adquirirLock(${JSON.stringify(bloqueio)}); } catch { process.exit(0); }
+      mkdirSync(${JSON.stringify(secao)});
+      await new Promise((r) => setTimeout(r, 300));
+      rmdirSync(${JSON.stringify(secao)});
+    `;
+    const codigos = await Promise.all(Array.from({ length: 6 }, () => new Promise<number | null>((resolve) => {
+      spawn(process.execPath, ["--input-type=module", "-e", script], { stdio: "ignore" }).on("close", resolve);
+    })));
+    expect(codigos).toEqual([0, 0, 0, 0, 0, 0]);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
   it("funcional: lock abandonado de processo morto é recuperado", () => {
     const raiz = mkdtempSync(join(tmpdir(), "expx-lock-abandonado-"));
     const cache = join(raiz, "cache");
@@ -464,7 +620,7 @@ describe("sincronização Axis no SessionStart", () => {
     mkdirSync(join(cache, ".git"), { recursive: true });
     mkdirSync(join(cache, "dist", "cli"), { recursive: true });
     writeFileSync(join(cache, ".axis-cache-owner"), "AxisGov/expxdev\n");
-    writeFileSync(join(cache, ".axis-build-sha"), "old\n");
+    writeFileSync(join(cache, ".axis-build-sha"), `${marcadorDoBuild(cache, "old")}\n`);
     const chamadas: string[][] = [];
     const executar = (_arquivo: string, argumentos: string[]) => {
       if (argumentos.includes("tag")) return "v0.12.9\n";
@@ -486,7 +642,7 @@ describe("sincronização Axis no SessionStart", () => {
     const cache = join(raiz, "cache");
     mkdirSync(join(cache, ".git"), { recursive: true });
     mkdirSync(join(cache, "dist", "cli"), { recursive: true });
-    writeFileSync(join(cache, ".axis-build-sha"), "old\n");
+    writeFileSync(join(cache, ".axis-build-sha"), `${marcadorDoBuild(cache, "old")}\n`);
     const chamadas: string[][] = [];
     const executar = (_arquivo: string, argumentos: string[]) => {
       if (argumentos.includes("tag")) return "v0.12.9\n";
@@ -506,7 +662,7 @@ describe("sincronização Axis no SessionStart", () => {
     const cache = join(raiz, "cache");
     mkdirSync(join(cache, ".git"), { recursive: true });
     mkdirSync(join(cache, "dist", "cli"), { recursive: true });
-    writeFileSync(join(cache, ".axis-build-sha"), "old\n");
+    writeFileSync(join(cache, ".axis-build-sha"), `${marcadorDoBuild(cache, "old")}\n`);
     const chamadas: string[][] = [];
     const executar = (_arquivo: string, argumentos: string[]) => {
       if (argumentos.includes("tag")) return "v0.12.9\n";
@@ -543,7 +699,7 @@ describe("sincronização Axis no SessionStart", () => {
       mkdirSync(join(cache, "dist", "cli"), { recursive: true });
       mkdirSync(join(cache, ".git"), { recursive: true });
       writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
-      writeFileSync(join(cache, ".axis-build-sha"), "same\n");
+      writeFileSync(join(cache, ".axis-build-sha"), `${marcadorDoBuild(cache, "same")}\n`);
       const chamadas: string[][] = [];
       const executar = (_arquivo: string, argumentos: string[]) => {
         if (argumentos.includes("tag")) return "v0.12.9\n";
@@ -568,7 +724,7 @@ describe("sincronização Axis no SessionStart", () => {
       mkdirSync(join(cache, "dist", "cli"), { recursive: true });
       mkdirSync(join(cache, ".git"), { recursive: true });
       writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
-      writeFileSync(join(cache, ".axis-build-sha"), "same\n");
+      writeFileSync(join(cache, ".axis-build-sha"), `${marcadorDoBuild(cache, "same")}\n`);
       const chamadas: string[][] = [];
       const executar = (_arquivo: string, argumentos: string[]) => {
         if (argumentos.includes("tag")) return "v0.12.9\n";
@@ -595,7 +751,7 @@ describe("sincronização Axis no SessionStart", () => {
       mkdirSync(join(cache, "dist", "cli"), { recursive: true });
       mkdirSync(join(cache, ".git"), { recursive: true });
       writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
-      writeFileSync(join(cache, ".axis-build-sha"), "same\n");
+      writeFileSync(join(cache, ".axis-build-sha"), `${marcadorDoBuild(cache, "same")}\n`);
       const chamadas: string[][] = [];
       const executar = (_arquivo: string, argumentos: string[]) => {
         if (argumentos.includes("tag")) return "v0.12.9\n";

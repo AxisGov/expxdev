@@ -1,5 +1,11 @@
 # Changelog
 
+## Não publicado
+
+- **A trava do cache do SessionStart sem corrida.** Dois processos podiam ver a mesma trava velha, e um apagava a que o outro acabava de criar. A trava agora nasce inteira, com o dono dentro, e só quem detém `<trava>.recuperacao` remove uma trava velha. Dono vivo nunca perde a trava por idade.
+- **O marcador do build atesta o `dist/`.** `.axis-build-sha` guarda o commit e a soma do `dist/`, que o Git não versiona: `dist/` alterado com o mesmo commit reconstrói o cache. O cache de versões anteriores reconstrói uma vez.
+- **O lock é conferido antes de cache e rede.** O hook passa a exigir os campos obrigatórios do esquema (`lock_version`, `cli_version`, `harness`, e `repositorio`, `referencia`, `travado`, `resolvido_em` e `arquivos` de cada skill). Lock fora de forma adia a sincronização sem tocar em cache nem rede.
+
 ## 0.12.11 — o repositório-fonte fora da atualização automática
 
 - **O repositório-fonte do CLI não se atualiza nem troca o plugin global.** O SessionStart rodaria `update --yes` no expxdev a cada release e sujaria a `main`, e o `init` e o `update` trocariam o `expx-local` do escopo do usuário, que é único, por um marketplace com menos skills, afetando todas as sessões da máquina. Na raiz cujo `package.json` tem `name: expxdev` e `repository` em AxisGov/expxdev, o hook sai sem fazer nada e o registro não roda. O `expx update` explícito continua funcionando. Projetos consumidores não mudam.
