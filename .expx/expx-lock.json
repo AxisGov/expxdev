@@ -1,19 +1,19 @@
 {
   "lock_version": 2,
-  "cli_version": "0.12.11",
+  "cli_version": "0.12.13",
   "harness": [
     "claude"
   ],
   "skills": {
     "prodx": {
       "repositorio": "https://github.com/AxisGov/prodx",
-      "referencia": "7539db41013585d31b79ef21afd07268bd99d0c1",
+      "referencia": "06ce57a42db8eaae3f98ea60fc3895f1536383c5",
       "travado": true,
-      "commit": "7539db41013585d31b79ef21afd07268bd99d0c1",
+      "commit": "06ce57a42db8eaae3f98ea60fc3895f1536383c5",
       "resolvido_em": "2026-10-31",
       "arquivos": {
         "DECISOES-DA-SKILL.md": "9d283a6e7733fcd45eafd4484f38fc57b7f2800b9f905a455953f81ca9cd6645",
-        "SKILL.md": "5e22e42adb80c193413b35304e1e8d4c9137c2827f578b7e19160dc67a463e0a",
+        "SKILL.md": "5fbf75a6e7055b4ea9826b4cbd0938af0ef29a3464d458f4a01fad6a12d2b2c2",
         "assets/TEMPLATE-BRIEFING.md": "0c7001ce05b6e714cbaa58673cc8d463cf1ee42770601186fb9d79c4da7b0f82",
         "assets/TEMPLATE-INDICE.md": "ea2aee78d24a696ff142e9317f07b9bcf9c240fb8259a7ed0b3884389e5bd663",
         "assets/TEMPLATE-PRODUTO.md": "7a40ff741afcdb662b96a43ed358b84fbcb8b5939462bb270c82340f9330593a",
@@ -22,7 +22,7 @@
         "assets/TEMPLATE-existencia.md": "60789c0e8c34a2b8f102ef7484870d9edb298011ac7e7f46e59bdbc4c6a4f96f",
         "assets/TEMPLATE-pedido.md": "4d21f82a2978bf8b30dcbd924d11f806804f1dc942cd5e2747433d2b43c2e097",
         "assets/TEMPLATE-resposta-cliente.md": "5b11a929eed4a1f7606b541d9b044c5c4d2ec9e1d1fe05850f84f610e4619925",
-        "references/00-triagem.md": "5d43f23eae38b619450e72f026e0d6c5781d9bbce3de9e4805d94ed0990477d8",
+        "references/00-triagem.md": "83f829b2a38142a46db2e8e0ec8dbde79b743bb19ea2b058371b525fe682ee1f",
         "references/01-produto.md": "73470b45832e96204bf1145bb8fc7ad5f811bf5fbf0cb6dec5c1a32c2bd84173",
         "references/02-pedido.md": "ee47901270a8483dd805c3586ba5160b8ba0ff23fba211f78bcb621ac13a9c78",
         "references/03-existencia.md": "bf69af4e476a99ba5402dea3451f5ac3982a91dc6489becbfb52534f1043ff91",
@@ -36,7 +36,7 @@
   },
   "instalacao": {
     "arquivos": {
-      ".claude/hooks/expx-session-sync.mjs": "61cd65f247d502994dd3ee991b6229309805a8b08f7d03561e781a00a12f05ec",
+      ".claude/hooks/expx-session-sync.mjs": "e68faae8ed29110aea61e490eb3f1e09cabe87d3dfc63d210c480e834a18774f",
       ".expx/marketplace/plugins/expx/commands/prodx-avaliar.md": "1dccd73e65583476d95b3e8795c69c5f5c788ccf98757832b38ed18fa5c4a5dc",
       ".expx/marketplace/plugins/expx/commands/prodx-briefing.md": "569db0045a2e13d2839bc74b53b88ceae125d92333e3aea321f9f89b784c3651",
       ".expx/marketplace/plugins/expx/commands/prodx-existe.md": "2b3d235ab629d2c35237a8d7881172877d9e835eb5b1b3ae35404d5f8d63ec16",
@@ -44,7 +44,7 @@
       ".expx/marketplace/plugins/expx/commands/prodx-triar.md": "0d5ec1b930e7109bb6d37112c2765e0f51f570a9d05cc4ca869eeffd3f9f6655",
       ".expx/marketplace/plugins/expx/commands/prodx.md": "13bb00527417ad1c2f32c523d0690a6ec71bfaa679b4a1c214ddbfc8266e3c07",
       ".expx/marketplace/plugins/expx/skills/prodx/DECISOES-DA-SKILL.md": "9d283a6e7733fcd45eafd4484f38fc57b7f2800b9f905a455953f81ca9cd6645",
-      ".expx/marketplace/plugins/expx/skills/prodx/SKILL.md": "5e22e42adb80c193413b35304e1e8d4c9137c2827f578b7e19160dc67a463e0a",
+      ".expx/marketplace/plugins/expx/skills/prodx/SKILL.md": "5fbf75a6e7055b4ea9826b4cbd0938af0ef29a3464d458f4a01fad6a12d2b2c2",
       ".expx/marketplace/plugins/expx/skills/prodx/assets/TEMPLATE-BRIEFING.md": "0c7001ce05b6e714cbaa58673cc8d463cf1ee42770601186fb9d79c4da7b0f82",
       ".expx/marketplace/plugins/expx/skills/prodx/assets/TEMPLATE-INDICE.md": "ea2aee78d24a696ff142e9317f07b9bcf9c240fb8259a7ed0b3884389e5bd663",
       ".expx/marketplace/plugins/expx/skills/prodx/assets/TEMPLATE-PRODUTO.md": "7a40ff741afcdb662b96a43ed358b84fbcb8b5939462bb270c82340f9330593a",
@@ -53,7 +53,7 @@
       ".expx/marketplace/plugins/expx/skills/prodx/assets/TEMPLATE-existencia.md": "60789c0e8c34a2b8f102ef7484870d9edb298011ac7e7f46e59bdbc4c6a4f96f",
       ".expx/marketplace/plugins/expx/skills/prodx/assets/TEMPLATE-pedido.md": "4d21f82a2978bf8b30dcbd924d11f806804f1dc942cd5e2747433d2b43c2e097",
       ".expx/marketplace/plugins/expx/skills/prodx/assets/TEMPLATE-resposta-cliente.md": "5b11a929eed4a1f7606b541d9b044c5c4d2ec9e1d1fe05850f84f610e4619925",
-      ".expx/marketplace/plugins/expx/skills/prodx/references/00-triagem.md": "5d43f23eae38b619450e72f026e0d6c5781d9bbce3de9e4805d94ed0990477d8",
+      ".expx/marketplace/plugins/expx/skills/prodx/references/00-triagem.md": "83f829b2a38142a46db2e8e0ec8dbde79b743bb19ea2b058371b525fe682ee1f",
       ".expx/marketplace/plugins/expx/skills/prodx/references/01-produto.md": "73470b45832e96204bf1145bb8fc7ad5f811bf5fbf0cb6dec5c1a32c2bd84173",
       ".expx/marketplace/plugins/expx/skills/prodx/references/02-pedido.md": "ee47901270a8483dd805c3586ba5160b8ba0ff23fba211f78bcb621ac13a9c78",
       ".expx/marketplace/plugins/expx/skills/prodx/references/03-existencia.md": "bf69af4e476a99ba5402dea3451f5ac3982a91dc6489becbfb52534f1043ff91",
