@@ -78,14 +78,14 @@ No P2, quando a classificação pode terminar em `fazer`, a skill pergunta **den
 
 ## Os quatro vereditos
 
-Três dos quatro **não geram trabalho**:
+Dois vereditos **não geram trabalho**; dois geram briefing:
 
 | Veredito | Significado |
 |----------|-------------|
 | `ja_existe` | O sistema já faz. Sai um texto para o cliente explicando onde e como, na linguagem dele. |
 | `nao_fazer` | Com o motivo registrado. Este arquivo é **ativo permanente**: quando o pedido voltar, a avaliação já está feita. |
-| `fazer_outra_coisa` | O problema real reformulado, que costuma ser menor e diferente do pedido. |
-| `fazer` | E aí sai o briefing. |
+| `fazer_outra_coisa` | O problema real reformulado, que costuma ser menor e diferente do pedido. Gera briefing desse problema reformulado. |
+| `fazer` | Gera briefing do escopo mínimo aprovado. |
 
 O `VEREDITO.md` sempre traz: a recomendação, o raciocínio em três linhas, a evidência principal, o que muda a recomendação se for descoberto, e um campo de **assinatura humana** — quem aprovou e quando, preenchido pela pessoa, **nunca pela skill**.
 
@@ -109,7 +109,7 @@ docs/produto/
       02-existencia.md
       03-avaliacao.md
       VEREDITO.md
-      BRIEFING.md          só quando o veredito for fazer
+      BRIEFING.md          quando o veredito for fazer ou fazer_outra_coisa
 ```
 
 - Pedido que passa na triagem **não gera pasta**: entra só como linha no `INDICE.md`, com o veredito e o motivo.

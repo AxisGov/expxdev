@@ -9,6 +9,10 @@ foram selecionadas.
 | Arquivo | O que é |
 |---|---|
 | `hooks/expx-rastro.sh` | O rastro de eventos, os modos de hook e o `trabalho_id` |
+| `hooks/expx-integridade-final.sh` | `SubagentStart`/`SubagentStop`: a integridade final dos agentes de aprovação (CONTRATO-expx-orquestracao §12). Carrega o `expx-rastro.sh` do próprio diretório, por isso os dois são instalados lado a lado em `.claude/hooks/` |
+| `scripts/expx-fatiamento.mjs` | O leitor único de `.expx/fatiamento.json` (seção `scripts/` abaixo) |
+| `scripts/expx-limites.mjs` | As exclusões do núcleo, a gramática de `excluir_da_revisao` e a regra dos nomes `FATIA_*` reservados |
+| `scripts/expx-revisao.mjs` | A revisão por task pela CLI do CodeAnt: `revisar`, `conferir`, `rejeitar`, `listar` (seção `scripts/` abaixo) |
 | `commands/onboarding.md` | `/expx:onboarding` — orquestra o mapeamento inicial (stackx, designx, legadox, memox, prodx) das camadas instaladas. Não é núcleo de hook: `montarPlugin` o copia à parte, direto para `commands/` na raiz do plugin — não para dentro de `nucleo/` — porque é assim que o Claude Code descobre um comando. |
 
 ## Como chega até um projeto
@@ -46,6 +50,37 @@ Variáveis que o rastro lê, todas opcionais:
 | `EXPX_TRABALHO_ID` | vence a detecção automática |
 | `EXPX_FASE` / `EXPX_TASK` | preenchem `fase` e `task` (JSON: com aspas) |
 | `EXPX_AGENTE` | o subagente; sem ela, `principal` |
+| `EXPX_MODEL` / `EXPX_EFFORT` | o modelo e o esforço efetivos informados pelo runtime; vencem qualquer fallback |
+| `EXPX_HARNESS` | o harness; só `claude`/`claude-code` (ou, sem ela, `CLAUDECODE`) permitem o fallback de `.claude/agents/` |
+
+## `scripts/`
+
+Ferramentas Node (ESM, só `node:`), copiadas daqui como o resto do núcleo e
+chamadas por caminho. `expx-limites.mjs` concentra as regras fixas (exclusões,
+`FATIA_*` reservados, perfis em `perfis/`, predicado de revisável, medidas da CLI,
+localização e integridade do pacote da CLI), importadas pelo leitor e pela
+revisão. O módulo não lê o ambiente por conta própria.
+
+`expx-fatiamento.mjs` (formato no contrato de instalação, §5.2): `node <L>`
+imprime somente `EXPX_*` para `eval`; `--formato json` imprime as decisões
+efetivas; `--validar` só valida. Arquivo inválido ou qualquer `FATIA_*` no
+ambiente sai 1. `<L>` é
+`.expx/marketplace/plugins/expx/nucleo/scripts/expx-fatiamento.mjs`. O `doctor`
+o usa hoje; nos planos seguintes, sprintx (F3/F6) e mergex (E7) passarão a
+chamá-lo.
+
+`expx-revisao.mjs` (contrato em `docs/contrato/CONTRATO-expx-revisao.md`):
+`revisar` confere que o `codeant` do `PATH` é o pacote homologado e íntegro
+(`npm i -g codeant-cli@0.5.14`), aplica as exclusões e os limites L1 e L2, roda a
+CLI uma vez (`--uncommitted` ou `--base-commit <sha>`) pelo arquivo conferido,
+reconcilia a resposta com a task e grava a evidência v2 em
+`docs/entregas/<trabalho>/revisao/<T-NN.MM>.json`; sai 0 (`ok`), 1 (achado aberto),
+2 (`indisponivel`) ou 3 (`incompleta`). `conferir` é a regra da V12 da mergex
+(`incompleta` é FALHA em qualquer modo, e a evidência tem de cobrir os arquivos
+que o commit da task altera); `rejeitar` registra a rejeição de um
+achado pelo desenvolvedor; `listar` devolve, em JSON, os achados rejeitados, as
+rejeições e os removidos da evidência que o `conferir` aceita. Qualquer `FATIA_*` no ambiente sai 64. A sprintx
+(passo de revisão da F6) e a mergex (E2, V12) passam a chamá-lo nos planos delas.
 
 ## Por que existe
 

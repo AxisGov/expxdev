@@ -9,7 +9,7 @@ Produz `VEREDITO.md` e, quando couber, `BRIEFING.md`.
 
 ## Os quatro vereditos
 
-Três dos quatro **encerram o pedido sem gerar trabalho**. Essa é a razão de o prodx existir.
+Dois dos quatro, `ja_existe` e `nao_fazer`, **encerram sem gerar trabalho**. `fazer_outra_coisa` e `fazer` geram briefing.
 
 ### `ja_existe`
 

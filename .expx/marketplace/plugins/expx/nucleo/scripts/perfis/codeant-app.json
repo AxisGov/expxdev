@@ -1,0 +1,9 @@
+{
+  "perfil": "codeant-app",
+  "max_arquivos_pr": 100,
+  "conta": "todos os arquivos alterados (changed_files), sem desconto do painel",
+  "fontes": [
+    "AxisGov/mergex#15",
+    "katosmv/login#7"
+  ]
+}

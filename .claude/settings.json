@@ -3,7 +3,7 @@
     "expx-local": {
       "source": {
         "source": "directory",
-        "path": "/Users/thuliobittencourt/Documents/Projetos/Expx/.expx/marketplace"
+        "path": "./.expx/marketplace"
       }
     }
   },
@@ -17,6 +17,19 @@
           {
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/expx-lembrete.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/expx-session-sync.mjs"
+            ]
           }
         ]
       }
