@@ -122,7 +122,7 @@ le_frontmatter() {
   [ -n "$FM" ] || { ERRO="frontmatter vazio"; return 1; }
 }
 tem()   { printf '%s\n' "$FM" | awk -F'\t' -v c="$1" '$1 == c { achou = 1 } END { exit !achou }'; }
-valor() { printf '%s\n' "$FM" | awk -F'\t' -v c="$1" '$1 == c { print $2; exit }'; }
+valor() { awk -F'\t' -v c="$1" '$1 == c { print $2; exit }' <<<"$FM"; }
 
 # lista_fluxo <valor> — `[a, b]` vira `a b`; qualquer outra forma é erro.
 lista_fluxo() {
@@ -157,7 +157,7 @@ valida() { # <arquivo> <historico:0|1>
 
   causa="$(valor causa)"
   if [ "$causa" != null ] && [ "$causa" != "$INDETERMINADA" ] \
-     && ! printf '%s\n' "$CAUSAS" | cut -d'|' -f2 | grep -Fxq -- "$causa"; then
+     && ! printf '%s\n' "$CAUSAS" | cut -d'|' -f2 | grep -Fx -- "$causa" >/dev/null; then
     ERRO="causa fora do enum: '${causa}'"; return 1
   fi
 

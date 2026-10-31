@@ -291,7 +291,7 @@ registra_existente() { # <entrega> <origem> <trabalho> <task> <sha completo>
   confere_stage_de_entrada
   carrega_contexto_explicito "$entrega" "$origem_dada" "$trabalho_dado"
 
-  printf '%s\n' "$sha" | grep -Eq '^[0-9A-Fa-f]{40}$' \
+  grep -Eq '^[0-9A-Fa-f]{40}$' <<<"$sha" \
     || para 4 'PARADO — --sha precisa ter exatamente 40 hexadecimais'
   sha="$(printf '%s' "$sha" | tr 'A-F' 'a-f')"
   git cat-file -e "$sha^{commit}" 2>/dev/null \
@@ -738,7 +738,7 @@ EOF
   omitidos="$(printf '%s\n' "$CLASSIFICACAO" | awk -F'\t' '$1 == "na_task_atual" { print $2 }' \
     | while IFS= read -r caminho; do
         [ -n "$caminho" ] || continue
-        printf '%s\n' "$@" | grep -Fxq -- "$caminho" || printf '  - %s\n' "$caminho"
+        printf '%s\n' "$@" | grep -Fx -- "$caminho" >/dev/null || printf '  - %s\n' "$caminho"
       done)"
   [ -z "$omitidos" ] || para 11 'PARADO — produto da task atual alterado e não listado no E1' \
     "Task sendo fechada: $task" \
@@ -752,7 +752,7 @@ EOF
   STAGING="$(printf '%s\n' "$CLASSIFICACAO" | awk -F'\t' '$1 == "na_task_atual" { print $2 }' \
     | while IFS= read -r caminho; do
         [ -n "$caminho" ] || continue
-        printf '%s\n' "$@" | grep -Fxq -- "$caminho" && printf '%s\n' "$caminho"
+        printf '%s\n' "$@" | grep -Fx -- "$caminho" >/dev/null && printf '%s\n' "$caminho"
       done)"
 }
 

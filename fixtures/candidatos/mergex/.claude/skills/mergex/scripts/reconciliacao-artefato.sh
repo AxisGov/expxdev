@@ -40,7 +40,7 @@ rb_sha256() {
   else
     RB_ERRO="nem sha256sum nem shasum disponível"; return 1
   fi
-  printf '%s' "$h" | grep -Eq '^[0-9a-f]{64}$' || { RB_ERRO="hash inválido"; return 1; }
+  grep -Eq '^[0-9a-f]{64}$' <<<"$h" || { RB_ERRO="hash inválido"; return 1; }
   printf '%s\n' "$h"
 }
 
@@ -156,7 +156,7 @@ _rb_ler_arq() { # <arquivo> <destino>
   [ -r "${1:-}" ] || { RB_ERRO="artefato ilegível: ${1:-}"; return 1; }
   local erro
   _rb_ler_awk "$1" > "$2" 2>/dev/null
-  erro="$(sed -n 's/^ERRO	//p' "$2" | head -n1)"
+  erro="$(sed -n 's/^ERRO	//p' "$2" | awk 'NR == 1')"
   if [ -n "$erro" ]; then RB_ERRO="frontmatter inválido: $erro"; return 1; fi
   return 0
 }
@@ -272,7 +272,7 @@ rb_emitir() { # <saida> <tsv-escalares> <tsv-arquivos>
   mv "$tmp" "$saida" || { rm -f "$tmp"; RB_ERRO="não foi possível gravar $saida"; return 1; }
 }
 
-_rb_hex() { printf '%s' "$2" | grep -Eq "^[0-9a-f]{$1}\$"; }
+_rb_hex() { grep -Eq "^[0-9a-f]{$1}\$" <<<"$2"; }
 
 # Schema e assinatura; não olha o nome do arquivo.
 _rb_validar_conteudo() { # <arquivo> <trabalho> <numero>
@@ -281,7 +281,7 @@ _rb_validar_conteudo() { # <arquivo> <trabalho> <numero>
   _rb_ler_arq "$arq" "$tl" || { rm -f "$tl"; return 1; }
   lido="$(cat "$tl")"; rm -f "$tl"
   _rb_tem() { printf '%s\n' "$lido" | awk -F'\t' -v k="$1" '$1 == "escalar" && $2 == k { f = 1 } END { exit !f }'; }
-  _rb_val() { printf '%s\n' "$lido" | awk -F'\t' -v k="$1" '$1 == "escalar" && $2 == k { print $3; exit }'; }
+  _rb_val() { awk -F'\t' -v k="$1" '$1 == "escalar" && $2 == k { print $3; exit }' <<<"$lido"; }
   for k in expx_schema expx_tool kind trabalho_id numero anterior branch branch_base origem_base \
            b0_sha p1_sha b1_sha m_sha estado arquivos registrado_em assinatura; do
     _rb_tem "$k" || { RB_ERRO="chave ausente: $k"; return 1; }
@@ -291,7 +291,7 @@ _rb_validar_conteudo() { # <arquivo> <trabalho> <numero>
   [ "$(_rb_val kind)" = reconciliacao_base ] || { RB_ERRO="kind deve ser reconciliacao_base"; return 1; }
   [ "$(_rb_val trabalho_id)" = "$trab" ] || { RB_ERRO="trabalho_id diverge de $trab"; return 1; }
   v="$(_rb_val numero)"
-  printf '%s' "$v" | grep -Eq '^[1-9][0-9]*$' || { RB_ERRO="numero inválido: $v"; return 1; }
+  grep -Eq '^[1-9][0-9]*$' <<<"$v" || { RB_ERRO="numero inválido: $v"; return 1; }
   [ "$v" = "$num" ] || { RB_ERRO="numero $v diverge do esperado $num"; return 1; }
   ant="$(_rb_val anterior)"
   if [ "$v" = 1 ]; then
@@ -307,7 +307,7 @@ _rb_validar_conteudo() { # <arquivo> <trabalho> <numero>
     _rb_hex 40 "$(_rb_val "$k")" || { RB_ERRO="$k não é SHA de 40 hex"; return 1; }
   done
   case "$(_rb_val estado)" in ativa|superada) ;; *) RB_ERRO="estado inválido: $(_rb_val estado)"; return 1 ;; esac
-  printf '%s' "$(_rb_val registrado_em)" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}([T ][0-9:.+Z-]+)?$' \
+  grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}([T ][0-9:.+Z-]+)?$' <<<"$(_rb_val registrado_em)" \
     || { RB_ERRO="registrado_em não é data ISO"; return 1; }
   v="$(_rb_val arquivos)"
   n_arq="$(printf '%s\n' "$lido" | grep -c '^arquivo	')"
@@ -347,7 +347,7 @@ rb_validar() { # <arquivo> <trabalho> <numero esperado>
   [ "$#" -eq 3 ] || { RB_ERRO="rb_validar: uso <arquivo> <trabalho> <numero>"; return 1; }
   local nome nnn
   nome="$(basename "$1")"
-  printf '%s' "$nome" | grep -Eq '^RECONCILIACAO-BASE-[0-9]{3}\.md$' \
+  grep -Eq '^RECONCILIACAO-BASE-[0-9]{3}\.md$' <<<"$nome" \
     || { RB_ERRO="nome fora do padrão RECONCILIACAO-BASE-NNN.md: $nome"; return 1; }
   nnn="$(printf '%s' "$nome" | sed 's/^RECONCILIACAO-BASE-0*\([0-9][0-9]*\)\.md$/\1/')"
   [ "$nnn" = "$3" ] || { RB_ERRO="NNN do nome ($nnn) diverge do número esperado ($3)"; return 1; }

@@ -204,7 +204,7 @@ classificar() {
   # A task atual precisa existir no plano com arquivos declarados. Sem isso o
   # ownership unitário não é determinável — e inferir pela prosa é proibido.
   # Cair para "a primeira task do plano" aqui inventaria o dono.
-  arquivos_de "$atual" | grep -q . || { ERRO="a task atual '$atual' nao declara arquivos no plano corrente de '$trabalho'"; return 1; }
+  arquivos_de "$atual" | grep . >/dev/null || { ERRO="a task atual '$atual' nao declara arquivos no plano corrente de '$trabalho'"; return 1; }
 
   # Os arquivos que mudaram: argumentos, ou a entrada padrão.
   if [ "$#" -gt 0 ]; then
@@ -228,7 +228,7 @@ EOF
   # B — declarado na atual e que não mudou.
   while IFS= read -r arquivo; do
     [ -n "$arquivo" ] || continue
-    printf '%s\n' "$mudados" | grep -Fxq "$arquivo" && continue
+    grep -Fxq -- "$arquivo" <<<"$mudados" && continue
     saida="${saida}2${TAB}${S_INTACTO}${TAB}${arquivo}${TAB}$(tasks_de "$arquivo")"$'\n'
   done <<EOF
 $(arquivos_de "$atual")
@@ -239,7 +239,7 @@ EOF
   # a saída.
   printf '%s' "$saida" | grep -v '^$' | LC_ALL=C sort -t"$TAB" -k1,1 -k3,3 | cut -f2-
 
-  printf '%s' "$saida" | grep -q "^4${TAB}" && return 2
+  grep -q "^4${TAB}" <<<"$saida" && return 2
   return 0
 }
 

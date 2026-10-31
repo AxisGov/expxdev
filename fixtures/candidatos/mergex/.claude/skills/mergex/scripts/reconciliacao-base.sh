@@ -653,7 +653,7 @@ legado_base() {
   n="$(grep -c . "$TMP_DIR/legado-mb")"
   [ "$n" = 1 ] || { LEG_ERRO="$n merge-bases entre P1 $p1 e B1 $b1 (a inferência exige exatamente um)"; return 1; } # guarda:LEG2
   mg="$(sed -n 1p "$TMP_DIR/legado-mb")"
-  printf '%s' "$mg" | grep -Eq '^[0-9a-f]{40}$' || { LEG_ERRO="merge-base de P1 e B1 fora de 40 hex: $mg"; return 1; }
+  grep -Eq '^[0-9a-f]{40}$' <<<"$mg" || { LEG_ERRO="merge-base de P1 e B1 fora de 40 hex: $mg"; return 1; }
   g rev-list --first-parent --merges "$p1" "^$mg" > "$TMP_DIR/legado-merges" 2>/dev/null \
     || { LEG_ERRO="linha de primeiro pai de P1 ilegível"; return 1; }
   [ ! -s "$TMP_DIR/legado-merges" ] || { LEG_ERRO="a linha de primeiro pai de P1 desde o merge-base $mg contém o merge $(sed -n 1p "$TMP_DIR/legado-merges")"; return 1; } # guarda:LEG3
@@ -892,7 +892,7 @@ cadeia_coerencia() {
     [ "$em" = "$(_r "$idx" m_sha)" ] || motivo 5 entrega "ENTREGA.reconciliacoes: m_sha de $arquivo diverge do artefato" # guarda:COERENCIA
   done 3< "$TMP_DIR/lista-entrega"
   while IFS= read -r nome <&3; do
-    cut -f2 "$TMP_DIR/lista-entrega" | grep -Fxq -e "$nome" || motivo 5 orfao "artefato órfão: $nome (fora de ENTREGA.reconciliacoes)" # guarda:COERENCIA
+    cut -f2 "$TMP_DIR/lista-entrega" | grep -Fx -e "$nome" >/dev/null || motivo 5 orfao "artefato órfão: $nome (fora de ENTREGA.reconciliacoes)" # guarda:COERENCIA
   done 3< "$TMP_DIR/artefatos"
   if [ "$n" -gt 0 ] && [ -f "$TMP_DIR/r$n.lido" ]; then
     bv="$(catalogo_fm "$ENTREGA_D" base_validada_sha)"
@@ -1032,7 +1032,7 @@ entrega_disco_tolerado() {
     bloco="$(_entrega_bloco "$ENTREGA" "$chave")" || { ENTREGA_ERRO="$chave ausente ou repetida"; return 1; }
     if [ "$chave" = atualizado_em ]; then
       case "$bloco" in *"$NL"*) ENTREGA_ERRO="atualizado_em em mais de uma linha"; return 1 ;; esac
-      printf '%s' "$bloco" | grep -Eqx 'atualizado_em: [0-9]{4}-[0-9]{2}-[0-9]{2}' || { ENTREGA_ERRO="atualizado_em fora de AAAA-MM-DD"; return 1; } # guarda:DISCO
+      grep -Eqx 'atualizado_em: [0-9]{4}-[0-9]{2}-[0-9]{2}' <<<"$bloco" || { ENTREGA_ERRO="atualizado_em fora de AAAA-MM-DD"; return 1; } # guarda:DISCO
     else
       [ "$bloco" = "$chave: $esperado" ] || { ENTREGA_ERRO="$chave não tem o valor que a cadeia implica ($esperado)"; return 1; } # guarda:DISCO
     fi
@@ -1129,7 +1129,7 @@ base_do_registro() {
   [ "$p1_com_entrega" = 1 ] || cp "$ENTREGA_M" "$ENTREGA_P1"
   if _entrega_chave_qualquer "$ENTREGA_P1" base_validada_sha; then
     B0="$(catalogo_fm "$ENTREGA_P1" base_validada_sha)"
-    printf '%s' "$B0" | grep -Eq '^[0-9a-f]{40}$' || para 5 "ENTREGA.base_validada_sha não é SHA de 40 hex: ${B0:-vazia ou ilegível}"
+    grep -Eq '^[0-9a-f]{40}$' <<<"$B0" || para 5 "ENTREGA.base_validada_sha não é SHA de 40 hex: ${B0:-vazia ou ilegível}"
     ORIGEM_BASE=registrada_e0
     return 0
   fi
@@ -1315,7 +1315,7 @@ if [ "$TEM_ARTEFATO" = 1 ]; then
     [ -e "$existente" ] || [ -L "$existente" ] || continue
     nome="${existente##*/}"
     sobra_superada "$nome" && continue
-    cut -f2 "$TMP_DIR/lista-entrega" | grep -Fxq -e "$nome" && continue
+    cut -f2 "$TMP_DIR/lista-entrega" | grep -Fx -e "$nome" >/dev/null && continue
     [ -n "$(g ls-files -z -- "$existente" 2>/dev/null)" ] && continue
     [ -z "$SOBRAS" ] || para 5 "artefato órfão de registro interrompido: $nome; remova $nome$SOBRAS e registre de novo" # guarda:ORFAO
     para 5 "artefato órfão de registro interrompido: $nome; remova-o e registre de novo" # guarda:ORFAO

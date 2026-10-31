@@ -148,7 +148,7 @@ verificar() { # <ENTREGA.md> <tasks.md>...
   while IFS=$'\t' read -r id arq; do
     [ -n "$id" ] || continue
     # EXISTE pelo menos um item: casamento EXATO do id, nunca prefixo ou trecho.
-    printf '%s\n' "$provadas" | cut -f1 | grep -Fxq -- "$id" && continue
+    printf '%s\n' "$provadas" | cut -f1 | grep -Fx -- "$id" >/dev/null && continue
     faltam="$faltam$id	$arq
 "
   done <<EOF

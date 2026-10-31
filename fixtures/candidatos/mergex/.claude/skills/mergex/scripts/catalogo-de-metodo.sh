@@ -141,7 +141,7 @@ catalogo_sprints() { # <raiz> <pasta>
   for dir in "$raiz/$pasta"/sprint-*; do
     [ -d "$dir" ] || continue
     nome="$(basename "$dir")"
-    printf '%s\n' "$nome" | grep -Eq '^sprint-[0-9]{2,}$' || continue
+    grep -Eq '^sprint-[0-9]{2,}$' <<<"$nome" || continue
     for arquivo in tasks.md sprint.md fases.md; do
       printf '%s\n' "$pasta/$nome/$arquivo"
     done

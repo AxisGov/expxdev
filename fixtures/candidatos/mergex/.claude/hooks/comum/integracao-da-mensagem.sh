@@ -44,7 +44,7 @@ integracao_arquivo_do_comando() {
     -e 's/.*--file="\([^"]*\)".*/\1/p' \
     -e "s/.*--file='\([^']*\)'.*/\1/p" \
     -e 's/.*[[:space:]]-F[[:space:]]*\([^[:space:]]*\).*/\1/p' \
-    -e 's/.*--file=\([^[:space:]]*\).*/\1/p' | head -1)"
+    -e 's/.*--file=\([^[:space:]]*\).*/\1/p' | awk 'NR == 1')"
   [ -n "$arq" ] || return 0
   arq="$(printf '%s' "$arq" | sed "s/^['\"]//; s/['\"]$//")"
   case "$arq" in /*) : ;; *) arq="$RAIZ/$arq" ;; esac
@@ -72,16 +72,16 @@ integracao_da_mensagem() {
   INT_CLASSE=nenhuma; INT_SAIDA=""
   local txt tr integra trab tmp mh rc
   # Invólucro do heredoc `-m "$(cat <<'EOF' ... EOF)"`.
-  txt="$(printf '%s\n' "$1" | awk 'NR==1 && /^\$\(cat[[:space:]]*<</ { h=1; next } h && /^[A-Z_]+[[:space:]]*$/ { exit } { print }')"
+  txt="$(awk 'NR==1 && /^\$\(cat[[:space:]]*<</ { h=$0; tab=(h ~ /<<-/); sub(/^\$\(cat[[:space:]]*<<-?[[:space:]]*/, "", h); gsub(/[\047"\\[:space:]]/, "", h); next } h != "" { t=$0; if (tab) sub(/^\t+/, "", t); if (t == h) exit } { print }' <<<"$1")"
   tr="$(printf '%s\n' "$txt" | git interpret-trailers --parse 2>/dev/null)"
   # Sem `-q` (sob `pipefail`, um grep que sai cedo dá SIGPIPE ao printf e o
   # pipeline devolve 141 — rodada extra da revisão): o grep lê até o fim.
   printf '%s\n' "$tr" | grep -E '^Integra-base:' >/dev/null || return 0
-  integra="$(printf '%s\n' "$tr" | sed -n 's/^Integra-base:[[:space:]]*//p' | head -1)"
+  integra="$(printf '%s\n' "$tr" | sed -n 's/^Integra-base:[[:space:]]*//p' | awk 'NR == 1')"
   # Lixo depois dos 40 hex: a leitura não isolou o trailer.
   printf '%s' "$integra" | grep -E '^[0-9a-f]{40}[^0-9a-f]' >/dev/null && return 0
   trab="$2"
-  [ -n "$trab" ] || trab="$(printf '%s\n' "$tr" | sed -n 's/^Trabalho:[[:space:]]*//p' | head -1)"
+  [ -n "$trab" ] || trab="$(printf '%s\n' "$tr" | sed -n 's/^Trabalho:[[:space:]]*//p' | awk 'NR == 1')"
   if [ ! -r "$3" ]; then
     if [ "${INT_SEM_CONTRATO:-invalida}" = invalida ]; then
       INT_CLASSE=invalida; INT_SAIDA="instalação MergeX incompleta: $3"

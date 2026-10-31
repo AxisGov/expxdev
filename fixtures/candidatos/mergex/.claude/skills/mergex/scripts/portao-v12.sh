@@ -219,7 +219,7 @@ commits="$("$SH" "$AQUI/sequencia-de-commits.sh" --ler "$entrega_head" 2> "$tmp/
 ALVOS=""; VISTAS=""
 while IFS="$(printf '\t')" read -r id _; do
   [ -n "$id" ] || continue
-  printf '%s' "$VISTAS" | grep -Fxq -- "$id" && continue
+  grep -Fxq -- "$id" <<<"$VISTAS" && continue
   VISTAS="$VISTAS$id
 "
   tem_item=0; sha=""

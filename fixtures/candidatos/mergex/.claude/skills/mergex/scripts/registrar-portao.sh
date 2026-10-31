@@ -170,7 +170,7 @@ if [ "$SEM_GIT" = 1 ]; then
   HEAD_SHA=null
 else
   HEAD_SHA="$(git -C "$RAIZ" rev-parse -q --verify 'HEAD^{commit}' 2>/dev/null)" || contrato 'HEAD não resolve para um commit'
-  printf '%s\n' "$HEAD_SHA" | grep -Eqx '[0-9a-f]{40}|[0-9a-f]{64}' || contrato "HEAD sem SHA completo: $HEAD_SHA"
+  grep -Eqx '[0-9a-f]{40}|[0-9a-f]{64}' <<<"$HEAD_SHA" || contrato "HEAD sem SHA completo: $HEAD_SHA"
 fi
 
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mergex-registrar-portao.XXXXXX")" || { TMP_DIR=""; ambiente 'não foi possível criar diretório temporário'; }

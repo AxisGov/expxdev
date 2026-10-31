@@ -161,7 +161,7 @@ fi
 . "$PR_AQUI/reconciliacao-arvore.sh"
 
 _pr_g() { git -c core.quotepath=false "$@"; }
-_pr_nulo() { printf '%s' "$1" | grep -Eq '^0+$'; }
+_pr_nulo() { grep -Eq '^0+$' <<<"$1"; }
 
 # _pr_modo <raiz> — PR_MODO (sem subshell, para ler PR_ERRO)
 _pr_modo() {
@@ -197,7 +197,7 @@ pr_modo_null() {
 _pr_falta_objeto() {
   local o
   o="$(_pr_g -C "$1" rev-list --objects --no-walk --missing=print "$2" 2>/dev/null)" || return 0
-  printf '%s\n' "$o" | grep -q '^?'
+  grep -q '^?' <<<"$o"
 }
 
 # _pr_raso <raiz> — rc 0 num repositório raso (como arvore_recusa_raso, pelo

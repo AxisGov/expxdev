@@ -658,7 +658,7 @@ elif printf '%s' "$CMD_N" | grep -E 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]
   DESCARTA=1
 fi
 if [ "$DESCARTA" = "1" ]; then
-  SUJO="$(git -C "$RAIZ" status --porcelain 2>/dev/null | head -20)"
+  SUJO="$(git -C "$RAIZ" status --porcelain 2>/dev/null | awk 'NR <= 20')"
   if [ -n "$SUJO" ]; then
     barra "descarte de alteracao local" \
 "mergex/git-perigoso — descarte de alteração local
@@ -685,7 +685,7 @@ fi
 # --------------------------------------------------------------------------
 if printf '%s' "$CMD_N" | grep -E 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]+clean([[:space:]]|$)' >/dev/null; then
   if printf '%s' "$CMD_N" | grep -E '[[:space:]]-[a-zA-Z]*[fdx]' >/dev/null; then
-    ALVOS="$(git -C "$RAIZ" clean -nd 2>/dev/null | head -20)"
+    ALVOS="$(git -C "$RAIZ" clean -nd 2>/dev/null | awk 'NR <= 20')"
     barra "limpeza destrutiva" \
 "mergex/git-perigoso — limpeza destrutiva de arquivos não rastreados
 

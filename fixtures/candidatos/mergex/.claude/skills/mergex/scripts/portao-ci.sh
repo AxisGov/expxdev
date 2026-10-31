@@ -77,7 +77,7 @@ while [ "$#" -gt 0 ]; do
   shift 2
 done
 for v in "$SHA" "$BASE"; do
-  printf '%s\n' "$v" | grep -Eqx '[0-9a-f]{40}|[0-9a-f]{64}' || uso '--sha e --base precisam ser SHAs completos em minúsculas (40 hex, ou 64)'
+  grep -Eqx '[0-9a-f]{40}|[0-9a-f]{64}' <<<"$v" || uso '--sha e --base precisam ser SHAs completos em minúsculas (40 hex, ou 64)'
 done
 [ -n "$BRANCH" ] || uso '--branch vazio'
 case "$BRANCH" in refs/*) uso '--branch é o nome da branch, sem o prefixo refs/' ;; esac

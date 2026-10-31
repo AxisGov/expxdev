@@ -108,7 +108,7 @@ awk -v out="$TMP_DIR/itens" -v estado="$TMP_DIR/estado" '
 rc=$?
 [ "$rc" = 0 ] || sem_prova "manifesto malformado: $(tr '\n' ' ' < "$TMP_DIR/parse.err")"
 # O trabalho no manifesto é conferido separadamente para manter a gramática simples.
-trab_manifesto="$(sed -n 's/^trabalho_id:[[:space:]]*//p' "$TMP_DIR/manifesto" | head -n1)"
+trab_manifesto="$(sed -n 's/^trabalho_id:[[:space:]]*//p' "$TMP_DIR/manifesto" | awk 'NR == 1')"
 [ "$trab_manifesto" = "$TRABALHO" ] || sem_prova 'trabalho_id diverge do trabalho solicitado'
 
 # Lista vazia só é N/A quando o Git prova que nenhum docs/superpowers/** existiu

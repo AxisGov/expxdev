@@ -118,8 +118,8 @@ prova() {
   [ -s "$TMP_DIR/predecessores" ] && cmp -s "$TMP_DIR/predecessores" "$TMP_DIR/desvios" \
     || { RET_ERRO='desvios antigos nao correspondem exatamente aos predecessores provados'; return 1; }
   out="$(bash "$V9_SH" --verificar --entrega "$ENTREGA" --origem sprintx --trabalho "$TRABALHO" 2>/dev/null)"; rc=$?
-  [ "$rc" = 0 ] && printf '%s\n' "$out" | grep -Fxq resultado=ok \
-    && ! printf '%s\n' "$out" | grep -q '^fora_do_plano' \
+  [ "$rc" = 0 ] && grep -Fxq resultado=ok <<<"$out" \
+    && ! grep -q '^fora_do_plano' <<<"$out" \
     || { RET_ERRO="v9 ainda nao esta integralmente verde (rc $rc)"; return 1; }
   RET_HEAD="$head"; RET_ERRO=""
   return 0

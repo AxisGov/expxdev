@@ -139,7 +139,7 @@ if [ -n "$RECONC_ARQ" ]; then
 fi
 
 # Correspondência exata de linha inteira: nunca substring, nunca glob.
-e_reconciliado() { [ -n "$RECONC" ] && printf '%s\n' "$RECONC" | grep -Fxq -e "$1"; } # guarda:O10-exato
+e_reconciliado() { [ -n "$RECONC" ] && grep -Fxq -e "$1" <<<"$RECONC"; } # guarda:O10-exato
 
 # NNN do registro que reconciliou o caminho (vazio se a lista não o informou).
 num_do_registro() { printf '%s\n' "$RECONC_RAW" | P="$1" awk -F'\t' '$1 == ENVIRON["P"] && NF == 2 { print $2; exit }'; }
@@ -403,14 +403,14 @@ reconhece() {
       dir="${rel%%/*}"; nome="${rel#*/}"
       if [ "$rel" = "$dir" ]; then
         chave="$rel"
-      elif printf '%s' "$dir" | grep -Eq '^sprint-[0-9]{2,}$' && [ "${nome#*/}" = "$nome" ]; then
+      elif grep -Eq '^sprint-[0-9]{2,}$' <<<"$dir" && [ "${nome#*/}" = "$nome" ]; then
         chave="sprint-NN/$nome"
       elif [ "$dir" = base ]; then
         # a área pode estar numa subpasta da base, se o índice a lista assim (DM-288)
         case "$nome" in
           00-INDICE.md|00-LACUNAS.md) chave="$rel" ;;
           *)
-            if ! areas_do_indice "$RAIZ/$PASTA/base/00-INDICE.md" | grep -Fxq -- "$nome" \
+            if ! areas_do_indice "$RAIZ/$PASTA/base/00-INDICE.md" | grep -Fx -- "$nome" >/dev/null \
                || [ "$(fm "$RAIZ/$PASTA/base/00-INDICE.md" kind)" != base_indice ] \
                || [ "$(fm "$RAIZ/$PASTA/base/00-INDICE.md" trabalho_id)" != "$TRABALHO" ]; then
               nao_reconhecido "arquivo da base não listado no base/00-INDICE.md deste trabalho"; return
@@ -536,7 +536,7 @@ done
 if [ -n "$RECONC" ]; then
   while IFS= read -r caminho_rec; do
     [ -n "$caminho_rec" ] || continue
-    if printf '%s' "$EMITIDOS" | grep -Fxq -e "$caminho_rec"; then continue; fi # guarda:O10-ausentes
+    if grep -Fxq -e "$caminho_rec" <<<"$EMITIDOS"; then continue; fi # guarda:O10-ausentes
     EMITIDOS="$EMITIDOS$caminho_rec
 "
     classifica "$caminho_rec"
