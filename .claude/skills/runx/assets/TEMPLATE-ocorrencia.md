@@ -9,10 +9,11 @@ recebido_em: {{AAAA-MM-DD}}
 origem: {{ticket-NNNN | canal | caminho do arquivo | null}}
 tem_reproducao: {{true | false}}
 modulo_afetado: [{{modulo}}]
+worktree: {{../<repo>--<OC-ID>-<slug> | null}}
 atualizado_em: {{AAAA-MM-DD}}
 ---
 
-> Frontmatter obrigatorio (expx-schema v1). Formato completo em `references/00-schema.md`. Substitua os marcadores; NUNCA omita uma chave — ausente e `null`, lista vazia e `[]`. Sem acento em chave nem em valor de enum. `atualizado_em` e reescrito a cada gravacao.
+> Preencha pelo contrato e pela instrução comum de templates em `references/00-schema.md`.
 
 # {{OC-ID}} — {{título da ocorrência}}
 

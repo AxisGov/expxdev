@@ -1,0 +1,30 @@
+{
+  "expx_hooks": 1,
+  "_leia": "Composto pelo expxdev init a partir do .expx/hooks.json de cada skill. O modo de cada hook: 'aviso' registra no rastro e nao bloqueia; 'bloqueio' barra a acao; 'desligado' desliga so aquele id. Mudar o modo aqui e decisao sua e sobrevive a reinstalacao.",
+  "hooks": {
+    "escopo-da-task": {
+      "modo": "aviso",
+      "tipo": "metodo"
+    },
+    "segredo": {
+      "modo": "bloqueio",
+      "tipo": "seguranca"
+    },
+    "sem-placeholder-no-plano": {
+      "modo": "aviso",
+      "tipo": "metodo"
+    },
+    "sprintx/git-perigoso": {
+      "modo": "bloqueio",
+      "tipo": "seguranca"
+    },
+    "task-so-fecha-verde": {
+      "modo": "aviso",
+      "tipo": "metodo"
+    },
+    "tdd-teste-antes": {
+      "modo": "aviso",
+      "tipo": "metodo"
+    }
+  }
+}

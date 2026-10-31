@@ -12,7 +12,7 @@ riscos: [{{risco, uma linha}}]
 atualizado_em: {{AAAA-MM-DD}}
 ---
 
-> Frontmatter obrigatorio (expx-schema v1). Formato completo em `references/00-schema.md`. Substitua os marcadores; NUNCA omita uma chave — ausente e `null`, lista vazia e `[]`. Sem acento em chave nem em valor de enum. `atualizado_em` e reescrito a cada gravacao.
+> Preencha pelo contrato e pela instrução comum de templates em `references/00-schema.md`.
 
 # Sprint {{NN}} — {{título da sprint}}
 
@@ -41,6 +41,6 @@ Detalhe de cada fase em `fases.md`; tasks em `tasks.md`.
 
 ## Fora de escopo
 
-> Escopo travado (regra 8). O que foi percebido e NÃO será tocado nesta ocorrência. Melhoria avulsa vira sugestão de nova ocorrência no relatório técnico, nunca implementação.
+> Fora de escopo (invariante 5). O que foi percebido e NÃO será tocado nesta ocorrência. Melhoria avulsa vira sugestão de nova ocorrência no relatório técnico, nunca implementação.
 
 - {{o que não será tocado}} — {{por quê}}

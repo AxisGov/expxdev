@@ -44,6 +44,7 @@ tasks:
     arquivos:
       cria: []
       altera: [{{caminho/relativo/existente.ext}}]
+    teste_regressao: null
     teste_integracao: {{o que valida, contra o que - uma frase, OBRIGATORIO}}
     teste_funcional: {{o que valida, com qual entrada e saida - uma frase, OBRIGATORIO}}
     criterio_aceite: {{condicao verificavel, binaria, sem adjetivo}}
@@ -54,7 +55,7 @@ tasks:
 ---
 
 > Frontmatter obrigatorio (expx-schema v1). Formato completo em `references/00-schema.md`.
-> Substitua TODOS os marcadores; NUNCA omita uma chave — ausente e `null`, lista vazia e `[]`.
+> Preencha pelo contrato e pela instrução comum de templates em `references/00-schema.md`.
 > Sem acento em chave nem em valor de enum. `atualizado_em` e reescrito a cada gravacao.
 >
 > **Um unico bloco YAML.** Os leitores de frontmatter param no primeiro `---` de fechamento:
@@ -66,7 +67,7 @@ tasks:
 > `TEMPLATE-tasks.md`, os tres arquivos separados de sempre.
 >
 > `teste_regressao` existe APENAS na primeira task da primeira fase, e e obrigatorio quando
-> `tipo: bug`. Nas demais tasks, a chave nao aparece.
+> `tipo: bug`. Nas demais tasks, a chave permanece com valor `null`.
 
 # Plano — Sprint {{NN}} — {{título da sprint}}
 
@@ -85,7 +86,7 @@ tasks:
 
 ## Fora de escopo
 
-> Escopo travado (regra 8). O que foi percebido e NÃO será tocado nesta ocorrência.
+> Fora de escopo: o que foi percebido e NÃO será tocado nesta ocorrência (invariante 5).
 > Melhoria avulsa vira sugestão de nova ocorrência no relatório técnico, nunca implementação.
 
 - {{o que não será tocado}} — {{por quê}}

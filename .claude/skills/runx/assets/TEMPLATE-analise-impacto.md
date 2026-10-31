@@ -22,7 +22,7 @@ atualizado_em: {{AAAA-MM-DD}}
 
 > `regressao_de` e `evidencia_regressao` ficam `null` a menos que a verificacao de historico encontre vinculo causal comprovado. Coincidencia de arquivo NAO e regressao (regra 15). `palavras_chave` e preenchido normalmente.
 
-> Frontmatter obrigatorio (expx-schema v1). Formato completo em `references/00-schema.md`. Substitua os marcadores; NUNCA omita uma chave — ausente e `null`, lista vazia e `[]`. Sem acento em chave nem em valor de enum. `atualizado_em` e reescrito a cada gravacao.
+> Preencha pelo contrato e pela instrução comum de templates em `references/00-schema.md`.
 
 ## Cadeia da causa — modo analise de impacto
 

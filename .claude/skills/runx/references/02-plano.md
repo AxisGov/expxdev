@@ -55,7 +55,7 @@ Cresceu em **fases**; a segunda sprint existe porque há um portão real de migr
 - **A primeira task da primeira fase é sempre o teste** que reproduz o problema (bug) ou que fixa o comportamento esperado (demais tipos). Ela vem **antes de qualquer implementação** e carrega o campo `teste_regressao`.
 - **Todo número que aparecer no plano vem da base.** Se não existir lá, marque `LACUNA` no plano e avise o usuário — não invente o número.
 - **Nenhuma task pode depender de decisão humana em execução.** Se ao planejar aparecer uma, ela vira decisão registrada em `01-CAUSA-RAIZ.md` como nova linha `D-NN` e a skill **pergunta na hora**, antes de seguir o plano. Esta é a única pergunta permitida neste estágio.
-- **O plano declara explicitamente o que está FORA de escopo** — em `sprint.md`, uma lista nominal do que foi percebido e não será tocado. Escopo travado é a regra 8 do SKILL.md.
+- **O plano declara explicitamente o que está FORA de escopo** — em `sprint.md`, uma lista nominal do que foi percebido e não será tocado. É a aplicação do invariante 5 do `SKILL.md`.
 - **Paralelismo declarado:** para CADA task, declare `paralelizavel` e `depende_de`; para CADA fase, declare com qual outra fase pode rodar em paralelo (ou "nenhuma"). A execução nunca decidirá isso — se você não declarar, é sequencial.
 
 ## Passo 3 — Escolher o formato do plano
@@ -125,7 +125,7 @@ Três pontos de atenção deste estágio:
 
 - **Contradição entre campos não gera diagrama, gera erro de plano reportado.** Uma task com `paralelizavel: true` e `depende_de` não vazio, uma seta para id inexistente, um ciclo de dependência: nesses casos o bloco não é escrito, a contradição é anunciada ao usuário, e **você corrige o plano aqui mesmo** — o E2 é o lugar de mexer no plano — e então regera. Essa detecção é a mesma coisa que a checklist do Passo 6 já verifica; o diagrama apenas a torna visível.
 - **Limite de tamanho, regra dura:** acima de 25 tasks na sprint, uma visão geral das fases mais um diagrama por fase. Nunca um diagrama que não caiba numa tela.
-- **O diagrama é derivado e nunca bloqueia.** Ele não entra no critério de saída deste estágio; falha ao gerá-lo é registrada no rastro e ignorada.
+- A natureza derivada e não bloqueante do diagrama é definida uma única vez em `references/07-diagrama.md`.
 
 ## Passo 5 — Escrever o ORQUESTRADOR.md
 
@@ -134,7 +134,7 @@ Crie `docs/manutencao/<OC-ID>-<slug>/ORQUESTRADOR.md` de `assets/TEMPLATE-ORQUES
 1. **Objetivo** em no máximo 5 linhas.
 2. **Mapa dos arquivos e ordem de leitura.**
 3. **Rota de execução** com paralelismo e caminho crítico, derivada de `fases.md` e dos `depende_de`.
-4. **Ferramentas:** comando de teste, comando de lint, comando de type check — os comandos exatos do projeto, tirados da base; `NÃO EXISTE NO PROJETO` quando não houver.
+4. **Ferramentas:** comando de teste, comando de lint, comando de type check — os comandos exatos do projeto, tirados da base; `NÃO EXISTE NO PROJETO` quando não houver. A linha **Área de trabalho** copia o `worktree` de `00-OCORRENCIA.md` — o caminho do worktree, ou "checkout principal (sem worktree)" quando `worktree: null`.
 5. **Regras de autonomia.**
 6. **Definição de pronto da ocorrência.**
 7. **Como retomar uma sessão interrompida.**
@@ -173,4 +173,4 @@ Com o plano no disco, atualize `.expx/estado.json` pelo procedimento de `referen
 
 Anuncie: "E2 concluído. Plano em `docs/manutencao/<OC-ID>-<slug>/sprint-*/` (N sprints, M fases, K tasks) e `ORQUESTRADOR.md` escrito. Próximo estágio: E3 FIX." Siga para o E3 lendo `references/03-fix.md`.
 
-Ao fazer a transição, grave `fase: e3` em `.expx/estado.json` — toda transição de estágio atualiza a barra.
+Ao fazer a transição, registre o marco E2→E3 pelo contrato de `references/06-estado.md`.

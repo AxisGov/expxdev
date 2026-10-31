@@ -432,7 +432,7 @@ Dez defeitos, cada um violando uma regra desta página:
 5. `(Corrigir)` — forma de nó diferente das demais, sem motivo (regra 6).
 6. `T-01.01 --> T-01.02` dentro do subgraph — aresta pertence à seção de arestas, depois do `end`.
 7. `-.->|paralelo|` — aresta pontilhada com rótulo, e pior: **uma aresta inventada a partir de `paralelizavel`**. Paralelismo é ausência de aresta, nunca uma aresta (regra 1).
-8. `Deploy` e `Refatorar` — **nós inventados**: não são tasks do plano. O deploy é externo ao runx e o refactor viola a regra 8 do SKILL.md (escopo travado). Isso é invenção, não derivação (regra 1).
+8. `Deploy` e `Refatorar` — **nós inventados**: não são tasks do plano. O deploy é externo ao runx e o refactor viola o invariante 5 do `SKILL.md`. Isso é invenção, não derivação (regra 1).
 9. `style` por nó e `linkStyle` — estilo fora das `classDef`, que o E3 não sabe atualizar e que fica ilegível em tela pequena (regra 6). O `linkStyle 7` ainda aponta para uma seta que não existe: **o bloco inteiro falha a renderizar**.
 10. Falta o comentário `%%` de cabeçalho e faltam as `classDef` de status.
 

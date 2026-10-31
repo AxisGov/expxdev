@@ -196,4 +196,4 @@ Via avaliacao completa: 11 (23%)
 Nao viraram trabalho: 19 (40%)
 ```
 
-A terceira linha é o indicador de utilidade (soma de `ja_existe`, `nao_fazer` e `fazer_outra_coisa` sobre o total). A segunda é o indicador de atrito: acima de 50%, os gatilhos precisam apertar.
+A terceira linha é o indicador de utilidade (soma de `ja_existe` e `nao_fazer` sobre o total). `fazer_outra_coisa` gera briefing e, portanto, conta como trabalho. A segunda linha é o indicador de atrito: acima de 50%, os gatilhos precisam apertar.

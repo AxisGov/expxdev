@@ -10,7 +10,7 @@ prejudicar a leitura humana — a máquina lê o YAML, a pessoa lê a prosa abai
 O painel apenas LÊ. Esta skill continua sendo a única a escrever.
 
 Este contrato é compartilhado com a skill irmã `sprintx`. Os kinds comuns —
-`orquestrador`, `sprint`, `fases`, `tasks`, `bloqueios`, `base_indice` — são idênticos
+`orquestrador`, `sprint`, `fases`, `tasks`, `plano`, `bloqueios`, `base_indice` — são idênticos
 campo por campo nas duas skills. Divergência quebra o painel.
 
 Os campos de indexação `modulo_afetado`, `arquivos_alterados` e `palavras_chave` existem nas
@@ -34,6 +34,12 @@ Valem para todo arquivo que leva frontmatter:
    continua exatamente como esta skill já a produz.
 8. Campos de texto no YAML são de UMA linha. Nada de duplicar prosa longa no YAML.
 9. `atualizado_em` é reescrito a cada gravação do arquivo.
+
+## Instrução comum dos templates
+
+Substitua os marcadores pelos valores reais segundo o kind desta referência. Preserve
+todas as chaves e seções do template; use `null`, `[]` ou `NÃO DETERMINADO` quando o
+contrato assim determinar. Os templates apontam para esta regra em vez de copiá-la.
 
 ## Enums
 
@@ -127,6 +133,7 @@ recebido_em: 2026-08-28
 origem: ticket-4471
 tem_reproducao: true
 modulo_afetado: [frete, checkout]
+worktree: null
 atualizado_em: 2026-08-29
 ---
 ```
@@ -134,6 +141,10 @@ atualizado_em: 2026-08-29
 - `origem` identifica de onde veio o chamado (ticket, canal, arquivo); `null` se não houver.
 - `tem_reproducao` reflete o portão do E1: `false` quando não há passos de reprodução.
 - `modulo_afetado` é a lista de módulos em linguagem do sistema; `[]` se ainda não determinado.
+- `worktree` é o caminho relativo à raiz do checkout principal para o `git worktree` desta
+  ocorrência (regra 16, `references/01-investigacao.md`). `null` quando não há git, ou quando
+  o pedido foi explicitamente "sem worktree" — a chave existe sempre, mesmo quando não se
+  aplica. Nunca um caminho absoluto.
 
 ### `01-CAUSA-RAIZ.md` → `kind: causa_raiz`
 
@@ -242,6 +253,14 @@ EXATAMENTE os mesmos campos do Contrato da Task do `SKILL.md` — nenhum a mais,
 menos — acrescidos apenas dos dois campos de execução (`concluida_em`, `suite`) e do
 vínculo com a fase (`fase`).
 
+**Campos de extensão de task.** A única exceção ao "nenhum a mais" são os campos de task
+que uma camada **instalada e ativa** declara no próprio schema — hoje, `design_refs` e
+`tom_estetico`, da designx (`references/06-schema.md` dela). Eles só aparecem com a
+camada ativa, nunca substituem nem renomeiam campo do contrato, e valem igual nos
+kinds `tasks` e `plano`. Quem lê o plano preserva a chave como veio; campo que nenhuma
+camada instalada e ativa declara continua proibido, inclusive o de uma camada instalada
+mas inativa. A regra é a mesma na sprintx e na runx.
+
 ```yaml
 ---
 expx_schema: 1
@@ -280,7 +299,7 @@ Regras duras deste kind:
 - `arquivos` mantém a forma do Contrato da Task do `SKILL.md`: um mapa com `cria` e
   `altera`, cada um uma lista de caminhos relativos à raiz do repositório (`[]` quando vazio).
 - `concluida_em` é `null` enquanto a task não estiver `concluida`.
-- `suite` é `nao_executada` até a suíte rodar para aquela task; depois `verde` ou `vermelha`.
+- `suite` é `nao_executada` antes dos testes; `parcial` quando só o subconjunto afetado foi executado; `verde` quando a suíte integral passou; `vermelha` quando houve falha.
 - Os campos do YAML são a mesma verdade da prosa do bloco correspondente. Os dois andam juntos.
 
 ### `BLOQUEIOS.md` → `kind: bloqueios`
@@ -328,8 +347,9 @@ atualizado_em: 2026-08-29
 
 ### `sprint-NN/tasks.md` no formato condensado → `kind: plano`
 
-**Exclusivo da runx.** A `sprintx` não produz este kind, e por isso ele pode evoluir sem
-afetar a skill irmã — ao contrário de `sprint`, `fases` e `tasks`, que são compartilhados.
+**Compartilhado com a sprintx.** Criado exclusivo da runx (DR-62), o kind foi adotado depois
+pela `sprintx`, cujo `00-schema.md` o declara compartilhado: ele evolui de forma compatível
+nas duas skills, como `sprint`, `fases` e `tasks`.
 
 Quando o plano tem **uma sprint e uma fase**, o E2 grava um arquivo único em vez de três.
 O arquivo continua se chamando `sprint-NN/tasks.md`: é o caminho que os hooks de método
@@ -390,7 +410,7 @@ Regras duras deste kind:
   `atualizado_em`), que já estão no topo e não se repetem — é exatamente essa repetição
   que o formato condensado elimina.
 - `sprint.fora_de_escopo` é uma lista de strings de uma linha (`[]` quando vazia). Ela
-  existe porque o escopo travado é a regra 8 e precisa continuar declarado.
+  existe porque o limite de escopo do invariante 5 precisa continuar declarado.
 - **Quando usar:** uma sprint e uma fase. Com mais de uma sprint, ou mais de uma fase, o
   E2 grava os três arquivos separados (`sprint.md`, `fases.md`, `tasks.md`) como sempre.
 - O formato de três arquivos **continua válido e não é descontinuado**. Planos já escritos

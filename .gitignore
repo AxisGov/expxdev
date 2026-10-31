@@ -13,3 +13,6 @@ promptcli2.md
 
 __pycache__/
 *.pyc
+
+# rastro do metodo, gravado durante a sessao
+docs/eventos/

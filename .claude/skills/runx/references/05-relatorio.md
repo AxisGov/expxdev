@@ -37,6 +37,7 @@ Leitor: **o próximo desenvolvedor que abrir este código.** Pode usar nome de a
 5. **Solução aplicada**
 6. **Decisão técnica e alternativas descartadas** — as linhas `D-NN`
 7. **Sprints, fases e tasks executadas**
+7.a. **Área de trabalho** — o caminho do worktree em que a ocorrência foi implementada (`worktree` de `00-OCORRENCIA.md`), ou "checkout principal" quando `null` (regra 16). O worktree e a branch **ficam**: a skill nunca os remove; remoção é decisão de quem entrega.
 8. **Arquivos alterados** — caminhos relativos
 9. **Testes adicionados, incluindo o de regressão**
 10. **Risco residual** — inclua aqui os achados MÉDIA/BAIXA de `QA.md` que permanecem válidos

@@ -14,7 +14,7 @@ entradas:
 
 > Este kind NAO leva `trabalho_id`: o indice e do sistema inteiro. A lista `entradas:` e append-only, mais recente no topo, e espelha exatamente a tabela em prosa abaixo. Toda ocorrencia fechada entra nas duas.
 
-> Frontmatter obrigatorio (expx-schema v1). Formato completo em `references/00-schema.md`. Substitua os marcadores; NUNCA omita uma chave — ausente e `null`, lista vazia e `[]`. Sem acento em chave nem em valor de enum. `atualizado_em` e reescrito a cada gravacao.
+> Preencha pelo contrato e pela instrução comum de templates em `references/00-schema.md`.
 
 # Índice de ocorrências
 

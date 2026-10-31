@@ -2,22 +2,15 @@
 
 Você está no E1. Este estágio tem duas metades, nesta ordem: **E1.a base de conhecimento**, depois **E1.b causa raiz ou análise de impacto**. Você não planeja nada e não escreve nenhum código de implementação neste estágio.
 
-## Delegue ao agente `runx-investigador`, quando ele existir
+## Delegue ao agente `runx-investigador` somente por falta de prova
 
-A investigação lê muito — código, chamadores, migrações, testes existentes. Em contexto próprio, essa leitura não consome o contexto que depois vai implementar.
+Primeiro reúna a evidência local disponível: relato, busca pelos termos, código, testes e
+histórico relevante. Só delegue quando a causa ainda não estiver demonstrada por evidência local
+depois dessa leitura. Quantidade de arquivos não é critério.
 
-**Delegue quando houver o que carregar.** O agente tem custo de partida: ele relê do zero o que a sessão principal já tem em contexto. Numa ocorrência de um ou dois arquivos, esse custo é maior que a leitura que ele evita.
-
-O corte é mecânico, e sai de um dado que o próprio E1 já produz — **quantos arquivos candidatos o grep pelos termos do relato devolveu** (a busca descrita em "Por onde começar a busca", logo abaixo):
-
-| Arquivos candidatos | O que fazer |
-|---|---|
-| **3 ou mais** | delegue ao agente `runx-investigador`, quando ele existir |
-| 1 ou 2 | **leia direto**, você mesmo, na sessão principal — o método é idêntico |
-
-Faça a busca primeiro, conte, e só então decida. Decidir antes de buscar é palpite, e é justamente o que este corte existe para evitar. Na dúvida entre os dois lados — arquivos grandes, cadeia de chamadores que já se mostrou longa —, delegue: o custo de delegar demais é uma leitura repetida, e o de delegar de menos é o contexto da implementação gasto antes de implementar.
-
-Este corte vale **só para o `runx-investigador`**. Os outros dois agentes não têm corte por tamanho: o `qa` é a única verificação independente do método, e o `runx-revisor-testes` responde uma pergunta só e é barato mesmo em ocorrência mínima.
+Registre o digest das entradas e siga a política de exclusão mútua, repetição e classe de
+capacidade de `references/06-estado.md`. Sem agente disponível, continue na sessão
+principal com o mesmo método.
 
 **Ao delegar, passe:** o caminho da pasta da ocorrência, o `00-OCORRENCIA.md` já preenchido (Passo 0 é sempre seu, não dele), o tipo classificado e os arquivos candidatos que o grep devolveu. Ele devolve o conteúdo dos arquivos da `base/`, do `00-INDICE.md`, do `00-LACUNAS.md` e do `01-CAUSA-RAIZ.md` — prontos, mas **não gravados**: ele não tem ferramenta de escrita. Quem grava é você, com o frontmatter de `references/00-schema.md`.
 
@@ -39,16 +32,42 @@ python3 .claude/runx-hooks/comum/rastro.py --evento agente_concluido --agente ru
 
 **Sem o agente disponível, execute você mesmo tudo o que segue** — o método é idêntico, muda só quem carrega a leitura.
 
+## Caminhos determinísticos
+
+Ancore `docs/manutencao/` e `docs/relatorios/` na raiz Git mais próxima do
+diretório atual: suba até o diretório que contém `.git` (arquivo ou pasta). Se
+nenhum ancestral tiver `.git`, use o diretório de trabalho inicial. Nunca crie
+essas árvores dentro de um pacote de monorepo quando a raiz Git já tiver
+`docs/`.
+
+O identificador segue `OC-<AAAA>-<NNNN>`. O `<slug>` deriva do título em
+minúsculas e sem acentos; espaços e separadores viram hífen; remova caracteres
+fora de `a-z`, `0-9` e `-`, colapse hífens e limite o slug às primeiras seis
+palavras. Use o mesmo slug em manutenção, branch, worktree e relatório.
+
 ## Pré-requisitos verificáveis
 
 - A ocorrência chegou (texto colado, identificador de ticket ou caminho de arquivo).
-- O `<OC-ID>` e o `<slug>` estão definidos pelas regras do SKILL.md.
+- O `<OC-ID>` e o `<slug>` estão definidos pelas regras acima.
 
 Se `docs/manutencao/<OC-ID>-<slug>/base/` já existe completa e `01-CAUSA-RAIZ.md` também existe, o E1 já passou: anuncie o estágio real detectado pela máquina de estados e execute-o em vez deste.
 
 ---
 
 ## Passo 0 — Registrar a ocorrência
+
+**Ordem obrigatória em qualquer árvore:** classifique primeiro o tipo da ocorrência
+(`bug`, `melhoria-ui`, `melhoria-ux`, `novo-relatorio`, `regra-de-calculo`,
+`campo-novo` ou `outro`) a partir do relato, sem gravar arquivos. Em seguida
+execute sempre o Passo 0.a **antes** de criar o scaffold.
+
+Com Git e sem pedido explícito de não usar worktree, execute também o Passo 0.b
+e só retome a criação depois de estar dentro da árvore da branch de ocorrência;
+`git worktree add` não transporta arquivos não commitados do checkout principal.
+Sem Git ou com pedido explícito de não usar worktree, crie o scaffold na árvore
+atual e registre `worktree: null` **somente se** o Passo 0.a não encontrou outra
+ocorrência aberta. Se encontrou, aplique primeiro a decisão de árvore ocupada
+descrita naquele passo; nunca crie uma segunda ocorrência na mesma árvore.
 
 Crie o scaffold, se ainda não existir:
 
@@ -65,11 +84,67 @@ docs/manutencao/<OC-ID>-<slug>/
 
 Preencha `00-OCORRENCIA.md` pelo contrato de entrada do SKILL.md. O relato do cliente é **copiado literalmente**, sem reescrever, sem corrigir, sem resumir. Se não houver identificador, gere `OC-<AAAA>-<NNNN>` sequencial olhando `docs/manutencao/` e `docs/relatorios/` — obtenha o ano com `date +%Y` do sistema, nunca de memória.
 
-**Classifique o tipo** pela lista do SKILL.md. Se ambíguo, escolha o mais provável, registre a escolha em uma linha no próprio `00-OCORRENCIA.md` e siga sem esperar confirmação.
+**Registre o tipo já classificado** no `00-OCORRENCIA.md`. Se a classificação
+inicial inclui `bug` como opção plausível, registre `bug` de forma conservadora
+até a evidência descartá-lo; isso preserva os portões de reprodução e prova.
+Somente quando a ambiguidade estiver restrita a tipos que não são bug mantenha
+a escolha mais provável, registrando-a no próprio arquivo sem esperar confirmação.
 
 **Portão único de pergunta deste estágio:** se `tipo: bug` e não houver passos de reprodução nem evidência suficiente para investigar (nenhum log, nenhuma mensagem de erro, nenhum dado concreto), PARE e pergunte isso — e apenas isso. Investigar bug sem reprodução é chute. Para os demais tipos, siga com o que houver.
 
 **Grave o estado da barra.** Com o `00-OCORRENCIA.md` no disco, atualize `.expx/estado.json` pelo procedimento de `references/06-estado.md`: `trabalho` com o `<OC-ID>`, `ferramenta: runx`, `titulo_curto` com o **título** da ocorrência (o comando corta em 30 caracteres), `fase: e1`, `task: null` e as contagens em zero. Sem `.expx/` no projeto, siga sem gravar, sem erro e sem aviso. Se a gravação falhar, registre no rastro e siga — a barra de status nunca interrompe o trabalho.
+
+---
+
+## Passo 0.a — Uma ocorrência aberta por árvore (regra 16)
+
+Antes de criar a pasta: verifique se `docs/manutencao/` desta raiz já tem outra ocorrência aberta (um `ORQUESTRADOR.md` sem `status: concluido`, ou — antes do E2 — um `00-OCORRENCIA.md` sem ocorrência fechada correspondente em `docs/relatorios/`).
+
+Se encontrou outra ocorrência aberta:
+
+- **Com Git e worktree permitido:** siga para o Passo 0.b — o worktree resolve a colisão isolando esta ocorrência em árvore própria; nenhuma pergunta é necessária.
+- **Sem Git ou com pedido explícito de não usar worktree:** a raiz está genuinamente ocupada. Não crie o scaffold. Anuncie qual ocorrência está aberta e o estágio dela, e pergunte se é para continuar nela ou encerrá-la antes de abrir esta. É uma pergunta legítima aqui, porque sem worktree não há isolamento entre as duas.
+
+## Passo 0.b — Abrir a área de trabalho (worktree)
+
+Só se aplica com git (`git rev-parse --is-inside-work-tree` responde `true`). Sem git, ou com "sem worktree" explícito no pedido, `worktree: null` no `00-OCORRENCIA.md` e nada muda no restante do estágio.
+
+1. **Nome da branch e base — copiados da mergex, nunca recalculados do zero:** `fix/<OC-ID>-<slug>` para `tipo: bug`, `chore/<OC-ID>-<slug>` para os demais tipos. Base, nesta ordem, parando na primeira que responder: `docs/stack/CONVENCOES.md` da stackx (seção de versionamento, se marcada e não `PROPOSTA`) → `git symbolic-ref refs/remotes/origin/HEAD` → a branch atual, se for `main`, `master`, `develop` ou equivalente detectada.
+2. **Criar ou retomar.** `git worktree list` já lista um worktree nessa branch → retome nele (não crie outro). Senão: `git worktree add -b <branch> ../<repo>--<OC-ID>-<slug> <base>`, onde `<repo>` é o nome do diretório do checkout principal. Se a branch já existe mas sem worktree associado: `git worktree add ../<repo>--<OC-ID>-<slug> <branch>`.
+3. **Herdar o local do checkout principal** — lista fechada, copiando só o que existir lá, nunca lendo o conteúdo: `.expx/hooks.json` (mais `estado.json` do objeto padrão de `references/06-estado.md`), `.claude/settings.local.json`, `.env`, `.env.local`, `.env.*.local`.
+4. **Instalar dependências**, para o E1 conseguir rodar teste no worktree novo. Comando do `CONVENCOES.md` da stackx quando existir; senão pelo lockfile encontrado, na primeira ordem que casar:
+
+   | Lockfile | Comando |
+   |---|---|
+   | `package-lock.json` | `npm ci` |
+   | `pnpm-lock.yaml` | `pnpm install --frozen-lockfile` |
+   | `yarn.lock` | `yarn install --frozen-lockfile` |
+   | `bun.lock` / `bun.lockb` | `bun install` |
+   | `requirements.txt` | `pip install -r requirements.txt` |
+   | `poetry.lock` | `poetry install` |
+   | `go.mod` | `go mod download` |
+   | `Cargo.lock` | `cargo fetch` |
+   | `Gemfile.lock` | `bundle install` |
+   | `composer.lock` | `composer install` |
+
+   Nenhum lockfile reconhecido: guarde a lacuna e registre-a em `base/00-LACUNAS.md` depois de criar o scaffold no item 6 — não inventa comando.
+5. **Entrar na área de trabalho antes de gravar a ocorrência.** Se a raiz atual
+   já é o worktree associado à branch da ocorrência, siga para o item 6. Caso
+   contrário, use o mecanismo de transição oferecido pelo harness. No Claude
+   Code, use `EnterWorktree` com `path` apontando para o diretório criado. Em
+   qualquer harness sem transição na própria sessão — OpenCode e MimoCode,
+   inclusive — anuncie um bloco de handoff com **Área de trabalho**,
+   **OC-ID**, **tipo classificado** e **relato literal completo**. Instrua:
+   "Abra o harness nesse diretório e reenvie este bloco inteiro para continuar".
+   A nova sessão não avança sem receber novamente o relato literal, o ID e o
+   tipo; anunciar somente o caminho é insuficiente. Encerre o E1 aqui. O
+   mecanismo muda por harness; a máquina de estados e o resultado são os mesmos.
+6. **Criar e registrar, já dentro da árvore correta.** Volte a "Crie o scaffold"
+   acima. Depois de criar `00-OCORRENCIA.md` dentro do worktree, grave
+   `worktree: ../<repo>--<OC-ID>-<slug>` e registre no rastro:
+   `fase_iniciada --fase e1 --detalhe "worktree ../<repo>--<OC-ID>-<slug>"`.
+
+Toda a pasta `docs/manutencao/<OC-ID>-<slug>/` desta ocorrência vive dentro do worktree a partir daqui; nada dela é gravado no checkout principal.
 
 ---
 
@@ -257,4 +332,4 @@ Continue investigando até atender. Se a prova de um bug não aparece, encerre c
 
 Anuncie: "E1 concluído. Base em `docs/manutencao/<OC-ID>-<slug>/base/` (N arquivos, M lacunas). Causa raiz COMPROVADA / impacto mapeado. Próximo estágio: E2 PLANO." Em seguida, se a sessão continuar, entre no E2 lendo `references/02-plano.md`.
 
-Ao fazer a transição, grave `fase: e2` em `.expx/estado.json` (`references/06-estado.md`) — toda transição de estágio atualiza a barra.
+Ao fazer a transição, registre o marco E1→E2 pelo contrato de `references/06-estado.md`.

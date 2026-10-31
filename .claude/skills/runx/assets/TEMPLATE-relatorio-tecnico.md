@@ -15,7 +15,7 @@ testes_adicionados: {{numero de testes criados, incluindo o de regressao}}
 
 > `palavras_chave` e `regressao_de` sao COPIADOS de `01-CAUSA-RAIZ.md`, sem recalcular: `null` la e `null` aqui. Nunca invente um vinculo de regressao no fechamento (regra 15). `evidencia_regressao` nao entra neste YAML — a linha de evidencia vai na secao 4.
 
-> Frontmatter obrigatorio (expx-schema v1). Formato completo em `references/00-schema.md`. Substitua os marcadores; NUNCA omita uma chave — ausente e `null`, lista vazia e `[]`. Sem acento em chave nem em valor de enum. `atualizado_em` e reescrito a cada gravacao.
+> Preencha pelo contrato e pela instrução comum de templates em `references/00-schema.md`.
 
 # {{OC-ID}} — {{título da ocorrência}}
 
@@ -79,6 +79,6 @@ D-01 | {{decisão tomada}} | {{alternativa descartada}} | {{motivo}}
 
 ## 12. Sugestões de novas ocorrências percebidas e não feitas
 
-> Escopo travado (regra 8): tudo que foi visto e deliberadamente NÃO tocado. Sugestão, nunca implementação.
+> Fora de escopo (invariante 5): tudo que foi visto e deliberadamente NÃO tocado. Sugestão, nunca implementação.
 
 - {{o que foi percebido}} — {{por que vale uma ocorrência própria}}
