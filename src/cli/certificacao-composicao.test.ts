@@ -64,12 +64,13 @@ describe("composição SprintX e runx", () => {
     }
     // As duas de fato: uma composição vazia passaria nas comparações acima.
     const caminhos = Object.keys(a.arquivos as Record<string, string>);
-    const comandos = Object.values(a.hooks).flat().join("\n");
     for (const nome of ["sprintx", "runx"]) {
       expect(caminhos.filter((c) => c.startsWith(`.claude/hooks/${nome}/`)).length, nome).toBeGreaterThan(0);
-      expect(comandos, nome).toContain(`.claude/hooks/${nome}/`);
       expect(existsSync(join(juntas, ".claude", "skills", nome, "SKILL.md")), nome).toBe(true);
     }
+    // A SprintX liga os hooks no settings; a runx, no hooks.json do plugin.
+    expect(Object.values(a.hooks).flat().join("\n")).toContain(".claude/hooks/sprintx/");
+    expect(readFileSync(join(juntas, ".expx", "marketplace", "plugins", "expx", "hooks", "hooks.json"), "utf8")).toContain("runx/");
     for (const caminho of caminhos) {
       expect(existsSync(join(juntas, caminho)), caminho).toBe(true);
     }
