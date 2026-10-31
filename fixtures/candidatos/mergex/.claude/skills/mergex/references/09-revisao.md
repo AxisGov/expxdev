@@ -254,6 +254,23 @@ Se o PR foi aberto pela mergex **na mesma máquina** — a URL de algum PR de um
 
 Não é impedimento: é divulgação. Quem aprova é a pessoa, e ela precisa saber que a máquina que está apresentando o PR é a mesma que o produziu.
 
+## Depois do merge — a worktree entregue
+
+Mergeado o PR final do trabalho, tire do disco a worktree dele, a partir de fora dela (DM-290). Em
+`por_sprint`, isso vale só para a última sprint: a próxima F6 retoma naquele checkout.
+
+```bash
+bash .claude/skills/mergex/scripts/worktrees-entregues.sh --remover <caminho-da-worktree>
+```
+
+Ela só sai com branch, sem trava, sem submódulo, com o HEAD ancestral da base remota, sem alteração
+visível ou oculta e sem arquivo ignorado que não seja dependência. A branch fica. Se o script parar, relate o motivo e
+deixe a worktree: rastro ignorado (`docs/eventos/`) é decisão humana. Nunca force a remoção nem
+apague a pasta à mão.
+
+Para ver todas as sobras e o motivo de cada uma: `worktrees-entregues.sh --listar`. A listagem não
+remove nada, e é ela que alcança o trabalho mergeado fora do E9.
+
 ## O REVIEW EVIDENCE GATE
 
 Antes de oferecer merge de qualquer PR, o E9 avalia automaticamente o estado do review

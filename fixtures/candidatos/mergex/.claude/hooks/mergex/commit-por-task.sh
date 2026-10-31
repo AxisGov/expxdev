@@ -163,9 +163,9 @@ TRAILERS_CONTROLE="$(printf '%s\n' "$MSG" | git interpret-trailers --parse 2>/de
 Q_TASK="$(printf '%s\n' "$TRAILERS_CONTROLE" | grep -Ec '^Task:[[:space:]]*')"
 Q_TRABALHO="$(printf '%s\n' "$TRAILERS_CONTROLE" | grep -Ec '^Trabalho:[[:space:]]*')"
 Q_METODO="$(printf '%s\n' "$TRAILERS_CONTROLE" | grep -Ec '^Metodo:[[:space:]]*')"
-TASK_ATUAL="$(printf '%s\n' "$TRAILERS_CONTROLE" | sed -n 's/^Task:[[:space:]]*//p' | head -1)"
-TRABALHO_MENSAGEM="$(printf '%s\n' "$TRAILERS_CONTROLE" | sed -n 's/^Trabalho:[[:space:]]*//p' | head -1)"
-METODO_ATUAL="$(printf '%s\n' "$TRAILERS_CONTROLE" | sed -n 's/^Metodo:[[:space:]]*//p' | head -1)"
+TASK_ATUAL="$(printf '%s\n' "$TRAILERS_CONTROLE" | sed -n 's/^Task:[[:space:]]*//p' | awk 'NR == 1')"
+TRABALHO_MENSAGEM="$(printf '%s\n' "$TRAILERS_CONTROLE" | sed -n 's/^Trabalho:[[:space:]]*//p' | awk 'NR == 1')"
+METODO_ATUAL="$(printf '%s\n' "$TRAILERS_CONTROLE" | sed -n 's/^Metodo:[[:space:]]*//p' | awk 'NR == 1')"
 
 if [ "$Q_TASK" -gt 0 ] || [ "$Q_METODO" -gt 0 ]; then
   [ -r "$CONTRATO_COMMIT" ] || {
@@ -411,7 +411,7 @@ fi
 for id in $TASKS_TOCADAS; do
   # o `head -1` sai cedo: o status do pipeline sob `pipefail` pode ser 141; a
   # decisão é pelo conteúdo (rodada extra da revisão)
-  linha="$(grep -F "$id	" "$TMP" | head -1)"
+  linha="$(grep -F "$id	" "$TMP" | awk 'NR == 1')"
   [ -n "$linha" ] || continue
   status="$(printf '%s' "$linha" | cut -f2)"
   suite="$(printf '%s' "$linha" | cut -f3)"

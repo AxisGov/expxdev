@@ -52,7 +52,7 @@ MODO="$(expx_modo "$HOOK" "$PADRAO" "$RAIZ")"
 SUJO="$(git -C "$RAIZ" status --porcelain 2>/dev/null)"
 [ -n "$SUJO" ] || expx_permite "$RAIZ" "$HOOK" "arvore limpa na troca de branch"
 
-RESUMO="$(printf '%s' "$SUJO" | head -20)"
+RESUMO="$(printf '%s' "$SUJO" | awk 'NR <= 20')"
 QTD="$(printf '%s\n' "$SUJO" | grep -c .)"
 
 expx_barra "$MODO" "$RAIZ" "$HOOK" "troca de branch com arvore suja ($QTD)" \

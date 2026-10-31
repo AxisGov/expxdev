@@ -220,7 +220,7 @@ fatos="$(printf '%s\n' "$conteudo" | awk -v q="'" '
   }
 ')"
 
-erro="$(printf '%s\n' "$fatos" | awk -F'\t' '$1 == "E" { print $2; exit }')"
+erro="$(awk -F'\t' '$1 == "E" { print $2; exit }' <<<"$fatos")"
 [ -z "$erro" ] || ilegivel "$erro"
 
 TAB='	'
@@ -436,7 +436,7 @@ confere_e_troca() {
   local depois l
   depois="$(bash "$0" --entrega "$tmp" 2>/dev/null)" || { rm -f "$tmp"; ilegivel "a gravação não ficou legível em $ENTREGA"; }
   for l in "$@"; do
-    printf '%s\n' "$depois" | grep -Fqx -- "$l" || { rm -f "$tmp"; ilegivel "a gravação não ficou legível em $ENTREGA ($l)"; }
+    grep -Fqx -- "$l" <<<"$depois" || { rm -f "$tmp"; ilegivel "a gravação não ficou legível em $ENTREGA ($l)"; }
   done
   mv "$tmp" "$ENTREGA" || { rm -f "$tmp"; ilegivel "não consegui gravar $ENTREGA"; }
 }

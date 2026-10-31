@@ -104,7 +104,7 @@ case "$ACAO" in
     [ "$V_TRABALHO" = "$TRABALHO" ] \
       || invalido "Trabalho divergente: mensagem=$V_TRABALHO contexto=$TRABALHO"
     [ "$Q_INTEGRA" = 1 ] || invalido "integração exige exatamente um Integra-base; encontrou $Q_INTEGRA" # guarda:INT
-    printf '%s' "$V_INTEGRA" | grep -Eq '^[0-9a-f]{40}$' \
+    grep -Eq '^[0-9a-f]{40}$' <<<"$V_INTEGRA" \
       || invalido "Integra-base não é um SHA completo de 40 hex minúsculo: $V_INTEGRA" # guarda:INT
     if [ -n "$COMMIT" ]; then
       PAIS="$(git rev-list --parents -n1 "$COMMIT" 2>/dev/null)" \
