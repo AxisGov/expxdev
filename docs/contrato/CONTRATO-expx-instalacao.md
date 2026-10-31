@@ -122,6 +122,8 @@ pelo nome do arquivo), e o que o projeto já tinha.
 
 O registro do plugin no escopo do usuário (`claude plugin marketplace add`) grava um caminho absoluto. Rodado numa worktree, o `init` (e o `update` que aplicou algo) registra o `.expx/marketplace` do **checkout principal** quando ele existe, porque é contra ele que o Claude Code resolve o `./.expx/marketplace` do projeto, e ele sobrevive à remoção da worktree; sem ele, registra o da worktree e avisa que o registro quebra quando ela for removida. O registro anterior de `expx-local` é removido antes do novo, só no escopo do usuário (`--scope user`; sem ele, o `remove` apagaria também a declaração versionada do projeto), para não ficar apontando para uma worktree antiga. Depois do `add`, `claude plugin marketplace list --json` precisa mostrar o `expx-local` com o caminho escolhido; senão a instalação para com erro antes de reinstalar. No `update`, essa falha faz o comando sair 1; no `init`, o registro é o passo final e a saída segue 0, com o motivo.
 
+O repositório-fonte do CLI não registra o plugin: o `expx-local` do escopo do usuário é único, e o conjunto de skills de lá trocaria o plugin de todas as sessões da máquina. A fonte é a raiz Git cujo `package.json` tem `name: expxdev` e `repository` em `AxisGov/expxdev` (`ehRepositorioFonte`, no `expx-session-sync`). O `init` e o `update` explícitos montam `.expx/` e `.claude/` normalmente e avisam que o registro não rodou.
+
 ## 5. `.expx/hooks.json` — composição
 
 É o manifesto de modo (`aviso`, `bloqueio`, `desligado`) lido pelos hooks.
@@ -474,7 +476,8 @@ pessoa, e rodar o `init` de novo trava o arquivo com a escolha dela.
 ## 10. SessionStart e instalação com origem local (D-03)
 
 O hook do núcleo `expx-session-sync` roda no `startup`/`resume` e, numa
-instalação comum com árvore limpa, sincroniza a distribuição com o ExpxDev da
+instalação comum com árvore limpa (o repositório-fonte do CLI fica fora, sem mensagem:
+ele só muda por `expx update` explícito), sincroniza a distribuição com o ExpxDev da
 AxisGov: o cache busca a `main` do ExpxDev com as tags, vai para a **última release**
 (a maior tag `vX.Y.Z`, nunca a ponta da `main`) e roda o CLI dela com `expx update
 --yes`, que segue os commits certificados dessa release. Sem release publicada, a

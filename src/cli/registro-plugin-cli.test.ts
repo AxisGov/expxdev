@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  */
 const registro = vi.hoisted(() => ({
   chamadas: [] as string[],
-  instalacao: { ok: true, executados: [] } as { ok: boolean; executados: string[]; instrucao?: string; erro?: string },
+  instalacao: { ok: true, executados: [] } as { ok: boolean; executados: string[]; instrucao?: string; erro?: string; pulado?: boolean },
 }));
 
 vi.mock("../harness/registro.js", async (original) => {
@@ -72,6 +72,14 @@ describe("a CLI registra o plugin pela regra comum", () => {
     expect(rc).toBe(0);
     expect(registro.chamadas).toEqual([process.cwd()]);
     expect(s.texto.join("")).toContain("aviso: AVISO-DA-WORKTREE");
+  });
+
+  it("init: quando o registro foi pulado, nao diz que o plugin foi registrado", async () => {
+    registro.instalacao = { ok: true, executados: [], pulado: true };
+    const s = saida();
+    const rc = await executarExpx(["init", "--skills", "mergex", "--yes"], s);
+    expect(rc).toBe(0);
+    expect(s.texto.join("")).not.toContain("plugin registrado");
   });
 
   it("update que aplicou: registra pela mesma regra", async () => {

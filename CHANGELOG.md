@@ -1,5 +1,9 @@
 # Changelog
 
+## Não publicado
+
+- **O repositório-fonte do CLI não se atualiza nem troca o plugin global.** O SessionStart rodaria `update --yes` no expxdev a cada release e sujaria a `main`, e o `init` e o `update` trocariam o `expx-local` do escopo do usuário, que é único, por um marketplace com menos skills, afetando todas as sessões da máquina. Na raiz cujo `package.json` tem `name: expxdev` e `repository` em AxisGov/expxdev, o hook sai sem fazer nada e o registro não roda. O `expx update` explícito continua funcionando. Projetos consumidores não mudam.
+
 ## 0.12.10 — o commit certificado e os achados do Login e do conselhos
 
 - **O commit certificado de cada skill.** Até a 0.12.9, o `init` e o `update` instalavam a maior tag da skill e, sem tag (nenhuma das nove tem), o topo da `main` dela. O katosmv/login recebeu na 0.12.8 o conteúdo da 0.12.9, com o lock dizendo 0.12.8, e a DM-286 da MergeX chegou a projetos antes de qualquer release do expxdev. Agora o catálogo grava, em `certificado`, o commit de cada skill que a versão do CLI certifica, e da origem canônica é esse commit que se instala. Um merge na `main` de uma skill só chega aos projetos pela próxima release do expxdev.

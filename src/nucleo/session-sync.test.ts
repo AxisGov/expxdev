@@ -30,6 +30,41 @@ function projeto(lock: Record<string, unknown> | string | null = LOCK_REMOTO): s
   return raiz;
 }
 
+describe("repositório-fonte do CLI no SessionStart", () => {
+  const FONTE = { name: "expxdev", repository: { type: "git", url: "git+https://github.com/AxisGov/expxdev.git" } };
+
+  function sincronizar(pacote: string): { saida: string; chamadas: string[][] } {
+    const raiz = projeto();
+    writeFileSync(join(raiz, "package.json"), pacote);
+    const chamadas: string[][] = [];
+    const executar = (arquivo: string, argumentos: string[]) => {
+      chamadas.push([arquivo, ...argumentos]);
+      if (argumentos.includes("--show-toplevel")) return `${raiz}\n`;
+      if (argumentos.includes("status")) throw new Error("parou aqui");
+      return "";
+    };
+    const saida = sincronizarSessao({ entrada: JSON.stringify({ source: "startup" }), raiz, ambiente: ambiente(raiz), executar });
+    rmSync(raiz, { recursive: true, force: true });
+    return { saida, chamadas };
+  }
+
+  it("funcional: na fonte, nada de status, rede ou update, e nenhuma mensagem", () => {
+    const { saida, chamadas } = sincronizar(JSON.stringify(FONTE));
+    expect(saida).toBe("");
+    expect(chamadas.filter((c) => !c.includes("--show-toplevel"))).toEqual([]);
+  });
+
+  it("funcional: o `expxdev` de outro autor segue o fluxo comum", () => {
+    const { chamadas } = sincronizar(JSON.stringify({ name: "expxdev", repository: "https://github.com/outro/expxdev.git" }));
+    expect(chamadas.some((c) => c.includes("status"))).toBe(true);
+  });
+
+  it("funcional: package.json ilegível não é a fonte", () => {
+    const { chamadas } = sincronizar("{ nao e json");
+    expect(chamadas.some((c) => c.includes("status"))).toBe(true);
+  });
+});
+
 describe("sincronização Axis no SessionStart", () => {
   it("integração: bootstrap fixa o repositório AxisGov e a branch main", () => {
     const raiz = mkdtempSync(join(tmpdir(), "expx-bootstrap-"));
