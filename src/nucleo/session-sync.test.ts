@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
 // @ts-expect-error The runtime helper is intentionally shipped as a Node module beside the harness adapters.
 import { AXIS_REPOSITORIO, adquirirLock, bootstrapAxis, construirComandoNpm, lerOrigemDoLock, maiorRelease, marcadorDoBuild, sincronizarSessao } from "../../nucleo/hooks/expx-session-sync.mjs";
 
@@ -420,6 +421,31 @@ describe("sincronização Axis no SessionStart", () => {
     });
     expect(construiu).toBe(true);
     expect(readFileSync(join(cache, ".axis-build-sha"), "utf8").trim()).toBe(marcadorDoBuild(cache, "mesmo"));
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it.skipIf(process.platform === "win32")("funcional: FIFO no dist não trava a soma", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-dist-fifo-"));
+    const limpo = marcadorDoBuild(raiz, "c");
+    mkdirSync(join(raiz, "dist"));
+    execFileSync("mkfifo", [join(raiz, "dist", "cano")]);
+    // Em outro processo: uma leitura presa no FIFO travaria o próprio teste.
+    const hook = new URL("../../nucleo/hooks/expx-session-sync.mjs", import.meta.url).href;
+    const script = `const { marcadorDoBuild } = await import(${JSON.stringify(hook)}); console.log(marcadorDoBuild(${JSON.stringify(raiz)}, "c"));`;
+    const filho = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8", timeout: 10_000 });
+    expect(filho.status).toBe(0);
+    expect(filho.stdout.trim()).not.toBe(limpo);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it.skipIf(!suportaSymlinkDeDiretorio())("funcional: link no dist vale pelo alvo", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-dist-link-"));
+    mkdirSync(join(raiz, "dist"));
+    symlinkSync("alvo-um", join(raiz, "dist", "elo"));
+    const antes = marcadorDoBuild(raiz, "c");
+    rmSync(join(raiz, "dist", "elo"));
+    symlinkSync("alvo-dois", join(raiz, "dist", "elo"));
+    expect(marcadorDoBuild(raiz, "c")).not.toBe(antes);
     rmSync(raiz, { recursive: true, force: true });
   });
 

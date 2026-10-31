@@ -83,7 +83,7 @@ export const CATALOGO: readonly Skill[] = [
     nome: "prodx",
     repositorio: "https://github.com/AxisGov/prodx",
     origensLegadas: ["https://github.com/bittencourtthulio/prodx"],
-    certificado: "7539db41013585d31b79ef21afd07268bd99d0c1",
+    certificado: "06ce57a42db8eaae3f98ea60fc3895f1536383c5",
     papel: "camada de produto, decide se o pedido vira trabalho",
     camada: true,
   },

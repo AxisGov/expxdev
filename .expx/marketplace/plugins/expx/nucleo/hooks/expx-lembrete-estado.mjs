@@ -23,6 +23,7 @@ const TTL_EVENTO_MS = 24 * 60 * 60 * 1_000;
 const TTL_TRABALHO_MS = 7 * 24 * 60 * 60 * 1_000;
 const LIMITE_POR_TIPO = 64;
 const ESPERA_LOCK_MS = 50;
+const FUTURO_TOLERADO_MS = 60_000;
 const STALE_LOCK_MS = 30_000;
 const PREFIXO_TEMPORARIO = ".estado.";
 
@@ -197,10 +198,12 @@ export function lerEstado(raiz) {
   }
 }
 
+// `agora` é lido antes da trava: outro processo pode gravar um carimbo milissegundos à
+// frente, e podá-lo emitiria de novo. Só o relógio que voltou de verdade passa da tolerância.
 function limitar(itens, ttl, agora) {
   return itens
     .filter(registroValido)
-    .filter((item) => agora - item.timestamp <= ttl)
+    .filter((item) => item.timestamp - agora <= FUTURO_TOLERADO_MS && agora - item.timestamp <= ttl)
     .sort((a, b) => a.timestamp - b.timestamp)
     .slice(-LIMITE_POR_TIPO);
 }

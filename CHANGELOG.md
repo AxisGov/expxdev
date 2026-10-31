@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.12.13 — a ProdX
+
+- Certifica a ProdX em AxisGov/prodx@06ce57a (AxisGov/prodx#2). A máquina de estados previa o briefing só para `fazer`, embora `fazer_outra_coisa` também o gere, e o fluxo ficava sem próximo passo. O painel da triagem apontava as linhas erradas: utilidade é a quarta linha, e atrito é a terceira.
+- A soma do `dist/` lê só arquivo comum: um FIFO ali travaria o SessionStart (CodeAnt no expxdev#119).
+
 ## 0.12.12 — a trava do SessionStart e o lembrete
 
 - **A trava do cache do SessionStart sem corrida.** Dois processos podiam ver a mesma trava velha, e um apagava a que o outro acabava de criar. A trava agora nasce inteira, com o dono dentro, e só quem detém `<trava>.recuperacao` remove uma trava velha. Dono vivo nunca perde a trava por idade, e só um processo limpa uma recuperação abandonada.

@@ -138,7 +138,7 @@ O kind `veredito` carrega: `veredito`, `via`, `gatilhos_disparados`, `aprovado_p
 | `02-existencia.md` existe, `03-avaliacao.md` não | P4 |
 | `03-avaliacao.md` existe, `VEREDITO.md` não | P5 |
 | `VEREDITO.md` sem assinatura | aguarda humano |
-| `VEREDITO.md` assinado como `fazer`, sem briefing | gera o briefing |
+| `VEREDITO.md` assinado como `fazer` ou `fazer_outra_coisa`, sem briefing | gera o briefing |
 
 - **Etapa adiantada**: a skill explica o que falta e executa a pendente.
 - **Vários pedidos abertos sem indicação de qual**: lista com o estágio de cada um.
