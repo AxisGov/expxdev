@@ -62,7 +62,7 @@ ORDEM='O1 O2 O3 O4 O5 O6 O7 O8 O9 O10 L1 L2 L3 L4 D1 D2 D3 D4 PADRAO'
 
 # origem|caminho|kind|critério|função
 #   caminho sem `docs/` na frente é relativo à pasta do trabalho;
-#   `sprint-NN` é só `sprint-` seguido de dígitos; `base/<area>.md` só vale para
+#   `sprint-NN` é só `sprint-` seguido de dígitos; `base/<area>.md` (`<area>` pode ter subpasta) só vale para
 #   arquivo listado no `base/00-INDICE.md` do mesmo trabalho;
 #   kind `-` = o contrato não define frontmatter, e o arquivo não pode declarar kind
 #   (salvo a evidência de revisão, $CHAVE_EVIDENCIA: o conteúdo nunca é lido);
@@ -264,15 +264,23 @@ prova_reconciliacao_verificada() {
 }
 
 prova_indice_consistente() {
-  local arq="$RAIZ/$1" dir area n=0
+  local arq="$RAIZ/$1" dir area parte resto n=0
   dir="$(dirname "$arq")"
   while IFS= read -r area; do
     [ -n "$area" ] || continue
+    # A mesma forma do catalogo_base: subpasta da base vale (DM-288).
     case "$area" in
-      */*|*..*|00-INDICE.md|00-LACUNAS.md) PROVA_MOTIVO="o índice lista caminho fora da forma '<area>.md': $area"; return 1 ;;
+      /*|*\\*|*//*|.|./*|*/.|*/./*|..|../*|*/..|*/../*|00-INDICE.md|00-LACUNAS.md) PROVA_MOTIVO="o índice lista caminho fora da base: $area"; return 1 ;;
       *.md) ;;
       *) PROVA_MOTIVO="o índice lista arquivo que não é .md: $area"; return 1 ;;
     esac
+    parte="$dir"; resto="$area"
+    while :; do
+      parte="$parte/${resto%%/*}"
+      [ ! -L "$parte" ] || { PROVA_MOTIVO="o índice lista área atrás de link simbólico: $area"; return 1; }
+      [ "${resto#*/}" != "$resto" ] || break
+      resto="${resto#*/}"
+    done
     [ -f "$dir/$area" ] || { PROVA_MOTIVO="o índice lista arquivo inexistente: $area"; return 1; }
     n=$((n+1))
   done <<EOF
@@ -359,7 +367,8 @@ reconhece() {
   local caminho="$1" arq chave origem_linha linha kind_esperado criterio funcao kind_real rel dir nome modo
 
   case "$caminho" in
-    /*|*\\*|./*|*/./*|*..*|'') nao_reconhecido "caminho fora da forma canônica"; return ;;
+    # Segmento `.` ou `..`, não `..` dentro de um nome (`v1..v2.md`): a mesma forma do catalogo_base.
+    /*|*\\*|*//*|.|./*|*/.|*/./*|..|../*|*/..|*/../*|'') nao_reconhecido "caminho fora da forma canônica"; return ;;
   esac
   [ "$CONTEXTO_OK" = 1 ] || { nao_reconhecido "$CONTEXTO_MOTIVO"; return; }
 
@@ -396,11 +405,12 @@ reconhece() {
         chave="$rel"
       elif printf '%s' "$dir" | grep -Eq '^sprint-[0-9]{2,}$' && [ "${nome#*/}" = "$nome" ]; then
         chave="sprint-NN/$nome"
-      elif [ "$dir" = base ] && [ "${nome#*/}" = "$nome" ]; then
+      elif [ "$dir" = base ]; then
+        # a área pode estar numa subpasta da base, se o índice a lista assim (DM-288)
         case "$nome" in
           00-INDICE.md|00-LACUNAS.md) chave="$rel" ;;
           *)
-            if ! areas_do_indice "$RAIZ/$PASTA/base/00-INDICE.md" | grep -Fxq "$nome" \
+            if ! areas_do_indice "$RAIZ/$PASTA/base/00-INDICE.md" | grep -Fxq -- "$nome" \
                || [ "$(fm "$RAIZ/$PASTA/base/00-INDICE.md" kind)" != base_indice ] \
                || [ "$(fm "$RAIZ/$PASTA/base/00-INDICE.md" trabalho_id)" != "$TRABALHO" ]; then
               nao_reconhecido "arquivo da base não listado no base/00-INDICE.md deste trabalho"; return
