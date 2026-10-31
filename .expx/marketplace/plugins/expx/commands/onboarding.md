@@ -74,12 +74,15 @@ cada uma se apoia no que a anterior deixou, quando existe:
    padrão único ou sem cobertura de teste?". Se sim, acione
    `/legadox-perfil`. Se não, pule e registre "usuário confirmou que não é
    legado" — nunca acione o legadox sem essa confirmação explícita.
-5. **memox** — gatilho: já existe pelo menos um artefato de trabalho fechado
-   no projeto (relatório técnico, causa raiz, decisão, QA, entrega, ou os
-   próprios artefatos que as camadas acima acabaram de gerar nesta mesma
-   sessão de onboarding). Sem nenhum artefato, pule e registre "nada para
-   indexar ainda" — isso é estado correto, não falha. Acione
-   `/memox-indexar`.
+5. **memox** — entra na fila sempre que estiver instalado e pendente; o
+   gatilho dele **não** se avalia aqui, e sim na vez dele, no passo 4, depois
+   que as camadas acima rodaram: já existe pelo menos um artefato de trabalho
+   fechado no projeto (relatório técnico, causa raiz, decisão, QA, entrega, ou
+   os próprios artefatos que as camadas acima acabaram de gerar nesta mesma
+   sessão de onboarding). Avaliado antes, num primeiro onboarding ele nunca
+   veria o que a sessão acabou de gerar. Sem nenhum artefato na vez dele, pule
+   e registre "nada para indexar ainda" — isso é estado correto, não falha.
+   Acione `/memox-indexar`.
 
 ## 4. Execute a fila, uma camada de cada vez
 

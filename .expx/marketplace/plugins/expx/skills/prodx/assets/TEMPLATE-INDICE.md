@@ -27,7 +27,7 @@ Pedido recusado **nunca é apagado**: a avaliação vale para a próxima vez.
 - **Total de pedidos:** <n>
 - **Via triagem:** <n> (<%>)
 - **Via avaliação completa:** <n> (<%>) — acima de 50% os gatilhos estão largos demais
-- **Não viraram trabalho:** <n> (<%>) — soma de ja_existe, nao_fazer e fazer_outra_coisa
+- **Não viraram trabalho:** <n> (<%>) — soma de ja_existe e nao_fazer
 
 <A última linha é o indicador honesto de utilidade da skill. Se tudo que
 entra sai como "fazer", o prodx é burocracia.>
