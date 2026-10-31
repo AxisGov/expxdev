@@ -482,6 +482,20 @@ describe("sincronização Axis no SessionStart", () => {
     rmSync(raiz, { recursive: true, force: true });
   });
 
+  it("funcional: com a limpeza em curso, a recuperação abandonada espera", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-lock-limpeza-"));
+    const bloqueio = join(raiz, "cache.lock");
+    mkdirSync(bloqueio);
+    writeFileSync(join(bloqueio, "owner.json"), JSON.stringify({ pid: 999999, timestamp: 1 }));
+    mkdirSync(`${bloqueio}.recuperacao`);
+    writeFileSync(join(`${bloqueio}.recuperacao`, "owner.json"), JSON.stringify({ pid: 999999, timestamp: 1 }));
+    mkdirSync(`${bloqueio}.recuperacao.limpeza`);
+    writeFileSync(join(`${bloqueio}.recuperacao.limpeza`, "owner.json"), JSON.stringify({ pid: process.pid, timestamp: Date.now() }));
+    expect(() => adquirirLock(bloqueio)).toThrow("bootstrap em andamento");
+    expect(existsSync(`${bloqueio}.recuperacao`)).toBe(true);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
   it("funcional: a trava nasce com dono, sem pasta de montagem sobrando", () => {
     const raiz = mkdtempSync(join(tmpdir(), "expx-lock-atomica-"));
     const bloqueio = join(raiz, "cache.lock");

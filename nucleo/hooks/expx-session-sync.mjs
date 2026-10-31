@@ -101,6 +101,20 @@ function criarTrava(trava, gravar) {
   }
 }
 
+/** Só um processo limpa a recuperação abandonada: dois apagariam a que outro acabou de criar. */
+function limparRecuperacao(recuperacao, gravar) {
+  const limpeza = `${recuperacao}.limpeza`;
+  if (!criarTrava(limpeza, gravar)) {
+    if (!travaOcupada(limpeza)) removerSemFalhar(limpeza);
+    return;
+  }
+  try {
+    if (!travaOcupada(recuperacao)) removerSemFalhar(recuperacao);
+  } finally {
+    removerSemFalhar(limpeza);
+  }
+}
+
 /**
  * Só quem detém `<trava>.recuperacao` remove uma trava velha, e decide isso já com
  * ela nas mãos: enquanto a velha existe, ninguém cria a nova, e dois processos não
@@ -111,7 +125,7 @@ function criarTrava(trava, gravar) {
 function recuperarTrava(trava, gravar) {
   const recuperacao = `${trava}.recuperacao`;
   if (!criarTrava(recuperacao, gravar)) {
-    if (!travaOcupada(recuperacao)) removerSemFalhar(recuperacao);
+    limparRecuperacao(recuperacao, gravar);
     throw new Error("bootstrap em andamento");
   }
   try {
