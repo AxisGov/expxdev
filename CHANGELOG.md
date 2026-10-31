@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.12.14 — a MergeX: dispensa, worktrees e pipefail
+
+- Certifica a MergeX em AxisGov/mergex@7209397:
+  - **Dispensa por hash no `sem-segredo` (mergex#63, DM-289).** Refaz a DM-286, revertida na DM-287. O arquivo do framework cujo blob bate com o lock não é varrido, e o commit que instala uma versão nova deixa de pedir a exceção manual do README. O custo é constante: 8 processos com 1 ou 300 arquivos, cerca de 2 s no Windows. Prazo de 4 s para o evento inteiro. Sem `perl`, fora do prazo ou em qualquer falha, a varredura completa roda.
+  - **Worktrees entregues (mergex#64, DM-290).** `worktrees-entregues.sh` lista cada worktree com estado e motivo e remove a entregue, sem forçar, mantendo a branch. O E9 o chama depois do merge. Rastro ignorado bloqueia, e o descarte é humano. Exige Git 2.36.
+  - **Consumidor precoce sob `pipefail` (mergex#62).** 56 pipelines dos scripts instalados deixam de inverter a decisão acima de 64 KB, e o lint da SprintX entra no CI. Corrige também a mensagem de integração com linha em maiúsculas no heredoc, que perdia os trailers.
+- Certifica a SprintX em AxisGov/sprintx@d80c96f (sprintx#59, DS-194): a Regra 21 passa a dizer que a worktree sai pela MergeX.
+- Teste de composição da SprintX com a runx em projeto temporário (expxdev#120), no lugar de instalar as duas neste repositório.
+
 ## 0.12.13 — a ProdX
 
 - Certifica a ProdX em AxisGov/prodx@06ce57a (AxisGov/prodx#2). A máquina de estados previa o briefing só para `fazer`, embora `fazer_outra_coisa` também o gere, e o fluxo ficava sem próximo passo. O painel da triagem apontava as linhas erradas: utilidade é a quarta linha, e atrito é a terceira.

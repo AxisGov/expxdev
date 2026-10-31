@@ -35,13 +35,16 @@ eh_placeholder() {
   # `${...}`, `{{...}}` e `<...>` só são referência quando são o valor inteiro: um
   # `${X}` no meio de uma senha real não a dispensa (CodeAnt no mergex#54).
   printf '%s\n%s\n' "$v" "$cauda" \
-    | grep -aEq -e '^(\$\{[^}]*\}|\{\{[^}]*\}\}|<[^<>]*>)$' && return 0
+    | grep -aE -e '^(\$\{[^}]*\}|\{\{[^}]*\}\}|<[^<>]*>)$' >/dev/null && return 0
   case "$cauda" in '%s'|'%('*')s') return 0 ;; esac
   # Substituição de comando do shell (`SENHA="$(cat arquivo)"`, crase) é código, não valor:
   # com a aspa que não fecha, a forma entre aspas a pegava (revisão do Codex no login#34).
   # Só a substituição inteira: senha colada depois dela é credencial (CodeAnt no mergex#56).
-  case "$cauda" in '$('*')'|'`'*'`') printf '%s' "$cauda" | grep -aEq -e '^(\$\([^()]*\)|`[^`]*`)$' && return 0 ;; esac
-  printf '%s' "$cauda" | grep -aEq -e '^(\$[A-Za-z_][A-Za-z0-9_]*|[*]+|[?]+)$' && return 0
+  case "$cauda" in
+    '$('*')'|'`'*'`')
+      grep -aEq -e '^(\$\([^()]*\)|`[^`]*`)$' <<<"$cauda" && return 0 ;;
+  esac
+  grep -aEq -e '^(\$[A-Za-z_][A-Za-z0-9_]*|[*]+|[?]+)$' <<<"$cauda" && return 0
   # Palavras reservadas só dispensam o valor inteiro, não uma credencial real
   # que por acaso contenha "example", "sample" ou outro fragmento. O valor pode
   # juntar mais de uma (`sk-example-placeholder`), mas só delas é feito.
@@ -50,7 +53,7 @@ eh_placeholder() {
   # atribuição, que chega com a chave junto: `token: "placeholder`) — login#30.
   local alvo_w
   for alvo_w in "$v" "$cauda"; do
-    printf '%s' "$alvo_w" | grep -aEiq -e "^(sk-|gh[pousr]_|github_pat_|xox[baprs]-)?$w([-_]$w)*\$" && return 0
+    grep -aEiq -e "^(sk-|gh[pousr]_|github_pat_|xox[baprs]-)?$w([-_]$w)*\$" <<<"$alvo_w" && return 0
   done
   return 1
 }
@@ -67,7 +70,7 @@ eh_referencia_de_codigo() {
   local v="${1#*[:=]}" d="$2"
   v="${v#"${v%%[![:space:]]*}"}"
   case "$v" in \"*|\'*) return 1 ;; esac
-  printf '%s' "$v" | grep -aEq -e '^[A-Za-z_$][A-Za-z_$]*(\.[A-Za-z_$][A-Za-z_$]*)*$' || return 1
+  grep -aEq -e '^[A-Za-z_$][A-Za-z_$]*(\.[A-Za-z_$][A-Za-z_$]*)*$' <<<"$v" || return 1
   d="${d#"${d%%[![:space:]]*}"}"
   case "$d" in ,*|\;*|\)*|\}*) return 0 ;; esac
   return 1
@@ -89,7 +92,7 @@ achou() {
     while IFS= read -r casou; do
       [ -n "$casou" ] || continue
       off="${casou%%:*}"; valor="${casou#*:}"
-      [ -n "$esq" ] && valor="$(printf '%s' "$valor" | grep -aEo -e "$2" | head -1)"
+      [ -n "$esq" ] && valor="$(grep -aEo -e "$2" <<<"$valor" | awk 'NR == 1')"
       [ -n "$valor" ] || continue
       # Placeholder dispensa somente este candidato. Na URL, só a senha decide:
       # um `${USER}` no usuário não torna placeholder a senha real (conselhos#210, P5).

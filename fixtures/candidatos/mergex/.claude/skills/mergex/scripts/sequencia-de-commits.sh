@@ -184,9 +184,9 @@ itens_de() {
   b="$(bloco "$arq" commits)"
   confere_bloco "$b" || return 1
   # `commits: []` (inline) é lista vazia declarada: legítima, sem nenhum item.
-  case "$(printf '%s\n' "$b" | head -1)" in
+  case "$(printf '%s\n' "$b" | awk 'NR == 1')" in
     $'\001'|$'\001'\[\]) ;;
-    $'\001'*) ERRO="commits não é lista de itens: $(printf '%s\n' "$b" | head -1 | cut -c2-)"; return 1 ;;
+    $'\001'*) ERRO="commits não é lista de itens: $(printf '%s\n' "$b" | awk 'NR == 1' | cut -c2-)"; return 1 ;;
   esac
   printf '%s\n' "$b" | awk '
     function chave(l,   k, v) {

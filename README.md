@@ -539,18 +539,20 @@ pacote certificado de uma GitHub Release SemVer explícita:
 
 Requisitos para os comandos abaixo: Node ≥ 20.19.0, `git`, GitHub CLI (`gh`) autenticado e
 `sha256sum` (Linux) ou `shasum` (macOS) para conferir o pacote antes de executá-lo.
+A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com `Digest::SHA` para
+a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.12.13 -R AxisGov/expxdev -D ~/expx-cli/v0.12.13
+gh release download v0.12.14 -R AxisGov/expxdev -D ~/expx-cli/v0.12.14
 (
-  cd ~/expx-cli/v0.12.13
+  cd ~/expx-cli/v0.12.14
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.12.13.tgz.sha256
+    sha256sum -c expxdev-0.12.14.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.12.13.tgz.sha256
+    shasum -a 256 -c expxdev-0.12.14.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.12.13/expxdev-0.12.13.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.12.14/expxdev-0.12.14.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -564,7 +566,7 @@ npx --yes --package ~/expx-cli/v0.12.13/expxdev-0.12.13.tgz expx init --skills b
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.12.13 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.12.14 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -620,6 +622,8 @@ npx --yes --package ~/expx-cli/v0.12.13/expxdev-0.12.13.tgz expx init --skills b
 - `0.12.12` fecha a corrida na trava do SessionStart, atesta o `dist/` do cache, confere o lock
   antes de cache e rede e descarta carimbo do futuro no lembrete.
 - `0.12.13` certifica a ProdX com a máquina de estados e os ordinais da triagem corrigidos.
+- `0.12.14` certifica a MergeX com a dispensa por hash de custo constante, a remoção da worktree
+  entregue e a guarda de `pipefail`, e a SprintX com a Regra 21 completa.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

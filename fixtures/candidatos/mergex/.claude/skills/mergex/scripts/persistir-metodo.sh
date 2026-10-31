@@ -525,7 +525,7 @@ tasks_concluidas() {
   for dir in "$RAIZ/$PASTA"/sprint-*; do
     [ -d "$dir" ] || continue
     nome="$(basename "$dir")"
-    printf '%s\n' "$nome" | grep -Eq '^sprint-[0-9]{2,}$' || continue
+    grep -Eq '^sprint-[0-9]{2,}$' <<<"$nome" || continue
     [ -f "$dir/tasks.md" ] && set -- "$@" "$dir/tasks.md"
   done
   CONCLUIDAS=""

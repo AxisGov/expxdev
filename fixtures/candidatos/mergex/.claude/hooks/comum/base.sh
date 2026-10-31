@@ -81,7 +81,7 @@ expx_trabalho_id() {
   # O trabalho corrente é o ENTREGA.md mais recentemente modificado.
   # Sem estado próprio: a informação já está no artefato da entrega.
   local mais_novo
-  mais_novo="$(ls -t "$raiz"/docs/entregas/*/ENTREGA.md 2>/dev/null | head -1)" || true
+  mais_novo="$(ls -t "$raiz"/docs/entregas/*/ENTREGA.md 2>/dev/null | awk 'NR == 1')" || true
   if [ -n "${mais_novo:-}" ]; then
     basename "$(dirname "$mais_novo")"
   else

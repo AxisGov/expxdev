@@ -347,7 +347,7 @@ g cat-file -e "$BASE^{commit}" 2>/dev/null || sem_prova "base $BASE não é comm
 # planejamento é o 1º), a de HEAD é a mais nova (r = k), e k nunca passa do
 # número de PRs fechados. As guardas olham `<base> ^L`, L = o merge do k-ésimo.
 L_SPRINT=""
-if [ -n "$ULTIMO" ] && printf '%s\n' "$MARCA_H" | grep -qx 'entrega=por_sprint'; then
+if [ -n "$ULTIMO" ] && grep -qx 'entrega=por_sprint' <<<"$MARCA_H"; then
   # Com reconciliação, a cadeia já prova BASE (DM-266). L_SPRINT ainda precisa apontar
   # o último PR fechado: ele tem de ser ancestral de BASE e separa das guardas
   # o produto das sprints que a main já recebeu.
