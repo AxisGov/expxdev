@@ -222,6 +222,23 @@ function raizGit(cwd, executar) {
 }
 
 /**
+ * O próprio repositório do CLI. Ele não se atualiza sozinho, porque o `update`
+ * sujaria a `main` a cada release, nem registra o plugin no escopo do usuário,
+ * que é único e pertence aos projetos consumidores. Um fork que mantenha os dois
+ * campos também cai aqui, e isso é aceitável: ele também não deve fazer nenhum
+ * dos dois. Leitura falha conta como projeto comum.
+ */
+export function ehRepositorioFonte(raiz) {
+  try {
+    const pacote = JSON.parse(readFileSync(join(raiz, "package.json"), "utf8"));
+    const url = typeof pacote?.repository === "string" ? pacote.repository : pacote?.repository?.url;
+    return pacote?.name === "expxdev" && typeof url === "string" && url.replace(/^git\+/, "") === AXIS_REPOSITORIO;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Origem local no lock: o sinal durável que `copiarLocal` grava no commit —
  * `<sha>-local`, ou `local` quando a fonte não tem git. O caminho do
  * repositório não decide nada.
@@ -280,6 +297,7 @@ export function sincronizarSessao({ entrada, plataforma = "claude", raiz, cwd, a
       } catch {
         return "";
       }
+    if (ehRepositorioFonte(projeto)) return "";
     const caminhoLock = join(projeto, ".expx", "expx-lock.json");
     if (!existsSync(caminhoLock)) return "";
     // D-03: o lock é lido antes de status, cache Axis, rede ou update. Lock

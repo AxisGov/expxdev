@@ -98,6 +98,8 @@ export type ResultadoInstalacao = {
   /** Quando o binário falta, o texto que o usuário precisa ver. */
   instrucao?: string;
   erro?: string;
+  /** O registro não rodou de propósito: nada foi ativado no Claude Code. */
+  pulado?: boolean;
 };
 
 /** O caminho como o sistema o vê: resolvido, sem link nem nome curto 8.3. */

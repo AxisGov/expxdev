@@ -128,7 +128,7 @@ const EXECUTORES: Partial<Record<Subcomando, Executor>> = {
         saida.escreverErro(`nao foi possivel registrar o plugin: ${inst.erro}\n`);
         return 0;
       }
-      fecho.push("plugin registrado: os comandos /expx: estao disponiveis");
+      if (inst.pulado !== true) fecho.push("plugin registrado: os comandos /expx: estao disponiveis");
     }
     saida.escrever(sucesso(fecho, temCor()));
     return 0;
