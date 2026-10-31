@@ -408,16 +408,17 @@ describe("sincronização Axis no SessionStart", () => {
     writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "original");
     writeFileSync(join(cache, ".axis-build-sha"), `${marcadorDoBuild(cache, "mesmo")}\n`);
     writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "alterado");
-    const npm: string[][] = [];
-    bootstrapAxis(cache, (arquivo, argumentos) => {
-      if (arquivo === "npm") npm.push(argumentos);
+    let construiu = false;
+    bootstrapAxis(cache, (_arquivo, argumentos) => {
+      // no Windows o npm roda pelo cmd.exe: quem identifica o build são os argumentos
+      if (argumentos.includes("build:server")) construiu = true;
       if (argumentos.includes("tag")) return "v0.12.9\n";
       if (argumentos.includes("remote")) return `${AXIS_REPOSITORIO}\n`;
       if (argumentos.includes("rev-parse")) return "mesmo\n";
       if (argumentos.includes("--show-current")) return "main\n";
       return "";
     });
-    expect(npm).toContainEqual(["run", "build:server"]);
+    expect(construiu).toBe(true);
     expect(readFileSync(join(cache, ".axis-build-sha"), "utf8").trim()).toBe(marcadorDoBuild(cache, "mesmo"));
     rmSync(raiz, { recursive: true, force: true });
   });
