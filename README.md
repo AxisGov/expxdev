@@ -541,16 +541,16 @@ Requisitos para os comandos abaixo: Node ≥ 20.19.0, `git`, GitHub CLI (`gh`) a
 `sha256sum` (Linux) ou `shasum` (macOS) para conferir o pacote antes de executá-lo.
 
 ```bash
-gh release download v0.12.11 -R AxisGov/expxdev -D ~/expx-cli/v0.12.11
+gh release download v0.12.12 -R AxisGov/expxdev -D ~/expx-cli/v0.12.12
 (
-  cd ~/expx-cli/v0.12.11
+  cd ~/expx-cli/v0.12.12
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.12.11.tgz.sha256
+    sha256sum -c expxdev-0.12.12.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.12.11.tgz.sha256
+    shasum -a 256 -c expxdev-0.12.12.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.12.11/expxdev-0.12.11.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.12.12/expxdev-0.12.12.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -564,7 +564,7 @@ npx --yes --package ~/expx-cli/v0.12.11/expxdev-0.12.11.tgz expx init --skills b
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.12.11 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.12.12 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -617,6 +617,8 @@ npx --yes --package ~/expx-cli/v0.12.11/expxdev-0.12.11.tgz expx init --skills b
   os achados das instalações da `0.12.9` no katosmv/login#41 e no conselhos#216 e #217.
 - `0.12.11` faz o repositório-fonte do CLI parar de se atualizar sozinho e de trocar o plugin
   global. Projetos consumidores não mudam.
+- `0.12.12` fecha a corrida na trava do SessionStart, atesta o `dist/` do cache, confere o lock
+  antes de cache e rede e descarta carimbo do futuro no lembrete.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
