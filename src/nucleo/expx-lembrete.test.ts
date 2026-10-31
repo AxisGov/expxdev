@@ -310,6 +310,21 @@ describe("estado seguro e concorrencia pendentes", () => {
     expect(() => JSON.parse(readFileSync(estado, "utf8"))).not.toThrow();
   });
 
+  it("poda carimbo do futuro: relogio que voltou nao suprime lembrete", async () => {
+    // @ts-expect-error Modulo interno de runtime instalado ao lado do hook.
+    const { podarEstado } = await import("../../nucleo/hooks/expx-lembrete-estado.mjs");
+    const agora = Date.UTC(2026, 9, 31);
+    const registro = (timestamp: number) => ({ versao: 1, hash: "a".repeat(64), skill: "mergex", timestamp });
+    const futuro = registro(agora + 120_000);
+    const quaseAgora = registro(agora + 5);
+    const presente = registro(agora);
+    const passado = registro(agora - 60_000);
+    const vencido = registro(agora - 8 * 86_400_000);
+    const podado = podarEstado({ versao: 1, eventos: [futuro, quaseAgora, presente, passado, vencido], trabalhos: [futuro, presente] }, agora);
+    expect(podado.eventos).toEqual([passado, presente, quaseAgora]);
+    expect(podado.trabalhos).toEqual([presente]);
+  });
+
   it("duas execucoes concorrentes do mesmo evento emitem exatamente uma vez (caso 15)", async () => {
     const projeto = criarProjeto();
     const entrada = evento(projeto);
