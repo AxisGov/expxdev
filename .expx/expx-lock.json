@@ -36,7 +36,7 @@
   },
   "instalacao": {
     "arquivos": {
-      ".claude/hooks/expx-session-sync.mjs": "e68faae8ed29110aea61e490eb3f1e09cabe87d3dfc63d210c480e834a18774f",
+      ".claude/hooks/expx-session-sync.mjs": "a4678b62ee9fcdda7d5154be858edeb707104fc9529b2d8a41298d0435d73424",
       ".expx/marketplace/plugins/expx/commands/prodx-avaliar.md": "1dccd73e65583476d95b3e8795c69c5f5c788ccf98757832b38ed18fa5c4a5dc",
       ".expx/marketplace/plugins/expx/commands/prodx-briefing.md": "569db0045a2e13d2839bc74b53b88ceae125d92333e3aea321f9f89b784c3651",
       ".expx/marketplace/plugins/expx/commands/prodx-existe.md": "2b3d235ab629d2c35237a8d7881172877d9e835eb5b1b3ae35404d5f8d63ec16",

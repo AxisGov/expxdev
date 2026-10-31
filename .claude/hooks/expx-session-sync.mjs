@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -151,8 +151,12 @@ function somaDoDist(cache) {
       if (entrada.isDirectory()) {
         visitar(join(pasta, entrada.name), `${relativo}/`);
       } else {
-        soma.update(`${relativo}\0`);
-        soma.update(readFileSync(join(pasta, entrada.name)));
+        // Só arquivo comum é lido, e link vale pelo alvo: um FIFO travaria o SessionStart.
+        const caminho = join(pasta, entrada.name);
+        const tipo = entrada.isFile() ? "arquivo" : entrada.isSymbolicLink() ? "link" : "outro";
+        soma.update(`${tipo}\0${relativo}\0`);
+        if (tipo === "arquivo") soma.update(readFileSync(caminho));
+        if (tipo === "link") soma.update(readlinkSync(caminho));
         soma.update("\0");
       }
     }
