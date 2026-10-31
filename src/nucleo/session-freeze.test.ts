@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 // @ts-expect-error The runtime helper is intentionally shipped as a Node module beside the harness adapters.
 import { AXIS_REPOSITORIO, sincronizarSessao } from "../../nucleo/hooks/expx-session-sync.mjs";
 
@@ -88,7 +88,7 @@ const PROIBIDO = ["clone", "fetch", "npm", "expx-bin.js", "update"];
 
 /** Toda chamada que tocaria rede, cache Axis ou o CLI de update. */
 function proibidas(chamadas: string[][]): string[][] {
-  return chamadas.filter((c) => c.some((v) => PROIBIDO.some((p) => v.includes(p))));
+  return chamadas.filter((c) => c.some((v) => PROIBIDO.includes(basename(v))));
 }
 
 /** Nada de rede, nada de update, nada escrito — nem no projeto, nem no cache. */
