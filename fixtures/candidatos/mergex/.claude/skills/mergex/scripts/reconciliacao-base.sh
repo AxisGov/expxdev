@@ -570,11 +570,32 @@ anteriores_da_cadeia() {
   awk -F'\t' '{ u[$1] = $3 "\t" $4 } END { for (p in u) print p "\t" u[p] }' "$1"
 }
 
-# artefato_da_entrega <caminho> — um RECONCILIACAO-BASE-NNN.md da própria
+# nome_de_evidencia <nome> — `<T-NN.MM>.json` ou o legado `<T-N>.json`, o id do
+# plano no nome (a mesma forma do E1 e do classificar-atencao.sh).
+nome_de_evidencia() {
+  local id="${1%.json}"
+  [ "$id.json" = "$1" ] || return 1
+  case "$id" in
+    T-[0123456789][0123456789].[0123456789][0123456789]) return 0 ;;
+    T-*) id="${id#T-}"
+         case "$id" in ''|*[!0123456789]*) return 1 ;; esac
+         return 0 ;;
+  esac
+  return 1
+}
+
+# artefato_da_entrega <M> <caminho> — um RECONCILIACAO-BASE-NNN.md da própria
 # entrega (commitado pelo checkpoint reconciliacao-base antes do merge
-# seguinte); é artefato de método, não produto.
+# seguinte), ou a evidência de revisão de uma task deste trabalho (DM-240),
+# arquivo comum em M; é artefato de método, não produto. Temporário, trava,
+# link e o que o merge removeu sob `revisao/` continuam produto (DM-291).
 artefato_da_entrega() {
-  case "$1" in "docs/entregas/$TRABALHO/"RECONCILIACAO-BASE-[0-9][0-9][0-9].md) return 0 ;; esac
+  case "$2" in
+    "docs/entregas/$TRABALHO/"RECONCILIACAO-BASE-[0-9][0-9][0-9].md) return 0 ;;
+    "docs/entregas/$TRABALHO/revisao/"*)
+      nome_de_evidencia "${2#"docs/entregas/$TRABALHO/revisao/"}" || return 1
+      case "$(modo_em "$1" "$2")" in 100644|100755) return 0 ;; esac ;;
+  esac
   return 1
 }
 
@@ -595,7 +616,7 @@ inventario() {
       contem "$UNIAO" "$p" || reprova "inventário: $p: submódulo (gitlink) alterado pelo merge e não declarado em task" inventario # guarda:SUB
       continue
     fi
-    contem "$UNIAO" "$p" || contem "$CATALOGO" "$p" || contem "$lista" "$p" || artefato_da_entrega "$p" || herdado_da_cadeia "$b0" "$b1" "$m" "$p" "$anteriores" || reprova "inventário: $p: alterado pelo merge e não declarado" inventario # guarda:INV
+    contem "$UNIAO" "$p" || contem "$CATALOGO" "$p" || contem "$lista" "$p" || artefato_da_entrega "$m" "$p" || herdado_da_cadeia "$b0" "$b1" "$m" "$p" "$anteriores" || reprova "inventário: $p: alterado pelo merge e não declarado" inventario # guarda:INV
   done 3< "$INVENTARIO"
 }
 

@@ -15,7 +15,10 @@ hook que já existe, como revertê-lo, como as entregas são selecionadas e o qu
 (`scripts/segredo-tabela.sh`), ele lê o que o push publica: a mensagem e as linhas adicionadas de
 cada commit que o remoto ainda não tem (contra o primeiro pai, inclusive em merge) e a mensagem da
 tag anotada. "O que o remoto tem" é o SHA remoto do protocolo; na branch nova, o que o servidor
-anuncia na hora (`ls-remote` na URL do push), e a consulta que falha barra. A ref de rastreio
+anuncia na hora (`ls-remote` na URL do push), e a consulta que falha barra. Com o SHA remoto, a
+consulta só entra quando há achado ou intervalo acima do limite: o que o servidor já tem por outra
+ref, como o merge da main trazido à feature, sai da conta, e a consulta que falha mantém o achado
+(DM-293). A ref de rastreio
 (`refs/remotes/<remoto>`) não conta: é cache local (DM-281). O modo é o do `sem-segredo` em `.expx/hooks.json` (nasce `bloqueio`): achado barra a
 ref; em `aviso`, diagnostica e o push segue; em `desligado`, não varre. A falha de leitura nunca conta como limpo:
 em `bloqueio` ela barra, e em `aviso` vira diagnóstico e o push segue, como o achado. Acima de 300

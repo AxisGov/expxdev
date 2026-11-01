@@ -265,6 +265,7 @@ prova_reconciliacao_verificada() {
 
 prova_indice_consistente() {
   local arq="$RAIZ/$1" dir area parte resto n=0
+  [ ! -L "$arq" ] || { PROVA_MOTIVO="o índice é link simbólico"; return 1; }
   dir="$(dirname "$arq")"
   while IFS= read -r area; do
     [ -n "$area" ] || continue
@@ -364,13 +365,20 @@ linha_do_catalogo() {
 }
 
 reconhece() {
-  local caminho="$1" arq chave origem_linha linha kind_esperado criterio funcao kind_real rel dir nome modo
+  local caminho="$1" arq chave origem_linha linha kind_esperado criterio funcao kind_real rel dir nome modo parte resto
 
   case "$caminho" in
     # Segmento `.` ou `..`, não `..` dentro de um nome (`v1..v2.md`): a mesma forma do catalogo_base.
-    /*|*\\*|*//*|.|./*|*/.|*/./*|..|../*|*/..|*/../*|'') nao_reconhecido "caminho fora da forma canônica"; return ;;
+    /*|*\\*|*//*|.|./*|*/.|*/./*|..|../*|*/..|*/../*|''|*$'\n'*) nao_reconhecido "caminho fora da forma canônica"; return ;;
   esac
   [ "$CONTEXTO_OK" = 1 ] || { nao_reconhecido "$CONTEXTO_MOTIVO"; return; }
+
+  # Link em qualquer pasta do caminho: o que está atrás dele não é desta árvore (DM-294).
+  parte="$RAIZ"; resto="$caminho"
+  while [ "${resto#*/}" != "$resto" ]; do
+    parte="$parte/${resto%%/*}"; resto="${resto#*/}"
+    [ ! -L "$parte" ] || { nao_reconhecido "link simbólico no caminho: ${parte#"$RAIZ/"}"; return; }
+  done
 
   arq="$RAIZ/$caminho"
   if [ -L "$arq" ] || [ ! -f "$arq" ]; then
@@ -410,6 +418,7 @@ reconhece() {
         case "$nome" in
           00-INDICE.md|00-LACUNAS.md) chave="$rel" ;;
           *)
+            [ ! -L "$RAIZ/$PASTA/base/00-INDICE.md" ] || { nao_reconhecido "o base/00-INDICE.md é link simbólico"; return; }
             if ! areas_do_indice "$RAIZ/$PASTA/base/00-INDICE.md" | grep -Fx -- "$nome" >/dev/null \
                || [ "$(fm "$RAIZ/$PASTA/base/00-INDICE.md" kind)" != base_indice ] \
                || [ "$(fm "$RAIZ/$PASTA/base/00-INDICE.md" trabalho_id)" != "$TRABALHO" ]; then

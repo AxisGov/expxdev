@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.12.15 — os achados do Conselhos
+
+- Certifica a MergeX em AxisGov/mergex@6e01fc9 (mergex#65, DM-291 a DM-298):
+  - **A evidência de revisão na reconciliação de base (DM-291).** O inventário reprovava `docs/entregas/<trabalho>/revisao/<T-NN.MM>.json`, que o E1 commita na feature, e travava a entrega. Agora aceita esse arquivo, deste trabalho, na forma do E1 e como arquivo comum. Temporário, subpasta, link, remoção pelo merge e evidência de outro trabalho seguem reprovados.
+  - **O que o servidor já tem não barra o push (DM-293).** Em `por_sprint`, depois de `merge --ff-only main` na feature, um push limpo barrava em um merge que já está no remoto, e o limite de 300 commits fazia o mesmo. Achado ou limite agora consultam o `ls-remote` e recalculam o intervalo uma vez. Se a consulta falhar, o achado e o limite ficam.
+  - **Link não desce de faixa (DM-294).** Corrige regressões da DM-288: área atrás de pasta que é link, `base/` que é link e `00-INDICE.md` que é link voltam a pedir olho humano ou a barrar o catálogo. Pasta `sprint-NN` com quebra de linha é ignorada.
+  - **A mensagem não se autentica sozinha (DM-295).** Sem trabalho pela branch, o trailer `Trabalho:` só vale com um `ENTREGA.md` real desse trabalho e da branch ativa.
+  - **`commits: [] # comentário` (DM-296).** Vale na leitura e na escrita, e a recusa do `--acrescentar` passa a dizer o motivo.
+  - **`git clean` (DM-296 e DM-298).** Cada `git clean` do comando é lido por si: `--force`, `-i` e `git -C <dir> clean` passam a barrar, `-n` prevalece, aspas não escondem opção, e a prévia considera `-x` e `-X`.
+  - **`senha = ********` continua sem acusação (DM-296).** É decisão: asteriscos e interrogações sozinhos são máscara. Limite assumido: uma senha real feita só desses caracteres passa.
+  - **Mutação com teto, no desenvolvimento da MergeX (DM-292).** As bancadas disparavam até 60 mutantes de uma vez e deixavam cópias no `/tmp`. Agora são no máximo quatro ao mesmo tempo, e tudo é removido no fim. Nada muda em quem instala.
+- Certifica a SprintX em AxisGov/sprintx@d5acea7 (sprintx#60, DS-195):
+  - **O plano é o bloco `tasks:` do frontmatter.** Um id que só aparecia em exemplo depois do frontmatter era aceito por `rastro.sh task-iniciada` e por mais três leitores, e o `escopo-da-task` deixava quem o reivindicasse editar qualquer arquivo. Plano sem frontmatter continua lido por inteiro, como legado.
+  - **Task e slug com quebra de linha** são recusados em `bloqueios.sh registrar`.
+- **O SessionStart usa as tags do remoto.** Uma tag local `v9.9.9` na ponta da `main` fazia a sincronização escolher a ponta em vez da última release. O `fetch` do cache agora poda e atualiza as tags pelo remoto.
+- **Rejector que falha não vira revisão limpa.** Com `[error] Rejector failed` no stderr (visto com HTTP 413 no Conselhos), a CLI devolvia JSON limpo e saída 0 sem as sugestões do lote, e o `revisar` gravava `ok`. Agora qualquer `[error]` no stderr e o `Warning: parsing error in rejector` dão `incompleta:lote-falhou`. O `[warning]` do Risk planner segue sem barrar, porque não perde achado. Evidência gravada antes desta versão não guarda o stderr, então não dá para reavaliá-la. Limite assumido: turno da API encerrado sem `output` e sem erro não é detectável com a CLI 0.5.14.
+- **Errata da 0.12.14:** a entrada sobre o consumidor precoce diz "acima de 64 KB". Não há tamanho seguro: a falha é intermitente e mais provável com saída maior. O Conselhos a viu a partir de 8 KB no WSL2, e `cat` chegou a falhar com 2 KB em máquina sob carga. A correção não muda, e os comentários e as decisões foram corrigidos na origem (DM-297 e DS-195).
+
 ## 0.12.14 — a MergeX: dispensa, worktrees e pipefail
 
 - Certifica a MergeX em AxisGov/mergex@7209397:
