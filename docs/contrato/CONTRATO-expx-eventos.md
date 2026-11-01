@@ -150,6 +150,7 @@ Quem valida uma linha verifica que as doze estão **contidas** nela — nunca ig
 | `commit_criado` · `pr_aberto` | mergex |
 | `artefato_gravado` | mergex, quando a gravação de um artefato derivado (`.expx/estado.json`) falha: sai com `resultado: falha` e `agente: principal`, no rastro do trabalho ou em `docs/eventos/sem-trabalho.jsonl` no E9 sem trabalho atual. Nunca interrompe a etapa |
 | `invocacao_abandonada` | declarado para o envelope da invocação de agente (CONTRATO-expx-orquestracao §8.2, passo 3): a invocação aberta que nunca fechou. Nenhum escritor o grava ainda; entra com a F3b |
+| `diagrama_nao_gerado` · `diagrama_nao_atualizado` | runx, por `rastro.py`: o diagrama da ocorrência não foi gerado, por contradição no E1 ou no E2, ou não foi atualizado no E3. É registrado e ignorado |
 
 **Esta tabela não é a fonte: o enum é.** A lista mora em `EventoNome`
 (`src/parser/esquema/evento.ts`) e `src/nucleo/documentacao.test.ts` confere a

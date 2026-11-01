@@ -143,6 +143,10 @@ export const EventoNome = z.enum([
   // aprovação com a do fim. Evento próprio, e não `agente_concluido`: esse já é
   // gravado pela SprintX para todo subagente, e o aprovador ficaria com dois.
   "integridade_final_verificada",
+  // runx (DR-55 e DR-91): o diagrama da ocorrência não foi gerado, por contradição
+  // no E1 ou no E2, ou não foi atualizado no E3. O erro é registrado e ignorado.
+  "diagrama_nao_gerado",
+  "diagrama_nao_atualizado",
 ]);
 
 export const Agente = z.enum([
