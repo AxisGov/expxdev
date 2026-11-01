@@ -37,7 +37,7 @@ que vale onde os dois divergem. Os limites L1, L2 e L3 estão em
   CLI errada ou falsa no `PATH`, não defender de máquina comprometida.
 - **Execução pelo arquivo conferido:** `node <bin do pacote> review ...`, pelo mesmo
   `node` que roda a revisão; nunca o `codeant` do `PATH` depois da conferência.
-- **Comando**, uma chamada só, **sem lotes**:
+- **Comando**, uma chamada só, **sem lotes do lado do expx** (a CLI fatia a chamada, por dentro, em lotes de até cinco arquivos):
   - trabalho antes do commit (F6): `review --headless --uncommitted --include <revisáveis>`;
   - trabalho já commitado: `review --headless --base-commit <SHA inicial da task> --include <revisáveis>`.
   - Nunca `--last-n-commits` (máximo 5) nem `--fail-on`.
@@ -55,11 +55,20 @@ Uma task só fecha com os dois (emenda, 3):
 
 1. **Cobertura completa:** os arquivos revisáveis enviados são exatamente os revisados
    pela CLI, sem faltante, sem sobra, sem repetido e sem pulado; nenhuma linha
-   `[error] Failed to review ` no stderr. "Sem achado" num arquivo pulado não é
+   `[error]` no stderr, nem `Warning: parsing error in rejector`. "Sem achado" num arquivo pulado não é
    aprovação. Antes da CLI, L1 (≤ 40 revisáveis) e L2 (cada revisável ≤ 5.000 linhas e
    ≤ 204.800 bytes, no blob e no checkout, vale o maior) garantem que a CLI não
    precisará cortar nem pular.
 2. **Zero achado aberto** em linha alterada pela task.
+
+**O que o `ok` atesta:** a chamada cobriu os arquivos e terminou sem erro visível, e não
+sobrou achado aberto. **Não atesta que a mudança não tem defeito.** A CLI 0.5.14 pode perder
+sugestões sem avisar: uma execução do Rejector sem nenhum `output` vira lista vazia, e um
+gerador sem `output` tira o lote do fluxo. A mesma revisão também pode variar de uma chamada
+para outra. Relato do Conselhos, sem reprodução aqui: 15 arquivos deram zero achado, e os
+mesmos em lotes menores deram quatro, dois deles sem nenhum `[error]` na chamada maior. A
+causa desses dois não está determinada. Zero achado é um sinal a mais, e não substitui os
+testes nem a revisão humana.
 
 ## A evidência (v2)
 
@@ -83,7 +92,7 @@ exceto `motivo`:
 | `cli` | `{versao, integridade}`: a versão do `package.json` do pacote e `conferida`; `integridade` `null` quando a CLI foi achada mas não passou; `cli` `null` quando a CLI não foi procurada (nada a revisar, ou um portão antes dela) ou não foi achada |
 | `executada_em` | timestamp ISO (R4) |
 | `arquivos` | `{<caminho>: {blob, bytes, linhas, revisao} \| null}`. `blob`: o sha1 que vai ao commit (sem `--base-commit`, `git hash-object -w`, com os filtros de fim de linha; com, o de `HEAD:<caminho>`). `bytes` e `linhas`: medidos como a CLI (`Buffer.byteLength` e `split('\n').length`) no blob e no checkout, o maior; conteúdo acima de 1 MiB não é lido (já reprova L2 pelo tamanho, porque a decodificação da CLI nunca encolhe o conteúdo): `bytes` é o tamanho e `linhas` `null`. `revisao`: `enviado`, `nao-revisavel` (fora do predicado da CLI) ou `excluido` (exclusões do núcleo ou do projeto). `null` para arquivo removido |
-| `chamada` | `{include, meta, error, falhas_de_lote, issues, stdout_sha256}` da única chamada, ou `null` sem chamada. `falhas_de_lote`: as linhas do stderr que começam com `[error] Failed to review `. `issues`: a lista `issues` do JSON da CLI, crua (cada objeto com todas as chaves que a CLI deu, sem reformatar), ou `null` com JSON ilegível. `stdout_sha256`: sha256, em hex, do stdout da CLI byte a byte (com os avisos do npm), para rastreio |
+| `chamada` | `{include, meta, error, falhas_de_lote, issues, stdout_sha256}` da única chamada, ou `null` sem chamada. `falhas_de_lote`: as linhas do stderr que começam com `[error]` ou `Warning: parsing error in rejector`. `issues`: a lista `issues` do JSON da CLI, crua (cada objeto com todas as chaves que a CLI deu, sem reformatar), ou `null` com JSON ilegível. `stdout_sha256`: sha256, em hex, do stdout da CLI byte a byte (com os avisos do npm), para rastreio |
 | `resultado` | `ok`, `achados` (algum `aberto`), `incompleta` ou `indisponivel` |
 | `motivo` | só com `incompleta` e `indisponivel` (abaixo) |
 | `achados` | `[{identidade, arquivo, linha, label, texto, estado}]`, `estado` ∈ `aberto`, `anterior`, `rejeitado`: um por item de `chamada.issues`, na mesma ordem, derivado dele (abaixo) |
@@ -173,7 +182,7 @@ O primeiro que se aplica decide o resultado:
 | 4 | `indisponivel:integridade` | `codeant` fora de pacote, `package.json` de outro pacote, `bin` que não é o executável, arquivo do manifesto ausente ou diferente, `package.json` com outro `name`, `version` ou `bin`, ou o que não se consegue conferir. A CLI não roda |
 | 4 | `indisponivel:versao` | versão do pacote sem perfil |
 | 5 | — | a chamada |
-| 6 | `incompleta:lote-falhou` | alguma linha do stderr começa com `[error] Failed to review `, qualquer que seja o JSON ou o código de saída |
+| 6 | `incompleta:lote-falhou` | alguma linha do stderr começa com `[error]` (análise ou Rejector do lote) ou `Warning: parsing error in rejector`, qualquer que seja o JSON ou o código de saída |
 | 7 | `indisponivel:erro` | `error` não nulo ou JSON ilegível |
 | 8 | `incompleta:perfil` | topo fora da forma (`issues` lista de objetos, `error` nulo, `noFiles` booleano, `meta` objeto); `meta` fora da forma (`reviewed_files` lista de texto, `total_changed` inteiro, `skipped` lista de `{file, reason}` de texto, `capped` booleano); `max_files` ≠ perfil; `total_changed` ≠ revisados + pulados; motivo fora do perfil; código de saída ≠ 0 com `error` nulo |
 | 9 | `incompleta:repetido:<f>` | o arquivo duas vezes em `reviewed_files` ∪ `skipped` |
@@ -302,7 +311,7 @@ Na sprintx (F6), `incompleta` vira o bloqueio da classe **`revisao_incompleta`**
 | `L2` | uma task anterior divide o arquivo |
 | `excluido-declarado` | tirar o arquivo da lista de exclusão ou da task |
 | `perfil` | instalar a versão homologada ou homologar a nova |
-| `lote-falhou` | revisar de novo a task inteira |
+| `lote-falhou` | revisar de novo a task inteira; repetindo com HTTP 413, reduzir o que vai no lote e repetir. A CLI agrupa os arquivos ordenados, em lotes de até cinco: dividir a task pode manter o mesmo lote, e um arquivo sozinho pode passar do limite do servidor, que não se conhece |
 | `pulado`, `faltante`, `sobra`, `repetido` | diagnóstico |
 
 `indisponivel` depende do modo (`obrigatoria`: a task não fecha). Na mergex, a V12
@@ -313,7 +322,9 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 - O perfil da versão é gerado pela homologação (`scripts/homologar-codeant-cli.mjs`, do
   desenvolvedor): baixa o tarball do npm, confere o sha512 contra `dist.integrity` e
   grava o manifesto. Homologar versão que mude números, exclusões ou motivos é emenda
-  nova.
+  nova. Homologar também é reler as mensagens de stderr: a CLI 0.5.14 só avisa ali que um
+  lote se perdeu. Limite assumido: se a API encerrar o turno sem `output` e sem erro, a
+  0.5.14 não avisa nada, e isso não se detecta de fora (ver "O que o `ok` atesta").
 - Os testes de conformidade com a CLI real e logada ficam em
   `fixtures/conformidade/codeant-cli-<versão>/` (`LEIAME.md`, `conformidade.sh` e o
   stdout da CLI byte a byte), nunca em `nucleo/`. Quem os roda é o desenvolvedor, ao
@@ -344,3 +355,4 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-10-20 | Revisão da PR 72 (CodeAnt): a saída das listas do git (`diff --name-only`, `ls-tree -r`) é lida até 256 MiB, não até 1 MiB (o padrão do `spawnSync`), e o commit grande coberto deixa de dar `evidencia-invalida:cobertura`. |
 | 2026-10-20 | Revisão da PR 72 (CodeAnt, 2ª rodada): a evidência na árvore do commit que o git não lê é `evidencia-invalida` (antes, `evidencia-ausente`, AVISO em `se_disponivel`); na cobertura, `modo` fora dos dois ou `base_commit` que não é commit (que em `indisponivel`/`incompleta` nada mais conferia) é `evidencia-invalida:cobertura`. |
 | 2026-10-24 | `--arquivos` com caminho absoluto ou que sai da raiz por `..` é uso errado (64), antes de qualquer leitura (achado do CodeAnt em katosmv/conselhos-municipais#208): o snapshot apagava e reescrevia o caminho resolvido fora do checkout temporário. O snapshot também recusa destino fora dele (`indisponivel:snapshot`). |
+| 2026-11-01 | Falha de lote passa a ser qualquer `[error]` no stderr e `Warning: parsing error in rejector`; o `ok` passa a dizer que atesta a chamada sem erro visível, não a ausência de defeito (relatos do Conselhos, 0.12.15). |

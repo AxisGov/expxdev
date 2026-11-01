@@ -105,6 +105,7 @@ catalogo_areas_do_indice() {
 catalogo_base() { # <raiz> <trabalho> <pasta>
   local raiz="$1" trabalho="$2" pasta="$3" indice area parte resto
   indice="$pasta/base/00-INDICE.md"
+  [ ! -L "$raiz/$pasta/base" ] || { CATALOGO_ERRO="$pasta/base é link simbólico"; return 1; }
   printf '%s\n' "$pasta/base/00-LACUNAS.md"
   [ -f "$raiz/$indice" ] || return 0
   [ ! -L "$raiz/$indice" ] || { CATALOGO_ERRO="$indice é link simbólico"; return 1; }
@@ -140,7 +141,10 @@ catalogo_sprints() { # <raiz> <pasta>
   local raiz="$1" pasta="$2" dir nome arquivo
   for dir in "$raiz/$pasta"/sprint-*; do
     [ -d "$dir" ] || continue
-    nome="$(basename "$dir")"
+    # Sem `$(basename ...)`, que tira a quebra de linha do fim do nome. O grep julga linha a
+    # linha, e o catálogo é uma lista por linha (DM-294).
+    nome="${dir##*/}"
+    case "$nome" in *$'\n'*) continue ;; esac
     grep -Eq '^sprint-[0-9]{2,}$' <<<"$nome" || continue
     for arquivo in tasks.md sprint.md fases.md; do
       printf '%s\n' "$pasta/$nome/$arquivo"

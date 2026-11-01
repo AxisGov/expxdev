@@ -201,7 +201,7 @@ export function maiorRelease(tags) {
  * O commit da última release do ExpxDev, no cache. O CLI que o SessionStart roda
  * é o da release, nunca a ponta da main: é a release que certifica os commits
  * das skills, e o que está na main ainda não foi liberado. Só vale a tag cujo
- * commit está na main revisada: o `fetch --tags` traz também a tag de um commit
+ * commit está na main revisada: o fetch das tags traz também a tag de um commit
  * que nunca entrou nela (CodeAnt no expxdev#111).
  */
 function commitDaRelease(cache, executar) {
@@ -255,7 +255,9 @@ export function bootstrapAxis(cache, executar = comandoPadrao) {
     }
     const remoto = executar("git", ["-C", cache, "remote", "get-url", "origin"]).trim();
     if (remoto !== AXIS_REPOSITORIO) throw new Error("cache nao aponta para AxisGov/expxdev");
-    executar("git", ["-C", cache, "fetch", "--tags", "origin", "+refs/heads/main:refs/remotes/origin/main"]);
+    // As tags são as do remoto: a que só existe aqui sai, e a movida volta. Senão, uma v9.9.9
+    // local na ponta da main escolheria a ponta como release (Conselhos na 0.12.14).
+    executar("git", ["-C", cache, "fetch", "--prune", "origin", "+refs/heads/main:refs/remotes/origin/main", "+refs/tags/*:refs/tags/*"]);
     const local = executar("git", ["-C", cache, "rev-parse", "HEAD"]).trim();
     const alvo = commitDaRelease(cache, executar);
     let marcador = "";

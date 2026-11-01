@@ -64,6 +64,20 @@ integracao_mensagem_do_comando() {
   integracao_le_m "$1"
 }
 
+# integracao_entrega_desta_branch <id> — o id tem forma de nome, e o ENTREGA.md dele,
+# arquivo comum, é uma entrega deste trabalho e desta branch.
+integracao_entrega_desta_branch() {
+  local id="$1" arq branch
+  case "$id" in ''|.*|*[!A-Za-z0-9._-]*) return 1 ;; esac
+  arq="$RAIZ/docs/entregas/$id/ENTREGA.md"
+  [ -f "$arq" ] && [ ! -L "$arq" ] && [ ! -L "$RAIZ/docs/entregas/$id" ] || return 1
+  branch="$(git -C "$RAIZ" branch --show-current 2>/dev/null)"
+  [ -n "$branch" ] || return 1
+  [ "$(expx_frontmatter_valor "$arq" kind)" = entrega ] \
+    && [ "$(expx_frontmatter_valor "$arq" trabalho_id)" = "$id" ] \
+    && [ "$(expx_frontmatter_valor "$arq" branch)" = "$branch" ]
+}
+
 # integracao_da_mensagem <mensagem-lida> <trabalho-da-branch> <contrato>
 # Variável opcional INT_SEM_CONTRATO: `invalida` (padrão) ou `nenhuma` — o que
 # fazer quando o contrato-de-commit.sh não está instalado.
@@ -81,7 +95,15 @@ integracao_da_mensagem() {
   # Lixo depois dos 40 hex: a leitura não isolou o trailer.
   printf '%s' "$integra" | grep -E '^[0-9a-f]{40}[^0-9a-f]' >/dev/null && return 0
   trab="$2"
-  [ -n "$trab" ] || trab="$(printf '%s\n' "$tr" | sed -n 's/^Trabalho:[[:space:]]*//p' | awk 'NR == 1')"
+  if [ -z "$trab" ]; then
+    trab="$(printf '%s\n' "$tr" | sed -n 's/^Trabalho:[[:space:]]*//p' | awk 'NR == 1')"
+    # Sem trabalho pela branch, a mensagem não se autentica sozinha (DM-295).
+    if [ -n "$trab" ] && ! integracao_entrega_desta_branch "$trab"; then
+      INT_CLASSE=invalida
+      INT_SAIDA="Trabalho '$trab' sem ENTREGA.md desta branch: o trailer só vale com docs/entregas/<id>/ENTREGA.md de kind entrega, com o mesmo trabalho_id e o branch ativo"
+      return 0
+    fi
+  fi
   if [ ! -r "$3" ]; then
     if [ "${INT_SEM_CONTRATO:-invalida}" = invalida ]; then
       INT_CLASSE=invalida; INT_SAIDA="instalação MergeX incompleta: $3"

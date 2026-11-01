@@ -206,7 +206,8 @@ a versão 2:
 ```
 
 - `revisao_por_task.modo`: `se_disponivel` quando ausente; aceita também
-  `obrigatoria` e `desligada`;
+  `obrigatoria` e `desligada`. Mesmo em `obrigatoria`, o `ok` atesta que a chamada terminou
+  sem erro visível, não que falta defeito (CONTRATO-expx-revisao, "O que o `ok` atesta");
 - `entrega`: `por_trabalho` quando ausente; aceita também `por_sprint`;
 - `merge_automatico.ativo`: `false` quando ausente. A decisão é independente do
   modo da revisão por task. `caminhos_protegidos` soma à lista padrão, nunca a

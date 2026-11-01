@@ -177,6 +177,14 @@ _seg_anunciados() {
   fi
   [ "$SEG_ANUNC" = ok ]
 }
+# _seg_refina — uma vez por ref, soma à exclusão o que o servidor anuncia (usa o
+# pode_refinar de segredo_da_ref). Devolve 0 quando o intervalo vale ser recalculado.
+_seg_refina() {
+  [ "$pode_refinar" = 1 ] || return 1
+  pode_refinar=0
+  _seg_anunciados || return 1
+  cat "$TMP_DIR/anunciados" >> "$TMP_DIR/excluir" || return 1
+}
 # segredo_da_ref <ref remota> <sha local> <sha remoto> — SEG_RES: limpo | achou | erro | grande;
 # SEG_DIAG: o que dizer
 segredo_da_ref() {
@@ -217,10 +225,16 @@ $corpo_tag"
   # zero), ou com um SHA remoto que não existe aqui, vale o que o servidor anuncia
   # agora (`ls-remote` na URL do push), filtrado pelo que existe aqui. Consulta
   # que falha não libera. Nada anunciado aqui: toda a ancestralidade é varrida.
+  #
+  # O SHA remoto não diz tudo: um merge da main, trazido à feature por `merge --ff-only`,
+  # já está no servidor por outra ref (C1, DM-293). A rede só entra quando há o que julgar:
+  # achado ou intervalo grande demais levam à consulta do que o servidor anuncia, e o
+  # intervalo é recalculado uma vez. Consulta que falha mantém o achado e o limite.
   : > "$TMP_DIR/excluir"
-  local busca=""
+  local busca="" pode_refinar=0
   if ! _seg_nulo "$sr" && git cat-file -e "$sr^{commit}" 2>/dev/null; then
     printf '^%s\n' "$sr" > "$TMP_DIR/excluir"
+    pode_refinar=1
   else
     _seg_anunciados || { SEG_RES=erro; SEG_DIAG="a consulta ao servidor das refs que ele já tem (ls-remote) falhou: sem ela, o intervalo publicado não se delimita"; return 0; }
     cat "$TMP_DIR/anunciados" > "$TMP_DIR/excluir"
@@ -234,30 +248,34 @@ $corpo_tag"
       *) busca="rode git fetch $REMOTO antes (o que o servidor já tem e ainda não está aqui não delimita o intervalo); se continuar, " ;;
     esac
   fi
-  lista="$(git rev-list --stdin "$alvo_commit" < "$TMP_DIR/excluir" 2>/dev/null)" || { SEG_RES=erro; SEG_DIAG="o intervalo publicado não se lê (rev-list)"; return 0; }
-  n="$(printf '%s' "$lista" | grep -c .)"
-  if [ "$n" -gt "$SEG_LIMITE" ]; then
-    SEG_RES=grande
-    SEG_DIAG="intervalo grande demais para varrer segredo ($n commits, limite $SEG_LIMITE): ${busca}divida a publicação em pushes menores ou, conscientemente, ponha sem-segredo em desligado"
-    return 0
-  fi
   # Uma varredura do intervalo inteiro; só com achado, commit a commit, para dizer onde.
   # Cada commit é lido no Git uma vez por push e guardado por SHA (que não muda): a
   # segunda fase e as outras refs do mesmo push leem dali (A4 no conselhos#211).
   mkdir -p "$TMP_DIR/seg-commit" || { SEG_RES=erro; SEG_DIAG="o cache dos commits não se cria"; return 0; }
-  ALVO="$texto_tag"
-  for c in $lista; do
-    if [ ! -f "$TMP_DIR/seg-commit/$c" ]; then
-      _seg_commit "$c" > "$TMP_DIR/seg-commit/$c.parcial" \
-        && mv "$TMP_DIR/seg-commit/$c.parcial" "$TMP_DIR/seg-commit/$c" \
-        || { SEG_RES=erro; SEG_DIAG="o commit $c não se lê ou não se guarda no diretório temporário (${TMPDIR:-/tmp} cheio?)"; return 0; }
+  while :; do
+    lista="$(git rev-list --stdin "$alvo_commit" < "$TMP_DIR/excluir" 2>/dev/null)" || { SEG_RES=erro; SEG_DIAG="o intervalo publicado não se lê (rev-list)"; return 0; }
+    n="$(printf '%s' "$lista" | grep -c .)"
+    if [ "$n" -gt "$SEG_LIMITE" ]; then
+      _seg_refina && continue
+      SEG_RES=grande
+      SEG_DIAG="intervalo grande demais para varrer segredo ($n commits, limite $SEG_LIMITE): ${busca}divida a publicação em pushes menores ou, conscientemente, ponha sem-segredo em desligado"
+      return 0
     fi
-    texto="$(cat "$TMP_DIR/seg-commit/$c")" || { SEG_RES=erro; SEG_DIAG="o commit $c não se lê"; return 0; }
-    ALVO="$ALVO
+    ALVO="$texto_tag"
+    for c in $lista; do
+      if [ ! -f "$TMP_DIR/seg-commit/$c" ]; then
+        _seg_commit "$c" > "$TMP_DIR/seg-commit/$c.parcial" \
+          && mv "$TMP_DIR/seg-commit/$c.parcial" "$TMP_DIR/seg-commit/$c" \
+          || { SEG_RES=erro; SEG_DIAG="o commit $c não se lê ou não se guarda no diretório temporário (${TMPDIR:-/tmp} cheio?)"; return 0; }
+      fi
+      texto="$(cat "$TMP_DIR/seg-commit/$c")" || { SEG_RES=erro; SEG_DIAG="o commit $c não se lê"; return 0; }
+      ALVO="$ALVO
 $texto"
+    done
+    segredo_varrer
+    [ -n "$ACHADOS" ] || return 0
+    _seg_refina || break
   done
-  segredo_varrer
-  [ -n "$ACHADOS" ] || return 0
   if [ -n "$texto_tag" ]; then
     ALVO="$texto_tag"; segredo_varrer
     [ -z "$ACHADOS" ] || achados_ref="${achados_ref}  na tag ${sl:0:12}:

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, mkdirSync, symlinkSync } from "node:fs";
+import { mkdtempSync, mkdirSync, symlinkSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { comandosDeInstalacao, instalarPlugin, instrucaoManual, type Executor } from "./instalar.js";
@@ -132,14 +132,18 @@ describe("instalação: o registro é conferido depois do add", () => {
 
   it("funcional: link simbólico ou caminho relativo para o mesmo diretório contam como o mesmo caminho", async () => {
     const base = mkdtempSync(join(tmpdir(), "expx-inst-"));
-    const real = join(base, "real", ".expx", "marketplace");
-    mkdirSync(real, { recursive: true });
-    const link = join(base, "link");
-    symlinkSync(join(base, "real"), link, "junction");
-    for (const registrado of [join(link, ".expx", "marketplace"), relative(process.cwd(), real)]) {
-      const { executar } = executorFalso(listaCom(registrado));
-      const r = await instalarPlugin(real, executar);
-      expect(r.ok).toBe(true);
+    try {
+      const real = join(base, "real", ".expx", "marketplace");
+      mkdirSync(real, { recursive: true });
+      const link = join(base, "link");
+      symlinkSync(join(base, "real"), link, "junction");
+      for (const registrado of [join(link, ".expx", "marketplace"), relative(process.cwd(), real)]) {
+        const { executar } = executorFalso(listaCom(registrado));
+        const r = await instalarPlugin(real, executar);
+        expect(r.ok).toBe(true);
+      }
+    } finally {
+      rmSync(base, { recursive: true, force: true });
     }
   });
 

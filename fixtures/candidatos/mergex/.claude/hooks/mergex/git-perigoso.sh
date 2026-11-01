@@ -683,9 +683,63 @@ fi
 # --------------------------------------------------------------------------
 # 5. Limpeza destrutiva de arquivo não rastreado
 # --------------------------------------------------------------------------
-if printf '%s' "$CMD_N" | grep -E 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]+clean([[:space:]]|$)' >/dev/null; then
-  if printf '%s' "$CMD_N" | grep -E '[[:space:]]-[a-zA-Z]*[fdx]' >/dev/null; then
-    ALVOS="$(git -C "$RAIZ" clean -nd 2>/dev/null | awk 'NR <= 20')"
+# clean_opcoes <o que vem depois de `clean`> — as opções de UM comando: CL_APAGA, CL_SECO e
+# CL_IGNORADO (-x ou -X). Aspas não escondem a opção, e o valor de -e não é opção.
+clean_opcoes() {
+  local t i c pula=0 W=()
+  CL_APAGA=0; CL_SECO=0; CL_IGNORADO=""
+  read -r -a W <<<"$1"
+  for t in ${W[@]+"${W[@]}"}; do
+    t="${t//\'/}"; t="${t//\"/}"
+    if [ "$pula" = 1 ]; then pula=0; continue; fi
+    case "$t" in
+      --) break ;;
+      --force|--interactive) CL_APAGA=1 ;;
+      --dry-run) CL_SECO=1 ;;
+      --exclude) pula=1 ;;
+      --*) ;;
+      -*)
+        i=1
+        while [ "$i" -lt "${#t}" ]; do
+          c="${t:i:1}"
+          case "$c" in
+            f|d|i) CL_APAGA=1 ;;
+            x) CL_APAGA=1; CL_IGNORADO=-x ;;
+            X) CL_APAGA=1; CL_IGNORADO=-X ;;
+            n) CL_SECO=1 ;;
+            e) [ $((i + 1)) -lt "${#t}" ] || pula=1; break ;;
+            [!a-zA-Z]) break ;;
+          esac
+          i=$((i + 1))
+        done ;;
+    esac
+  done
+}
+
+# Cada `git clean` do comando é julgado por si: opção de outro comando não conta, e a
+# simulação não apaga, mesmo com -f (git clean: -n prevalece).
+# O valor de `-C` e de `-c` é uma palavra separada entre `git` e `clean` (CodeAnt no mergex#65).
+CLEAN_APAGA=0; PREVIA_IGNORADO=""; CLEAN_TRECHOS=""
+CLEAN_RE='git([[:space:]]+(-C|-c|--git-dir|--work-tree|--namespace|--config-env)[[:space:]]+[^[:space:]]+|[[:space:]]+-[^[:space:]]+)*[[:space:]]+clean'
+case "$CMD_N" in
+  *clean*)
+    CLEAN_TRECHOS="$(printf '%s\n' "$CMD_N" | awk '{ gsub(/[;&|(){}`]/, "\n"); print }' \
+      | grep -E "$CLEAN_RE"'([[:space:]]|$)')" ;;
+esac
+if [ -n "$CLEAN_TRECHOS" ]; then
+  while IFS= read -r CLEAN_T; do
+    # Sem processo: o que vier depois de `clean` é o último grupo da expressão.
+    CLEAN_ARGS=""
+    if [[ "$CLEAN_T" =~ $CLEAN_RE(.*)$ ]]; then CLEAN_ARGS="${BASH_REMATCH[3]}"; fi
+    clean_opcoes "$CLEAN_ARGS"
+    if [ "$CL_APAGA" = 1 ] && [ "$CL_SECO" = 0 ]; then
+      CLEAN_APAGA=1
+      [ -z "$CL_IGNORADO" ] || PREVIA_IGNORADO="$CL_IGNORADO"
+    fi
+  done <<<"$CLEAN_TRECHOS"
+  if [ "$CLEAN_APAGA" = 1 ]; then
+    # A prévia diz o que ESTE comando removeria: com -x ou -X, o ignorado entra (DM-296).
+    ALVOS="$(git -C "$RAIZ" clean -nd $PREVIA_IGNORADO 2>/dev/null | awk 'NR <= 20')"
     barra "limpeza destrutiva" \
 "mergex/git-perigoso — limpeza destrutiva de arquivos não rastreados
 
@@ -695,7 +749,7 @@ git clean apaga arquivo que o versionador nunca viu. Não há histórico, não h
 stash, não há recuperação. Arquivo de ambiente, dado local e trabalho ainda
 não commitado de outra pessoa somem juntos.
 
-Seria removido:
+Pode ser removido (a prévia não aplica -e nem caminho do comando):
 ${ALVOS:-  (não foi possível pré-visualizar)}
 
 O que fazer:

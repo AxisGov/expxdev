@@ -183,10 +183,13 @@ itens_de() {
   legivel "$arq" || return 1
   b="$(bloco "$arq" commits)"
   confere_bloco "$b" || return 1
-  # `commits: []` (inline) é lista vazia declarada: legítima, sem nenhum item.
-  case "$(printf '%s\n' "$b" | awk 'NR == 1')" in
-    $'\001'|$'\001'\[\]) ;;
-    $'\001'*) ERRO="commits não é lista de itens: $(printf '%s\n' "$b" | awk 'NR == 1' | cut -c2-)"; return 1 ;;
+  # `commits: []` (inline) é lista vazia declarada: legítima, sem nenhum item, com ou
+  # sem comentário depois, como em YAML (DM-296).
+  local primeira vazia=$'^\001(\\[\\]([[:space:]]+#.*)?)?$'
+  primeira="$(printf '%s\n' "$b" | awk 'NR == 1')"
+  case "$primeira" in
+    $'\001'*)
+      [[ "$primeira" =~ $vazia ]] || { ERRO="commits não é lista de itens: ${primeira#?}"; return 1; } ;;
   esac
   printf '%s\n' "$b" | awk '
     function chave(l,   k, v) {
@@ -214,11 +217,18 @@ itens_de() {
   '
 }
 
+# erro_de_itens <ENTREGA.md> — o motivo de itens_de, que o `$(...)` de quem a chamou perdeu.
+# Só no caminho de erro, e a entrada padrão não se lê duas vezes.
+erro_de_itens() {
+  [ "$1" = - ] || itens_de "$1" >/dev/null
+  [ -n "$ERRO" ] || ERRO="commits ilegível na entrada padrão"
+}
+
 # ler <ENTREGA.md> — `ordem_efetiva<TAB>seq<TAB>task<TAB>commit`.
 # No item legado, `seq` é a ordem efetiva derivada da posição (regra 3).
 ler() {
   local arq="$1" its linha
-  its="$(itens_de "$arq")" || return 1
+  its="$(itens_de "$arq")" || { erro_de_itens "$arq"; return 1; }
   [ -n "$its" ] || return 0
   while IFS= read -r linha; do
     [ -n "$linha" ] || continue
@@ -245,7 +255,7 @@ inteiro_positivo() { # <valor>
 # ---------------------------------------------------------------------------
 validar() {
   local arq="$1" its linha pos seq modernos=0 vistos=" " n=0
-  its="$(itens_de "$arq")" || return 1
+  its="$(itens_de "$arq")" || { erro_de_itens "$arq"; return 1; }
   while IFS= read -r linha; do
     [ -n "$linha" ] || continue
     campos "$linha"; pos="$CAMPO1"; seq="$CAMPO2"
@@ -331,7 +341,8 @@ acrescentar() {
   [ -n "$task" ] || { ERRO="item novo sem task: não há o que registrar"; return 1; }
   sha_valido "$commit" \
     || { ERRO="item novo com commit que não é prova: ${commit:-<vazio>}"; return 1; }
-  seq="$(proximo "$arq")" || return 1
+  # O ERRO de proximo se perde no `$(...)`: no caminho de erro, a validação roda aqui.
+  seq="$(proximo "$arq")" || { validar "$arq" >/dev/null; return 1; }
 
   tmp="$arq.seq.$$"
   awk -v seq="$seq" -v task="$task" -v commit="$commit" -v revisao="$revisao" '
@@ -348,9 +359,10 @@ acrescentar() {
     !fm { print; next }
     !feito && nu ~ /^commits:/ {
       inline = nu; sub(/^commits:[[:space:]]*/, "", inline)
-      if (inline == "[]" || inline == "") {
+      vazia = (inline ~ /^\[\]([[:space:]]+#.*)?$/)
+      if (vazia || inline == "") {
         printf "commits:%s\n", cr
-        if (inline == "[]") { novo(cr); feito = 1 } else { dentro = 1 }
+        if (vazia) { novo(cr); feito = 1 } else { dentro = 1 }
         next
       }
       print; next

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # segredo-dispensa — os arquivos do framework que o lock da instalação confere por hash.
 #
 # A atualização do framework escreve arquivos que a varredura de segredo acusava

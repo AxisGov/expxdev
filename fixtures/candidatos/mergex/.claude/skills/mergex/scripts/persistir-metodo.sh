@@ -524,7 +524,8 @@ tasks_concluidas() {
   set --
   for dir in "$RAIZ/$PASTA"/sprint-*; do
     [ -d "$dir" ] || continue
-    nome="$(basename "$dir")"
+    nome="${dir##*/}"
+    case "$nome" in *$'\n'*) continue ;; esac
     grep -Eq '^sprint-[0-9]{2,}$' <<<"$nome" || continue
     [ -f "$dir/tasks.md" ] && set -- "$@" "$dir/tasks.md"
   done
