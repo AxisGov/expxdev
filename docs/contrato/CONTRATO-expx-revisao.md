@@ -61,6 +61,15 @@ Uma task só fecha com os dois (emenda, 3):
    precisará cortar nem pular.
 2. **Zero achado aberto** em linha alterada pela task.
 
+**O que o `ok` atesta:** a chamada cobriu os arquivos e terminou sem erro visível, e não
+sobrou achado aberto. **Não atesta que a mudança não tem defeito.** A CLI 0.5.14 pode perder
+sugestões sem avisar: uma execução do Rejector sem nenhum `output` vira lista vazia, e um
+gerador sem `output` tira o lote do fluxo. A mesma revisão também pode variar de uma chamada
+para outra. Relato do Conselhos, sem reprodução aqui: 15 arquivos deram zero achado, e os
+mesmos em lotes menores deram quatro, dois deles sem nenhum `[error]` na chamada maior. A
+causa desses dois não está determinada. Zero achado é um sinal a mais, e não substitui os
+testes nem a revisão humana.
+
 ## A evidência (v2)
 
 O id da task é o da sprintx e da runx, `T-NN.MM` (sprint.task, dois dígitos em cada
@@ -315,7 +324,7 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
   grava o manifesto. Homologar versão que mude números, exclusões ou motivos é emenda
   nova. Homologar também é reler as mensagens de stderr: a CLI 0.5.14 só avisa ali que um
   lote se perdeu. Limite assumido: se a API encerrar o turno sem `output` e sem erro, a
-  0.5.14 não avisa nada, e isso não se detecta de fora.
+  0.5.14 não avisa nada, e isso não se detecta de fora (ver "O que o `ok` atesta").
 - Os testes de conformidade com a CLI real e logada ficam em
   `fixtures/conformidade/codeant-cli-<versão>/` (`LEIAME.md`, `conformidade.sh` e o
   stdout da CLI byte a byte), nunca em `nucleo/`. Quem os roda é o desenvolvedor, ao
@@ -346,3 +355,4 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-10-20 | Revisão da PR 72 (CodeAnt): a saída das listas do git (`diff --name-only`, `ls-tree -r`) é lida até 256 MiB, não até 1 MiB (o padrão do `spawnSync`), e o commit grande coberto deixa de dar `evidencia-invalida:cobertura`. |
 | 2026-10-20 | Revisão da PR 72 (CodeAnt, 2ª rodada): a evidência na árvore do commit que o git não lê é `evidencia-invalida` (antes, `evidencia-ausente`, AVISO em `se_disponivel`); na cobertura, `modo` fora dos dois ou `base_commit` que não é commit (que em `indisponivel`/`incompleta` nada mais conferia) é `evidencia-invalida:cobertura`. |
 | 2026-10-24 | `--arquivos` com caminho absoluto ou que sai da raiz por `..` é uso errado (64), antes de qualquer leitura (achado do CodeAnt em katosmv/conselhos-municipais#208): o snapshot apagava e reescrevia o caminho resolvido fora do checkout temporário. O snapshot também recusa destino fora dele (`indisponivel:snapshot`). |
+| 2026-11-01 | Falha de lote passa a ser qualquer `[error]` no stderr e `Warning: parsing error in rejector`; o `ok` passa a dizer que atesta a chamada sem erro visível, não a ausência de defeito (relatos do Conselhos, 0.12.15). |
