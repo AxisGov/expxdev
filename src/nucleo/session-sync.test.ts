@@ -121,7 +121,7 @@ describe("sincronização Axis no SessionStart", () => {
     expect(chamadas.some((c) => c.argumentos.includes(AXIS_REPOSITORIO))).toBe(false);
     // A refspec explícita atualiza origin/main sempre: a guarda de commit local
     // compara o HEAD com ela, e uma origin/main velha recusaria o cache à toa.
-    expect(chamadas).toContainEqual({ arquivo: "git", argumentos: ["-C", cache, "fetch", "--tags", "origin", "+refs/heads/main:refs/remotes/origin/main"] });
+    expect(chamadas).toContainEqual({ arquivo: "git", argumentos: ["-C", cache, "fetch", "--prune", "origin", "+refs/heads/main:refs/remotes/origin/main", "+refs/tags/*:refs/tags/*"] });
     expect(AXIS_REPOSITORIO).toBe("https://github.com/AxisGov/expxdev.git");
     rmSync(raiz, { recursive: true, force: true });
   });
@@ -241,8 +241,58 @@ describe("sincronização Axis no SessionStart", () => {
     }
   });
 
+  it("funcional: tag só local some, tag movida volta ao remoto, e o resto do cache fica", () => {
+    // Conselhos na 0.12.14: uma tag local v9.9.9 na ponta da main fazia escolher a ponta.
+    const raiz = mkdtempSync(join(tmpdir(), "expx-bootstrap-tag-local-"));
+    const fonte = join(raiz, "fonte");
+    const cache = join(raiz, "cache");
+    const ambienteGit = { ...process.env, GIT_AUTHOR_NAME: "a", GIT_AUTHOR_EMAIL: "a@a.invalid", GIT_COMMITTER_NAME: "a", GIT_COMMITTER_EMAIL: "a@a.invalid" };
+    const git = (cwd: string, ...args: string[]): string => execFileSync("git", args, { cwd, env: ambienteGit, encoding: "utf8" }).trim();
+    try {
+      mkdirSync(fonte);
+      git(fonte, "init", "-q", "-b", "main");
+      const commit = (msg: string): string => { git(fonte, "commit", "-q", "--allow-empty", "-m", msg); return git(fonte, "rev-parse", "HEAD"); };
+      writeFileSync(join(fonte, ".gitignore"), "dist/\nnode_modules/\n");
+      git(fonte, "add", ".gitignore");
+      const anterior = commit("1");
+      const release = commit("2");
+      git(fonte, "tag", "v0.1.0", release);
+      const ponta = commit("3");
+      execFileSync("git", ["clone", "-q", "--branch", "main", "--single-branch", fonte, cache], { env: ambienteGit });
+      git(cache, "reset", "-q", "--hard", release);
+      mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+      writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
+      writeFileSync(join(cache, ".axis-build-sha"), `${marcadorDoBuild(cache, release)}\n`);
+      // o que não veio do remoto
+      git(cache, "tag", "v9.9.9", ponta);
+      git(cache, "tag", "-f", "v0.1.0", anterior);
+      git(cache, "branch", "guardada", anterior);
+      git(cache, "update-ref", "refs/remotes/origin/outra", anterior);
+
+      const executar = (arquivo: string, argumentos: string[], opcoes: { cwd?: string } = {}): string => {
+        if (argumentos.includes("remote") && argumentos.includes("get-url")) return `${AXIS_REPOSITORIO}\n`;
+        if (arquivo !== "git") {
+          mkdirSync(join(opcoes.cwd ?? cache, "dist", "cli"), { recursive: true });
+          writeFileSync(join(opcoes.cwd ?? cache, "dist", "cli", "expx-bin.js"), "");
+          return "";
+        }
+        return execFileSync("git", argumentos, { env: ambienteGit, encoding: "utf8", ...opcoes });
+      };
+      bootstrapAxis(cache, executar);
+
+      expect(git(cache, "rev-parse", "HEAD")).toBe(release);
+      expect(git(cache, "tag", "--list")).toBe("v0.1.0");
+      expect(git(cache, "rev-parse", "v0.1.0^{commit}")).toBe(release);
+      expect(git(cache, "rev-parse", "guardada")).toBe(anterior);
+      expect(git(cache, "rev-parse", "refs/remotes/origin/outra")).toBe(anterior);
+      expect(git(cache, "rev-parse", "origin/main")).toBe(ponta);
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
+  });
+
   it("funcional: a maior release fora da main é ignorada, e vale a maior que está nela", () => {
-    // CodeAnt no expxdev#111: o `fetch --tags` traz qualquer tag vX.Y.Z, inclusive de
+    // CodeAnt no expxdev#111: o fetch das tags traz qualquer tag vX.Y.Z, inclusive de
     // commit que nunca entrou na main revisada.
     const raiz = mkdtempSync(join(tmpdir(), "expx-bootstrap-release-fora-"));
     const cache = join(raiz, "cache");
