@@ -55,7 +55,7 @@ Uma task só fecha com os dois (emenda, 3):
 
 1. **Cobertura completa:** os arquivos revisáveis enviados são exatamente os revisados
    pela CLI, sem faltante, sem sobra, sem repetido e sem pulado; nenhuma linha
-   `[error] Failed to review ` no stderr. "Sem achado" num arquivo pulado não é
+   `[error]` no stderr, nem `Warning: parsing error in rejector`. "Sem achado" num arquivo pulado não é
    aprovação. Antes da CLI, L1 (≤ 40 revisáveis) e L2 (cada revisável ≤ 5.000 linhas e
    ≤ 204.800 bytes, no blob e no checkout, vale o maior) garantem que a CLI não
    precisará cortar nem pular.
@@ -83,7 +83,7 @@ exceto `motivo`:
 | `cli` | `{versao, integridade}`: a versão do `package.json` do pacote e `conferida`; `integridade` `null` quando a CLI foi achada mas não passou; `cli` `null` quando a CLI não foi procurada (nada a revisar, ou um portão antes dela) ou não foi achada |
 | `executada_em` | timestamp ISO (R4) |
 | `arquivos` | `{<caminho>: {blob, bytes, linhas, revisao} \| null}`. `blob`: o sha1 que vai ao commit (sem `--base-commit`, `git hash-object -w`, com os filtros de fim de linha; com, o de `HEAD:<caminho>`). `bytes` e `linhas`: medidos como a CLI (`Buffer.byteLength` e `split('\n').length`) no blob e no checkout, o maior; conteúdo acima de 1 MiB não é lido (já reprova L2 pelo tamanho, porque a decodificação da CLI nunca encolhe o conteúdo): `bytes` é o tamanho e `linhas` `null`. `revisao`: `enviado`, `nao-revisavel` (fora do predicado da CLI) ou `excluido` (exclusões do núcleo ou do projeto). `null` para arquivo removido |
-| `chamada` | `{include, meta, error, falhas_de_lote, issues, stdout_sha256}` da única chamada, ou `null` sem chamada. `falhas_de_lote`: as linhas do stderr que começam com `[error] Failed to review `. `issues`: a lista `issues` do JSON da CLI, crua (cada objeto com todas as chaves que a CLI deu, sem reformatar), ou `null` com JSON ilegível. `stdout_sha256`: sha256, em hex, do stdout da CLI byte a byte (com os avisos do npm), para rastreio |
+| `chamada` | `{include, meta, error, falhas_de_lote, issues, stdout_sha256}` da única chamada, ou `null` sem chamada. `falhas_de_lote`: as linhas do stderr que começam com `[error]` ou `Warning: parsing error in rejector`. `issues`: a lista `issues` do JSON da CLI, crua (cada objeto com todas as chaves que a CLI deu, sem reformatar), ou `null` com JSON ilegível. `stdout_sha256`: sha256, em hex, do stdout da CLI byte a byte (com os avisos do npm), para rastreio |
 | `resultado` | `ok`, `achados` (algum `aberto`), `incompleta` ou `indisponivel` |
 | `motivo` | só com `incompleta` e `indisponivel` (abaixo) |
 | `achados` | `[{identidade, arquivo, linha, label, texto, estado}]`, `estado` ∈ `aberto`, `anterior`, `rejeitado`: um por item de `chamada.issues`, na mesma ordem, derivado dele (abaixo) |
@@ -173,7 +173,7 @@ O primeiro que se aplica decide o resultado:
 | 4 | `indisponivel:integridade` | `codeant` fora de pacote, `package.json` de outro pacote, `bin` que não é o executável, arquivo do manifesto ausente ou diferente, `package.json` com outro `name`, `version` ou `bin`, ou o que não se consegue conferir. A CLI não roda |
 | 4 | `indisponivel:versao` | versão do pacote sem perfil |
 | 5 | — | a chamada |
-| 6 | `incompleta:lote-falhou` | alguma linha do stderr começa com `[error] Failed to review `, qualquer que seja o JSON ou o código de saída |
+| 6 | `incompleta:lote-falhou` | alguma linha do stderr começa com `[error]` (análise ou Rejector do lote) ou `Warning: parsing error in rejector`, qualquer que seja o JSON ou o código de saída |
 | 7 | `indisponivel:erro` | `error` não nulo ou JSON ilegível |
 | 8 | `incompleta:perfil` | topo fora da forma (`issues` lista de objetos, `error` nulo, `noFiles` booleano, `meta` objeto); `meta` fora da forma (`reviewed_files` lista de texto, `total_changed` inteiro, `skipped` lista de `{file, reason}` de texto, `capped` booleano); `max_files` ≠ perfil; `total_changed` ≠ revisados + pulados; motivo fora do perfil; código de saída ≠ 0 com `error` nulo |
 | 9 | `incompleta:repetido:<f>` | o arquivo duas vezes em `reviewed_files` ∪ `skipped` |
@@ -302,7 +302,7 @@ Na sprintx (F6), `incompleta` vira o bloqueio da classe **`revisao_incompleta`**
 | `L2` | uma task anterior divide o arquivo |
 | `excluido-declarado` | tirar o arquivo da lista de exclusão ou da task |
 | `perfil` | instalar a versão homologada ou homologar a nova |
-| `lote-falhou` | revisar de novo a task inteira |
+| `lote-falhou` | revisar de novo a task inteira; repetindo com HTTP 413, dividir a task |
 | `pulado`, `faltante`, `sobra`, `repetido` | diagnóstico |
 
 `indisponivel` depende do modo (`obrigatoria`: a task não fecha). Na mergex, a V12
@@ -313,7 +313,9 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 - O perfil da versão é gerado pela homologação (`scripts/homologar-codeant-cli.mjs`, do
   desenvolvedor): baixa o tarball do npm, confere o sha512 contra `dist.integrity` e
   grava o manifesto. Homologar versão que mude números, exclusões ou motivos é emenda
-  nova.
+  nova. Homologar também é reler as mensagens de stderr: a CLI 0.5.14 só avisa ali que um
+  lote se perdeu. Limite assumido: se a API encerrar o turno sem `output` e sem erro, a
+  0.5.14 não avisa nada, e isso não se detecta de fora.
 - Os testes de conformidade com a CLI real e logada ficam em
   `fixtures/conformidade/codeant-cli-<versão>/` (`LEIAME.md`, `conformidade.sh` e o
   stdout da CLI byte a byte), nunca em `nucleo/`. Quem os roda é o desenvolvedor, ao

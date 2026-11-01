@@ -437,7 +437,9 @@ function revisar() {
     if (r.error?.code === "ETIMEDOUT") return fim("indisponivel", "tempo-esgotado");
     const stdout = r.stdout ?? Buffer.alloc(0);
     const j = json(stdout.toString("utf8"));
-    const falhas = String(r.stderr ?? "").split(/\r?\n/).filter((l) => l.startsWith("[error] Failed to review "));
+    // só o stderr diz que um lote se perdeu: o JSON sai limpo, com saída 0. Qualquer `[error]` conta, e a resposta
+    // do Rejector que não se entendeu também; o `[warning]` do Risk planner só tira as hipóteses da revisão.
+    const falhas = String(r.stderr ?? "").split(/\r?\n/).filter((l) => l.startsWith("[error]") || l.startsWith("Warning: parsing error in rejector"));
     ev.chamada = { include: enviados, meta: j?.meta ?? null, error: j === undefined ? `json ilegivel (rc ${r.status})` : j.error ?? null, falhas_de_lote: falhas,
       issues: j?.issues ?? null, stdout_sha256: createHash("sha256").update(stdout).digest("hex") };
     // 6-9. a resposta cobre a task inteira

@@ -546,6 +546,24 @@ describe("expx-revisao.mjs revisar v2: depois da CLI", () => {
   });
 
   it.each([
+    ["o Rejector falhou", "[error] Rejector failed for batch 2: HTTP error 413"],
+    ["a resposta do Rejector não foi entendida", "Warning: parsing error in rejector response"],
+    ["outra mensagem de erro", "[error] algo novo"],
+  ])("funcional: %s, JSON limpo e zero achado → incompleta:lote-falhou (rc 3)", (_nome, linha) => {
+    const c = cenario({ stderr: `[progress] Fetching diff...\n${linha}\n` });
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js");
+    expect(r).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "lote-falhou", chamada: { falhas_de_lote: [linha] } } });
+  });
+
+  it("borda: o Risk planner que falha só degrada a revisão, e ela segue", () => {
+    const c = cenario({ stderr: "[warning] Risk planner failed; continuing without hypotheses: 500\n[progress] Analyzing 1 file...\n" });
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js");
+    expect(r).toMatchObject({ rc: 0, ev: { resultado: "ok", chamada: { falhas_de_lote: [] } } });
+  });
+
+  it.each([
     ["max_files 15", { resposta: resp({ max_files: 15 }) }],
     ["reason fora do perfil", { resposta: resp({ skipped: [{ file: "x.js", reason: "too big" }], total_changed: 2 }) }],
     ["total_changed errado", { resposta: resp({ total_changed: 3 }) }],
@@ -942,6 +960,7 @@ describe("expx-revisao.mjs conferir v2", () => {
     ["meta ausente", (ev: Record<string, any>) => { ev["chamada"].meta = null; }, "perfil"],
     ["pulo com motivo fora do perfil", (ev: Record<string, any>) => { ev["chamada"].meta.skipped = [{ file: "x.js", reason: "too big" }]; }, "perfil"],
     ["falha de lote registrada", (ev: Record<string, any>) => { ev["chamada"].falhas_de_lote = ["[error] Failed to review src/a.js: 500"]; }, "lote-falhou"],
+    ["falha do Rejector registrada", (ev: Record<string, any>) => { ev["chamada"].falhas_de_lote = ["[error] Rejector failed for batch 2: HTTP error 413"]; }, "lote-falhou"],
     ["enviado fora de reviewed_files", (ev: Record<string, any>) => { ev["chamada"].meta.reviewed_files = []; }, "cobertura"],
     ["enviado pulado", (ev: Record<string, any>) => { ev["chamada"].meta.skipped = [{ file: "src/a.js", reason: "too large (5001 lines, max 5000)" }]; }, "cobertura"],
     ["enviado com linhas menores que as do blob", (ev: Record<string, any>) => { ev["arquivos"]["src/a.js"].linhas = 1; }, "L2"],

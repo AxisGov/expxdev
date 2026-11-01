@@ -21,7 +21,7 @@ nesse estado não significa aprovação.
 | Locks, imagens, fontes, binários, compactados, mídia, documentos de escritório, dados e bancos da lista publicada são `binary/generated`; `.min.js` e `.min.css` também ficam fora | `EXCLUDED_FILENAMES`, `EXCLUDED_EXTENSIONS` e `isReviewableFile` no pacote homologado |
 | Markdown não está nessa lista: `.md` é revisável e conta para os 40 e para L2 | caso `pulos`, no qual `notas.md` foi revisado e `manual.pdf` foi pulado |
 | Deletado, excluído por padrão, acima de L2 e além do 40º são pulos distintos; pulo ou corte não faz a CLI sair com erro | fonte publicada e quatro respostas gravadas em `fixtures/conformidade/codeant-cli-0.5.14/` |
-| `meta.reviewed_files` significa enviado, não necessariamente revisado pela API; falha de lote aparece apenas no stderr como `[error] Failed to review ...` | `src/reviewHeadless.js` do pacote e `LEIAME.md` das fixtures de conformidade |
+| `meta.reviewed_files` significa enviado, não necessariamente revisado pela API; falha de lote aparece apenas no stderr, como `[error] Failed to review ...`, `[error] Rejector failed ...` ou `Warning: parsing error in rejector response` | `src/reviewHeadless.js` do pacote e `LEIAME.md` das fixtures de conformidade |
 | O app não revisa PR com mais de **100 arquivos** | observado em `AxisGov/mergex#15` |
 | Exclusões configuradas no painel tiram arquivos da revisão, mas **não descontam** dos 100 | teste em `katosmv/login#7`: 101 arquivos, cinco em pasta excluída, e o app pulou a PR |
 | Não há limite de linhas por PR, commit ou task | código e documentação da CLI; a PR `AxisGov/sprintx#26`, com 61 arquivos e mais de 19 mil linhas, foi revisada |
@@ -103,8 +103,8 @@ Uma task só fecha quando os dois portões passam:
 1. **Cobertura completa:** o conjunto revisável declarado pela task coincide com
    o conjunto coberto pela resposta da CLI, sem faltante, sobra ou repetição. O
    perfil valida `meta.max_files`, a forma de `meta` e os motivos. Corte, pulo por
-   tamanho, arquivo ausente, pulo desconhecido ou `[error] Failed to review ...`
-   no stderr tornam a revisão `incompleta`; não há aprovação por ausência de
+   tamanho, arquivo ausente, pulo desconhecido ou falha de lote no stderr (`[error]` ou
+   `Warning: parsing error in rejector`) tornam a revisão `incompleta`; não há aprovação por ausência de
    achado.
 2. **Zero achado aberto** em linha alterada pela task. Achado anterior segue F1;
    falso positivo ou risco só é rejeitado pelo desenvolvedor, conforme
