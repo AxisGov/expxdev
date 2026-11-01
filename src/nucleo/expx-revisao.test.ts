@@ -281,7 +281,8 @@ describe("expx-revisao.mjs revisar", () => {
     altera3(c.raiz);
     const antigo = (Date.now() - 2 * 60 * 60 * 1000) / 1000;
     const velho = (Date.now() - 2 * 24 * 60 * 60 * 1000) / 1000;
-    const morto = spawnSync(process.execPath, ["-e", ""]).pid;
+    // PID alto demais para estar em uso: o de um filho encerrado o Windows reusa logo, e o dono pareceria vivo.
+    const morto = 2 ** 31 - 4;
     const snapshot = (dono?: number, tempo?: number): string => {
       const base = mkdtempSync(join(tmpdir(), "expx-revisao-snapshot-"));
       // A ordem do `revisar`: o dono existe antes de o worktree ser registrado.
@@ -290,7 +291,7 @@ describe("expx-revisao.mjs revisar", () => {
       if (tempo !== undefined) utimesSync(base, tempo, tempo);
       return base;
     };
-    const saem = [snapshot(morto), snapshot(undefined, antigo), snapshot(process.pid, velho)];
+    const saem = { morto: snapshot(morto), antigo: snapshot(undefined, antigo), velho: snapshot(process.pid, velho) };
     const ficam = [snapshot(process.pid), snapshot(undefined)];
     // Outro worktree do repositório nunca é assunto do `revisar`, mesmo antigo.
     const alheio = mkdtempSync(join(tmpdir(), "expx-worktree-alheio-"));
@@ -306,14 +307,12 @@ describe("expx-revisao.mjs revisar", () => {
     try {
       expect(revisar(c, "src/a.js")).toMatchObject({ rc: 0, ev: { resultado: "ok" } });
       const lista = git(c.raiz, "worktree", "list", "--porcelain");
-      for (const base of saem) {
-        expect(existsSync(base), base).toBe(false);
-        expect(lista).not.toContain(base.split(/[\\/]/).pop());
-      }
+      expect(Object.entries(saem).filter(([, base]) => existsSync(base)).map(([caso]) => caso)).toEqual([]);
+      for (const base of Object.values(saem)) expect(lista).not.toContain(base.split(/[\\/]/).pop());
       for (const base of [...ficam, alheio, fora, travado]) expect(existsSync(join(base, "checkout")), base).toBe(true);
     } finally {
       git(c.raiz, "worktree", "unlock", join(travado, "checkout"));
-      for (const base of [...saem, ...ficam, alheio, dirname(fora), travado]) rmSync(base, { recursive: true, force: true });
+      for (const base of [...Object.values(saem), ...ficam, alheio, dirname(fora), travado]) rmSync(base, { recursive: true, force: true });
       git(c.raiz, "worktree", "prune");
     }
   });
