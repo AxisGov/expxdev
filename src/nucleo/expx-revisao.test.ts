@@ -296,6 +296,13 @@ describe("expx-revisao.mjs revisar", () => {
     const alheio = mkdtempSync(join(tmpdir(), "expx-worktree-alheio-"));
     git(c.raiz, "worktree", "add", "-q", "--detach", join(alheio, "checkout"), "HEAD");
     utimesSync(alheio, velho, velho);
+    // Nome igual fora do temporário e snapshot travado: o Git recusa, e nada é apagado.
+    const fora = join(mkdtempSync(join(tmpdir(), "expx-fora-")), "expx-revisao-snapshot-z");
+    mkdirSync(fora);
+    git(c.raiz, "worktree", "add", "-q", "--detach", join(fora, "checkout"), "HEAD");
+    utimesSync(fora, velho, velho);
+    const travado = snapshot(morto);
+    git(c.raiz, "worktree", "lock", join(travado, "checkout"));
     try {
       expect(revisar(c, "src/a.js")).toMatchObject({ rc: 0, ev: { resultado: "ok" } });
       const lista = git(c.raiz, "worktree", "list", "--porcelain");
@@ -303,9 +310,10 @@ describe("expx-revisao.mjs revisar", () => {
         expect(existsSync(base), base).toBe(false);
         expect(lista).not.toContain(base.split(/[\\/]/).pop());
       }
-      for (const base of [...ficam, alheio]) expect(existsSync(join(base, "checkout")), base).toBe(true);
+      for (const base of [...ficam, alheio, fora, travado]) expect(existsSync(join(base, "checkout")), base).toBe(true);
     } finally {
-      for (const base of [...saem, ...ficam, alheio]) rmSync(base, { recursive: true, force: true });
+      git(c.raiz, "worktree", "unlock", join(travado, "checkout"));
+      for (const base of [...saem, ...ficam, alheio, dirname(fora), travado]) rmSync(base, { recursive: true, force: true });
       git(c.raiz, "worktree", "prune");
     }
   });

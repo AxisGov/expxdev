@@ -14,7 +14,7 @@
 // `continuar` entre a releitura e a gravação.
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { closeSync, existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, statSync,
+import { closeSync, existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statSync,
   writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, posix, relative } from "node:path";
@@ -208,12 +208,17 @@ function snapshotAbandonado(base) {
 function limparSnapshotsAbandonados() {
   const lista = git("worktree", "list", "--porcelain");
   if (lista.status !== 0) return;
+  const real = (c) => { try { const r = realpathSync.native(c); return process.platform === "win32" ? r.toLowerCase() : r; } catch { return undefined; } };
+  const temporario = real(tmpdir());
   for (const linha of lista.stdout.split(/\r?\n/)) {
     if (!linha.startsWith("worktree ")) continue;
     const raiz = linha.slice("worktree ".length);
     const base = dirname(raiz);
-    if (basename(raiz) !== "checkout" || !basename(base).startsWith(SNAPSHOT_PREFIXO) || !snapshotAbandonado(base)) continue;
-    git("worktree", "remove", "--force", raiz);
+    if (basename(raiz) !== "checkout" || !basename(base).startsWith(SNAPSHOT_PREFIXO)) continue;
+    // Só o que este script cria: outro worktree com nome parecido, fora do temporário, não é assunto daqui.
+    if (temporario === undefined || real(dirname(base)) !== temporario || !snapshotAbandonado(base)) continue;
+    // O Git recusa o travado, e a pasta fica: apagar deixaria o registro para trás.
+    if (git("worktree", "remove", "--force", raiz).status !== 0) continue;
     rmSync(base, { recursive: true, force: true });
   }
 }
