@@ -543,16 +543,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.12.16 -R AxisGov/expxdev -D ~/expx-cli/v0.12.16
+gh release download v0.12.17 -R AxisGov/expxdev -D ~/expx-cli/v0.12.17
 (
-  cd ~/expx-cli/v0.12.16
+  cd ~/expx-cli/v0.12.17
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.12.16.tgz.sha256
+    sha256sum -c expxdev-0.12.17.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.12.16.tgz.sha256
+    shasum -a 256 -c expxdev-0.12.17.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.12.16/expxdev-0.12.16.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.12.17/expxdev-0.12.17.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -566,7 +566,7 @@ npx --yes --package ~/expx-cli/v0.12.16/expxdev-0.12.16.tgz expx init --skills b
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.12.16 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.12.17 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -630,6 +630,8 @@ npx --yes --package ~/expx-cli/v0.12.16/expxdev-0.12.16.tgz expx init --skills b
 - `0.12.16` faz a runx funcionar ao lado da SprintX e pelo `expx init`: o plano da ocorrência é
   dela, os comandos das referências acham os hooks, os hooks não deixam `.pyc`, e a MergeX aceita o
   id curto da ocorrência. A branch nasce sem rastrear a base.
+- `0.12.17` fecha a perda silenciosa no `--acrescentar`, as formas de `git clean` que não barravam e
+  o destino do worktree, e o `revisar` passa a remover o snapshot deixado por um processo morto.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

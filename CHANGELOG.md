@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.12.17 — registro perdido, git clean e worktree
+
+Achados do CodeAnt nos conselhos#227 e #229, reproduzidos antes de corrigir.
+
+- Certifica a MergeX em AxisGov/mergex@c5e72ae (mergex#67, DM-301 a DM-304):
+  - **Registro perdido em silêncio.** `commits: [] ` com espaço no fim fazia `--acrescentar` imprimir `seq=1` com rc 0, e o item não entrava. `commits: # lista` com itens em bloco dava rc 1. As duas formas valem agora, e antes de gravar o script prova que o item entrou; senão, rc 1, com o arquivo intacto.
+  - **`git clean` que não barrava.** Expansão como `$flags`, subcomando entre aspas, `-C` com espaço no caminho e `git clean` puro com `clean.requireForce` falso, no comando ou no repositório-alvo. A continuação de linha some antes da leitura, em todas as regras do `git-perigoso`, o que fecha também a do `checkout`; `\\` antes da quebra continua separando comandos.
+  - **A prévia do `git clean`** é do repositório que o comando limpa. Com expansão no alvo, `--git-dir`, `--work-tree`, `cd` ou dois alvos, a mensagem diz que não há prévia.
+  - **Remoção do `RECONCILIACAO-BASE-NNN.md` pelo merge.** Passava pelo inventário com rc 0, e agora dá rc 4.
+  - **Comentário de YAML depois do valor.** `trabalho_id: OC-2026-0001 # nota` dava rc 1, porque o comentário ficava no valor. Sai nos dois leitores do frontmatter e no de `branch:` do portão. Entre aspas, `#` é valor.
+- Certifica a SprintX em AxisGov/sprintx@209306b (sprintx#62, DS-198) e a runx em AxisGov/runx@4dd006a (runx#11, DR-92):
+  - **O worktree nasce irmão do checkout principal.** De uma subpasta, ele nascia dentro do checkout; de outro worktree, ao lado dele.
+  - **Registro de worktree sem pasta.** A branch ainda aparecia na lista, e a instrução mandava retomar nela. `git worktree remove <caminho>` tira só esse registro; `git worktree prune` não serve, porque tira também o de worktree movido.
+- **O `revisar` remove o snapshot de um processo morto.** `SIGKILL` ou queda da máquina pulavam a limpeza, e o worktree em `/tmp` ficava registrado, segurando o commit. A revisão seguinte remove o de processo morto, o sem dono com mais de uma hora e qualquer um com mais de um dia.
+- **O contrato de revisão** registra a rota do HTTP 403, tente o login uma vez e, persistindo, é conta ou serviço, e a regra de mudança de modo: religue `obrigatoria` entre trabalhos, porque a evidência precisa estar no commit da task e rodar `revisar` depois não a cria.
+- **Limite assumido:** `GIT_CONFIG_*` no ambiente, `xargs` e alias não são lidos pelo `git-perigoso`. O fechamento da runx depois do merge segue sem caminho oficial e fica para a próxima versão, porque precisa de mudança executável na MergeX.
+
 ## 0.12.16 — a runx ao lado da SprintX
 
 Achados da primeira ocorrência da runx num projeto com a SprintX (Conselhos, OC-2026-0001).

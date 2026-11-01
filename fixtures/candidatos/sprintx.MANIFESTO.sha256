@@ -33,14 +33,14 @@ b2b9f7b6b8c6349316092989a7babefd495ee6c9ff89bcf2c6dc6ba76d66ac8d  .claude/hooks/
 663d621222f04de02a84b2d79c9d3982dd4825d2696dcbb6f9b393e0d09cd9a7  .claude/hooks/testes/bancada-pipefail.sh
 554f5eb46c2ed6d54614d1d30076d8f5b91e470d0092a2b3b58d839e49c07d42  .claude/hooks/testes/bancada-plano-so-frontmatter.sh
 5a78c8af26ea09687b34657ae8cc7aaf848fdf868aadb6b737dbe8c0c1bb0cc1  .claude/hooks/testes/bancada-rastro-suite.sh
-9a679616036647b5d0b69c91ba26ba581e48d3c8d9523f90674678dc80e43988  .claude/hooks/testes/bancada-runx-na-mesma-arvore.sh
+124239f9e8fec1d063417739c8133059f2183732bf12fb88dacf08e6a3a992ee  .claude/hooks/testes/bancada-runx-na-mesma-arvore.sh
 c4585b4985bc6187d61677ddf68430d51183c3b5a4ad4a6c295d76b523b79d85  .claude/hooks/testes/bancada-segredo-limite.sh
 f7174dee86fb586fc35fa09a029ba2438d25095351309c14a64b060961d085f6  .claude/hooks/testes/bancada-segredo-sem-git.sh
 7fc1ccf4d876b581a456339b819d1b0084ee03dd3e67a9163bd85bc27475ed0d  .claude/hooks/testes/bancada.sh
 d9370952ede36c379751835d4a711550bd37b95c16f127d841883a49e962d2a5  .claude/hooks/testes/fonte.sh
 00dc2c2d5319710f73f5f54616c5b652aa3f99879f8c75444c8002abeeb13483  .claude/hooks/testes/transcrito-agente.sh
 0354c304ed52b1d41becc8df83b36f4a3bf0b3543316bf0e569347ca719fe43d  .claude/settings.json
-531f774976a91b64897476db495c346d998fec6a5031d97fa41608814de07329  .claude/skills/sprintx/DECISOES-DA-SKILL.md
+4c19a0dc922714b199269f4adcc378ff7228d2ae1d9d5a5cde1ad29bd6dbbd1e  .claude/skills/sprintx/DECISOES-DA-SKILL.md
 a5364adf48f84168a5bfa5afb6a444eb4f3ed57d55f546641ed497751eda4489  .claude/skills/sprintx/SKILL.md
 175d6d8d357624377d97f51e893e89a01a7268ab0c80efb1762b40fbccd9fc11  .claude/skills/sprintx/assets/TEMPLATE-BLOQUEIOS.md
 87e9ed363f1a083e60fc37d2c48cb3315513a3a47950858dd445d8d5bc780de3  .claude/skills/sprintx/assets/TEMPLATE-DECISOES.md
@@ -58,7 +58,7 @@ ac3084e6f5f53fc19f53874467f4dcce3ccf9e8e0bac836bb1aa714acc5463f6  .claude/skills
 4db575c8ae17011a2868eae1b7aceb32b247b9eb7db37b51b847bce981a0817d  .claude/skills/sprintx/assets/TEMPLATE-tasks.md
 be133494a6bda66c7b28a4317fe7369a1e2eb6132f0f2328fe62d2d373ffc33e  .claude/skills/sprintx/decisoes/ajustes-anteriores-ao-p0.md
 667307edbdc8444fa1a5b8937f924aff856e82b2153999fe2e0a9588a7543965  .claude/skills/sprintx/references/00-schema.md
-2207d0c3ced3ca075899799a2cf4550d9ebb06db70a180ce61c8c5ebbe477fc4  .claude/skills/sprintx/references/01-ingestao.md
+24f83e3fe7eb1a5a2bf804023aefbc04fa2ac786d0d417fe785df3125d3aa991  .claude/skills/sprintx/references/01-ingestao.md
 a4102c98bdd79bd6adb347ae31550e2c3f159a116dfe877650d19953fb6833e0  .claude/skills/sprintx/references/02-descoberta.md
 ea4f7911c1c4fdd412313c64566275b80b00f39d97e10ee69efd7c86cdd77642  .claude/skills/sprintx/references/03-plano.md
 81fc160be05bde218ab4e187eba2f84f9c565ff4de1126749ac041bd4ea1ca2e  .claude/skills/sprintx/references/04-orquestrador.md

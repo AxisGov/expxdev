@@ -14,10 +14,10 @@
 // `continuar` entre a releitura e a gravação.
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { closeSync, existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, statSync,
+import { closeSync, existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statSync,
   writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, posix, relative } from "node:path";
+import { basename, dirname, isAbsolute, join, posix, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { conferirIntegridade, excluido, EXCLUIDOS_DO_NUCLEO, fatiaNoAmbiente, homologadas, localizarPacote, medir, mensagemFatia,
   motivoAceito, perfilCli, revisavel } from "./expx-limites.mjs";
@@ -192,11 +192,43 @@ const TEMPO_DA_CLI = Number(process.env.EXPX_REVISAO_TESTE_TEMPO_CLI) > 0 ? Numb
 const codeant = (bin, a, cwd = op.raiz) => spawnSync(process.execPath, [bin, ...a], {
   cwd, maxBuffer: 64 << 20, timeout: TEMPO_DA_CLI, killSignal: "SIGKILL",
 });
+const SNAPSHOT_PREFIXO = "expx-revisao-snapshot-";
+const UMA_HORA = 60 * 60 * 1_000;
+/** O snapshot pode estar em uso? Com dono: o processo vive, até um dia, porque o PID pode ter sido reusado e a
+ *  CLI morre em 15 minutos. Sem dono, de versão anterior ou no instante da criação: até uma hora. */
+function snapshotAbandonado(base) {
+  let idade, dono;
+  try { idade = Date.now() - statSync(base).mtimeMs; } catch { return true; }
+  try { dono = Number(readFileSync(join(base, "dono"), "utf8")); } catch { return idade > UMA_HORA; }
+  if (!Number.isSafeInteger(dono) || dono <= 0) return idade > UMA_HORA;
+  if (idade > 24 * UMA_HORA) return true;
+  try { process.kill(dono, 0); return false; } catch (e) { return e?.code === "ESRCH"; }
+}
+/** SIGKILL ou queda da máquina pulam o `finally`, e o worktree fica registrado, segurando o commit. */
+function limparSnapshotsAbandonados() {
+  const lista = git("worktree", "list", "--porcelain");
+  if (lista.status !== 0) return;
+  const real = (c) => { try { const r = realpathSync.native(c); return process.platform === "win32" ? r.toLowerCase() : r; } catch { return undefined; } };
+  const temporario = real(tmpdir());
+  for (const linha of lista.stdout.split(/\r?\n/)) {
+    if (!linha.startsWith("worktree ")) continue;
+    const raiz = linha.slice("worktree ".length);
+    const base = dirname(raiz);
+    if (basename(raiz) !== "checkout" || !basename(base).startsWith(SNAPSHOT_PREFIXO)) continue;
+    // Só o que este script cria: outro worktree com nome parecido, fora do temporário, não é assunto daqui.
+    if (temporario === undefined || real(dirname(base)) !== temporario || !snapshotAbandonado(base)) continue;
+    // O Git recusa o travado, e a pasta fica: apagar deixaria o registro para trás.
+    if (git("worktree", "remove", "--force", raiz).status !== 0) continue;
+    rmSync(base, { recursive: true, force: true });
+  }
+}
 /** Materializa o HEAD capturado em worktree descartável e sobrepõe os blobs medidos.
  *  A CLI nunca lê o checkout mutável que o usuário pode editar e restaurar durante a revisão. */
 function snapshotDaRevisao(head, blobs) {
-  const base = mkdtempSync(join(tmpdir(), "expx-revisao-snapshot-"));
+  limparSnapshotsAbandonados();
+  const base = mkdtempSync(join(tmpdir(), SNAPSHOT_PREFIXO));
   const raiz = join(base, "checkout");
+  writeFileSync(join(base, "dono"), String(process.pid));
   let vinculado = false;
   const limpar = () => {
     if (vinculado) git("worktree", "remove", "--force", raiz);

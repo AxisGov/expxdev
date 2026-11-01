@@ -241,6 +241,9 @@ _PR_AWK_BRANCH='
         linha = $0; gsub(/\r/, "", linha)
         if (index(linha, "branch:") == 1) {
           sub(/^[^:]*:[[:space:]]*/, "", linha)
+          if (linha !~ /^["\047]/) sub(/[[:space:]]+#.*$/, "", linha)
+          else if (linha ~ /^"[^"]*"[[:space:]]+#/) sub(/"[[:space:]]+#.*$/, "\"", linha)
+          else if (linha ~ /^\047[^\047]*\047[[:space:]]+#/) sub(/\047[[:space:]]+#.*$/, "\047", linha)
           gsub(/^["\047]|["\047]$/, "", linha)
           gsub(/[[:space:]]+$/, "", linha)
           if (linha == b) print i

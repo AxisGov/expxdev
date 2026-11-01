@@ -276,6 +276,48 @@ describe("expx-revisao.mjs revisar", () => {
     expect(r.ev.arquivos[f]?.blob).toMatch(/^[0-9a-f]{40}$/);
   });
 
+  it("funcional: o snapshot de processo morto sai na revisão seguinte; o que pode estar em uso fica", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    const antigo = (Date.now() - 2 * 60 * 60 * 1000) / 1000;
+    const velho = (Date.now() - 2 * 24 * 60 * 60 * 1000) / 1000;
+    const morto = spawnSync(process.execPath, ["-e", ""]).pid;
+    const snapshot = (dono?: number, tempo?: number): string => {
+      const base = mkdtempSync(join(tmpdir(), "expx-revisao-snapshot-"));
+      // A ordem do `revisar`: o dono existe antes de o worktree ser registrado.
+      if (dono !== undefined) writeFileSync(join(base, "dono"), String(dono));
+      git(c.raiz, "worktree", "add", "-q", "--detach", join(base, "checkout"), "HEAD");
+      if (tempo !== undefined) utimesSync(base, tempo, tempo);
+      return base;
+    };
+    const saem = [snapshot(morto), snapshot(undefined, antigo), snapshot(process.pid, velho)];
+    const ficam = [snapshot(process.pid), snapshot(undefined)];
+    // Outro worktree do repositório nunca é assunto do `revisar`, mesmo antigo.
+    const alheio = mkdtempSync(join(tmpdir(), "expx-worktree-alheio-"));
+    git(c.raiz, "worktree", "add", "-q", "--detach", join(alheio, "checkout"), "HEAD");
+    utimesSync(alheio, velho, velho);
+    // Nome igual fora do temporário e snapshot travado: o Git recusa, e nada é apagado.
+    const fora = join(mkdtempSync(join(tmpdir(), "expx-fora-")), "expx-revisao-snapshot-z");
+    mkdirSync(fora);
+    git(c.raiz, "worktree", "add", "-q", "--detach", join(fora, "checkout"), "HEAD");
+    utimesSync(fora, velho, velho);
+    const travado = snapshot(morto);
+    git(c.raiz, "worktree", "lock", join(travado, "checkout"));
+    try {
+      expect(revisar(c, "src/a.js")).toMatchObject({ rc: 0, ev: { resultado: "ok" } });
+      const lista = git(c.raiz, "worktree", "list", "--porcelain");
+      for (const base of saem) {
+        expect(existsSync(base), base).toBe(false);
+        expect(lista).not.toContain(base.split(/[\\/]/).pop());
+      }
+      for (const base of [...ficam, alheio, fora, travado]) expect(existsSync(join(base, "checkout")), base).toBe(true);
+    } finally {
+      git(c.raiz, "worktree", "unlock", join(travado, "checkout"));
+      for (const base of [...saem, ...ficam, alheio, dirname(fora), travado]) rmSync(base, { recursive: true, force: true });
+      git(c.raiz, "worktree", "prune");
+    }
+  });
+
   it("funcional: a CLI só consegue reescrever o snapshot descartável, não o checkout", () => {
     const c = cenario({ reescreve: "src/a.js" });
     altera3(c.raiz);

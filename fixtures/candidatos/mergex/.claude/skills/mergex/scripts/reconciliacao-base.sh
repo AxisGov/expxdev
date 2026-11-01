@@ -588,14 +588,15 @@ nome_de_evidencia() {
 # entrega (commitado pelo checkpoint reconciliacao-base antes do merge
 # seguinte), ou a evidência de revisão de uma task deste trabalho (DM-240),
 # arquivo comum em M; é artefato de método, não produto. Temporário, trava,
-# link e o que o merge removeu sob `revisao/` continuam produto (DM-291).
+# link e o que o merge removeu continuam produto (DM-291 e DM-303).
 artefato_da_entrega() {
   case "$2" in
-    "docs/entregas/$TRABALHO/"RECONCILIACAO-BASE-[0-9][0-9][0-9].md) return 0 ;;
+    "docs/entregas/$TRABALHO/"RECONCILIACAO-BASE-[0-9][0-9][0-9].md) ;;
     "docs/entregas/$TRABALHO/revisao/"*)
-      nome_de_evidencia "${2#"docs/entregas/$TRABALHO/revisao/"}" || return 1
-      case "$(modo_em "$1" "$2")" in 100644|100755) return 0 ;; esac ;;
+      nome_de_evidencia "${2#"docs/entregas/$TRABALHO/revisao/"}" || return 1 ;;
+    *) return 1 ;;
   esac
+  case "$(modo_em "$1" "$2")" in 100644|100755) return 0 ;; esac
   return 1
 }
 

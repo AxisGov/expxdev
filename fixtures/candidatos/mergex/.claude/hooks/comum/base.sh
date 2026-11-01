@@ -126,6 +126,10 @@ expx_frontmatter_valor() {
       gsub(/\r/, "", linha)
       if (index(linha, chave ":") == 1) {
         sub(/^[^:]*:[[:space:]]*/, "", linha)
+        # comentário de YAML só fora de aspas: `trabalho_id: x # nota` é x (DM-304)
+        if (linha !~ /^["'"'"']/) sub(/[[:space:]]+#.*$/, "", linha)
+        else if (linha ~ /^"[^"]*"[[:space:]]+#/) sub(/"[[:space:]]+#.*$/, "\"", linha)
+        else if (linha ~ /^'"'"'[^'"'"']*'"'"'[[:space:]]+#/) sub(/'"'"'[[:space:]]+#.*$/, "'"'"'", linha)
         gsub(/^["'"'"']|["'"'"']$/, "", linha)
         gsub(/[[:space:]]+$/, "", linha)
         print linha
