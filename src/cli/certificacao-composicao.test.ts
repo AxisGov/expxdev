@@ -94,7 +94,10 @@ describe("composição SprintX e runx", () => {
     const instalar = rodarExpx(["init", "--skills", "sprintx,runx", "--harness", "claude", "--yes"], produto, ambienteCom(pathControlado(true), isolado.env));
     expect(instalar.status, `${instalar.stdout}\n${instalar.stderr}`).toBe(0);
 
-    const ambiente = ambienteCom(pathDosHooks(), { CLAUDE_PROJECT_DIR: produto, EXPX_SESSAO: "claude@fluxo" });
+    // A identidade é a que o Claude Code expõe, nas três pontas: o escritor da SprintX só a aceita do harness.
+    const ambiente = ambienteCom(pathDosHooks(), { CLAUDE_PROJECT_DIR: produto, CLAUDECODE: "1", CLAUDE_CODE_SESSION_ID: "fluxo" });
+    delete ambiente["EXPX_SESSAO"];
+    delete ambiente["EXPX_HARNESS"];
     const escreve = (rel: string, texto: string): void => {
       mkdirSync(dirname(join(produto, rel)), { recursive: true });
       writeFileSync(join(produto, rel), texto);
