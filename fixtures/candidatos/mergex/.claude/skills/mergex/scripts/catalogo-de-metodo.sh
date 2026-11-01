@@ -102,6 +102,15 @@ catalogo_areas_do_indice() {
   ' "$1" 2>/dev/null
 }
 
+# O artefato da runx declara o <OC-ID>, e a pasta, a branch e a entrega usam <OC-ID>-<slug>
+# (DM-299). Nada mais vale como o mesmo trabalho: nem prefixo solto, nem outra ocorrência.
+catalogo_e_do_trabalho() { # <pasta> <trabalho_id lido> <trabalho>
+  [ "$2" = "$3" ] && return 0
+  case "$1" in docs/manutencao/*) ;; *) return 1 ;; esac
+  case "$3" in "$2"-*) ;; *) return 1 ;; esac
+  [[ $2 =~ ^OC-[0-9]{4}-[0-9]{4}$ ]]
+}
+
 catalogo_base() { # <raiz> <trabalho> <pasta>
   local raiz="$1" trabalho="$2" pasta="$3" indice area parte resto
   indice="$pasta/base/00-INDICE.md"
@@ -111,7 +120,7 @@ catalogo_base() { # <raiz> <trabalho> <pasta>
   [ ! -L "$raiz/$indice" ] || { CATALOGO_ERRO="$indice é link simbólico"; return 1; }
   [ "$(catalogo_fm "$raiz/$indice" kind)" = base_indice ] \
     || { CATALOGO_ERRO="$indice não declara kind: base_indice"; return 1; }
-  [ "$(catalogo_fm "$raiz/$indice" trabalho_id)" = "$trabalho" ] \
+  catalogo_e_do_trabalho "$pasta" "$(catalogo_fm "$raiz/$indice" trabalho_id)" "$trabalho" \
     || { CATALOGO_ERRO="$indice pertence a outro trabalho"; return 1; }
   printf '%s\n' "$indice"
   while IFS= read -r area; do

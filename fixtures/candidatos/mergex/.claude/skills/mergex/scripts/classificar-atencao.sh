@@ -169,6 +169,14 @@ TRABALHO=""; ORIGEM=""; PASTA=""; BRANCH=""; CONTEXTO_MOTIVO=""
 
 fm() { expx_frontmatter_valor "$1" "$2"; }
 
+# O artefato da runx declara o <OC-ID>; a pasta, a branch e a entrega usam <OC-ID>-<slug> (DM-299).
+e_do_trabalho() { # <trabalho_id lido>
+  [ "$1" = "$TRABALHO" ] && return 0
+  [ "$ORIGEM" = runx ] || return 1
+  case "$TRABALHO" in "$1"-*) ;; *) return 1 ;; esac
+  [[ $1 =~ ^OC-[0-9]{4}-[0-9]{4}$ ]]
+}
+
 resolve_contexto() {
   [ "$TEM_BASE" = 1 ] || { CONTEXTO_MOTIVO="biblioteca comum dos hooks indisponível"; return 1; }
 
@@ -197,7 +205,7 @@ resolve_contexto() {
   fi
 
   local orq="$RAIZ/$PASTA/ORQUESTRADOR.md"
-  if [ "$(fm "$orq" kind)" != "orquestrador" ] || [ "$(fm "$orq" trabalho_id)" != "$TRABALHO" ]; then
+  if [ "$(fm "$orq" kind)" != "orquestrador" ] || ! e_do_trabalho "$(fm "$orq" trabalho_id)"; then
     CONTEXTO_MOTIVO="$PASTA/ORQUESTRADOR.md ausente ou não é deste trabalho"
     PASTA=""; ORIGEM=""; return 1
   fi
@@ -421,7 +429,7 @@ reconhece() {
             [ ! -L "$RAIZ/$PASTA/base/00-INDICE.md" ] || { nao_reconhecido "o base/00-INDICE.md é link simbólico"; return; }
             if ! areas_do_indice "$RAIZ/$PASTA/base/00-INDICE.md" | grep -Fx -- "$nome" >/dev/null \
                || [ "$(fm "$RAIZ/$PASTA/base/00-INDICE.md" kind)" != base_indice ] \
-               || [ "$(fm "$RAIZ/$PASTA/base/00-INDICE.md" trabalho_id)" != "$TRABALHO" ]; then
+               || ! e_do_trabalho "$(fm "$RAIZ/$PASTA/base/00-INDICE.md" trabalho_id)"; then
               nao_reconhecido "arquivo da base não listado no base/00-INDICE.md deste trabalho"; return
             fi
             chave="base/<area>.md" ;;
@@ -450,7 +458,9 @@ reconhece() {
     esac
     if [ "$chave" = docs/sprintx/estimativas/HISTORICO.md ]; then
       [ "$(fm "$arq" trabalho_id)" = null ] || { nao_reconhecido "HISTORICO global precisa de trabalho_id: null"; return; }
-    elif [ "$(fm "$arq" trabalho_id)" != "$TRABALHO" ]; then
+    elif [ "$kind_esperado" = entrega ] && [ "$(fm "$arq" trabalho_id)" != "$TRABALHO" ]; then
+      nao_reconhecido "trabalho_id do arquivo não é $TRABALHO"; return
+    elif ! e_do_trabalho "$(fm "$arq" trabalho_id)"; then
       nao_reconhecido "trabalho_id do arquivo não é $TRABALHO"; return
     fi
     if [ "$kind_esperado" = entrega ] && [ "$(fm "$arq" branch)" != "$BRANCH" ]; then

@@ -58,7 +58,7 @@ D.ecossistema = `
 
     <text x="14" y="174" font-size="10.5" fill="var(--ink-faint)" letter-spacing="1.1">2 · O CLI</text>
     <rect x="14" y="184" width="872" height="52" rx="7" fill="var(--accent-wash)" stroke="var(--accent)" stroke-opacity=".45"/>
-    <text x="30" y="206" font-family="var(--mono)" font-size="13.5" fill="var(--accent)" font-weight="600">expx init · release v0.12.15</text>
+    <text x="30" y="206" font-family="var(--mono)" font-size="13.5" fill="var(--accent)" font-weight="600">expx init · release v0.12.16</text>
     <text x="30" y="223" font-size="11" fill="var(--ink-muted)">resolve a versao · detecta o layout · verifica caminhos · calcula o hash de cada arquivo · monta atomicamente</text>
 
     <path d="M450 238 L450 266" stroke="var(--ink-faint)" stroke-width="1.2" marker-end="url(#sf)"/>

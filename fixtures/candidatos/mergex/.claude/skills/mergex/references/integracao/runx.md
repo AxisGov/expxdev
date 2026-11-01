@@ -69,7 +69,9 @@ Isso aparece em três etapas da mergex:
 | `QA.md` | idem | E2 (V5 — veredito), E4 (seção 9), E5 (**o roteiro de teste manual, completo**) |
 | Relatório de uso | `docs/relatorios/<data>-<OC-ID>-<slug>/uso.md` | E5 (apontado no pacote de QA como o texto que o suporte devolve ao cliente) |
 
-O `trabalho_id` da mergex é o **mesmo `<OC-ID>-<slug>`** da runx.
+O `trabalho_id` da mergex é o `<OC-ID>-<slug>`, o nome da pasta da ocorrência e o que o `ENTREGA.md` declara. Os
+artefatos da runx declaram o `<OC-ID>` curto, como pedem o schema dela e o `estado.py`, e valem como o mesmo trabalho
+dentro da pasta da ocorrência. O id completo também é aceito, por causa das ocorrências já gravadas assim (DM-299).
 
 No **E3**, os artefatos da pasta da ocorrência (`00-OCORRENCIA.md`, `01-CAUSA-RAIZ.md`,
 `ORQUESTRADOR.md`, `QA.md`, `BLOQUEIOS.md`, `sprint-NN/`, `base/`) são classificados pelo
