@@ -311,10 +311,10 @@ Na sprintx (F6), `incompleta` vira o bloqueio da classe **`revisao_incompleta`**
 | `L2` | uma task anterior divide o arquivo |
 | `excluido-declarado` | tirar o arquivo da lista de exclusão ou da task |
 | `perfil` | instalar a versão homologada ou homologar a nova |
-| `lote-falhou` | revisar de novo a task inteira; repetindo com HTTP 413, reduzir o que vai no lote e repetir. A CLI agrupa os arquivos ordenados, em lotes de até cinco: dividir a task pode manter o mesmo lote, e um arquivo sozinho pode passar do limite do servidor, que não se conhece. Com HTTP 403 (`Access denied`), tente `codeant logout` e `codeant login` uma vez, apesar de a mensagem da CLI induzir a repetir; persistindo, é conta ou serviço, e nada aqui resolve |
+| `lote-falhou` | revisar de novo a task inteira; repetindo com HTTP 413, reduzir o que vai no lote e repetir. A CLI agrupa os arquivos ordenados, em lotes de até cinco: dividir a task pode manter o mesmo lote, e um arquivo sozinho pode passar do limite do servidor, que não se conhece. Com HTTP 403 (`Access denied`), tente `codeant logout` e `codeant login` uma vez, apesar de a mensagem da CLI induzir a repetir; persistindo, é conta ou serviço, e nada aqui resolve. Se o 403 vier em `error` no JSON, o resultado é `indisponivel:erro`, e a rota é a mesma |
 | `pulado`, `faltante`, `sobra`, `repetido` | diagnóstico |
 
-**Mudar o modo:** a evidência precisa estar no commit da task, porque o `conferir` lê `<sha>:docs/entregas/.../revisao/<task>.json`. Rodar `revisar` depois não cria essa evidência para o commit antigo. Por isso, religue `obrigatoria` entre trabalhos: a task concluída com o modo desligado dá `evidencia-ausente` se o E2 for reexecutado, e o trabalho já integrado não reexecuta o E2. Trabalho aberto termina no modo em que começou.
+**Mudar o modo:** a evidência precisa estar no commit da task, porque o `conferir` lê `<sha>:docs/entregas/.../revisao/<task>.json`. Rodar `revisar` depois não cria essa evidência para o commit antigo. Por isso, religue `obrigatoria` entre trabalhos, regra de operação que nada aqui impõe: a task concluída com o modo desligado dá `evidencia-ausente` se o E2 for reexecutado, e o trabalho já integrado não reexecuta o E2. Trabalho aberto termina no modo em que começou.
 
 `indisponivel` depende do modo (`obrigatoria`: a task não fecha). Na mergex, a V12
 mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.

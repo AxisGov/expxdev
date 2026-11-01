@@ -624,6 +624,26 @@ caso "push +refspec"          mergex/git-perigoso.sh "$(bash_json 'git push orig
 caso "commit na principal"    mergex/git-perigoso.sh "$(bash_json "git commit -m x")" 2
 caso "clean -fd"              mergex/git-perigoso.sh "$(bash_json 'git clean -fd')" 2
 caso "clean --force"          mergex/git-perigoso.sh "$(bash_json 'git clean --force')" 2
+# As formas que passavam (CodeAnt no conselhos#227, DM-302).
+caso "clean com expansão"     mergex/git-perigoso.sh "$(bash_json 'flags=-fd; git clean $flags')" 2
+caso "clean com expansão entre aspas" mergex/git-perigoso.sh "$(bash_json 'git clean "$flags"')" 2
+caso "clean com substituição" mergex/git-perigoso.sh "$(bash_json 'git clean $(echo -fd)')" 2
+caso "barra escapada e quebra: o push é outro comando" mergex/git-perigoso.sh "$(bash_json $'echo a\\\\\ngit push --force')" 2
+caso "duas barras escapadas e quebra" mergex/git-perigoso.sh "$(bash_json $'echo a\\\\\\\\\ngit push --force')" 2
+caso "git, continuação, clean" mergex/git-perigoso.sh "$(bash_json $'git \\\n clean -fd')" 2
+caso "clean, continuação, -fd" mergex/git-perigoso.sh "$(bash_json $'git clean \\\n -fd')" 2
+caso "clean, continuação com CRLF, -fd" mergex/git-perigoso.sh "$(bash_json $'git clean \\\r\n -fd')" 2
+caso "clean.requireForce=false" mergex/git-perigoso.sh "$(bash_json 'git -c clean.requireForce=false clean')" 2
+caso "clean.requireforce=0, em minúsculas" mergex/git-perigoso.sh "$(bash_json 'git -c clean.requireforce=0 clean')" 2
+caso "o último -c vale: false" mergex/git-perigoso.sh "$(bash_json 'git -c clean.requireForce=true -c clean.requireForce=false clean')" 2
+caso "o caminho depois de clean não muda o -c" mergex/git-perigoso.sh "$(bash_json 'git -c clean.requireForce=false clean clean.requireForce=true')" 2
+caso "requireForce por --config-env" mergex/git-perigoso.sh "$(bash_json 'git --config-env clean.requireForce=F clean')" 2
+caso "requireForce por expansão" mergex/git-perigoso.sh "$(bash_json 'git -c clean.requireForce=$f clean')" 2
+caso "clean puro depois de cd" mergex/git-perigoso.sh "$(bash_json 'cd /tmp/outro && git clean')" 2
+caso "-C com espaço entre aspas" mergex/git-perigoso.sh "$(bash_json 'git -C "/dir com espaco" clean -fd')" 2
+caso "-C com espaço, clean puro" mergex/git-perigoso.sh "$(bash_json "git -C '/dir com espaco' clean")" 2
+caso "'clean' entre aspas"    mergex/git-perigoso.sh "$(bash_json "git 'clean' -fd")" 2
+caso '"clean" entre aspas'    mergex/git-perigoso.sh "$(bash_json 'git "clean" -fd')" 2
 # A mensagem lista o que seria removido: com -x e -X, o ignorado entra na conta (DM-296).
 CLEAN_T="$(mktemp -d)"
 (
@@ -647,6 +667,34 @@ previa_tem "prévia de clean -fX: só o ignorado" 'git clean -fX' ignorado.env s
 previa_tem "prévia com -x entre aspas" "git clean -f '-x'" ignorado.env -
 previa_tem "prévia: X é o valor de -e, não a opção" 'git clean -fdx -eX' solto.txt -
 previa_tem "prévia: -x é o valor de -e, não a opção" 'git clean -fd -e -x' solto.txt ignorado.env
+# A prévia é do repositório que o comando limpa, e sem isso ela não promete nada (DM-302).
+CLEAN_O="$(mktemp -d)"
+( cd "$CLEAN_O" || exit 1; git init -q -b main; printf 's\n' > de-outro.txt )
+previa_em() { # <desc> <comando> <deve ter>
+  case "$(previa "$2")" in
+    *"$3"*) OK=$((OK+1)); printf '  ok    %s\n' "$1" ;;
+    *) FALHOU=$((FALHOU+1)); printf '  FALHA %s: %s\n' "$1" "$(previa "$2")" ;;
+  esac
+}
+previa_em "prévia de -C é do outro repositório" "git -C $CLEAN_O clean -fd" "Would remove de-outro.txt"
+case "$(previa "git -C $CLEAN_O clean -fd")" in
+  *solto.txt*) FALHOU=$((FALHOU+1)); printf '  FALHA a prévia de -C listou este repositório\n' ;;
+  *) OK=$((OK+1)); printf '  ok    a prévia de -C não lista este repositório\n' ;;
+esac
+( cd "$CLEAN_O" || exit 1; git config clean.requireForce false )
+case "$(printf '%s' "$(bash_json "git -C $CLEAN_O clean")" | bash "$H/mergex/git-perigoso.sh" >/dev/null 2>&1; echo $?)" in
+  2) OK=$((OK+1)); printf '  ok    clean puro com -C lê a configuração do alvo\n' ;;
+  *) FALHOU=$((FALHOU+1)); printf '  FALHA clean puro com -C não leu a configuração do alvo\n' ;;
+esac
+( cd "$CLEAN_O" || exit 1; git config --unset clean.requireForce )
+for c in 'git -C "$x" clean -fd' 'git -C "/dir com espaco" clean -fd' 'git --git-dir=.git clean -fd' 'git --work-tree /x clean -fd' 'cd /tmp && git clean -fd' "git clean -fd && git -C $CLEAN_O clean -fd"; do
+  previa_em "sem prévia: $c" "$c" "sem prévia"
+done
+case "$(cd "$CLEAN_T" && git config clean.requireForce false; printf '%s' "$(bash_json 'git clean')" | (HOOK_CWD="$CLEAN_T"; cd "$CLEAN_T"; jq --arg w "$CLEAN_T" '.cwd=$w' | bash "$H/mergex/git-perigoso.sh") >/dev/null 2>&1; echo $?; git -C "$CLEAN_T" config --unset clean.requireForce)" in
+  2) OK=$((OK+1)); printf '  ok    clean puro com requireForce=false no repositório barra\n' ;;
+  *) FALHOU=$((FALHOU+1)); printf '  FALHA clean puro com requireForce=false no repositório passou\n' ;;
+esac
+rm -rf "$CLEAN_O"
 case "$(previa 'git clean -fd -- ignorado.env')" in
   *"não aplica -e nem caminho"*) OK=$((OK+1)); printf '  ok    a prévia avisa que não aplica caminho\n' ;;
   *) FALHOU=$((FALHOU+1)); printf '  FALHA a prévia promete mais do que sabe\n' ;;
@@ -659,6 +707,18 @@ caso "npm run push-notifications" mergex/git-perigoso.sh "$(bash_json 'npm run p
 caso "echo sobre push --force"    mergex/git-perigoso.sh "$(bash_json "echo 'nao faca push --force'")" 0
 caso "grep por push"          mergex/git-perigoso.sh "$(bash_json 'grep -r push src/')" 0
 caso "git clean -n (seco)"    mergex/git-perigoso.sh "$(bash_json 'git clean -n')" 0
+caso "clean puro: o Git recusa sem -f" mergex/git-perigoso.sh "$(bash_json 'git clean')" 0
+caso "clean -h"               mergex/git-perigoso.sh "$(bash_json 'git clean -h')" 0
+caso "clean --help"           mergex/git-perigoso.sh "$(bash_json 'git clean --help')" 0
+caso "help clean"             mergex/git-perigoso.sh "$(bash_json 'git help clean')" 0
+caso "config de clean"        mergex/git-perigoso.sh "$(bash_json 'git config clean.requireForce')" 0
+caso "requireForce=true"      mergex/git-perigoso.sh "$(bash_json 'git -c clean.requireForce=true clean')" 0
+caso "caminho com o nome da chave, sem -c" mergex/git-perigoso.sh "$(bash_json 'git clean clean.requireForce=false')" 0
+caso "o último -c vale: true" mergex/git-perigoso.sh "$(bash_json 'git -c clean.requireForce=false -c clean.requireForce=true clean')" 0
+caso "barra escapada e outro comando inofensivo" mergex/git-perigoso.sh "$(bash_json $'echo a\\\\\ngit status')" 0
+caso "clean -n com expansão"  mergex/git-perigoso.sh "$(bash_json 'git clean -n $flags')" 0
+caso "aspas em volta do subcomando inteiro" mergex/git-perigoso.sh "$(bash_json "git 'clean -fd'")" 0
+caso "continuação sem git destrutivo" mergex/git-perigoso.sh "$(bash_json $'git \\\n status')" 0
 # Cada `git clean` por si: opção de outro comando não barra, e a simulação não apaga (CodeRabbit no mergex#65).
 caso "clean -n e fetch --force" mergex/git-perigoso.sh "$(bash_json 'git clean -n && git fetch --force')" 0
 caso "clean -n e rm -f"       mergex/git-perigoso.sh "$(bash_json 'git clean -n; rm -f x')" 0
@@ -768,6 +828,9 @@ custo_ok "10 KB com git push --force no fim: barra em menos de $LIMITE_TXT" "$(b
 DENSO=""; while [ "${#DENSO}" -lt 102400 ]; do DENSO="${DENSO}git;git;git;git;git;git;git;git;git;git;git;git;git;git;git;git;"; done
 custo_ok "100 KB de git; + git push --force no fim: barra em menos de $LIMITE_TXT" \
   "$(printf '%s' "${DENSO}git push --force origin feature/x" | jq -Rs --arg w "$HOOK_CWD" '{tool_name:"Bash",cwd:$w,tool_input:{command:.}}')" 2
+CONT=""; while [ "${#CONT}" -lt 102400 ]; do CONT="${CONT}"$'x \\\n x \\\n x \\\n x \\\n x \\\n x \\\n x \\\n x \\\n'; done
+custo_ok "100 KB de continuações + git clean -fd: barra em menos de $LIMITE_TXT" \
+  "$(printf '%s' "git status; ${CONT}true; git clean -fd" | jq -Rs --arg w "$HOOK_CWD" '{tool_name:"Bash",cwd:$w,tool_input:{command:.}}')" 2
 # Teto que falha FECHADO: acima de GIT_TETO bytes (512 KB) com git, o hook nao
 # avalia e barra (um hook morto pelo timeout do harness nao bloqueia). Mesmo um
 # comando inofensivo (git status) barra ali; e o limite de tempo prova que ele
@@ -915,6 +978,7 @@ caso "restore --worktree" mergex/git-perigoso.sh "$(bash_json 'git restore --wor
 # git.exe e a forma entre aspas sao o mesmo git tambem na regra de descarte
 caso "git.exe restore barra"            mergex/git-perigoso.sh "$(bash_json 'git.exe restore arquivo.txt')" 2
 caso "git.exe checkout -- barra"        mergex/git-perigoso.sh "$(bash_json 'git.exe checkout -- arquivo.txt')" 2
+caso "git, continuação, checkout" mergex/git-perigoso.sh "$(bash_json $'git \\\n checkout -- arquivo.txt')" 2
 caso "\"/usr/bin/git\" restore barra"   mergex/git-perigoso.sh "$(bash_json '"/usr/bin/git" restore arquivo.txt')" 2
 caso "git.exe restore --staged passa"   mergex/git-perigoso.sh "$(bash_json 'git.exe restore --staged arquivo.txt')" 0
 caso "switch -c com suja"      comum/branch-limpa.sh "$(bash_json 'git switch -c nova')" 2

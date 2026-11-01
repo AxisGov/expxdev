@@ -184,8 +184,9 @@ itens_de() {
   b="$(bloco "$arq" commits)"
   confere_bloco "$b" || return 1
   # `commits: []` (inline) é lista vazia declarada: legítima, sem nenhum item, com ou
-  # sem comentário depois, como em YAML (DM-296).
-  local primeira vazia=$'^\001(\\[\\]([[:space:]]+#.*)?)?$'
+  # sem comentário depois, como em YAML (DM-296). Comentário sozinho é `commits:` sem
+  # valor, e os itens vêm em bloco (DM-301).
+  local primeira vazia=$'^\001(\\[\\]([[:space:]]+#.*)?|#.*)?$'
   primeira="$(printf '%s\n' "$b" | awk 'NR == 1')"
   case "$primeira" in
     $'\001'*)
@@ -358,8 +359,9 @@ acrescentar() {
     }
     !fm { print; next }
     !feito && nu ~ /^commits:/ {
-      inline = nu; sub(/^commits:[[:space:]]*/, "", inline)
+      inline = nu; sub(/^commits:[[:space:]]*/, "", inline); sub(/[[:space:]]+$/, "", inline)
       vazia = (inline ~ /^\[\]([[:space:]]+#.*)?$/)
+      if (inline ~ /^#/) { print; dentro = 1; next }
       if (vazia || inline == "") {
         printf "commits:%s\n", cr
         if (vazia) { novo(cr); feito = 1 } else { dentro = 1 }
@@ -372,6 +374,10 @@ acrescentar() {
     END { if (dentro && !feito) novo(cr) }
   ' "$arq" > "$tmp" || { rm -f "$tmp"; ERRO="falha ao reescrever $arq"; return 1; }
 
+  # Só diz `seq=` depois de provar que o item entrou: a forma que a leitura aceita e este
+  # awk não reconhece perdia o registro em silêncio, com rc 0 (DM-301).
+  [ "$(proximo "$tmp" 2>/dev/null)" = "$((seq + 1))" ] \
+    || { rm -f "$tmp"; ERRO="o item não entrou em commits de $arq: nada foi gravado"; return 1; }
   mv "$tmp" "$arq" || { rm -f "$tmp"; ERRO="falha ao substituir $arq"; return 1; }
   printf 'seq=%s\n' "$seq"
 }

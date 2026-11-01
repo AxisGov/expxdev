@@ -284,8 +284,9 @@ describe("expx-revisao.mjs revisar", () => {
     const morto = spawnSync(process.execPath, ["-e", ""]).pid;
     const snapshot = (dono?: number, tempo?: number): string => {
       const base = mkdtempSync(join(tmpdir(), "expx-revisao-snapshot-"));
-      git(c.raiz, "worktree", "add", "-q", "--detach", join(base, "checkout"), "HEAD");
+      // A ordem do `revisar`: o dono existe antes de o worktree ser registrado.
       if (dono !== undefined) writeFileSync(join(base, "dono"), String(dono));
+      git(c.raiz, "worktree", "add", "-q", "--detach", join(base, "checkout"), "HEAD");
       if (tempo !== undefined) utimesSync(base, tempo, tempo);
       return base;
     };
@@ -300,7 +301,7 @@ describe("expx-revisao.mjs revisar", () => {
       const lista = git(c.raiz, "worktree", "list", "--porcelain");
       for (const base of saem) {
         expect(existsSync(base), base).toBe(false);
-        expect(lista).not.toContain(realpathSync(dirname(base)) + "/" + base.split(/[\\/]/).pop());
+        expect(lista).not.toContain(base.split(/[\\/]/).pop());
       }
       for (const base of [...ficam, alheio]) expect(existsSync(join(base, "checkout")), base).toBe(true);
     } finally {
