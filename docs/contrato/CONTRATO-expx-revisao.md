@@ -311,8 +311,10 @@ Na sprintx (F6), `incompleta` vira o bloqueio da classe **`revisao_incompleta`**
 | `L2` | uma task anterior divide o arquivo |
 | `excluido-declarado` | tirar o arquivo da lista de exclusão ou da task |
 | `perfil` | instalar a versão homologada ou homologar a nova |
-| `lote-falhou` | revisar de novo a task inteira; repetindo com HTTP 413, reduzir o que vai no lote e repetir. A CLI agrupa os arquivos ordenados, em lotes de até cinco: dividir a task pode manter o mesmo lote, e um arquivo sozinho pode passar do limite do servidor, que não se conhece |
+| `lote-falhou` | revisar de novo a task inteira; repetindo com HTTP 413, reduzir o que vai no lote e repetir. A CLI agrupa os arquivos ordenados, em lotes de até cinco: dividir a task pode manter o mesmo lote, e um arquivo sozinho pode passar do limite do servidor, que não se conhece. Com HTTP 403 (`Access denied`), tente `codeant logout` e `codeant login` uma vez, apesar de a mensagem da CLI induzir a repetir; persistindo, é conta ou serviço, e nada aqui resolve |
 | `pulado`, `faltante`, `sobra`, `repetido` | diagnóstico |
+
+**Mudar o modo:** a evidência precisa estar no commit da task, porque o `conferir` lê `<sha>:docs/entregas/.../revisao/<task>.json`. Rodar `revisar` depois não cria essa evidência para o commit antigo. Por isso, religue `obrigatoria` entre trabalhos: a task concluída com o modo desligado dá `evidencia-ausente` se o E2 for reexecutado, e o trabalho já integrado não reexecuta o E2. Trabalho aberto termina no modo em que começou.
 
 `indisponivel` depende do modo (`obrigatoria`: a task não fecha). Na mergex, a V12
 mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
@@ -356,3 +358,4 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-10-20 | Revisão da PR 72 (CodeAnt, 2ª rodada): a evidência na árvore do commit que o git não lê é `evidencia-invalida` (antes, `evidencia-ausente`, AVISO em `se_disponivel`); na cobertura, `modo` fora dos dois ou `base_commit` que não é commit (que em `indisponivel`/`incompleta` nada mais conferia) é `evidencia-invalida:cobertura`. |
 | 2026-10-24 | `--arquivos` com caminho absoluto ou que sai da raiz por `..` é uso errado (64), antes de qualquer leitura (achado do CodeAnt em katosmv/conselhos-municipais#208): o snapshot apagava e reescrevia o caminho resolvido fora do checkout temporário. O snapshot também recusa destino fora dele (`indisponivel:snapshot`). |
 | 2026-11-01 | Falha de lote passa a ser qualquer `[error]` no stderr e `Warning: parsing error in rejector`; o `ok` passa a dizer que atesta a chamada sem erro visível, não a ausência de defeito (relatos do Conselhos, 0.12.15). |
+| 2026-11-01 | A revisão seguinte remove o snapshot de um `revisar` morto antes de limpar (SIGKILL, queda da máquina): o worktree ficava registrado e segurava o commit. Rota do HTTP 403 e regra de mudança de modo no contrato. |
