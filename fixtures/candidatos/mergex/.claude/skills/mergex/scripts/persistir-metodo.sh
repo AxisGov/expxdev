@@ -148,7 +148,7 @@ PASTA="$CATALOGO_PASTA"
 ORQUESTRADOR="$RAIZ/$PASTA/ORQUESTRADOR.md"
 [ -f "$ORQUESTRADOR" ] && [ ! -L "$ORQUESTRADOR" ] || para "$PASTA/ORQUESTRADOR.md não é arquivo regular"
 [ "$(fm "$ORQUESTRADOR" kind)" = orquestrador ] || para "$PASTA/ORQUESTRADOR.md não declara kind: orquestrador"
-[ "$(fm "$ORQUESTRADOR" trabalho_id)" = "$TRABALHO" ] || para "ORQUESTRADOR.md pertence a outro trabalho"
+catalogo_e_do_trabalho "$PASTA" "$(fm "$ORQUESTRADOR" trabalho_id)" "$TRABALHO" || para "ORQUESTRADOR.md pertence a outro trabalho"
 
 TMP_LISTA="$(mktemp "${TMPDIR:-/tmp}/mergex-metodo.XXXXXX")" || para 'não foi possível criar lista temporária'
 

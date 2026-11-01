@@ -396,7 +396,7 @@ Com a árvore limpa:
 | Situação | Comando |
 |---|---|
 | A branch já existe | `git switch <nome>` — **retome nela, nunca crie outra** |
-| A branch não existe | `git switch -c <nome-da-branch> <branch-base>` |
+| A branch não existe | `git switch -c <nome-da-branch> --no-track <branch-base>` |
 
 Confirme depois com `git branch --show-current`. Se a operação falhou, relate o erro do versionador literalmente e encerre — não tente contornar.
 

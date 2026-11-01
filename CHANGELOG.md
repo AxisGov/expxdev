@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.12.16 — a runx ao lado da SprintX
+
+Achados da primeira ocorrência da runx num projeto com a SprintX (Conselhos, OC-2026-0001).
+
+- Certifica a SprintX em AxisGov/sprintx@2c89012 (sprintx#61, DS-196 e DS-197):
+  - **O plano da ocorrência é da runx.** Depois que o `tasks.md` de `docs/manutencao/OC-*` ficava `em_andamento`, o `escopo-da-task` dava `sessao_ambigua` em tudo, inclusive no próprio plano, e nenhum escritor resolvia. Ele sai do porteiro, e a linha de rastro com `ferramenta: runx` não conta como reivindicação da SprintX. Com feature aberta na mesma árvore, a sessão sem reivindicação continua barrada, pela regra de um escritor por árvore.
+- Certifica a runx em AxisGov/runx@6a31b9f (runx#10, DR-88 a DR-91):
+  - **Os comandos das referências valem pelo `expx init`.** Eles só citavam `.claude/runx-hooks/`, o destino do `install.sh`. Agora usam esse caminho se a biblioteca está lá, e senão `.claude/hooks/`. `./install.sh --opencode` e a instalação global continuam sem os hooks nos dois caminhos, e o comando manual falha nelas, como já falhava.
+  - **Os hooks não deixam `.pyc`.** O `__pycache__` na árvore versionada parava o `fechamento-do-e1` da MergeX com rc 10.
+  - **`diagrama_nao_gerado` e `diagrama_nao_atualizado`.** A DR-55 os criou, e o `rastro.py` recusava os dois com rc 2. Entram no contrato `expx-eventos`, no docs-site e no painel.
+- Certifica a MergeX em AxisGov/mergex@0e0bf27 (mergex#66, DM-299 e DM-300):
+  - **O id curto da ocorrência.** O schema da runx exige `trabalho_id: OC-AAAA-NNNN`, e a MergeX comparava com `<OC-ID>-<slug>`: o `persistir-metodo` parava, e o E3 mandava todos os artefatos a olho humano. Dentro de `docs/manutencao/`, o id exato agora vale, e o completo segue aceito. O `ENTREGA.md` só vale com o completo.
+- **A branch nasce sem rastrear a base.** O E1 da runx, a F1 da SprintX e o E0 da MergeX usam `--no-track`: a branch criada de `origin/main` rastreava a `main`, e um `git push` sem argumentos sob `push.default=upstream` ia direto para ela.
+- Teste com a SprintX e a runx instaladas juntas pelo `init` real: o fluxo da ocorrência passa, e o que protege a feature continua valendo.
+- **Limites assumidos:** trocar o status do plano por shell desliga o `escopo-da-task`, que não vê escrita por shell. O fechamento da runx depois do merge ainda não tem caminho oficial na MergeX, e fica para a próxima versão.
+
 ## 0.12.15 — os achados do Conselhos
 
 - Certifica a MergeX em AxisGov/mergex@6e01fc9 (mergex#65, DM-291 a DM-298):
