@@ -37,7 +37,7 @@ que vale onde os dois divergem. Os limites L1, L2 e L3 estão em
   CLI errada ou falsa no `PATH`, não defender de máquina comprometida.
 - **Execução pelo arquivo conferido:** `node <bin do pacote> review ...`, pelo mesmo
   `node` que roda a revisão; nunca o `codeant` do `PATH` depois da conferência.
-- **Comando**, uma chamada só, **sem lotes**:
+- **Comando**, uma chamada só, **sem lotes do lado do expx** (a CLI fatia a chamada, por dentro, em lotes de até cinco arquivos):
   - trabalho antes do commit (F6): `review --headless --uncommitted --include <revisáveis>`;
   - trabalho já commitado: `review --headless --base-commit <SHA inicial da task> --include <revisáveis>`.
   - Nunca `--last-n-commits` (máximo 5) nem `--fail-on`.
@@ -302,7 +302,7 @@ Na sprintx (F6), `incompleta` vira o bloqueio da classe **`revisao_incompleta`**
 | `L2` | uma task anterior divide o arquivo |
 | `excluido-declarado` | tirar o arquivo da lista de exclusão ou da task |
 | `perfil` | instalar a versão homologada ou homologar a nova |
-| `lote-falhou` | revisar de novo a task inteira; repetindo com HTTP 413, dividir a task |
+| `lote-falhou` | revisar de novo a task inteira; repetindo com HTTP 413, reduzir o que vai no lote e repetir. A CLI agrupa os arquivos ordenados, em lotes de até cinco: dividir a task pode manter o mesmo lote, e um arquivo sozinho pode passar do limite do servidor, que não se conhece |
 | `pulado`, `faltante`, `sobra`, `repetido` | diagnóstico |
 
 `indisponivel` depende do modo (`obrigatoria`: a task não fecha). Na mergex, a V12
