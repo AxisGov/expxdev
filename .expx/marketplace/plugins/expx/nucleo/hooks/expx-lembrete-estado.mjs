@@ -22,7 +22,10 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 const TTL_EVENTO_MS = 24 * 60 * 60 * 1_000;
 const TTL_TRABALHO_MS = 7 * 24 * 60 * 60 * 1_000;
 const LIMITE_POR_TIPO = 64;
-const ESPERA_LOCK_MS = 50;
+// Sem o lock, o hook emite (fail-open): perder o lembrete é pior que repeti-lo.
+// Com 50 ms, sob carga, duas execuções concorrentes repetiam (2 em 20, load 22).
+// O teto é o `timeout: 1` do hook no settings: esperar mais cortaria a saída.
+const ESPERA_LOCK_MS = 250;
 const FUTURO_TOLERADO_MS = 60_000;
 const STALE_LOCK_MS = 30_000;
 const PREFIXO_TEMPORARIO = ".estado.";

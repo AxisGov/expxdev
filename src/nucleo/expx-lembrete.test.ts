@@ -325,7 +325,9 @@ describe("estado seguro e concorrencia pendentes", () => {
     expect(podado.trabalhos).toEqual([presente]);
   });
 
-  it("duas execucoes concorrentes do mesmo evento emitem exatamente uma vez (caso 15)", async () => {
+  // Decisão do Flávio na 0.13.1: sem o lock, o hook emite, e repetir é aceito;
+  // nunca emitir nenhuma vez é o defeito.
+  it("duas execucoes concorrentes do mesmo evento emitem ao menos uma vez, e no maximo duas (caso 15)", async () => {
     const projeto = criarProjeto();
     const entrada = evento(projeto);
     const saidas = await Promise.all([
@@ -333,7 +335,9 @@ describe("estado seguro e concorrencia pendentes", () => {
       executarHookConcorrente(projeto, entrada),
     ]);
 
-    expect(saidas.filter((saida) => saida !== "")).toHaveLength(1);
+    const emitidas = saidas.filter((saida) => saida !== "").length;
+    expect(emitidas).toBeGreaterThanOrEqual(1);
+    expect(emitidas).toBeLessThanOrEqual(2);
   });
 
   it("recusa raiz de estado symlink sem tocar o alvo e usa fail-open (caso 16)", () => {
