@@ -242,8 +242,8 @@ _PR_AWK_BRANCH='
         if (index(linha, "branch:") == 1) {
           sub(/^[^:]*:[[:space:]]*/, "", linha)
           if (linha !~ /^["\047]/) sub(/[[:space:]]+#.*$/, "", linha)
-          else if (linha ~ /^"[^"]*"[[:space:]]+#/) sub(/"[[:space:]]+#.*$/, "\"", linha)
-          else if (linha ~ /^\047[^\047]*\047[[:space:]]+#/) sub(/\047[[:space:]]+#.*$/, "\047", linha)
+          else if (match(linha, /^"([^"\\]|\\.)*"([[:space:]]+#|[[:space:]]*$)/)) { match(linha, /^"([^"\\]|\\.)*"/); linha = substr(linha, 1, RLENGTH); gsub(/\\"/, "\"", linha) }
+          else if (match(linha, /^\047([^\047]|\047\047)*\047([[:space:]]+#|[[:space:]]*$)/)) { match(linha, /^\047([^\047]|\047\047)*\047/); linha = substr(linha, 1, RLENGTH); gsub(/\047\047/, "\047", linha) }
           gsub(/^["\047]|["\047]$/, "", linha)
           gsub(/[[:space:]]+$/, "", linha)
           if (linha == b) print i

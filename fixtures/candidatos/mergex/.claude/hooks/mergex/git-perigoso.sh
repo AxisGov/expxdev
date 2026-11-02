@@ -748,6 +748,8 @@ clean_prefixo() {
     w="${w//\'/}"; w="${w//\"/}"
     if [ "$achou" = 0 ]; then [ "$w" = git ] && achou=1; continue; fi
     [ "$w" != clean ] || return 0
+    # `--config-env=<chave>=<var>` é a mesma opção, sem a palavra separada.
+    case "$pula$w" in 0--config-env=*) w="${w#--config-env=}"; pula=e ;; esac
     if [ "$pula" = c ] || [ "$pula" = e ]; then
       if [[ "$w" =~ ^[cC][lL][eE][aA][nN]\.[rR][eE][qQ][uU][iI][rR][eE][fF][oO][rR][cC][eE](=(.*))?$ ]]; then
         CL_FORCA_VISTA=1; CL_FORCA="${BASH_REMATCH[2]}"

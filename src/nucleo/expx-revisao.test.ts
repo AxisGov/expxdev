@@ -276,7 +276,7 @@ describe("expx-revisao.mjs revisar", () => {
     expect(r.ev.arquivos[f]?.blob).toMatch(/^[0-9a-f]{40}$/);
   });
 
-  it("funcional: o snapshot de processo morto sai na revisão seguinte; o que pode estar em uso fica", () => {
+  it("funcional: o snapshot de processo morto sai na revisão seguinte; o que pode estar em uso ou não tem dono fica", () => {
     const c = cenario();
     altera3(c.raiz);
     const antigo = (Date.now() - 2 * 60 * 60 * 1000) / 1000;
@@ -291,8 +291,16 @@ describe("expx-revisao.mjs revisar", () => {
       if (tempo !== undefined) utimesSync(base, tempo, tempo);
       return base;
     };
-    const saem = { morto: snapshot(morto), antigo: snapshot(undefined, antigo), velho: snapshot(process.pid, velho) };
+    const saem = { morto: snapshot(morto), velho: snapshot(process.pid, velho) };
     const ficam = [snapshot(process.pid), snapshot(undefined)];
+    // Sem `dono` válido não é deste script, em nenhuma idade, e o arquivo de quem o usa fica.
+    const semProva = [snapshot(undefined, velho), snapshot(undefined, antigo)];
+    const donoInvalido = mkdtempSync(join(tmpdir(), "expx-revisao-snapshot-"));
+    writeFileSync(join(donoInvalido, "dono"), "x");
+    git(c.raiz, "worktree", "add", "-q", "--detach", join(donoInvalido, "checkout"), "HEAD");
+    utimesSync(donoInvalido, velho, velho);
+    semProva.push(donoInvalido);
+    for (const base of semProva) writeFileSync(join(base, "checkout", "de-alguem.txt"), "nao commitado\n");
     // Outro worktree do repositório nunca é assunto do `revisar`, mesmo antigo.
     const alheio = mkdtempSync(join(tmpdir(), "expx-worktree-alheio-"));
     git(c.raiz, "worktree", "add", "-q", "--detach", join(alheio, "checkout"), "HEAD");
@@ -310,9 +318,10 @@ describe("expx-revisao.mjs revisar", () => {
       expect(Object.entries(saem).filter(([, base]) => existsSync(base)).map(([caso]) => caso)).toEqual([]);
       for (const base of Object.values(saem)) expect(lista).not.toContain(base.split(/[\\/]/).pop());
       for (const base of [...ficam, alheio, fora, travado]) expect(existsSync(join(base, "checkout")), base).toBe(true);
+      for (const base of semProva) expect(readFileSync(join(base, "checkout", "de-alguem.txt"), "utf8"), base).toBe("nao commitado\n");
     } finally {
       git(c.raiz, "worktree", "unlock", join(travado, "checkout"));
-      for (const base of [...Object.values(saem), ...ficam, alheio, dirname(fora), travado]) rmSync(base, { recursive: true, force: true });
+      for (const base of [...Object.values(saem), ...ficam, ...semProva, alheio, dirname(fora), travado]) rmSync(base, { recursive: true, force: true });
       git(c.raiz, "worktree", "prune");
     }
   });

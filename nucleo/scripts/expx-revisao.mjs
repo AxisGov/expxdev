@@ -194,13 +194,16 @@ const codeant = (bin, a, cwd = op.raiz) => spawnSync(process.execPath, [bin, ...
 });
 const SNAPSHOT_PREFIXO = "expx-revisao-snapshot-";
 const UMA_HORA = 60 * 60 * 1_000;
-/** O snapshot pode estar em uso? Com dono: o processo vive, até um dia, porque o PID pode ter sido reusado e a
- *  CLI morre em 15 minutos. Sem dono, de versão anterior ou no instante da criação: até uma hora. */
+/** O `dono` é a prova de que o snapshot é deste script: nasce antes do `worktree add`, e sem ele nada se apaga,
+ *  porque o `--force` levaria arquivo de quem usou o mesmo nome. Com dono: o processo vive, até um dia, porque o
+ *  PID pode ter sido reusado e a CLI morre em 15 minutos. */
 function snapshotAbandonado(base) {
   let idade, dono;
-  try { idade = Date.now() - statSync(base).mtimeMs; } catch { return true; }
-  try { dono = Number(readFileSync(join(base, "dono"), "utf8")); } catch { return idade > UMA_HORA; }
-  if (!Number.isSafeInteger(dono) || dono <= 0) return idade > UMA_HORA;
+  try {
+    idade = Date.now() - statSync(base).mtimeMs;
+    dono = Number(readFileSync(join(base, "dono"), "utf8"));
+  } catch { return false; }
+  if (!Number.isSafeInteger(dono) || dono <= 0) return false;
   if (idade > 24 * UMA_HORA) return true;
   try { process.kill(dono, 0); return false; } catch (e) { return e?.code === "ESRCH"; }
 }
