@@ -94,6 +94,17 @@ describe("expx-invocacao: observa a chamada do agente gerenciado", () => {
     expect(eventos(raiz)[0]).toMatchObject({ fora_da_politica: true, modelos_observados: ["claude-sonnet-5-5", "claude-haiku-5-5"] });
   });
 
+  // §13.5: o fallback real só ocorre sob sobrecarga, e não há como provocá-lo barato.
+  // Este é o payload que ele produz: o primário e a alternativa seguinte da cadeia.
+  it("funcional: fallback para a alternativa seguinte da cadeia fica dentro da política, com os dois modelos", () => {
+    const raiz = projeto();
+    antes(raiz, "qa");
+    depois(raiz, "qa", { status: "completed", resolvedModel: "claude-opus-5-5", modelsUsed: ["claude-sonnet-5-5", "claude-opus-5-5"], agentId: "ag-1" });
+    const e = eventos(raiz)[0];
+    expect(e).toMatchObject({ estado_invocacao: "concluida", modelos_observados: ["claude-sonnet-5-5", "claude-opus-5-5"] });
+    expect(e?.["fora_da_politica"]).toBeUndefined();
+  });
+
   it.each([[[]], [[1]], ["x"]])("funcional: modelsUsed inválido (%j) não significa dentro da política: cai em resolvedModel", (usados) => {
     const raiz = projeto();
     antes(raiz, "qa");
