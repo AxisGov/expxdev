@@ -33,6 +33,7 @@ import { artefatosOpenCode, pontesDeHooks } from "../harness/opencode.js";
 import { entradasPorNome, formaSemAspas, gravarSettings, planejarSettings, type PlanoSettings } from "../harness/settings.js";
 import { verificarModificacaoLocal } from "../update/modificacao.js";
 import { artefatosDeHooks, comHooks, hooksPorNome } from "../harness/hooks.js";
+import { conferirPisoDoClaude } from "../harness/versao-claude.js";
 import {
   caminhosReferenciados,
   hashDasEntradas,
@@ -276,10 +277,13 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
   let resolucoes: Resolucao[] | undefined;
   let projecao: string | undefined;
   if (claude) {
-    candidatos.push(...artefatosDeHooks(montaveis));
     // Política de orquestração: ausente, a camada não existe e nada muda.
     const pol = lerPolitica(op.raiz);
     if (!pol.ok) erros.push(pol.erro);
+    // O envelope da invocação pede a política e o Claude Code no piso; sem o piso, o resto segue.
+    const piso = pol.ok && pol.ativa ? conferirPisoDoClaude() : undefined;
+    if (piso !== undefined && !piso.ok) avisosDoPlano.push(piso.aviso);
+    candidatos.push(...artefatosDeHooks(montaveis, piso?.ok === true));
     const politica = pol.ok && pol.ativa ? pol.politica : undefined;
     // Agentes resolvidos pela política (se houver) e com o override do projeto
     // (`.expx/agentes.json`) aplicado.

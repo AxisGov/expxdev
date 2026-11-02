@@ -492,10 +492,16 @@ expx_rastro_grava() {
     # a resolucao vigente do subagente, so no Claude: a projecao e do adaptador claude
     case "$harness" in
       claude|claude-code)
-        if [ "$agente" != principal ]; then
-          local resolucao; resolucao="$(expx_resolucao_extras "$raiz" "$agente")"
-          [ -n "$resolucao" ] && linha="$linha,$resolucao"
-        fi
+        # salvo se o chamador ja a mandou: a da chamada, quando a vigente mudou no meio
+        case "$extras" in
+          *'"resolucao_id":'*) ;;
+          *)
+            if [ "$agente" != principal ]; then
+              local resolucao; resolucao="$(expx_resolucao_extras "$raiz" "$agente")"
+              [ -n "$resolucao" ] && linha="$linha,$resolucao"
+            fi
+            ;;
+        esac
         ;;
     esac
     [ -n "$extras" ] && linha="$linha,$extras"

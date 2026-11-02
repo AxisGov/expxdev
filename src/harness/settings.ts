@@ -58,6 +58,15 @@ function eventosDoHook(relativo: string): string[] {
  * com espaço quebraria a palavra e o hook não rodaria.
  */
 export function entradasPorNome(h: HookInstalado): EntradaHook[] {
+  // O envelope da invocação: só o `Agent`, e o `SessionStart` da recuperação. Sem
+  // `onFailure: "block"`: nesta versão ele observa, e o hook que quebra não trava o agente.
+  if (h.relativo.endsWith("expx-invocacao.mjs")) {
+    const hook = { type: "command", command: "node", args: [`\${CLAUDE_PROJECT_DIR}/${h.relativo}`], timeout: 10 };
+    return [
+      ...["PreToolUse", "PostToolUse", "PostToolUseFailure"].map((evento) => ({ skill: h.skill, evento, matcher: "Agent", hook })),
+      { skill: h.skill, evento: "SessionStart", hook },
+    ];
+  }
   const hook = h.relativo.endsWith("expx-session-sync.mjs")
     ? { type: "command", command: "node", args: [`\${CLAUDE_PROJECT_DIR}/${h.relativo}`] }
     : h.relativo.endsWith("expx-lembrete.sh")

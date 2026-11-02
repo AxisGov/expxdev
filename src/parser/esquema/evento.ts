@@ -43,8 +43,7 @@ export const EXTRAS_EVENTO = [
   "model",
   "effort",
   // A resolução da orquestração (CONTRATO-expx-orquestracao §11.1): o escritor
-  // comum grava as sete primeiras desde a F3a; `invocacao`,
-  // `modelos_observados` e `fora_da_politica` são do envelope da F3b.
+  // comum grava as sete primeiras desde a F3a; as demais são do envelope da F3b.
   "resolucao_id",
   "classe_declarada",
   "classe_resolvida",
@@ -53,6 +52,8 @@ export const EXTRAS_EVENTO = [
   "origem_alternativa",
   "materializado",
   "invocacao",
+  "instancia",
+  "estado_invocacao",
   "modelos_observados",
   "fora_da_politica",
   // CONTRATO-expx-orquestracao §12.3 (F3c): só em `integridade_final_verificada`.
@@ -135,8 +136,10 @@ export const EventoNome = z.enum([
   // e `agente: principal`, e nunca interrompe a etapa. Entrou aqui para que o
   // rastro legítimo da mergex não seja contado como fora do contrato.
   "artefato_gravado",
-  // CONTRATO-expx-orquestracao §8.2, passo 3: o envelope de uma invocação de
-  // agente que nunca fechou. Declarado na F3a; quem o emite é a F3b.
+  // CONTRATO-expx-orquestracao §8.2: o fechamento da chamada de um agente gerenciado,
+  // e o envelope que nunca fechou. Evento próprio, e não `agente_concluido`, que
+  // representa o `SubagentStop` e não conhece a chamada.
+  "invocacao_fechada",
   "invocacao_abandonada",
   // CONTRATO-expx-orquestracao §12 (F3c): o hook do núcleo
   // `expx-integridade-final.sh` compara a foto do início de um agente de
@@ -232,6 +235,9 @@ export const LinhaEvento = z
     origem_alternativa: z.enum(["projeto", "skill", "embutida", "sessao", "agentes-json-v1"]).optional(),
     materializado: z.strictObject({ model: z.string().min(1), effort: z.string().min(1).optional() }).optional(),
     invocacao: z.string().min(1).optional(),
+    // sessão e `agent_id` juntos: liga o fechamento à integridade final da mesma instância
+    instancia: z.string().regex(/^[0-9a-f]{40}([0-9a-f]{24})?$/).optional(),
+    estado_invocacao: z.enum(["concluida", "lancada", "falha"]).optional(),
     modelos_observados: z.array(z.string().min(1)).optional(),
     // presente só quando o executor saiu da cadeia; ausente nos demais casos
     fora_da_politica: z.literal(true).optional(),
@@ -247,6 +253,19 @@ export const LinhaEvento = z
     path: ["materializado"],
   })
   // A verificação sem o resultado não diz nada; o resultado fora dela não tem dono.
+  // CONTRATO-expx-orquestracao §13.2: o fechamento sem a chamada ou o desfecho não correlaciona nada.
+  .refine((l) => (l.evento !== "invocacao_fechada" && l.evento !== "invocacao_abandonada") || l.invocacao !== undefined, {
+    message: "invocacao é obrigatória em invocacao_fechada e invocacao_abandonada",
+    path: ["invocacao"],
+  })
+  .refine((l) => (l.evento === "invocacao_fechada") === (l.estado_invocacao !== undefined), {
+    message: "estado_invocacao é obrigatório em invocacao_fechada e só existe nele",
+    path: ["estado_invocacao"],
+  })
+  .refine((l) => l.estado_invocacao === undefined || (l.estado_invocacao === "falha") === (l.resultado === "falha"), {
+    message: "resultado de invocacao_fechada: falha só com estado_invocacao falha",
+    path: ["resultado"],
+  })
   .refine((l) => (l.evento === "integridade_final_verificada") === (l.integridade_final !== undefined), {
     message: "integridade_final é obrigatória em integridade_final_verificada e só existe nele",
     path: ["integridade_final"],

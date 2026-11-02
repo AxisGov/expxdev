@@ -99,9 +99,14 @@ grava() {
   [ "$estado" = igual ] && resultado=ok
   local raiz="$RAIZ"
   [ -n "$raiz" ] || raiz="$(expx_raiz "$CWD")"
+  # A mesma conta do fechamento da invocacao (expx-invocacao.mjs): o `agent_id` sozinho
+  # pode repetir entre sessoes, e ligaria a integridade a invocacao errada.
+  local inst="" ext=""
+  [ -n "$AGENT_ID" ] && inst="$(printf '%s\n%s' "$SESSAO" "$AGENT_ID" | git -C "$raiz" hash-object --stdin 2>/dev/null)"
+  [ -n "$inst" ] && ext=",\"instancia\":\"$inst\""
   EXPX_AGENTE="$AGENTE" expx_rastro_grava "$raiz" integridade_final_verificada hook "$resultado" \
     "integridade final de $AGENTE: $estado${2:+ ($2)}" '[]' \
-    "\"integridade_final\":{\"estado\":\"$estado\",\"diferencas\":[$lista]}"
+    "\"integridade_final\":{\"estado\":\"$estado\",\"diferencas\":[$lista]}$ext"
 }
 
 # hash <texto> — o nome de diretorio de um id do payload

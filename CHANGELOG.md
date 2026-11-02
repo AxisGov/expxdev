@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.13.0 — o envelope da invocação: observar antes de recusar
+
+Com a política de orquestração ativa, cada chamada de agente gerenciado passa a deixar registro: quem rodou, em que modelo, como terminou e se saiu da política. **Nada é recusado nesta versão.** Sem `.expx/orquestracao.json`, nada muda.
+
+- **`expx-invocacao.mjs`**, em `PreToolUse`, `PostToolUse` e `PostToolUseFailure` do `Agent`, e em `SessionStart`. Falha aberto: se o hook quebra, o agente roda, e o fechamento registra `sem envelope`. Agente fora do vocabulário do rastro não é observado.
+- **Aprovadores em primeiro plano.** O Claude Code roda `Agent` em segundo plano por padrão, e aí só se observa o lançamento. Quem emite `veredito_emitido` passa a rodar em primeiro plano, e **a sessão espera por ele**. Quem implementa segue como pediu.
+- **Eventos novos:** `invocacao_fechada` e, em `SessionStart`, `invocacao_abandonada`, com `invocacao`, `instancia`, `estado_invocacao`, `modelos_observados` e `fora_da_politica`.
+- **A integridade final se liga à invocação:** `integridade_final_verificada` ganha `instancia`, a mesma conta do fechamento.
+- **Piso do Claude Code: 2.1.310**, a versão em que o fluxo foi provado. Esta versão não usa `onFailure`, mas a recusa vai usar, e a 2.1.269 e a 2.1.287 o ignoraram. Abaixo do piso, o `init` instala o resto e avisa, e o `doctor` acusa `claude-abaixo-do-piso`. Com a política ativa e sem o hook, `envelope-nao-instalado`.
+- **Provado com o binário real:** `expx init` com política, `claude` 2.1.310 chamando `qa`, que rodou em primeiro plano sem `permissionDecision`, e agente não gerenciado sem envelope.
+- **Ficam para depois:** a recusa do veredito, que depende de observar uso real e de ligar `veredito_emitido` à invocação; `expx resolucao` e as camadas 6 e 7; o nível `isolado`, com o regime de transição mantido. O que falta para recusar está em CONTRATO-expx-orquestracao §13.5.
+
 ## 0.12.20 — o fechamento da runx no mundo real
 
 O Conselhos exercitou o `gh` real na 0.12.19 (conselhos#236) e achou três defeitos do script novo, reproduzidos antes de corrigir.

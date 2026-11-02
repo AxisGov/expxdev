@@ -1,3 +1,5 @@
+import { lerPolitica } from "../orquestracao/politica.js";
+import { conferirPisoDoClaude, PISO_CLAUDE } from "../harness/versao-claude.js";
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -223,6 +225,7 @@ export function diagnosticar(raiz: string, env: NodeJS.ProcessEnv = process.env)
   verificarHooks(raiz, push);
   verificarRastro(raiz, push);
   verificarRastroIgnorado(raiz, push);
+  verificarEnvelopeDaInvocacao(raiz, push);
   verificarFatiamento(raiz, env, fatias, push);
 
   return { saudavel: achados.filter((a) => a.severidade === "erro").length === 0, achados };
@@ -655,6 +658,25 @@ const GIT_LOCAIS = new Set([
   "GIT_NO_REPLACE_OBJECTS",
   "GIT_REPLACE_REF_BASE",
 ]);
+
+/**
+ * O envelope da invocação (CONTRATO-expx-orquestracao §8.2) pede o Claude Code no
+ * piso. Com a política ativa, a falta do hook ou uma versão abaixo do piso deixam a
+ * observação sem dado, e isso precisa aparecer. É aviso: esta versão só observa.
+ */
+function verificarEnvelopeDaInvocacao(raiz: string, push: (a: Achado) => void): void {
+  // Política inválida tem achado próprio, e o envelope é do adaptador Claude.
+  const politica = lerPolitica(raiz);
+  if (!politica.ok || !politica.ativa || !existsSync(join(raiz, ".claude", "settings.json"))) return;
+  const piso = conferirPisoDoClaude();
+  if (!piso.ok) {
+    push({ id: "claude-abaixo-do-piso", severidade: "aviso", problema: piso.aviso, correcao: `atualize o Claude Code para ${PISO_CLAUDE} ou superior e rode o expx init` });
+    return;
+  }
+  if (!existsSync(join(raiz, ".claude", "hooks", "expx-invocacao.mjs"))) {
+    push({ id: "envelope-nao-instalado", severidade: "aviso", problema: "politica de orquestracao ativa, sem o hook do envelope da invocacao", correcao: "rode o expx init de novo" });
+  }
+}
 
 /**
  * Com a integridade final instalada, o rastro precisa estar ignorado pelo Git

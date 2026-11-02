@@ -30,6 +30,7 @@ export const ROTULO_EVENTO: Record<string, string> = {
   commit_criado: "commit",
   pr_aberto: "pr aberto",
   artefato_gravado: "artefato gravado",
+  invocacao_fechada: "invocação fechada",
   invocacao_abandonada: "invocação abandonada",
   diagrama_nao_gerado: "diagrama não gerado",
   diagrama_nao_atualizado: "diagrama não atualizado",

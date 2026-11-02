@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
@@ -136,5 +137,43 @@ describe("doctor: integridade final", () => {
     mkdirSync(join(p.raiz, ".claude", "hooks"), { recursive: true });
     writeFileSync(join(p.raiz, ".claude", "hooks", "expx-integridade-final.sh"), "#!/usr/bin/env bash\n");
     expect(ids(p.raiz)).not.toContain("rastro-nao-ignorado");
+  });
+});
+
+describe.skipIf(process.platform === "win32")("doctor e o envelope da invocação", () => {
+  const PATH_ORIGINAL = process.env["PATH"];
+  afterEach(() => {
+    process.env["PATH"] = PATH_ORIGINAL;
+  });
+  function claudeFalso(saida: string): void {
+    const d = mkdtempSync(join(tmpdir(), "expx-claude-falso-"));
+    repos.push(d);
+    writeFileSync(join(d, "claude"), `#!/bin/sh\necho '${saida}'\n`, { mode: 0o755 });
+    process.env["PATH"] = `${d}:${PATH_ORIGINAL ?? ""}`;
+  }
+  const idsDe = (raiz: string) => diagnosticar(raiz, {}).achados.map((a) => a.id);
+
+  it("funcional: sem política, nenhum dos dois achados", async () => {
+    p = await projeto();
+    claudeFalso("2.0.0");
+    expect(idsDe(p.raiz)).not.toContain("claude-abaixo-do-piso");
+    expect(idsDe(p.raiz)).not.toContain("envelope-nao-instalado");
+  });
+
+  it("funcional: com política, abaixo do piso acusa; no piso, sem o hook, acusa o outro; com o hook, nada", async () => {
+    p = await projeto();
+    mkdirSync(join(p.raiz, ".expx"), { recursive: true });
+    writeFileSync(join(p.raiz, ".expx", "orquestracao.json"), JSON.stringify({ expx_orquestracao: 1 }));
+    claudeFalso("2.1.287 (Claude Code)");
+    expect(idsDe(p.raiz)).toContain("claude-abaixo-do-piso");
+    // política inválida tem achado próprio, e o envelope não é assunto ali
+    writeFileSync(join(p.raiz, ".expx", "orquestracao.json"), "{");
+    expect(idsDe(p.raiz)).not.toContain("claude-abaixo-do-piso");
+    writeFileSync(join(p.raiz, ".expx", "orquestracao.json"), JSON.stringify({ expx_orquestracao: 1 }));
+    claudeFalso("2.1.310 (Claude Code)");
+    expect(idsDe(p.raiz)).toContain("envelope-nao-instalado");
+    writeFileSync(join(p.raiz, ".claude", "hooks", "expx-invocacao.mjs"), "");
+    expect(idsDe(p.raiz)).not.toContain("envelope-nao-instalado");
+    expect(idsDe(p.raiz)).not.toContain("claude-abaixo-do-piso");
   });
 });

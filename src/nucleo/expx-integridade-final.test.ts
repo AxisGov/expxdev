@@ -113,6 +113,8 @@ describe("expx-integridade-final: a foto do início contra o fim, por instância
     expect(resto).toEqual([]);
     expect(v).toMatchObject({ ferramenta: "runx", agente: "qa", resultado: "ok" });
     expect(v?.integridade_final).toEqual({ estado: "igual", diferencas: [] });
+    // a mesma conta do fechamento da invocação (expx-invocacao.mjs), com sessão e agente
+    expect((v as unknown as Record<string, unknown>)["instancia"]).toMatch(/^[0-9a-f]{40,64}$/);
     expect(arquivosDoEstado(raiz)).toEqual([]);
   });
 
