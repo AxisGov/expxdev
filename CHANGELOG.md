@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.13.1 — o que a 0.13.0 deixou no consumidor
+
+O Conselhos instalou a 0.13.0 e achou dois defeitos, reproduzidos no pacote publicado. Esta versão os corrige e fecha as pendências pequenas.
+
+- **`expx update` entrega a CLI nova.** Com as skills em dia, a 0.13.0 dizia `em dia`, saía 0 e deixava o lock, o plugin e os hooks do núcleo da CLI anterior; o SessionStart passava pelo mesmo caminho. Agora o lock de uma CLI anterior remonta a instalação com as mesmas skills e os mesmos commits, com a proteção de modificação local de toda remontagem. O `--check` só relata. O `doctor` ganha o aviso `instalacao-de-cli-anterior` (35 verificações).
+- **Política ativa com as nove skills.** O `init` dava rc 1 com designx, legadox ou stackx: cinco agentes sem `classe:` e sem `model` classificável davam `sem_classe`. As skills agora declaram a classe de todos os agentes. Os cinco ficam em `raciocinio_normal`: com a política, deixam de herdar o modelo da sessão. Os outros oito declaram a classe que o `model` já dava. Certifica designx@cf5a54d (designx#4), legadox@e43d17e (legadox#5, DL-57), stackx@12b7dd7 (stackx#6, D-19), mergex@67ec8eb (mergex#71, DM-308), sprintx@739e69c (sprintx#65, DS-201) e runx@b52b890 (runx#15, DR-96). Um teste novo resolve, offline e com a política, os agentes do commit certificado de cada skill.
+- **A mensagem do `sem_classe` aponta a skill.** Ela mandava declarar `classe:` no agente, que no consumidor é a cópia instalada.
+- **Rastro da runx de subpasta** (runx#15, DR-97): os 14 comandos das referências e o `--ocorrencia` partem da raiz do Git.
+- **Lembrete sob carga:** a espera pelo lock vai de 50 a 250 ms, abaixo do `timeout: 1` do hook. Sem o lock, o hook emite: repetir o lembrete é aceito, perdê-lo não.
+- **Site:** o comando de instalação baixa o pacote em `~/expx-cli/v<versão>`, como o README, e não mais dentro do projeto.
+- **Recusa do veredito:** o critério para construí-la está no contrato (§13.5): 20 vereditos em ao menos 5 PRs e 3 configurações de projeto, sem nenhum falso positivo. Nada recusa ainda.
+- **Errata da 0.13.0:** "sem `.expx/orquestracao.json`, nada muda" não vale para o evento `integridade_final_verificada`, que ganhou `instancia` também sem a política, porque o hook da integridade final é instalado sempre. O campo é aditivo, e nada decide por ele.
+- **Errata do aviso da 0.13.0:** a instalação "por release e PR, como nas anteriores" não funcionava, porque o `update` não entregava a versão. Quem está na 0.13.0 chega à 0.13.1 pelo `update`.
+- **Provado com o `claude` 2.1.310 real:** duas chamadas de agente na mesma mensagem, cada uma com envelope próprio; a sessão da SprintX e o `session_id` da `instancia` são o mesmo id. **Não exercitado:** `modelsUsed` sob fallback real (só o payload, em teste) e o Windows nativo, por decisão do dono.
+
 ## 0.13.0 — o envelope da invocação: observar antes de recusar
 
 Com a política de orquestração ativa, cada chamada de agente gerenciado passa a deixar registro: quem rodou, em que modelo, como terminou e se saiu da política. **Nada é recusado nesta versão.** Sem `.expx/orquestracao.json`, nada muda.
