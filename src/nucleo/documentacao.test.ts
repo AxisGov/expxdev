@@ -50,6 +50,7 @@ const EXTENSO: Record<number, string> = {
   32: "Trinta e duas",
   33: "Trinta e três",
   34: "Trinta e quatro",
+  35: "Trinta e cinco",
 };
 
 function extenso(n: number): string {
@@ -91,6 +92,14 @@ describe("identidade da release no docs-site", () => {
   const pacote = JSON.parse(readFileSync("package.json", "utf8")) as { version: string };
   const site = readFileSync("docs-site/index.html", "utf8");
   const apresentacao = readFileSync("docs-site/apresentacao.html", "utf8");
+
+  // O `gh release download -D ./expx-cli` deixava o .tgz dentro do projeto do
+  // consumidor; o README já baixava em ~/expx-cli/v<versão>.
+  it("funcional: o comando do site baixa o pacote fora do projeto, como o README", () => {
+    expect(site).not.toContain("./expx-cli");
+    expect(site).toContain(`-D</span> ~/expx-cli/v${pacote.version}`);
+    expect(site).toContain(`~/expx-cli/v${pacote.version}/expxdev-${pacote.version}.tgz`);
+  });
 
   it("funcional: site e apresentação publicam a versão do package", () => {
     expect(site).toContain(`id="versao">v${pacote.version}</span>`);

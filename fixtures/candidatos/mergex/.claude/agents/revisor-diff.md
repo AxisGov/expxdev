@@ -4,6 +4,7 @@ description: Classifica o diff de uma entrega nas três faixas de atenção huma
 tools: Read, Grep, Glob, Bash
 model: opus
 effort: high
+classe: profundo_excepcional
 ---
 
 # revisor-diff — classificação da atenção humana

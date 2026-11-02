@@ -291,6 +291,19 @@ describe("init com política — falha antes de escrever", () => {
     expect(erro).toContain("frontmatter_fora_da_classe");
   });
 
+  // 0.13.0 no Conselhos: `model: inherit` sem `classe:`. A mensagem mandava
+  // declarar a classe no agente, que é a cópia instalada: o defeito é da skill.
+  it("agente sem classe aponta a skill, e não a cópia instalada", async () => {
+    const p = produto();
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+    const o = { alfa: skill("alfa", { ".claude/agents/cartografo.md": AGENTE("cartografo", "model: inherit") }) };
+    const erro = await falhaSemEscrever(p, o);
+    expect(erro).toContain("sem_classe");
+    expect(erro).toContain("a skill alfa publica o agente cartografo sem `classe:`");
+    expect(erro).toContain("nao edite a copia instalada");
+    expect(erro).not.toContain("declare classe: no agente");
+  });
+
   it("classe fora do vocabulário no agente da skill", async () => {
     const p = produto();
     gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });

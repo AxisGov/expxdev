@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { copyFileSync, existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
@@ -34,6 +34,27 @@ async function projetoSadio(): Promise<ProjetoTemporario> {
   await executarInit({ raiz: t.raiz, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: repo } });
   return t;
 }
+
+describe("doctor e a CLI que gravou o lock", () => {
+  it("funcional: lock de CLI anterior é aviso, com o update como correção", async () => {
+    p = await projetoSadio();
+    const caminho = join(p.raiz, ".expx/expx-lock.json");
+    const lock = JSON.parse(readFileSync(caminho, "utf8")) as { cli_version: string };
+    lock.cli_version = "0.0.1";
+    writeFileSync(caminho, `${JSON.stringify(lock, null, 2)}\n`);
+
+    const achado = diagnosticar(p.raiz).achados.find((a) => a.id === "instalacao-de-cli-anterior");
+
+    expect(achado?.severidade).toBe("aviso");
+    expect(achado?.problema).toContain("0.0.1");
+    expect(achado?.correcao).toContain("expx update --yes");
+  });
+
+  it("funcional: lock da CLI em uso não tem o achado", async () => {
+    p = await projetoSadio();
+    expect(diagnosticar(p.raiz).achados.some((a) => a.id === "instalacao-de-cli-anterior")).toBe(false);
+  });
+});
 
 describe("doctor", () => {
   it("integração: cada fixture quebrada produz o achado que a nomeia", async () => {

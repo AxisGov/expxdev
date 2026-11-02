@@ -543,16 +543,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.13.0 -R AxisGov/expxdev -D ~/expx-cli/v0.13.0
+gh release download v0.13.1 -R AxisGov/expxdev -D ~/expx-cli/v0.13.1
 (
-  cd ~/expx-cli/v0.13.0
+  cd ~/expx-cli/v0.13.1
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.13.0.tgz.sha256
+    sha256sum -c expxdev-0.13.1.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.13.0.tgz.sha256
+    shasum -a 256 -c expxdev-0.13.1.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.13.0/expxdev-0.13.0.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.13.1/expxdev-0.13.1.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -566,7 +566,7 @@ npx --yes --package ~/expx-cli/v0.13.0/expxdev-0.13.0.tgz expx init --skills bui
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.13.0 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.13.1 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -640,6 +640,9 @@ npx --yes --package ~/expx-cli/v0.13.0/expxdev-0.13.0.tgz expx init --skills bui
   pasta e a marca de quem venceu. O contrato registra que a CLI varia entre rodadas.
 - `0.13.0` passa a observar a chamada de cada agente gerenciado: quem rodou, em que modelo, como terminou
   e se saiu da política. Os agentes de aprovação vão para o primeiro plano. Nada é recusado ainda.
+- `0.13.1` corrige o que a 0.13.0 deixou no consumidor: o `update` entrega CLI nova com as skills em
+  dia, e o `init` com a política ligada funciona com as nove skills, que agora declaram a classe dos
+  agentes. Os comandos de rastro da runx rodam de subpasta.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -674,6 +677,12 @@ travada em versão publicada, o commit exato, a data e **o hash de cada arquivo*
 | `--check` | Só mostra o que mudaria, não aplica nada |
 | `--to <ref>` | Fixa uma skill numa tag ou commit específico — exige nomear exatamente uma skill |
 | `--yes` / `--sim` | Aplica sem exigir terminal interativo |
+
+> **CLI nova, skills em dia.** O plugin e os hooks do núcleo vêm da CLI. Com o lock gravado
+> por uma CLI anterior, o `update` remonta a instalação com as mesmas skills, nos mesmos
+> commits, mesmo que todas estejam em dia, e o `doctor` avisa `instalacao-de-cli-anterior`
+> até isso acontecer. Até a 0.13.0, o `update` dizia `em dia` e não entregava o núcleo novo:
+> nessas versões, use `expx init` com as skills do lock.
 
 A aplicação **remonta o plugin do zero** com a seleção inteira do lock, em vez de editar a
 árvore montada. É mais lento e é de propósito: editar no lugar deixa arquivo órfão quando uma
@@ -722,7 +731,7 @@ skill encolhe entre versões.
 npx expxdev doctor
 ```
 
-Trinta e quatro verificações, cada uma com severidade e correção sugerida. Achado de severidade
+Trinta e cinco verificações, cada uma com severidade e correção sugerida. Achado de severidade
 `aviso` não derruba a saída; `erro` sim.
 
 | Verificação | Severidade |
@@ -731,6 +740,7 @@ Trinta e quatro verificações, cada uma com severidade e correção sugerida. A
 | `.expx/` existe | erro |
 | lock legível | erro |
 | lock não é de uma versão futura do CLI | erro |
+| lock gravado por um CLI anterior: plugin e hooks do núcleo podem estar velhos | aviso |
 | `plugin.json` válido | erro |
 | `marketplace.json` válido | erro |
 | skill do lock presente em disco | erro |

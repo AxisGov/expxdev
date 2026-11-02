@@ -450,6 +450,13 @@ continuam válidas. O esquema também amarra o `resultado` ao `estado` e o
 SprintX já grava `agente_concluido` para todo subagente, e o aprovador ficaria
 com duas conclusões. O `SubagentStart` não grava evento.
 
+Desde a 0.13.0, o evento leva também `instancia` quando o payload traz
+`agent_id`: o hash Git de `<session_id>\n<agent_id>`, a mesma conta do fechamento
+da invocação (13.2). O hook da integridade final é instalado com ou sem política,
+então o campo aparece também sem `.expx/orquestracao.json`. É aditivo: o leitor do
+rastro (11.3), o portão da MergeX e o MemoX não decidem nada por ele (errata da
+0.13.1 ao "sem política, nada muda" da 0.13.0).
+
 ### 12.4 O que `divergente` e `ausente` invalidam, nesta fase
 
 Divergência ou ausência **invalidam o veredito** daquele aprovador, em qualquer
@@ -544,3 +551,20 @@ JSON inválido com saída 0 passa mesmo com `block`; a prova de chamadas concorr
 mesma mensagem e a de `modelsUsed` sob fallback real; a sessão `claude-code@<id>` da
 SprintX comparada ao `session_id` cru. As camadas 6 e 7, com o `expx resolucao`, ficam
 até haver elevação por tarefa. O nível `isolado` é trabalho à parte.
+
+**Critério para construir a recusa**, decidido pelo dono na 0.13.1: com a política ativa
+em projeto real, **20 vereditos de aprovação** observados, em ao menos **5 PRs** e **3
+configurações de projeto**, todos com rastro completo (`invocacao_fechada` e
+`integridade_final_verificada` com a mesma `instancia`) e **nenhum falso positivo**, isto
+é, nenhuma `falha` em aprovador que não tenha escrito no projeto. Vinte é limiar
+operacional, sem pretensão estatística: basta para ver concorrência e variação de ambiente.
+Antes disso, nada recusa. O `isolado` só se constrói depois da recusa, e o
+`revisor-diff` não chega a `estrutural` tirando o `Bash`, porque a revisão precisa de
+`git diff`, `git log` e `git show`.
+
+Provas da 0.13.1, com o `claude` 2.1.310 real: duas chamadas de `Agent` na mesma mensagem
+fecham com `invocacao` e `instancia` distintas, sem envelope restante; a sessão
+`claude-code@<id>` da SprintX tem o mesmo id cru que entra na `instancia`. O `modelsUsed`
+sob fallback real segue não exercitado, porque o fallback só ocorre sob sobrecarga, e o
+payload que ele produz está coberto por teste. O hook no Windows nativo não será provado,
+por decisão do dono: o trabalho é no WSL.
