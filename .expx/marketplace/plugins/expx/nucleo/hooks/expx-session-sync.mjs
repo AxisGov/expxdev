@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export const AXIS_REPOSITORIO = "https://github.com/AxisGov/expxdev.git";
 const CACHE_OWNER = "AxisGov/expxdev\n";
@@ -371,6 +371,28 @@ export function lerOrigemDoLock(caminho) {
   return { ok: true, locais };
 }
 
+/** O cache absoluto e fora da raiz do projeto, comparado pelo caminho real do projeto. */
+function cacheForaDoProjeto(projeto, cache) {
+  if (!isAbsolute(cache)) return false;
+  let raiz = resolve(projeto);
+  try {
+    raiz = realpathSync(raiz);
+  } catch {
+    // inexistente: fica o resolvido
+  }
+  const alvos = [resolve(cache)];
+  try {
+    alvos.push(realpathSync(cache));
+  } catch {
+    // o cache ainda nao existe: basta o resolvido
+  }
+  return alvos.every((alvo) => {
+    const trecho = relative(raiz, alvo);
+    // `..cache` dentro do projeto também começa com "..": só `..` inteiro sai dele
+    return trecho === ".." || trecho.startsWith(`..${sep}`) || isAbsolute(trecho);
+  });
+}
+
 /**
  * O relatório do `update --check --json`: a última linha da saída, em JSON. Um
  * CLI de antes da 0.13.2 não conhece `--json` e não responde nessa forma.
@@ -412,9 +434,15 @@ export function sincronizarSessao({ entrada, plataforma = "claude", raiz, cwd, a
         `[Expx/Axis] Sincronizacao automatica nao aplicada: instalacao contem origem local travada pelo lock (${origem.locais.join(", ")}). Use \`expx update\` explicitamente para alterar a distribuicao.`,
       );
     }
+    // O bootstrap cria, busca e constrói no cache: dentro do projeto, ou relativo à
+    // pasta da sessão, ele escreveria no próprio projeto (revisão do Codex na 0.13.2).
+    const caminhoCache = cachePadrao(ambiente);
+    if (!cacheForaDoProjeto(projeto, caminhoCache)) {
+      return resposta(`[Expx/Axis] Verificacao adiada: EXPX_AXIS_CACHE (${caminhoCache}) e relativo ou fica dentro do projeto, e o cache Axis precisa ficar fora dele. Nada foi aplicado.`);
+    }
     // 0.13.2: só avisa. O `--check` não escreve no projeto, então a árvore suja não
     // impede a verificação, e a atualização é sempre explícita, de quem instala.
-    const cache = bootstrapAxis(cachePadrao(ambiente), executar);
+    const cache = bootstrapAxis(caminhoCache, executar);
     const saida = executar(process.execPath, [join(cache, "dist", "cli", "expx-bin.js"), "update", "--check", "--json"], { cwd: projeto });
     const relatorio = lerRelatorio(saida);
     if (relatorio === undefined) {

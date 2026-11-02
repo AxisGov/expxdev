@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -7,8 +7,21 @@ import { suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
 // @ts-expect-error The runtime helper is intentionally shipped as a Node module beside the harness adapters.
 import { AXIS_REPOSITORIO, adquirirLock, bootstrapAxis, construirComandoNpm, lerOrigemDoLock, maiorRelease, marcadorDoBuild, sincronizarSessao } from "../../nucleo/hooks/expx-session-sync.mjs";
 
+/**
+ * O cache Axis fica FORA do projeto: dentro dele, o bootstrap escreveria no
+ * próprio projeto, e o hook recusa (revisão do Codex na 0.13.2).
+ */
+const caches: string[] = [];
+afterEach(() => {
+  for (const c of caches.splice(0)) rmSync(c, { recursive: true, force: true });
+});
+function cacheDe(raiz: string): string {
+  const c = `${raiz}-cache`;
+  if (!caches.includes(c)) caches.push(c);
+  return c;
+}
 function ambiente(raiz: string): Record<string, string> {
-  return { EXPX_AXIS_CACHE: join(raiz, "cache"), HOME: raiz };
+  return { EXPX_AXIS_CACHE: cacheDe(raiz), HOME: raiz };
 }
 
 function travada(repositorio: string, commit: string): Record<string, unknown> {
@@ -811,7 +824,7 @@ describe("sincronização Axis no SessionStart", () => {
   it("funcional: resume executa o mesmo fluxo do startup", () => {
     const raiz = projeto();
     try {
-      const cache = join(raiz, "cache");
+      const cache = cacheDe(raiz);
       mkdirSync(join(cache, "dist", "cli"), { recursive: true });
       mkdirSync(join(cache, ".git"), { recursive: true });
       writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
@@ -839,7 +852,7 @@ describe("sincronização Axis no SessionStart", () => {
     const subpasta = join(raiz, "src");
     mkdirSync(subpasta);
     try {
-      const cache = join(raiz, "cache");
+      const cache = cacheDe(raiz);
       mkdirSync(join(cache, "dist", "cli"), { recursive: true });
       mkdirSync(join(cache, ".git"), { recursive: true });
       writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
@@ -934,7 +947,7 @@ describe("sincronização Axis no SessionStart", () => {
   // 0.13.2, decisão do Flávio: o SessionStart só avisa. Ele roda o `--check --json` do
   // CLI da release, que não escreve no projeto, e nunca o `update --yes`.
   function cacheFalso(raiz: string): string {
-    const cache = join(raiz, "cache");
+    const cache = cacheDe(raiz);
     mkdirSync(join(cache, "dist", "cli"), { recursive: true });
     mkdirSync(join(cache, ".git"), { recursive: true });
     writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
@@ -997,6 +1010,29 @@ describe("sincronização Axis no SessionStart", () => {
       expect(cliDa(chamadas)[0]?.argumentos.slice(-3)).toEqual(["update", "--check", "--json"]);
       // o cache Axis faz checkout e reset nele mesmo; no projeto, nada
       expect(chamadas.some((c) => c.argumentos[1] === raiz && ["reset", "clean", "checkout", "pull", "add", "commit"].some((proibido) => c.argumentos.includes(proibido)))).toBe(false);
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ["dentro do projeto", (raiz: string) => join(raiz, ".expx", "cache")],
+    ["relativo", () => ".expx/cache"],
+    ["a própria raiz", (raiz: string) => raiz],
+    ["numa pasta que começa com ponto-ponto", (raiz: string) => join(raiz, "..cache")],
+  ] as const)("funcional: cache Axis %s adia, sem bootstrap nem CLI, porque escreveria no projeto", (_caso, cacheEm) => {
+    const raiz = projeto();
+    try {
+      const chamadas: string[][] = [];
+      const executar = (_arquivo: string, argumentos: string[]) => {
+        chamadas.push(argumentos);
+        if (argumentos.includes("rev-parse") && argumentos.includes("--show-toplevel")) return `${raiz}\n`;
+        throw new Error("nao deveria continuar");
+      };
+      const saida = sincronizarSessao({ entrada: JSON.stringify({ source: "startup" }), raiz, ambiente: { EXPX_AXIS_CACHE: cacheEm(raiz), HOME: raiz }, executar });
+      expect(saida).toContain("EXPX_AXIS_CACHE");
+      expect(chamadas.filter((c) => !c.includes("--show-toplevel"))).toEqual([]);
+      expect(existsSync(join(raiz, ".expx", "cache"))).toBe(false);
     } finally {
       rmSync(raiz, { recursive: true, force: true });
     }
