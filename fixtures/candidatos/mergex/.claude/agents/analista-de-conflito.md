@@ -4,6 +4,7 @@ description: Explica, por trecho em conflito, o que cada lado pretendia segundo 
 tools: Read, Grep, Glob
 model: opus
 effort: high
+classe: profundo_excepcional
 ---
 
 # analista-de-conflito — a intenção de cada lado

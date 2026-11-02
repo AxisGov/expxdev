@@ -1,6 +1,6 @@
-19ed7b5e3e56656c90ad7611ea6c16aa267fa6e623bde31a032eb82b671ea713  .claude/agents/auditor-plano.md
-2a07628c0a2888b5e721412711a73dc1b08c4178287c2c2c1eb0cc0f01c0b923  .claude/agents/sprintx-investigador.md
-0fcaac5897b1697505cef3130a4b354e4a68405db2184e68b98455c7646fe4c4  .claude/agents/sprintx-revisor-testes.md
+a8a84b0afcfb209d39a1624067c3d57d68408f03297339edd7c6c7ca2cf78f3c  .claude/agents/auditor-plano.md
+cf9719e650167f53b46cab14ae7f0bc2160f5abebe826a764d3e6086d201051c  .claude/agents/sprintx-investigador.md
+b38e7c33caa22792bb3ff8d58df2643ab8af5c44f907e55ad684049394352ffc  .claude/agents/sprintx-revisor-testes.md
 1250eb67c0298c63995176bb59a77a918925551cda15efc8d6def79672dce277  .claude/commands/sprintx-auditoria.md
 aedae18a62b0242d59aad58ddc46f76cdf43985f7a82b8826597f517d42715fa  .claude/commands/sprintx-base.md
 aa6d3a43b55a56ce5e217e5a87d7e8cb88e9f1deb0fd30849dd0e88004854fe2  .claude/commands/sprintx-descoberta.md
@@ -40,7 +40,7 @@ f7174dee86fb586fc35fa09a029ba2438d25095351309c14a64b060961d085f6  .claude/hooks/
 d9370952ede36c379751835d4a711550bd37b95c16f127d841883a49e962d2a5  .claude/hooks/testes/fonte.sh
 00dc2c2d5319710f73f5f54616c5b652aa3f99879f8c75444c8002abeeb13483  .claude/hooks/testes/transcrito-agente.sh
 0354c304ed52b1d41becc8df83b36f4a3bf0b3543316bf0e569347ca719fe43d  .claude/settings.json
-167ac1bdd52c2b01bd85a52dde930be9dd060978c2abd11dfeafd392ce33ee6f  .claude/skills/sprintx/DECISOES-DA-SKILL.md
+c0339fb8a398ba8cda5a37f910fc61ac37d23def9be22ee4b82721e640e5c79a  .claude/skills/sprintx/DECISOES-DA-SKILL.md
 c1cf8588ff739814135a0847b6274fd882d7b2dc6c5dcb75b44d985d771fd77d  .claude/skills/sprintx/SKILL.md
 175d6d8d357624377d97f51e893e89a01a7268ab0c80efb1762b40fbccd9fc11  .claude/skills/sprintx/assets/TEMPLATE-BLOQUEIOS.md
 87e9ed363f1a083e60fc37d2c48cb3315513a3a47950858dd445d8d5bc780de3  .claude/skills/sprintx/assets/TEMPLATE-DECISOES.md
