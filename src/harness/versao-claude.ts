@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { resolverClaude, type ResolucaoClaude } from "./binario-claude.js";
 
 /**
  * O Claude Code mínimo para o envelope da invocação, por decisão do dono
@@ -19,8 +20,14 @@ function menor(a: string, b: string): boolean {
 }
 
 /** Lê a versão do `claude` do PATH. Sem `claude`, ou com saída ilegível, não está no piso. */
-export function conferirPisoDoClaude(): PisoDoClaude {
-  const r = spawnSync("claude", ["--version"], { encoding: "utf8", timeout: 15_000, shell: process.platform === "win32" });
+export function conferirPisoDoClaude(resolver: () => ResolucaoClaude = resolverClaude): PisoDoClaude {
+  // No WSL, o `claude` do Windows não é o que vai rodar o hook: fica de fora (0.13.2).
+  const claude = resolver();
+  if (!claude.ok) {
+    const motivo = claude.motivo === "so-windows" ? "so o claude do Windows (sob /mnt/) esta no PATH do WSL" : "nao foi possivel ler a versao do claude";
+    return { ok: false, aviso: `envelope da invocacao nao instalado: ${motivo} (piso ${PISO_CLAUDE})` };
+  }
+  const r = spawnSync(claude.caminho, ["--version"], { encoding: "utf8", timeout: 15_000, shell: process.platform === "win32" });
   const versao = r.status === 0 ? /^(\d+\.\d+\.\d+)/.exec(r.stdout.trim())?.[1] : undefined;
   if (versao === undefined) {
     return { ok: false, aviso: `envelope da invocacao nao instalado: nao foi possivel ler a versao do claude (piso ${PISO_CLAUDE})` };

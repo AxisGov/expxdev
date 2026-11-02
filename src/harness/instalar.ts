@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
+import { resolverClaude, type ResolucaoClaude } from "./binario-claude.js";
 
 const exec = promisify(execFile);
 
@@ -92,6 +93,22 @@ export function instrucaoManual(caminhoMarketplace: string): string {
   ].join("\n");
 }
 
+/**
+ * No WSL, só com o `claude` do Windows no PATH. A instrução manual comum mandaria
+ * rodar `claude ...`, que cairia de novo no do Windows.
+ */
+export function instrucaoWsl(caminhoMarketplace: string): string {
+  return [
+    "So o `claude` do Windows (sob /mnt/) esta no PATH, e ele nao registra o plugin no WSL.",
+    "O .expx/ foi montado e esta pronto; falta registrar o plugin no Claude Code do Linux:",
+    "",
+    "  1. instale o Claude Code do Linux, ou ponha o binario dele no PATH antes do /mnt/;",
+    `  2. rode o \`expx init\` de novo neste projeto (o marketplace e ${caminhoMarketplace}).`,
+    "",
+    "Nenhum comando foi rodado no Claude do Windows.",
+  ].join("\n");
+}
+
 export type ResultadoInstalacao = {
   ok: boolean;
   executados: string[];
@@ -120,10 +137,10 @@ function normalizar(caminho: string): string {
  * sobreviveria com a instalação dizendo sucesso. A lista não traz o escopo;
  * traz o caminho, que é o que importa.
  */
-async function conferirRegistro(executar: Executor, caminhoMarketplace: string): Promise<string | undefined> {
+async function conferirRegistro(executar: Executor, caminhoMarketplace: string, bin: string): Promise<string | undefined> {
   let saida: string;
   try {
-    saida = (await executar("claude", ["plugin", "marketplace", "list", "--json"])).stdout;
+    saida = (await executar(bin, ["plugin", "marketplace", "list", "--json"])).stdout;
   } catch (e: unknown) {
     return `nao foi possivel conferir o registro do expx-local (claude plugin marketplace list --json): ${String(e)}`;
   }
@@ -155,11 +172,21 @@ async function conferirRegistro(executar: Executor, caminhoMarketplace: string):
 export async function instalarPlugin(
   caminhoMarketplace: string,
   executar: Executor = executorPadrao,
+  resolver: () => ResolucaoClaude = resolverClaude,
 ): Promise<ResultadoInstalacao> {
   const executados: string[] = [];
+  // O mesmo binário em todos os comandos, inclusive na conferência.
+  const claude = resolver();
+  if (!claude.ok) {
+    return {
+      ok: false,
+      executados,
+      instrucao: claude.motivo === "so-windows" ? instrucaoWsl(caminhoMarketplace) : instrucaoManual(caminhoMarketplace),
+    };
+  }
   for (const c of comandosDeInstalacao(caminhoMarketplace)) {
     try {
-      await executar(c.bin, c.args);
+      await executar(c.bin === "claude" ? claude.caminho : c.bin, c.args);
       executados.push(`${c.bin} ${c.args.join(" ")}`);
     } catch (e: unknown) {
       const msg = String(e);
@@ -171,7 +198,7 @@ export async function instalarPlugin(
       if (!tolerante(c.args)) return { ok: false, executados, erro: msg };
     }
     if (c.args[1] === "marketplace" && c.args[2] === "add") {
-      const erro = await conferirRegistro(executar, caminhoMarketplace);
+      const erro = await conferirRegistro(executar, caminhoMarketplace, claude.caminho);
       if (erro !== undefined) return { ok: false, executados, erro };
     }
   }
