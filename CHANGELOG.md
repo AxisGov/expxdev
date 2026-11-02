@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.12.18 — duas regressões da 0.12.17
+
+Relatadas no conselhos#230 e reproduzidas antes de corrigir.
+
+- **O `revisar` podia apagar arquivo de outra pessoa.** A limpeza da 0.12.17 removia com `--force` um worktree alheio em `<tmp>/expx-revisao-snapshot-*/checkout`, sem `dono` e com mais de uma hora, e o arquivo não commitado se perdia. Agora o `dono` com PID válido é a prova de que o snapshot é do script, e sem ele nada é tocado, em nenhuma idade. Errata da 0.12.17: "o sem dono com mais de uma hora" deixa de valer. Sobra de versão até a 0.12.16 fica registrada até remoção manual.
+- Certifica a SprintX em AxisGov/sprintx@1c40d0c (sprintx#63, DS-199) e a runx em AxisGov/runx@fa78efe (runx#12, DR-93):
+  - **Worktree movido inutilizado.** `prunable` também marca worktree movido, e o `git worktree remove` que a 0.12.17 mandava rodar deixava a pasta sem repositório, sem conserto por `git worktree repair`. A F1 e o E1 param e perguntam: pasta movida, `git worktree repair <novo caminho>`, e esse caminho é o gravado; pasta apagada, `git worktree remove <caminho>`.
+  - **Só na SprintX:** a sessão que já está no worktree segue para o scaffold, em vez de encerrar a F1 de novo. Não foi medido no OpenCode.
+- Certifica a MergeX em AxisGov/mergex@b485623 (mergex#68, DM-305):
+  - **`git clean` que não barrava.** `git --config-env=clean.requireForce=F clean`, a forma grudada, passava. A forma com a palavra separada já barrava.
+  - **Aspa escapada no frontmatter.** `branch: "a\"b" # nota` mantinha o comentário no valor. As três leituras devolvem `a"b`. Só `\"` e `''` se desfazem: o leitor não é YAML completo.
+- **Teste:** o caso do snapshot de processo morto deixa de depender de o Windows não reusar o PID (expxdev#125). Ele reprovou uma vez no CI do merge da 0.12.17 e passou na repetição do job.
+- **Adiado:** o fechamento da runx depois do merge passa para a próxima versão.
+
 ## 0.12.17 — registro perdido, git clean e worktree
 
 Achados do CodeAnt nos conselhos#227 e #229, reproduzidos antes de corrigir.

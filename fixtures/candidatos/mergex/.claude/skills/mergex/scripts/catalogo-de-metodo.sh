@@ -55,8 +55,9 @@ catalogo_fm() { # <arquivo> <chave>
         sub(/^[^:]*:[[:space:]]*/, "", linha)
         # comentário de YAML só fora de aspas: `trabalho_id: x # nota` é x (DM-304)
         if (linha !~ /^["'"'"']/) sub(/[[:space:]]+#.*$/, "", linha)
-        else if (linha ~ /^"[^"]*"[[:space:]]+#/) sub(/"[[:space:]]+#.*$/, "\"", linha)
-        else if (linha ~ /^'"'"'[^'"'"']*'"'"'[[:space:]]+#/) sub(/'"'"'[[:space:]]+#.*$/, "'"'"'", linha)
+        # a aspa escapada é parte do valor: `"a\"b" # nota` é a"b (DM-305)
+        else if (match(linha, /^"([^"\\]|\\.)*"([[:space:]]+#|[[:space:]]*$)/)) { match(linha, /^"([^"\\]|\\.)*"/); linha = substr(linha, 1, RLENGTH); gsub(/\\"/, "\"", linha) }
+        else if (match(linha, /^'"'"'([^'"'"']|'"'"''"'"')*'"'"'([[:space:]]+#|[[:space:]]*$)/)) { match(linha, /^'"'"'([^'"'"']|'"'"''"'"')*'"'"'/); linha = substr(linha, 1, RLENGTH); gsub(/'"'"''"'"'/, "'"'"'", linha) }
         gsub(/^["'"'"']|["'"'"']$/, "", linha)
         gsub(/[[:space:]]+$/, "", linha)
         print linha; exit
