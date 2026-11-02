@@ -28,6 +28,8 @@ export type OpcoesUpdateCli = {
   to?: string;
   latest: boolean;
   sim: boolean;
+  /** Só com `--check`: o relatório em JSON que o SessionStart lê para avisar. */
+  json: boolean;
 };
 
 export type ResultadoFlagsUpdate =
@@ -35,7 +37,7 @@ export type ResultadoFlagsUpdate =
   | { ok: false; erro: string };
 
 export function interpretarFlagsUpdate(argv: readonly string[]): ResultadoFlagsUpdate {
-  const opcoes: OpcoesUpdateCli = { skills: [], check: false, latest: false, sim: false };
+  const opcoes: OpcoesUpdateCli = { skills: [], check: false, latest: false, sim: false, json: false };
 
   for (let i = 0; i < argv.length; i++) {
     const bruto = argv[i] ?? "";
@@ -50,6 +52,9 @@ export function interpretarFlagsUpdate(argv: readonly string[]): ResultadoFlagsU
         break;
       case "--latest":
         opcoes.latest = true;
+        break;
+      case "--json":
+        opcoes.json = true;
         break;
       case "--yes":
       case "--sim":
@@ -67,6 +72,9 @@ export function interpretarFlagsUpdate(argv: readonly string[]): ResultadoFlagsU
     }
   }
 
+  if (opcoes.json && !opcoes.check) {
+    return { ok: false, erro: "--json so vale com --check: o relatorio nao aplica nada" };
+  }
   if (opcoes.to !== undefined && opcoes.skills.length !== 1) {
     return { ok: false, erro: "--to exige exatamente uma skill nomeada" };
   }
@@ -93,6 +101,12 @@ export type ResultadoUpdate = {
   emDia: string[];
   bloqueadas: Array<{ nome: string; motivo: string }>;
   mensagens: string[];
+  /**
+   * O que o `update --yes` aplicaria, no `--check` e sem confirmação:
+   * `skill:<nome>`, `cli:<versao do lock>`, `proveniencia:<nome>` e
+   * `normalizacao:<nome>`. Vazia, nada a aplicar.
+   */
+  pendencias?: string[];
 };
 
 /**
@@ -244,7 +258,13 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
     if (op.check !== true && (remontar(candidatas) || migracao.migradas.length > 0) && !podeAplicar) {
       mensagens.push("sem confirmacao disponivel: nada foi aplicado (use --yes para aplicar sem perguntar)");
     }
-    return { ok: true, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens };
+    const pendencias = [
+      ...candidatas.map((c) => `skill:${c.nome}`),
+      ...(cliAnterior !== undefined ? [`cli:${cliAnterior}`] : []),
+      ...proveniencias.map((n) => `proveniencia:${n}`),
+      ...normalizadas.map((n) => `normalizacao:${n}`),
+    ];
+    return { ok: true, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens, pendencias };
   }
   // Havia o que aplicar e trabalho manual impediu: o pedido não foi cumprido,
   // e a saída precisa dizer isso (o `--check`, só relatório, já saiu acima).

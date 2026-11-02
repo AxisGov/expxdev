@@ -303,10 +303,6 @@ function resposta(contexto) {
   })}\n`;
 }
 
-function arvoreSuja(raiz, executar) {
-  return executar("git", ["-C", raiz, "status", "--porcelain"]).trim() !== "";
-}
-
 function raizGit(cwd, executar) {
   return executar("git", ["-C", cwd, "rev-parse", "--show-toplevel"]).trim();
 }
@@ -375,12 +371,18 @@ export function lerOrigemDoLock(caminho) {
   return { ok: true, locais };
 }
 
-function houveAtualizacao(saida) {
-  return saida.includes("para desfazer esta atualizacao");
-}
-
-function nomesAtualizados(saida) {
-  return [...saida.matchAll(/^([a-z0-9-]+): .*→/gm)].map(([, nome]) => nome).filter(Boolean);
+/**
+ * O relatório do `update --check --json`: a última linha da saída, em JSON. Um
+ * CLI de antes da 0.13.2 não conhece `--json` e não responde nessa forma.
+ */
+function lerRelatorio(saida) {
+  const ultima = saida.trim().split("\n").pop() ?? "";
+  try {
+    const r = JSON.parse(ultima);
+    return r !== null && typeof r === "object" && typeof r.ok === "boolean" && Array.isArray(r.pendencias) ? r : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function sincronizarSessao({ entrada, plataforma = "claude", raiz, cwd, ambiente = process.env, executar = comandoPadrao }) {
@@ -410,15 +412,22 @@ export function sincronizarSessao({ entrada, plataforma = "claude", raiz, cwd, a
         `[Expx/Axis] Sincronizacao automatica nao aplicada: instalacao contem origem local travada pelo lock (${origem.locais.join(", ")}). Use \`expx update\` explicitamente para alterar a distribuicao.`,
       );
     }
-    if (arvoreSuja(projeto, executar)) {
-      return resposta("[Expx/Axis] Atualizacao automatica adiada porque o working tree possui alteracoes nao commitadas.");
-    }
+    // 0.13.2: só avisa. O `--check` não escreve no projeto, então a árvore suja não
+    // impede a verificação, e a atualização é sempre explícita, de quem instala.
     const cache = bootstrapAxis(cachePadrao(ambiente), executar);
-    const saida = executar(process.execPath, [join(cache, "dist", "cli", "expx-bin.js"), "update", "--yes"], { cwd: projeto });
-    if (houveAtualizacao(saida)) {
-      const nomes = nomesAtualizados(saida);
-      const detalhe = nomes.length > 0 ? ` Skills atualizadas: ${nomes.join(", ")}.` : "";
-      return resposta(`[Expx/Axis] Distribuicao sincronizada com AxisGov.${detalhe}`);
+    const saida = executar(process.execPath, [join(cache, "dist", "cli", "expx-bin.js"), "update", "--check", "--json"], { cwd: projeto });
+    const relatorio = lerRelatorio(saida);
+    if (relatorio === undefined) {
+      return resposta("[Expx/Axis] Verificacao adiada: o CLI da release nao respondeu o relatorio do `update --check --json`. Nada foi aplicado.");
+    }
+    if (!relatorio.ok) {
+      const motivos = Array.isArray(relatorio.bloqueadas) ? relatorio.bloqueadas.map((b) => `${b?.nome}: ${b?.motivo}`).join("; ") : "";
+      return resposta(`[Expx/Axis] Verificacao adiada: ${motivos || "o update --check falhou"}. Nada foi aplicado.`);
+    }
+    if (relatorio.pendencias.length > 0) {
+      return resposta(
+        `[Expx/Axis] Ha atualizacao da distribuicao AxisGov (${relatorio.pendencias.join(", ")}). Nada foi aplicado: para instalar, rode \`expx update --yes\` e commite o resultado.`,
+      );
     }
     return "";
   } catch (erro) {

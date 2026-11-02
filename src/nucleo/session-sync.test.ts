@@ -92,12 +92,12 @@ describe("repositório-fonte do CLI no SessionStart", () => {
 
   it("funcional: o `expxdev` de outro autor segue o fluxo comum", () => {
     const { chamadas } = sincronizar(JSON.stringify({ name: "expxdev", repository: "https://github.com/outro/expxdev.git" }));
-    expect(chamadas.some((c) => c.includes("status"))).toBe(true);
+    expect(chamadas.some((c) => !c.includes("--show-toplevel"))).toBe(true);
   });
 
   it("funcional: package.json ilegível não é a fonte", () => {
     const { chamadas } = sincronizar("{ nao e json");
-    expect(chamadas.some((c) => c.includes("status"))).toBe(true);
+    expect(chamadas.some((c) => !c.includes("--show-toplevel"))).toBe(true);
   });
 });
 
@@ -824,6 +824,7 @@ describe("sincronização Axis no SessionStart", () => {
         if (argumentos.includes("status")) return "";
         if (argumentos.includes("remote")) return AXIS_REPOSITORIO;
         if (argumentos.includes("rev-parse")) return "same\n";
+        if (argumentos.some((v) => v.endsWith("expx-bin.js"))) return '{"ok":true,"pendente":false,"pendencias":[],"bloqueadas":[]}\n';
         return "";
       };
       expect(sincronizarSessao({ entrada: JSON.stringify({ source: "resume" }), raiz, ambiente: ambiente(raiz), executar })).toBe("");
@@ -868,7 +869,7 @@ describe("sincronização Axis no SessionStart", () => {
     }
   });
 
-  it("funcional: working tree sujo impede update no Codex", () => {
+  it("funcional: working tree sujo não impede a verificação no Codex, e nada é aplicado", () => {
     const raiz = projeto();
     try {
       const chamadas: string[][] = [];
@@ -880,8 +881,9 @@ describe("sincronização Axis no SessionStart", () => {
         throw new Error("nao deveria continuar");
       };
       const saida = sincronizarSessao({ plataforma: "codex", entrada: JSON.stringify({ source: "resume", cwd: raiz }), executar });
-      expect(saida).toContain("working tree possui alteracoes");
-      expect(chamadas.some((a) => a.some((v) => v.endsWith("expx-bin.js")))).toBe(false);
+      expect(saida).not.toContain("working tree");
+      expect(chamadas.some((a) => a.includes("status") && a.includes(raiz))).toBe(false);
+      expect(chamadas.some((a) => a.includes("--yes"))).toBe(false);
     } finally {
       rmSync(raiz, { recursive: true, force: true });
     }
@@ -929,57 +931,85 @@ describe("sincronização Axis no SessionStart", () => {
     }
   });
 
-  it("funcional: working tree sujo adia sem bootstrap nem update", () => {
+  // 0.13.2, decisão do Flávio: o SessionStart só avisa. Ele roda o `--check --json` do
+  // CLI da release, que não escreve no projeto, e nunca o `update --yes`.
+  function cacheFalso(raiz: string): string {
+    const cache = join(raiz, "cache");
+    mkdirSync(join(cache, "dist", "cli"), { recursive: true });
+    mkdirSync(join(cache, ".git"), { recursive: true });
+    writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
+    return cache;
+  }
+  function sessao(raiz: string, relatorio: string, status = ""): { saida: string; chamadas: Array<{ arquivo: string; argumentos: string[] }> } {
+    const chamadas: Array<{ arquivo: string; argumentos: string[] }> = [];
+    const executar = (arquivo: string, argumentos: string[]) => {
+      if (argumentos.includes("tag")) return "v0.12.9\n";
+      chamadas.push({ arquivo, argumentos });
+      if (argumentos.includes("rev-parse") && argumentos.includes("--show-toplevel")) return `${raiz}\n`;
+      // só o status do projeto vem sujo; o do cache Axis segue limpo
+      if (argumentos.includes("status")) return argumentos[1] === raiz ? status : "";
+      if (argumentos.includes("remote")) return `${AXIS_REPOSITORIO}\n`;
+      if (argumentos.includes("rev-parse")) return "mesmo\n";
+      if (argumentos.includes("branch")) return "main\n";
+      if (argumentos.includes("merge-base")) return "";
+      if (argumentos.some((argumento) => argumento.endsWith("expx-bin.js"))) return relatorio;
+      return "";
+    };
+    return { saida: sincronizarSessao({ entrada: JSON.stringify({ source: "startup" }), raiz, ambiente: ambiente(raiz), executar }), chamadas };
+  }
+  const cliDa = (chamadas: Array<{ arquivo: string; argumentos: string[] }>) => chamadas.filter((c) => c.argumentos.some((a) => a.endsWith("expx-bin.js")));
+
+  it("funcional: com pendência, avisa e diz o comando, sem aplicar nada", () => {
     const raiz = projeto();
     try {
-      const chamadas: string[][] = [];
-      const executar = (_arquivo: string, argumentos: string[]) => {
-        if (argumentos.includes("tag")) return "v0.12.9\n";
-        chamadas.push(argumentos);
-        if (argumentos.includes("rev-parse")) return `${raiz}\n`;
-        if (argumentos.includes("status")) return "?? arquivo-novo\n";
-        return "";
-      };
-      const saida = sincronizarSessao({ entrada: JSON.stringify({ source: "startup" }), raiz, executar });
-      expect(saida).toContain("working tree possui alteracoes");
-      expect(chamadas.some((a) => a.includes("clone"))).toBe(false);
-      expect(chamadas.some((a) => a.includes("expx-bin.js"))).toBe(false);
-      expect(chamadas.some((a) => ["reset", "clean", "checkout", "pull"].some((proibido) => a.includes(proibido)))).toBe(false);
+      const cache = cacheFalso(raiz);
+      const { saida, chamadas } = sessao(raiz, '{"ok":true,"pendente":true,"pendencias":["skill:sprintx","cli:0.13.1"],"bloqueadas":[]}\n');
+      expect(saida).toContain("skill:sprintx, cli:0.13.1");
+      expect(saida).toContain("expx update --yes");
+      expect(saida).toContain("Nada foi aplicado");
+      expect(Object.keys(JSON.parse(saida).hookSpecificOutput).sort()).toEqual(["additionalContext", "hookEventName"]);
+      const cli = cliDa(chamadas);
+      expect(cli).toHaveLength(1);
+      expect(cli[0]?.arquivo).toMatch(/node/);
+      expect(cli[0]?.argumentos).toEqual([join(cache, "dist", "cli", "expx-bin.js"), "update", "--check", "--json"]);
+      expect(chamadas.some((c) => c.argumentos.includes("--yes"))).toBe(false);
     } finally {
       rmSync(raiz, { recursive: true, force: true });
     }
   });
 
-  it("funcional: projeto limpo chama o CLI Axis por caminho explícito sem campos inventados", () => {
+  it("funcional: em dia, fica em silêncio", () => {
     const raiz = projeto();
     try {
-      const cache = join(raiz, "cache");
-      mkdirSync(join(cache, "dist", "cli"), { recursive: true });
-      mkdirSync(join(cache, ".git"), { recursive: true });
-      writeFileSync(join(cache, "dist", "cli", "expx-bin.js"), "");
-      const chamadas: Array<{ arquivo: string; argumentos: string[] }> = [];
-      const executar = (arquivo: string, argumentos: string[]) => {
-        if (argumentos.includes("tag")) return "v0.12.9\n";
-        chamadas.push({ arquivo, argumentos });
-        if (argumentos.includes("rev-parse") && argumentos.includes("--show-toplevel")) return `${raiz}\n`;
-        if (argumentos.includes("status")) return "";
-        if (argumentos.includes("remote")) return `${AXIS_REPOSITORIO}\n`;
-        if (argumentos.includes("rev-parse")) return "mesmo\n";
-        if (argumentos.includes("branch")) return "main\n";
-        if (argumentos.includes("merge-base")) return "";
-        if (argumentos.some((argumento) => argumento.endsWith("expx-bin.js"))) return "sprintx: main → novo\npara desfazer esta atualizacao, reverta\n";
-        return "";
-      };
-      const saida = sincronizarSessao({ entrada: JSON.stringify({ source: "startup" }), raiz, ambiente: ambiente(raiz), executar });
-      expect(saida).toContain("Skills atualizadas: sprintx.");
-      expect(Object.keys(JSON.parse(saida).hookSpecificOutput).sort()).toEqual(["additionalContext", "hookEventName"]);
-      expect(saida).not.toContain("reloadSkills");
-      const cli = chamadas.find((c) => c.argumentos.some((argumento) => argumento.endsWith("expx-bin.js")));
-      expect(cli?.arquivo).toMatch(/node/);
-      expect(cli?.argumentos.slice(-2)).toEqual(["update", "--yes"]);
-      expect(cli?.argumentos).not.toContain("--latest");
-      expect(cli?.argumentos[0]).toBe(join(cache, "dist", "cli", "expx-bin.js"));
-      expect(saida).not.toContain("npx expxdev");
+      cacheFalso(raiz);
+      expect(sessao(raiz, '{"ok":true,"pendente":false,"pendencias":[],"bloqueadas":[]}\n').saida).toBe("");
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
+  });
+
+  it("funcional: working tree sujo ainda verifica, porque o --check não escreve", () => {
+    const raiz = projeto();
+    try {
+      cacheFalso(raiz);
+      const { saida, chamadas } = sessao(raiz, '{"ok":true,"pendente":true,"pendencias":["skill:runx"],"bloqueadas":[]}\n', "?? arquivo-novo\n");
+      expect(saida).toContain("skill:runx");
+      expect(cliDa(chamadas)[0]?.argumentos.slice(-3)).toEqual(["update", "--check", "--json"]);
+      // o cache Axis faz checkout e reset nele mesmo; no projeto, nada
+      expect(chamadas.some((c) => c.argumentos[1] === raiz && ["reset", "clean", "checkout", "pull", "add", "commit"].some((proibido) => c.argumentos.includes(proibido)))).toBe(false);
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
+  });
+
+  it("funcional: CLI que não responde em JSON adia com contexto, sem aplicar", () => {
+    const raiz = projeto();
+    try {
+      cacheFalso(raiz);
+      const { saida, chamadas } = sessao(raiz, "opcao desconhecida em update: --json\n");
+      expect(saida).toContain("adiada");
+      expect(() => JSON.parse(saida)).not.toThrow();
+      expect(chamadas.some((c) => c.argumentos.includes("--yes"))).toBe(false);
     } finally {
       rmSync(raiz, { recursive: true, force: true });
     }
