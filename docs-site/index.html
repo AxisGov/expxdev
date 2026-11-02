@@ -121,9 +121,9 @@
 
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
-    <pre><code><span class="tok-cmd">gh</span> release download v0.13.0 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
-(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-com">if command -v sha256sum &gt;/dev/null 2&gt;&amp;1; then</span> <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.13.0.tgz.sha256<span class="tok-com">; else</span> <span class="tok-cmd">shasum</span> <span class="tok-flag">-a 256 -c</span> expxdev-0.13.0.tgz.sha256<span class="tok-com">; fi</span>) &amp;&amp;
-<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.13.0.tgz expx <span class="tok-flag">--version</span></code></pre>
+    <pre><code><span class="tok-cmd">gh</span> release download v0.13.0 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ~/expx-cli/v0.13.0
+(<span class="tok-cmd">cd</span> ~/expx-cli/v0.13.0 &amp;&amp; <span class="tok-com">if command -v sha256sum &gt;/dev/null 2&gt;&amp;1; then</span> <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.13.0.tgz.sha256<span class="tok-com">; else</span> <span class="tok-cmd">shasum</span> <span class="tok-flag">-a 256 -c</span> expxdev-0.13.0.tgz.sha256<span class="tok-com">; fi</span>) &amp;&amp;
+<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ~/expx-cli/v0.13.0/expxdev-0.13.0.tgz expx <span class="tok-flag">--version</span></code></pre>
   </div>
 
   <div class="cartoes">
@@ -210,9 +210,9 @@
   não executa <code>npm publish</code>: baixe o tarball e o checksum da GitHub Release explícita.</p>
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
-    <pre><code><span class="tok-cmd">gh</span> release download v0.13.0 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
-(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-com">if command -v sha256sum &gt;/dev/null 2&gt;&amp;1; then</span> <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.13.0.tgz.sha256<span class="tok-com">; else</span> <span class="tok-cmd">shasum</span> <span class="tok-flag">-a 256 -c</span> expxdev-0.13.0.tgz.sha256<span class="tok-com">; fi</span>) &amp;&amp;
-<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.13.0.tgz expx init <span class="tok-flag">--skills</span> sprintx,runx,mergex <span class="tok-flag">--harness</span> claude,opencode <span class="tok-flag">--yes</span></code></pre>
+    <pre><code><span class="tok-cmd">gh</span> release download v0.13.0 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ~/expx-cli/v0.13.0
+(<span class="tok-cmd">cd</span> ~/expx-cli/v0.13.0 &amp;&amp; <span class="tok-com">if command -v sha256sum &gt;/dev/null 2&gt;&amp;1; then</span> <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.13.0.tgz.sha256<span class="tok-com">; else</span> <span class="tok-cmd">shasum</span> <span class="tok-flag">-a 256 -c</span> expxdev-0.13.0.tgz.sha256<span class="tok-com">; fi</span>) &amp;&amp;
+<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ~/expx-cli/v0.13.0/expxdev-0.13.0.tgz expx init <span class="tok-flag">--skills</span> sprintx,runx,mergex <span class="tok-flag">--harness</span> claude,opencode <span class="tok-flag">--yes</span></code></pre>
   </div>
 
   <div class="tabela-caixa"><table>
