@@ -450,6 +450,13 @@ continuam válidas. O esquema também amarra o `resultado` ao `estado` e o
 SprintX já grava `agente_concluido` para todo subagente, e o aprovador ficaria
 com duas conclusões. O `SubagentStart` não grava evento.
 
+Desde a 0.13.0, o evento leva também `instancia` quando o payload traz
+`agent_id`: o hash Git de `<session_id>\n<agent_id>`, a mesma conta do fechamento
+da invocação (13.2). O hook da integridade final é instalado com ou sem política,
+então o campo aparece também sem `.expx/orquestracao.json`. É aditivo: o leitor do
+rastro (11.3), o portão da MergeX e o MemoX não decidem nada por ele (errata da
+0.13.1 ao "sem política, nada muda" da 0.13.0).
+
 ### 12.4 O que `divergente` e `ausente` invalidam, nesta fase
 
 Divergência ou ausência **invalidam o veredito** daquele aprovador, em qualquer

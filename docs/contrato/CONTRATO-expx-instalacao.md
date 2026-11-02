@@ -300,6 +300,9 @@ Aqui fica o que a instalação faz com eles. Tudo vale **só com o harness
 `claude` e com o arquivo presente**. Sem `.expx/orquestracao.json`, nada desta
 seção acontece, e agentes e lock saem byte a byte iguais aos de uma instalação
 sem orquestração.
+O hook da integridade final não é desta seção: é instalado sempre, e desde a
+0.13.0 grava `instancia` no evento também sem a política
+(`CONTRATO-expx-orquestracao.md` §12.3).
 
 - **Materialização.** Cada agente de `.claude/agents/` é resolvido no
   adaptador `claude`, sem tarefa nem sessão. O frontmatter da cópia recebe o
