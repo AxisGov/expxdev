@@ -21,6 +21,8 @@ export type OpcoesResolucao = {
   wsl?: boolean;
   /** Onde o WSL monta o Windows. Injetável só para o teste. */
   raizWindows?: string;
+  /** A pasta da entrada vazia do PATH; sem ela, a do processo. */
+  cwd?: string;
 };
 
 /** WSL pela variável que ele define, ou pelo kernel da Microsoft. */
@@ -56,8 +58,11 @@ export function resolverClaude(op: OpcoesResolucao = {}): ResolucaoClaude {
   const raizWindows = op.raizWindows ?? "/mnt";
   let doWindows = false;
   // Em ordem: o primeiro do Linux vence, como o PATH faria sem o do Windows.
-  for (const pasta of (ambiente["PATH"] ?? "").split(delimiter)) {
-    if (pasta === "") continue;
+  for (const entrada of (ambiente["PATH"] ?? "").split(delimiter)) {
+    // No POSIX, a entrada vazia é a pasta atual, como no execvp (CodeAnt no #132).
+    const pasta = entrada === "" ? (op.cwd ?? process.cwd()) : entrada;
+    // O Windows pode expor só o `claude.exe`, que o WSL roda pelo interop: é do Windows.
+    if (dentro(raizWindows, resolve(pasta)) && executavel(join(resolve(pasta), "claude.exe"))) doWindows = true;
     const candidato = join(resolve(pasta), "claude");
     if (!executavel(candidato)) continue;
     let real: string;

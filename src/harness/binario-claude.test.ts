@@ -72,6 +72,23 @@ describe.skipIf(process.platform === "win32")("o claude do PATH no WSL", () => {
     expect(r).toEqual({ ok: false, motivo: "so-windows" });
   });
 
+  // CodeAnt no #132: o Windows pode expor só o `claude.exe`, que o WSL roda pelo interop.
+  it("funcional: só o claude.exe do Windows no PATH também é do Windows", () => {
+    const b = base();
+    const exe = join(b.windows, "claude.exe");
+    writeFileSync(exe, "MZ");
+    chmodSync(exe, 0o755);
+    expect(resolverClaude({ ambiente: { ...WSL, PATH: b.windows }, wsl: true, raizWindows: join(b.raiz, "mnt") })).toEqual({ ok: false, motivo: "so-windows" });
+  });
+
+  // No POSIX, a entrada vazia do PATH é a pasta atual, como no execvp.
+  it("funcional: entrada vazia do PATH é a pasta atual", () => {
+    const b = base();
+    const linux = executavel(b.linux);
+    const r = resolverClaude({ ambiente: { ...WSL, PATH: ["", b.outro].join(delimiter) }, wsl: true, raizWindows: join(b.raiz, "mnt"), cwd: b.linux });
+    expect(r).toEqual({ ok: true, caminho: linux });
+  });
+
   it("funcional: sem claude nenhum, ausente", () => {
     const b = base();
     expect(resolverClaude({ ambiente: { ...WSL, PATH: b.linux }, wsl: true, raizWindows: join(b.raiz, "mnt") })).toEqual({ ok: false, motivo: "ausente" });
