@@ -58,6 +58,9 @@ describe("instalação do plugin no Claude Code", () => {
  * Sem ela, um registro velho (de uma worktree removida) sobreviveria com a
  * instalação dizendo sucesso.
  */
+/** O `claude` resolvido sem olhar o PATH real: o teste não depende da máquina (0.13.2). */
+const claudeDoPath = () => ({ ok: true as const, caminho: "claude" });
+
 describe("instalação: o registro é conferido depois do add", () => {
   const CAMINHO = "/proj/.expx/marketplace";
   type Falha = { em: string; erro: string };
@@ -81,7 +84,7 @@ describe("instalação: o registro é conferido depois do add", () => {
 
   it("integração: caminho confirmado -> segue até o install", async () => {
     const { chamadas, executar } = executorFalso(listaCom(CAMINHO));
-    const r = await instalarPlugin(CAMINHO, executar);
+    const r = await instalarPlugin(CAMINHO, executar, claudeDoPath);
     expect(r.ok).toBe(true);
     const list = chamadas.indexOf("plugin marketplace list --json");
     const add = chamadas.findIndex((a) => a.startsWith("plugin marketplace add"));
@@ -92,7 +95,7 @@ describe("instalação: o registro é conferido depois do add", () => {
 
   it("funcional: o expx-local registrado aponta para outro caminho -> erro, e nada depois do add roda", async () => {
     const { chamadas, executar } = executorFalso(listaCom("/worktree-velha/.expx/marketplace"));
-    const r = await instalarPlugin(CAMINHO, executar);
+    const r = await instalarPlugin(CAMINHO, executar, claudeDoPath);
     expect(r.ok).toBe(false);
     expect(r.erro).toContain("/worktree-velha/.expx/marketplace");
     expect(depoisDoAdd(chamadas)).toEqual([]);
@@ -103,7 +106,7 @@ describe("instalação: o registro é conferido depois do add", () => {
       { em: "plugin marketplace remove", erro: "Marketplace not found" },
       { em: "plugin marketplace add", erro: "Marketplace 'expx-local' already exists" },
     ]);
-    const r = await instalarPlugin(CAMINHO, executar);
+    const r = await instalarPlugin(CAMINHO, executar, claudeDoPath);
     expect(r.ok).toBe(true);
   });
 
@@ -116,7 +119,7 @@ describe("instalação: o registro é conferido depois do add", () => {
     ];
     for (const c of casos) {
       const { chamadas, executar } = executorFalso(c.lista, c.falhas);
-      const r = await instalarPlugin(CAMINHO, executar);
+      const r = await instalarPlugin(CAMINHO, executar, claudeDoPath);
       expect(r.ok).toBe(false);
       expect(r.erro).toBeDefined();
       expect(depoisDoAdd(chamadas)).toEqual([]);
@@ -125,7 +128,7 @@ describe("instalação: o registro é conferido depois do add", () => {
 
   it("funcional: o remove nunca sai do escopo do usuário", async () => {
     const { chamadas, executar } = executorFalso(listaCom(CAMINHO));
-    await instalarPlugin(CAMINHO, executar);
+    await instalarPlugin(CAMINHO, executar, claudeDoPath);
     const removes = chamadas.filter((a) => a.startsWith("plugin marketplace remove"));
     expect(removes).toEqual(["plugin marketplace remove --scope user expx-local"]);
   });
@@ -139,7 +142,7 @@ describe("instalação: o registro é conferido depois do add", () => {
       symlinkSync(join(base, "real"), link, "junction");
       for (const registrado of [join(link, ".expx", "marketplace"), relative(process.cwd(), real)]) {
         const { executar } = executorFalso(listaCom(registrado));
-        const r = await instalarPlugin(real, executar);
+        const r = await instalarPlugin(real, executar, claudeDoPath);
         expect(r.ok).toBe(true);
       }
     } finally {
@@ -149,7 +152,7 @@ describe("instalação: o registro é conferido depois do add", () => {
 
   it("funcional: binário ausente -> instrução manual, sem erro", async () => {
     const { executar } = executorFalso(listaCom(CAMINHO), [{ em: "plugin", erro: "spawn claude ENOENT" }]);
-    const r = await instalarPlugin(CAMINHO, executar);
+    const r = await instalarPlugin(CAMINHO, executar, claudeDoPath);
     expect(r.ok).toBe(false);
     expect(r.instrucao).toBeDefined();
     expect(r.erro).toBeUndefined();
