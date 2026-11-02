@@ -375,6 +375,24 @@ describe("update depois de uma CLI nova", () => {
     expect(saida).not.toMatch(/^[a-z0-9-]+: .*→/m);
   });
 
+  // A prova de release da 0.13.1: vindo da 0.13.0, as skills também mudavam, e a
+  // mensagem dizia "com as mesmas skills".
+  it("funcional: com skill nova e CLI anterior, a mensagem não diz que as skills são as mesmas", async () => {
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    repos.push(repo);
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: repo } });
+    instalacaoDeCliAnterior(p.raiz);
+    novaTag(repo, "v1.1.0");
+
+    const r = await executarUpdate({ raiz: p.raiz, check: true, origens: { sprintx: repo } });
+
+    const saida = r.mensagens.join("\n");
+    expect(saida).toContain("0.0.1");
+    expect(saida).toContain("junto com as skills acima");
+    expect(saida).not.toContain("com as mesmas skills");
+  });
+
   it("funcional: --check relata a remontagem e não escreve", async () => {
     const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
     repos.push(repo);

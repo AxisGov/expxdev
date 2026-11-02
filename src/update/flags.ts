@@ -228,7 +228,8 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   }
 
   if (cliAnterior !== undefined) {
-    mensagens.push(`instalacao gravada pelo CLI ${cliAnterior}, e este e ${versaoDoCli()}: o plugin e os hooks do nucleo sao remontados, com as mesmas skills`);
+    const skills = candidatas.length > 0 ? "junto com as skills acima" : "com as mesmas skills";
+    mensagens.push(`instalacao gravada pelo CLI ${cliAnterior}, e este e ${versaoDoCli()}: o plugin e os hooks do nucleo sao remontados, ${skills}`);
   }
 
   const podeAplicar = (op.sim ?? false) || (op.interativo ?? false);
