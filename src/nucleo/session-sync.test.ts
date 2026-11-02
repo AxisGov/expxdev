@@ -991,6 +991,18 @@ describe("sincronização Axis no SessionStart", () => {
     }
   });
 
+  it("funcional: atualização bloqueada por modificação local também avisa, mesmo sem pendência", () => {
+    const raiz = projeto();
+    try {
+      cacheFalso(raiz);
+      const { saida } = sessao(raiz, '{"ok":true,"pendente":false,"pendencias":[],"bloqueadas":[{"nome":"runx","motivo":"modificacao local em references/01.md"}]}\n');
+      expect(saida).toContain("runx: modificacao local em references/01.md");
+      expect(saida).toContain("Nada foi aplicado");
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
+  });
+
   it("funcional: em dia, fica em silêncio", () => {
     const raiz = projeto();
     try {
@@ -1020,6 +1032,8 @@ describe("sincronização Axis no SessionStart", () => {
     ["relativo", () => ".expx/cache"],
     ["a própria raiz", (raiz: string) => raiz],
     ["numa pasta que começa com ponto-ponto", (raiz: string) => join(raiz, "..cache")],
+    // `resolve` tira o `..` antes de seguir o link, e o bootstrap recebe o caminho cru (CodeAnt no #131)
+    ["com segmento ponto-ponto", (raiz: string) => `${raiz}-fora/atalho/../cache`],
   ] as const)("funcional: cache Axis %s adia, sem bootstrap nem CLI, porque escreveria no projeto", (_caso, cacheEm) => {
     const raiz = projeto();
     try {

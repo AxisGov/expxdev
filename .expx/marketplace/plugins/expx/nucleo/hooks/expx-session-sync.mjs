@@ -389,6 +389,9 @@ function caminhoRealDoQueExiste(caminho) {
 /** O cache absoluto e fora da raiz do projeto, comparado pelo caminho real do projeto. */
 function cacheForaDoProjeto(projeto, cache) {
   if (!isAbsolute(cache)) return false;
+  // `resolve` tira o `..` antes de seguir o link, e o bootstrap recebe o caminho cru:
+  // `<fora>/atalho/../x`, com o atalho para dentro do projeto, escreveria nele.
+  if (cache.split(/[\\/]+/).includes("..")) return false;
   let raiz = resolve(projeto);
   try {
     raiz = realpathSync(raiz);
@@ -464,10 +467,14 @@ export function sincronizarSessao({ entrada, plataforma = "claude", raiz, cwd, a
       const motivos = Array.isArray(relatorio.bloqueadas) ? relatorio.bloqueadas.map((b) => `${b?.nome}: ${b?.motivo}`).join("; ") : "";
       return resposta(`[Expx/Axis] Verificacao adiada: ${motivos || "o update --check falhou"}. Nada foi aplicado.`);
     }
-    if (relatorio.pendencias.length > 0) {
-      return resposta(
-        `[Expx/Axis] Ha atualizacao da distribuicao AxisGov (${relatorio.pendencias.join(", ")}). Nada foi aplicado: para instalar, rode \`expx update --yes\` e commite o resultado.`,
-      );
+    // A skill bloqueada por modificação local não entra nas pendências, e o
+    // silêncio esconderia a atualização que espera por ela (CodeAnt no #131).
+    const bloqueadas = Array.isArray(relatorio.bloqueadas) ? relatorio.bloqueadas.map((b) => `${b?.nome}: ${b?.motivo}`) : [];
+    if (relatorio.pendencias.length > 0 || bloqueadas.length > 0) {
+      const partes = [];
+      if (relatorio.pendencias.length > 0) partes.push(`Ha atualizacao da distribuicao AxisGov (${relatorio.pendencias.join(", ")}).`);
+      if (bloqueadas.length > 0) partes.push(`Atualizacao bloqueada: ${bloqueadas.join("; ")}.`);
+      return resposta(`[Expx/Axis] ${partes.join(" ")} Nada foi aplicado: para instalar, rode \`expx update --yes\` e commite o resultado.`);
     }
     return "";
   } catch (erro) {
