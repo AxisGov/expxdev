@@ -182,7 +182,13 @@ export function planejarAgentes(skills: readonly SkillMontavel[], overrides: Ove
         donoDoNome.set(id, s.nome);
         const r = resolver({ agente: lido.agente, adaptador: "claude", politica });
         if (!r.ok) {
-          erros.push(`agente ${id} (skill ${s.nome}) sem resolucao: ${r.motivo} — ${r.mensagem}`);
+          // Sem classe, o defeito é da skill: a mensagem do resolvedor fala a
+          // quem escreve a skill, e quem instala não deve editar a cópia.
+          const detalhe =
+            r.motivo === "sem_classe"
+              ? `a skill ${s.nome} publica o agente ${id} sem \`classe:\` e sem model classificavel, e esta versao dela nao funciona com a politica de orquestracao ativa; instale a versao certificada da skill (\`expx update --yes\`) ou desligue a politica, e nao edite a copia instalada`
+              : r.mensagem;
+          erros.push(`agente ${id} (skill ${s.nome}) sem resolucao: ${r.motivo} — ${detalhe}`);
           continue;
         }
         const ov = Object.prototype.hasOwnProperty.call(overrides, id) ? overrides[id] : undefined;
