@@ -371,6 +371,21 @@ export function lerOrigemDoLock(caminho) {
   return { ok: true, locais };
 }
 
+function caminhoRealDoQueExiste(caminho) {
+  const resto = [];
+  let atual = caminho;
+  for (;;) {
+    try {
+      return join(realpathSync(atual), ...resto.reverse());
+    } catch {
+      const pai = dirname(atual);
+      if (pai === atual) return caminho;
+      resto.push(atual.slice(pai.length).replace(/^[\\/]+/, ""));
+      atual = pai;
+    }
+  }
+}
+
 /** O cache absoluto e fora da raiz do projeto, comparado pelo caminho real do projeto. */
 function cacheForaDoProjeto(projeto, cache) {
   if (!isAbsolute(cache)) return false;
@@ -380,12 +395,9 @@ function cacheForaDoProjeto(projeto, cache) {
   } catch {
     // inexistente: fica o resolvido
   }
-  const alvos = [resolve(cache)];
-  try {
-    alvos.push(realpathSync(cache));
-  } catch {
-    // o cache ainda nao existe: basta o resolvido
-  }
+  // O ancestral mais próximo que existe, pelo caminho real, mais o resto: uma pasta
+  // ainda inexistente sob um link para dentro do projeto também é dentro dele.
+  const alvos = [resolve(cache), caminhoRealDoQueExiste(resolve(cache))];
   return alvos.every((alvo) => {
     const trecho = relative(raiz, alvo);
     // `..cache` dentro do projeto também começa com "..": só `..` inteiro sai dele

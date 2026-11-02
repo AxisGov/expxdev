@@ -1038,6 +1038,28 @@ describe("sincronização Axis no SessionStart", () => {
     }
   });
 
+  it.skipIf(!suportaSymlinkDeDiretorio())("funcional: ancestral ainda inexistente do cache por link para dentro do projeto também adia", () => {
+    const raiz = projeto();
+    const fora = mkdtempSync(join(tmpdir(), "expx-session-sync-link-"));
+    try {
+      mkdirSync(join(raiz, ".expx", "alvo"), { recursive: true });
+      symlinkSync(join(raiz, ".expx", "alvo"), join(fora, "atalho"), "dir");
+      const chamadas: string[][] = [];
+      const executar = (_arquivo: string, argumentos: string[]) => {
+        chamadas.push(argumentos);
+        if (argumentos.includes("rev-parse") && argumentos.includes("--show-toplevel")) return `${raiz}\n`;
+        throw new Error("nao deveria continuar");
+      };
+      const saida = sincronizarSessao({ entrada: JSON.stringify({ source: "startup" }), raiz, ambiente: { EXPX_AXIS_CACHE: join(fora, "atalho", "novo", "cache"), HOME: raiz }, executar });
+      expect(saida).toContain("EXPX_AXIS_CACHE");
+      expect(chamadas.filter((c) => !c.includes("--show-toplevel"))).toEqual([]);
+      expect(existsSync(join(raiz, ".expx", "alvo", "novo"))).toBe(false);
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+      rmSync(fora, { recursive: true, force: true });
+    }
+  });
+
   it("funcional: CLI que não responde em JSON adia com contexto, sem aplicar", () => {
     const raiz = projeto();
     try {
