@@ -79,18 +79,35 @@ ESTADO="$(campo .state)"
 [ -n "$ESTADO" ] || para 5 "resposta ilegível do serviço sobre $PR_URL"
 [ "$(campo .url)" = "$PR_URL" ] || para 6 "o serviço devolveu outro PR: $(campo .url)"
 [ "$(campo .headRefName)" = "$BRANCH_ENTREGA" ] || para 6 "o PR é da branch $(campo .headRefName), e a entrega é de $BRANCH_ENTREGA"
-[ "$(campo .baseRefName)" = "$BASE" ] || para 6 "o PR mira $(campo .baseRefName), e a base da entrega é $BASE"
+# `branch_base` é a base efetiva do E0: nome, ref do remoto ou SHA. O PR só diz o nome.
+BASE_PR="$(campo .baseRefName)"
+BASE_SHA=""
+if [[ "$BASE" =~ ^[0-9a-f]{40}$ ]]; then
+  BASE_SHA="$BASE"
+else
+  # Ref completa não tem dúvida; sem ela, `origin/main` pode ser a branch `main` do
+  # remoto ou uma branch com esse nome literal.
+  case "$BASE" in
+    refs/heads/*) BASE_NOME="${BASE#refs/heads/}"; BASE_LITERAL="$BASE_NOME" ;;
+    refs/remotes/"$REMOTO"/*) BASE_NOME="${BASE#refs/remotes/"$REMOTO"/}"; BASE_LITERAL="$BASE_NOME" ;;
+    *) BASE_NOME="${BASE#"$REMOTO"/}"; BASE_LITERAL="$BASE" ;;
+  esac
+  [ "$BASE_PR" = "$BASE_NOME" ] || [ "$BASE_PR" = "$BASE_LITERAL" ] \
+    || para 6 "o PR mira $BASE_PR, e a base da entrega é $BASE"
+fi
 [ "$ESTADO" = MERGED ] || para 4 "o PR está $ESTADO: a ocorrência só fecha depois do merge. $PR_URL"
 MERGE="$(campo .mergeCommit.oid)"
 [[ "$MERGE" =~ ^[0-9a-f]{40}$ ]] || para 5 "o serviço não informou o commit de merge de $PR_URL"
 
-REF_BASE="refs/remotes/$REMOTO/$BASE"
+REF_BASE="refs/remotes/$REMOTO/$BASE_PR"
 # A refspec explícita: em clone de uma branch só, o fetch atualizaria só o FETCH_HEAD.
-g fetch -q --no-tags "$REMOTO" "+refs/heads/$BASE:$REF_BASE" 2>/dev/null || para 5 "git fetch $REMOTO $BASE falhou"
+g fetch -q --no-tags "$REMOTO" "+refs/heads/$BASE_PR:$REF_BASE" 2>/dev/null || para 5 "git fetch $REMOTO $BASE_PR falhou"
 [ "$(g rev-parse --is-shallow-repository 2>/dev/null)" != true ] \
   || para 5 "clone raso: o merge não se confere aqui (git fetch --unshallow $REMOTO)"
 g merge-base --is-ancestor "$MERGE" "$REF_BASE" 2>/dev/null \
-  || para 7 "o merge $MERGE não está em $REMOTO/$BASE"
+  || para 7 "o merge $MERGE não está em $REMOTO/$BASE_PR"
+[ -z "$BASE_SHA" ] || g merge-base --is-ancestor "$BASE_SHA" "$REF_BASE" 2>/dev/null \
+  || para 6 "a base da entrega, $BASE_SHA, não está em $REMOTO/$BASE_PR"
 
 BRANCH="docs/$OC-fechamento"
 PRINCIPAL="$(g worktree list --porcelain | sed -n '1s/^worktree //p')"
@@ -118,9 +135,11 @@ else
   g config --local "branch.$BRANCH.expxFechamento" "$MERGE" \
     || para 8 "a marca de $BRANCH não foi gravada"
   if ! g worktree add -q -b "$BRANCH" --no-track "$DESTINO" "$REF_BASE" 2>/dev/null; then
-    g config --local --unset "branch.$BRANCH.expxFechamento"
+    # A marca fica: se outro E5 venceu nesse intervalo, ela é dele; sem branch, não isenta nada.
     para 8 "o worktree $DESTINO não foi criado"
   fi
+  g config --local "branch.$BRANCH.expxFechamento" "$MERGE" \
+    || para 8 "a marca de $BRANCH não foi gravada"
   DESTINO="$(cd "$DESTINO" && pwd -P)"
 fi
 
