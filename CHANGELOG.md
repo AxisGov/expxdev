@@ -8,7 +8,7 @@
 - **`expx update --check --json`**: uma linha `{"ok", "pendente", "pendencias", "bloqueadas"}`, com `skill:`, `cli:`, `proveniencia:` e `normalizacao:`. O `--json` só vale com `--check`.
 - **O cache Axis fica fora do projeto.** Com `EXPX_AXIS_CACHE` relativo, dentro do projeto, sob link para dentro dele ou com `..`, o hook adia antes do bootstrap, que escreveria no próprio projeto.
 - **WSL sem o `claude` do Windows.** O registro do plugin e a leitura do piso deixam de usar o `claude` (ou `claude.exe`) sob `/mnt/`, inclusive por link. No Login, o `remove` e o `add` rodaram no Claude do Windows. Só com o do Windows no PATH, nada roda, e a instrução manda pôr o Claude Code do Linux no PATH. A entrada vazia do PATH conta como a pasta atual.
-- **designx@257b205** (designx#6): as buscas dos agentes `cartografo-visual` e `auditor-design` viram chamadas das ferramentas Grep e Glob. Esses agentes não têm shell, e a busca de cor com `\|` não achava nada. Toda chamada declara `output_mode` e `head_limit`: a ferramenta corta em 250 e, sem `output_mode`, só lista arquivos.
+- **designx@257b205** (designx#6): as buscas dos agentes `cartografo-visual` e `auditor-design` viram chamadas das ferramentas Grep e Glob. Esses agentes não têm shell, e a busca de cor com `\|` não achava nada. Toda chamada de Grep declara `output_mode` e `head_limit`: a ferramenta corta em 250 e, sem `output_mode`, só lista arquivos.
   - A animação sem `motion-reduce:animate-none` ou `motion-reduce:transition-none` na mesma `className` é achado.
   - A sessão principal, que no Claude Code 2.1.310 não tem Grep nem Glob, faz a mesma busca com `rg`.
   - O `install.sh --opencode` volta a levar a skill.
