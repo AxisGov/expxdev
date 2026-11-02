@@ -32,6 +32,18 @@ A mergex entra no meio porque:
 
 Fechar a ocorrência antes de a entrega existir registraria como resolvido algo que ainda não chegou ao repositório.
 
+### O fechamento depois do merge
+
+Quando o E5 roda, a branch da entrega já foi integrada. O caminho é `scripts/fechamento-pos-merge.sh --trabalho <OC-ID>-<slug>`:
+
+- **Prova o merge no serviço:** confere o `pr_url` de `ENTREGA.md`, a branch, a base e o commit de merge na base. Sem isso, não cria nada, e o rc diz por quê.
+- **Abre a área:** `docs/<OC-ID>-fechamento`, a partir da base, sem rastrear, em worktree próprio, com a marca `branch.<branch>.expxFechamento`.
+- **O commit** leva os trailers `Fechamento-de: <pr_url>` e `Merge: <sha>`, e só os quatro documentos do E5: `ORQUESTRADOR.md`, `tecnico.md`, `uso.md` e `docs/relatorios/INDICE.md`. O `arquivo-fora-do-plano` só os isenta nessa condição.
+- **`ENTREGA.md` não muda:** o portão não seleciona esse PR, e `pr_estado` segue com o E9 ou com uma pessoa, como em qualquer entrega mesclada sem o `/mergex-revisar`.
+- **O merge desse PR é humano.**
+
+**Limite assumido:** fora do harness, ou com o hook em aviso, alguém pode abrir o mesmo PR sem o script, e o CI não barra, porque barrar exigiria uma exceção no portão. Quem revisa vê a falta dos trailers.
+
 ### O nome da branch depende do tipo da ocorrência
 
 | `tipo` da ocorrência | Prefixo |

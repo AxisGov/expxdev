@@ -543,16 +543,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.12.18 -R AxisGov/expxdev -D ~/expx-cli/v0.12.18
+gh release download v0.12.19 -R AxisGov/expxdev -D ~/expx-cli/v0.12.19
 (
-  cd ~/expx-cli/v0.12.18
+  cd ~/expx-cli/v0.12.19
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.12.18.tgz.sha256
+    sha256sum -c expxdev-0.12.19.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.12.18.tgz.sha256
+    shasum -a 256 -c expxdev-0.12.19.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.12.18/expxdev-0.12.18.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.12.19/expxdev-0.12.19.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -566,7 +566,7 @@ npx --yes --package ~/expx-cli/v0.12.18/expxdev-0.12.18.tgz expx init --skills b
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.12.18 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.12.19 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -634,6 +634,8 @@ npx --yes --package ~/expx-cli/v0.12.18/expxdev-0.12.18.tgz expx init --skills b
   o destino do worktree, e o `revisar` passa a remover o snapshot deixado por um processo morto.
 - `0.12.18` corrige duas regressões da `0.12.17`: o `revisar` só remove snapshot com `dono` válido, e
   a SprintX e a runx param e perguntam diante de worktree `prunable`, que pode ter sido movido.
+- `0.12.19` dá caminho oficial ao fechamento da runx depois do merge: o E5 prova o merge no serviço e
+  abre uma branch própria, só com os documentos, sem exceção no portão.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

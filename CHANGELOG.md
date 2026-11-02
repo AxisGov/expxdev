@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.12.19 — o fechamento da runx depois do merge
+
+A primeira runx do Conselhos (OC-2026-0001) fechou por um PR aberto à mão, porque o método não dizia o caminho.
+
+- Certifica a MergeX em AxisGov/mergex@4f9e5cd (mergex#69, DM-306):
+  - **`fechamento-pos-merge.sh`.** Prova o merge no serviço e confere se o PR é o desta entrega: URL, branch, base, remoto e commit de merge na base. Só então cria `docs/<OC-ID>-fechamento`, sem rastrear, em worktree próprio. Sem a prova, não cria nada, e o rc diz por quê.
+  - **`arquivo-fora-do-plano`.** Nessa branch, com a marca do script e os trailers `Fechamento-de:` e `Merge:` batendo com a entrega, isenta só `ORQUESTRADOR.md`, `tecnico.md`, `uso.md` e `docs/relatorios/INDICE.md`. O resto é desvio, mesmo declarado numa task.
+  - **`ENTREGA.md`, validade, catálogo, pre-push e CI não mudam.** `pr_estado` segue com o E9 ou com uma pessoa.
+- Certifica a runx em AxisGov/runx@360cdd1 (runx#13, DR-94): o E5 começa pela prova. Com o PR aberto, a ocorrência não fecha. Nos outros erros, o E5 para, e fechar sem a prova é decisão da pessoa. Projeto sem entrega da MergeX segue como antes.
+- Certifica a SprintX em AxisGov/sprintx@6bd79ef (sprintx#64, DS-200), e na runx também: o caminho do worktree reparado é gravado relativo ao checkout principal.
+- **Limite assumido:** fora do harness, ou com o hook em aviso, alguém pode abrir o mesmo PR sem o script, e o CI não barra. Quem revisa vê a falta dos trailers. O `gh` real ainda não foi exercitado: a bancada usa um falso, com Git real.
+
 ## 0.12.18 — duas regressões da 0.12.17
 
 Relatadas no conselhos#230 e reproduzidas antes de corrigir.

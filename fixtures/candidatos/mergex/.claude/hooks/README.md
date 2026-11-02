@@ -21,7 +21,7 @@ importam mais, e onde um hook mal escrito faz mais estrago.
 | `mergex/git-perigoso` | `PreToolUse` | **bloqueio** | Barra push forçado, commit/push na principal, reescrita de histórico enviado, descarte de alteração local, limpeza destrutiva |
 | `branch-limpa` | `PreToolUse` | **bloqueio** | Barra criação ou troca de branch com alteração não commitada pendente |
 | `commit-por-task` | `PreToolUse` | aviso¹ | Verifica que o commit corresponde a **uma** task, `concluida` e com registro de suíte válido (`parcial` ou `verde`); e que nenhum arquivo em preparação pertence **só a outra task** da feature |
-| `arquivo-fora-do-plano` | `PreToolUse` | aviso | Compara o que está em preparação com a lista declarada na task. Artefato de método do **próprio** trabalho é isento; o de outro trabalho, não |
+| `arquivo-fora-do-plano` | `PreToolUse` | aviso | Compara o que está em preparação com a lista declarada na task. Artefato de método do **próprio** trabalho é isento; o de outro trabalho, não Na branch aberta por `fechamento-pos-merge.sh`, com a marca e os trailers, isenta só os quatro documentos do fechamento da runx (DM-306). |
 | `pr-so-com-portao` | `PreToolUse` | aviso² | Aviso antecipado no `git push`: avisa quando não determina o push; bloqueia só o push simples que a regra do `pre-push` prova inválido e o `--no-verify` |
 
 Os três de segurança nascem em bloqueio: segredo commitado não tem volta, e o

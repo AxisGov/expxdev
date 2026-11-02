@@ -146,9 +146,63 @@ eh_historico_global_sprintx() {
   return 1
 }
 
+# O fechamento da runx depois do merge (DM-306): só na branch aberta por
+# fechamento-pos-merge.sh, com a marca dele no ancestral do HEAD, os mesmos
+# trailers na mensagem e a entrega existente. Nessa branch, só quatro caminhos
+# exatos, e só arquivo comum adicionado ou alterado: o resto é desvio mesmo
+# declarado numa task. Remoção, link, executável, renomeação e cópia de fora de
+# docs/ ficam de fora, porque por eles passaria outra coisa que não documento.
+FECHAMENTO_ATIVO=0
+FECHAMENTO_ISENTOS=""
+fechamento_apurar() {
+  local branch oc marca msg trailers pr entrega achou=0 status caminho origem modo
+  branch="$(git -C "$RAIZ" branch --show-current 2>/dev/null)"
+  [[ "$branch" =~ ^docs/(OC-[0-9]{4}-[0-9]{4})-fechamento$ ]] || return 0
+  oc="${BASH_REMATCH[1]}"
+  git -C "$RAIZ" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && return 0
+  marca="$(git -C "$RAIZ" config --get "branch.$branch.expxFechamento" 2>/dev/null)"
+  [[ "$marca" =~ ^[0-9a-f]{40}$ ]] || return 0
+  git -C "$RAIZ" merge-base --is-ancestor "$marca" HEAD 2>/dev/null || return 0
+  msg="$(integracao_mensagem_do_comando "$CMD")"
+  trailers="$(printf '%s\n' "$msg" | git interpret-trailers --parse 2>/dev/null)"
+  printf '%s\n' "$trailers" | grep -Fx "Merge: $marca" >/dev/null || return 0
+  pr="$(printf '%s\n' "$trailers" | sed -n 's/^Fechamento-de: //p' | awk 'NR == 1')"
+  [ -n "$pr" ] || return 0
+  # O PR do trailer é o da entrega desta ocorrência, o mesmo que o script provou.
+  for entrega in "$RAIZ/docs/entregas/$oc/ENTREGA.md" "$RAIZ/docs/entregas/$oc"-*/ENTREGA.md; do
+    [ -f "$entrega" ] && [ "$(expx_frontmatter_valor "$entrega" pr_url)" = "$pr" ] && achou=1
+  done
+  [ "$achou" = 1 ] || return 0
+  FECHAMENTO_ATIVO=1
+  while IFS= read -r -d '' status; do
+    case "$status" in
+      A|M) IFS= read -r -d '' caminho || return 0 ;;
+      # Relatório parece com relatório: cópia de documento é normal, a de produto não.
+      C*) IFS= read -r -d '' origem || return 0; IFS= read -r -d '' caminho || return 0
+          case "$origem" in docs/relatorios/*|docs/manutencao/*) ;; *) continue ;; esac ;;
+      R*) IFS= read -r -d '' caminho || return 0; IFS= read -r -d '' caminho || return 0; continue ;;
+      *) IFS= read -r -d '' caminho || return 0; continue ;;
+    esac
+    [[ "$caminho" =~ ^docs/manutencao/$oc-[^/]+/ORQUESTRADOR\.md$ ]] \
+      || [[ "$caminho" =~ ^docs/relatorios/[0-9]{4}-[0-9]{2}-[0-9]{2}-$oc-[^/]+/(tecnico|uso)\.md$ ]] \
+      || [ "$caminho" = docs/relatorios/INDICE.md ] || continue
+    modo="$(git -C "$RAIZ" ls-files -s -- ":(literal)$caminho" 2>/dev/null | awk 'NR == 1 { print $1 }')"
+    [ "$modo" = 100644 ] || continue
+    FECHAMENTO_ISENTOS="$FECHAMENTO_ISENTOS$caminho
+"
+  done < <(git -C "$RAIZ" diff --cached --name-status -z --find-renames --find-copies-harder 2>/dev/null)
+}
+fechamento_apurar
+
 FORA=""
 while IFS= read -r arquivo; do
   [ -n "$arquivo" ] || continue
+  printf '%s' "$FECHAMENTO_ISENTOS" | grep -Fx -- "$arquivo" >/dev/null && continue
+  if [ "$FECHAMENTO_ATIVO" = 1 ]; then
+    FORA="$FORA  - $arquivo
+"
+    continue
+  fi
   eh_artefato_de_metodo "$arquivo" && continue
   eh_historico_global_sprintx "$arquivo" && continue
   printf '%s\n' "$DECLARADOS" | grep -Fx "$arquivo" >/dev/null || FORA="$FORA  - $arquivo

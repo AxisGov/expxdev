@@ -181,7 +181,7 @@ entregue_em: 2026-08-29
 | `desvios` | Arquivos alterados fora da lista declarada, detectados no E1 e no E2; `[]` quando não houve |
 | `push_feito` | `true` só quando o E6 confirmou que o remoto tem o mesmo commit |
 | `pr_url` | A URL devolvida pelo E7; `null` quando o PR não foi aberto — **não é falha** |
-| `pr_estado` | `rascunho` na abertura normal; `aberto` quando o QA já aprovou; `merged`/`fechado` quando o E9 ou uma pessoa atualizarem |
+| `pr_estado` | `rascunho` na abertura normal; `aberto` quando o QA já aprovou; `merged`/`fechado` quando o E9 ou uma pessoa atualizarem. O PR de fechamento da runx não toca este arquivo (`references/integracao/runx.md`) |
 | `sprint_atual` | `planejamento` no PR de planejamento, `NN` na sprint que o E0 abriu, ou `null` fora dessas entregas. Nunca é relido do plano depois de registrado |
 | `prs` | Os PRs do trabalho, um item `{sprint, url, estado, merge_sha, merge, base_sha}` por PR, em YAML de bloco e em sequência. O de planejamento é sempre o primeiro; numa entrega `por_sprint`, seguem `01`, `02`, ... . `pr_url`/`pr_estado` de topo são os da entrega atual |
 | `entregue_em` | A data em que o fluxo completou; `null` enquanto `estado` não for `entregue` |
