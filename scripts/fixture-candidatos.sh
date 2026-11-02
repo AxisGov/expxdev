@@ -18,6 +18,8 @@
 set -euo pipefail
 
 REPO="$1"; SHA="$2"; NOME="$3"
+# o nome vira caminho de `rm -rf`: sem separador, nunca sai de fixtures/candidatos
+[[ "$NOME" =~ ^[a-z][a-z0-9-]*$ ]] || { echo "nome de skill invalido: $NOME" >&2; exit 2; }
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST="$RAIZ/fixtures/candidatos/$NOME"
 
