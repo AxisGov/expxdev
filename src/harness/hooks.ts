@@ -76,7 +76,7 @@ const PASTA_DO_NUCLEO = join(dirname(fileURLToPath(import.meta.url)), "..", ".."
  * O `expx-session-sync` vai sempre. Núcleo ausente (checkout parcial) é falha
  * aberta: o hook simplesmente não é instalado.
  */
-function artefatosDoNucleo(comLembrete: boolean): Artefato[] {
+function artefatosDoNucleo(comLembrete: boolean, comInvocacao: boolean): Artefato[] {
   const saida: Artefato[] = [];
   const sync = join(PASTA_DO_NUCLEO, "expx-session-sync.mjs");
   if (existsSync(sync)) saida.push({ ...artefato(sync, ".claude/hooks/expx-session-sync.mjs", SKILL_DO_NUCLEO, "nucleo"), executavel: false });
@@ -101,6 +101,25 @@ function artefatosDoNucleo(comLembrete: boolean): Artefato[] {
       }
     }
   }
+  // O envelope da invocação (CONTRATO-expx-orquestracao §8.2) só com a política
+  // ativa e o Claude Code no piso: sem isso, a instalação fica byte a byte igual.
+  // Precisa da biblioteca do rastro, que nasce com o lembrete quando há hook de skill.
+  if (comInvocacao) {
+    const origem = join(PASTA_DO_NUCLEO, "expx-invocacao.mjs");
+    if (existsSync(origem)) {
+      for (const destino of [".claude/hooks/expx-invocacao.mjs", ".expx/marketplace/plugins/expx/nucleo/hooks/expx-invocacao.mjs"]) {
+        saida.push({ ...artefato(origem, destino, SKILL_DO_NUCLEO, "nucleo"), executavel: false });
+      }
+      if (!comLembrete) {
+        const rastro = join(PASTA_DO_NUCLEO, "expx-rastro.sh");
+        if (existsSync(rastro)) {
+          for (const destino of [".claude/hooks/expx-rastro.sh", ".expx/marketplace/plugins/expx/nucleo/hooks/expx-rastro.sh"]) {
+            saida.push({ ...artefato(rastro, destino, SKILL_DO_NUCLEO, "nucleo"), executavel: false });
+          }
+        }
+      }
+    }
+  }
   return saida;
 }
 
@@ -116,9 +135,9 @@ export function ehSuiteDeTesteDeHook(rel: string): boolean {
 }
 
 /** Os artefatos de `.claude/` para o harness Claude Code. */
-export function artefatosDeHooks(skills: readonly SkillMontavel[]): Artefato[] {
+export function artefatosDeHooks(skills: readonly SkillMontavel[], comInvocacao = false): Artefato[] {
   const alvos = emOrdemCanonica(comHooks(skills));
-  const saida = artefatosDoNucleo(alvos.length > 0);
+  const saida = artefatosDoNucleo(alvos.length > 0, comInvocacao);
   for (const s of alvos) {
     // a skill vai junto: é o que o hook procura ao lado de si mesmo
     saida.push(...artefatosDaArvore(s.raizSkill, `.claude/skills/${s.nome}`, s.nome, "skill"));
@@ -152,7 +171,7 @@ export function hooksPorNome(artefatos: readonly Artefato[], skills: readonly Sk
     if (!a.destino.startsWith(".claude/hooks/")) continue;
     const rel = a.destino.slice(".claude/hooks/".length);
     if (rel.includes("/")) continue;
-    if (!a.executavel && !rel.endsWith("expx-session-sync.mjs")) continue;
+    if (!a.executavel && !rel.endsWith("expx-session-sync.mjs") && !rel.endsWith("expx-invocacao.mjs")) continue;
     if (a.tipo === "hook" && !(rel.startsWith(`${a.skill}-`) || rel.startsWith(`${a.skill}.`))) continue;
     saida.push({ skill: a.skill, relativo: a.destino });
   }

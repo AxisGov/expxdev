@@ -48,6 +48,8 @@ const EXTENSO: Record<number, string> = {
   30: "Trinta",
   31: "Trinta e uma",
   32: "Trinta e duas",
+  33: "Trinta e três",
+  34: "Trinta e quatro",
 };
 
 function extenso(n: number): string {
@@ -200,6 +202,8 @@ const EXTENSO_EXTRAS: Record<number, string> = {
   6: "Seis",
   16: "Dezesseis",
   17: "Dezessete",
+  18: "Dezoito",
+  19: "Dezenove",
 };
 
 function extensoExtras(n: number): string {

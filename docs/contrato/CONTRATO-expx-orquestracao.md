@@ -16,7 +16,8 @@ política ativa, as chaves da resolução no evento do subagente, a partir da
 projeção `.expx/orquestracao-rastro.tsv`; o painel mostra a resolução como
 configuração não observada (seção 11 e `CONTRATO-expx-eventos.md`). **Desde a
 F3c**, o hook do núcleo registra a `integridade_final` dos agentes de aprovação
-(seção 12). O envelope da invocação e a recusa operacional do veredito (F3b)
+(seção 12). **Desde a 0.13.0**, o envelope da invocação observa a chamada de cada
+agente gerenciado (seção 13). A recusa operacional do veredito e o nível `isolado`
 ainda não existem.
 
 ## 1. Três coisas separadas
@@ -333,9 +334,8 @@ resolução vigente dele, depois das doze chaves:
 | `materializado` | `{model, effort?}`, **só** com `origem_alternativa: agentes-json-v1` (7.4) |
 
 O principal, outro harness e o agente fora da projeção não levam essas
-chaves. `invocacao`, `modelos_observados`, `fora_da_politica` e o evento
-`invocacao_abandonada` estão declarados em `CONTRATO-expx-eventos.md` para o
-envelope da invocação (F3b), e nenhum escritor os grava nesta versão.
+chaves. `invocacao`, `instancia`, `estado_invocacao`, `modelos_observados` e
+`fora_da_politica` são do envelope da invocação (seção 13).
 
 ### 11.2 A projeção `.expx/orquestracao-rastro.tsv`
 
@@ -458,10 +458,10 @@ regime. Nesta versão isso é registrado e mostrado, não executado:
 - o evento sai `falha`, e o painel o destaca;
 - o `doctor` avisa `integridade-final-invalida`, com a contagem por arquivo do
   rastro;
-- a **recusa operacional** do veredito fica para a F3b. Hoje o
-  `veredito_emitido` não carrega `agent_id` nem `invocacao`, e recusar por nome
-  de agente associaria aprovadores paralelos errado. O envelope da F3b
-  correlaciona invocação, instância, término e veredito.
+- a **recusa operacional** do veredito ainda não existe. O `veredito_emitido` não
+  carrega `invocacao`, e recusar por nome de agente associaria aprovadores
+  paralelos errado. O envelope (seção 13) já correlaciona invocação, instância e
+  término; falta o veredito, que entra com a decisão de recusar.
 
 ### 12.5 Pré-condição: o rastro ignorado
 
@@ -473,3 +473,74 @@ já está versionado: a regra do `.gitignore` não alcança o que está no índi
 Com a integridade instalada, o `doctor` avisa `rastro-nao-ignorado` nos dois
 casos. A comparação não exclui `docs/eventos/` por conta
 própria: o que ela mede é o que o Git vê.
+
+## 13. O envelope da invocação (0.13.0): só observa
+
+`nucleo/hooks/expx-invocacao.mjs`, em `PreToolUse`, `PostToolUse` e
+`PostToolUseFailure` do `Agent`, e em `SessionStart`. Instalado só com a política
+ativa e o Claude Code no piso (13.4). **Nada é recusado nesta versão**, e por isso o
+hook falha aberto: qualquer erro sai 0, sem imprimir, e o agente roda. O registro é
+sem `onFailure: "block"`, que só faz sentido com a recusa.
+
+### 13.1 O que acontece em cada chamada
+
+1. **Antes:** agente fora da projeção (11.2), ou fora do vocabulário `Agente` do rastro,
+   que não teria evento válido, passa sem nada. Gerenciado: grava o envelope, exclusivo, com a invocação (`tool_use_id`),
+   o `resolucao_id` vigente, o agente e a sessão.
+2. **Primeiro plano do aprovador:** o Claude Code roda `Agent` em segundo plano por
+   padrão, e aí a observação só alcança o lançamento. Para quem emite
+   `veredito_emitido` (`auditor-plano`, `sprintx-revisor-testes`, `revisor-diff`, `qa`,
+   `runx-revisor-testes`, com um prefixo `expx:` opcional), o hook devolve
+   `updatedInput` com todo o input e `run_in_background: false`. Não devolve
+   `permissionDecision`: permissão continua com quem decidia. A lista é transitória: a F4
+   a troca pelo `papel`.
+3. **Depois:** o envelope é tomado por `rename`, e quem não consegue não fecha. Sai
+   `invocacao_fechada`, e só então o envelope é removido. Se o escritor não rodou, ele
+   fica para a recuperação. O envelope vale mesmo se a projeção saiu no meio.
+
+O envelope mora no git-dir de cada worktree (`git rev-parse --git-path
+expx/invocacoes/v1`), com o nome em hash: na árvore, ele mudaria o `status` da
+integridade final de outro aprovador. Sem Git, em `.expx/invocacoes/`.
+
+### 13.2 O evento `invocacao_fechada`
+
+| Chave | O que é |
+|---|---|
+| `invocacao` | o `tool_use_id` |
+| `estado_invocacao` | `concluida` (`completed`), `lancada` (`async_launched`) ou `falha` (`PostToolUseFailure`). `falha` dá `resultado: falha` |
+| `instancia` | o hash Git de `<session_id>\n<agentId>`, a mesma conta de `integridade_final_verificada`. Sozinho, o `agent_id` pode repetir entre sessões |
+| `modelos_observados` | `modelsUsed`, só como lista não vazia de texto; senão `[resolvedModel]`; ausente se nada foi informado |
+| `fora_da_politica` | `true` quando algum modelo não corresponde à `cadeia` do registro, ou a `materializado` na exceção 7.4 |
+
+Só `concluida` é julgada: `lancada` prova o lançamento, não a execução. Registro
+ilegível ou nada observado não julgam, e a chave fica ausente: isso nunca significa
+"dentro da política". Um ID completo corresponde ao mesmo ID ou ao alias contido nele.
+Fechamento sem envelope grava `sem envelope` no `detalhe`: é assim que uma falha do
+hook aparece.
+
+### 13.3 O abandono
+
+`SessionStart` com `startup` ou `resume` começa um processo novo, então todo envelope
+daquela sessão é de antes dele, mesmo com o `session_id` igual. Vira
+`invocacao_abandonada`, salvo se o evento da invocação já está no rastro (fechamento
+interrompido). Envelope de outra sessão só depois de um dia: ela pode estar viva.
+Compactar não conta, porque a sessão continua, com agente rodando. Negação por prompt,
+negação por outro hook e queda chegam aqui: sem evento terminal, o envelope fica.
+
+### 13.4 O piso
+
+**Claude Code 2.1.310**, por decisão do dono: é a versão em que este fluxo foi provado
+ponta a ponta. Esta versão não usa `onFailure`, mas a recusa vai usar, e em 2026-11-02 a
+2.1.269 e a 2.1.287 o ignoraram enquanto a 2.1.310 o respeitou; a 2.1.295, citada no
+desenho, não foi medida. Abaixo do piso, ou sem `claude`, o `init` instala o resto e
+avisa, e o `doctor` acusa `claude-abaixo-do-piso`. Com a política ativa e sem o hook,
+`envelope-nao-instalado`.
+
+### 13.5 O que falta para recusar
+
+Decisão do dono, depois de observar uso real. Antes dela: `veredito_emitido` com
+`invocacao`; `onFailure: "block"` com saída diferente de 0 em todo erro próprio, porque
+JSON inválido com saída 0 passa mesmo com `block`; a prova de chamadas concorrentes na
+mesma mensagem e a de `modelsUsed` sob fallback real; a sessão `claude-code@<id>` da
+SprintX comparada ao `session_id` cru. As camadas 6 e 7, com o `expx resolucao`, ficam
+até haver elevação por tarefa. O nível `isolado` é trabalho à parte.

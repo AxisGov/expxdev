@@ -305,6 +305,13 @@ Invariantes:
 
 ### 8.2 Função de resolução
 
+> **Emenda de 2026-11-02 (0.13.0).** As provas com o binário real e as decisões do
+> dono mudaram o que segue, e `CONTRATO-expx-orquestracao.md` §13 é o normativo: o
+> `Agent` roda em segundo plano por padrão, então o aprovador é forçado ao primeiro
+> plano; `onFailure: "block"` não cobre JSON inválido com saída 0; a primeira versão
+> só observa e falha aberto, sem `expx resolucao` nem camadas 6 e 7; o envelope mora
+> no git-dir, e não em `.expx/invocacoes/`; o piso é 2.1.310.
+
 `resolver(skill, agente, adaptador, política, tabela, tarefa?, sessão?) → resolução`
 
 é **pura e determinística**: as mesmas entradas dão a mesma saída. A saída tem:

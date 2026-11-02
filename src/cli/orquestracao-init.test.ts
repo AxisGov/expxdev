@@ -335,3 +335,69 @@ describe("init com política — falha antes de escrever", () => {
     expect(readFileSync(join(p, ".expx/expx-lock.json"), "utf8")).toBe(lockAntes);
   });
 });
+
+// O piso é lido do `claude` do PATH: no Windows, um script falso não roda sem extensão.
+describe.skipIf(process.platform === "win32")("init e o envelope da invocação", () => {
+  const PATH_ORIGINAL = process.env["PATH"];
+  afterEach(() => {
+    process.env["PATH"] = PATH_ORIGINAL;
+  });
+  function claudeFalso(saida: string): void {
+    const d = mkdtempSync(join(tmpdir(), "expx-claude-falso-"));
+    criados.push(d);
+    writeFileSync(join(d, "claude"), `#!/bin/sh\necho '${saida}'\n`, { mode: 0o755 });
+    process.env["PATH"] = `${d}:${PATH_ORIGINAL ?? ""}`;
+  }
+  const comHook = (p: string) => existsSync(join(p, ".claude/hooks/expx-invocacao.mjs"));
+  const settings = (p: string) => JSON.parse(readFileSync(join(p, ".claude/settings.json"), "utf8")) as { hooks?: Record<string, { matcher?: string; hooks: { args?: string[]; onFailure?: string }[] }[]> };
+
+  it("com política e no piso: instala, registra só no Agent e no SessionStart, sem `onFailure`", async () => {
+    claudeFalso("2.1.310 (Claude Code)");
+    const p = produto();
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+    expect((await init(p)).ok).toBe(true);
+    expect(comHook(p)).toBe(true);
+    expect(existsSync(join(p, ".claude/hooks/expx-rastro.sh"))).toBe(true);
+    expect(existsSync(join(p, ".expx/marketplace/plugins/expx/nucleo/hooks/expx-invocacao.mjs"))).toBe(true);
+    const h = settings(p).hooks ?? {};
+    const dele = (ev: string) => (h[ev] ?? []).filter((e) => e.hooks.some((x) => x.args?.some((a) => a.endsWith("expx-invocacao.mjs"))));
+    for (const ev of ["PreToolUse", "PostToolUse", "PostToolUseFailure"]) {
+      expect(dele(ev).map((e) => e.matcher)).toEqual(["Agent"]);
+      expect(dele(ev)[0]?.hooks[0]?.onFailure).toBeUndefined();
+    }
+    expect(dele("SessionStart")).toHaveLength(1);
+  });
+
+  it.each([["2.1.309 (Claude Code)"], ["2.0.999"], ["nao e versao"]])("abaixo do piso ou ilegível (%s): instala o resto e avisa", async (saida) => {
+    claudeFalso(saida);
+    const p = produto();
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+    const r = await init(p);
+    expect(r.ok).toBe(true);
+    expect(comHook(p)).toBe(false);
+    expect(existsSync(join(p, ".expx/orquestracao-rastro.tsv"))).toBe(true);
+    expect(r.avisos.some((a) => a.includes("envelope da invocacao nao instalado"))).toBe(true);
+  });
+
+  it("sem política: nem pergunta a versão, e nada muda", async () => {
+    claudeFalso("2.1.310 (Claude Code)");
+    const p = produto();
+    const r = await init(p);
+    expect(r.ok).toBe(true);
+    expect(comHook(p)).toBe(false);
+    expect(r.avisos.some((a) => a.includes("envelope"))).toBe(false);
+  });
+
+  it("política removida: o hook sai no init seguinte", async () => {
+    claudeFalso("2.1.310 (Claude Code)");
+    const p = produto();
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+    const o = origens();
+    expect((await init(p, o)).ok).toBe(true);
+    expect(comHook(p)).toBe(true);
+    rmSync(join(p, ".expx/orquestracao.json"));
+    expect((await init(p, o)).ok).toBe(true);
+    expect(comHook(p)).toBe(false);
+    expect(JSON.stringify(settings(p).hooks ?? {})).not.toContain("expx-invocacao");
+  });
+});

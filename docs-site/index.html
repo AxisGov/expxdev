@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Documentação do método Expx</title>
-<meta name="description" content="Referência da linha AxisGov v0.12.20 do CLI expxdev e das nove skills do método Expx: instalação, contratos, grafo, painel, watch e arquitetura interna.">
+<meta name="description" content="Referência da linha AxisGov v0.13.0 do CLI expxdev e das nove skills do método Expx: instalação, contratos, grafo, painel, watch e arquitetura interna.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -24,7 +24,7 @@
       <path d="M7.6 7.4 L16.4 16.6 M16.4 7.4 L7.6 16.6" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/>
     </svg>
     <span class="marca__nome">expx<b>dev</b></span>
-    <span class="marca__versao" id="versao">v0.12.20</span>
+    <span class="marca__versao" id="versao">v0.13.0</span>
   </a>
 
   <div class="busca">
@@ -115,22 +115,22 @@
     o bastante para o agente decidir sozinho no meio da implementação, e ele decide: escolhe um padrão
     que não é o do projeto, escreve o teste na pasta que o runner não olha, refatora três arquivos que
     ninguém pediu. O método Expx é o conjunto das restrições que evitam isso, escrito. Este site é a
-    referência da linha <strong>AxisGov v0.12.20</strong> do <code>expxdev</code> — o CLI que instala e
+    referência da linha <strong>AxisGov v0.13.0</strong> do <code>expxdev</code> — o CLI que instala e
     mantém as nove skills — e de cada contrato que permite a elas cooperarem.
   </p>
 
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
-    <pre><code><span class="tok-cmd">gh</span> release download v0.12.20 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
-(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-com">if command -v sha256sum &gt;/dev/null 2&gt;&amp;1; then</span> <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.12.20.tgz.sha256<span class="tok-com">; else</span> <span class="tok-cmd">shasum</span> <span class="tok-flag">-a 256 -c</span> expxdev-0.12.20.tgz.sha256<span class="tok-com">; fi</span>) &amp;&amp;
-<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.12.20.tgz expx <span class="tok-flag">--version</span></code></pre>
+    <pre><code><span class="tok-cmd">gh</span> release download v0.13.0 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
+(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-com">if command -v sha256sum &gt;/dev/null 2&gt;&amp;1; then</span> <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.13.0.tgz.sha256<span class="tok-com">; else</span> <span class="tok-cmd">shasum</span> <span class="tok-flag">-a 256 -c</span> expxdev-0.13.0.tgz.sha256<span class="tok-com">; fi</span>) &amp;&amp;
+<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.13.0.tgz expx <span class="tok-flag">--version</span></code></pre>
   </div>
 
   <div class="cartoes">
     <div class="cartao"><div class="cartao__num">9</div><div class="cartao__rot">skills no catálogo</div></div>
     <div class="cartao"><div class="cartao__num">8</div><div class="cartao__rot">subcomandos do CLI</div></div>
-    <div class="cartao"><div class="cartao__num">1867</div><div class="cartao__rot">testes aprovados</div></div>
-    <div class="cartao"><div class="cartao__num">32</div><div class="cartao__rot">verificações do doctor</div></div>
+    <div class="cartao"><div class="cartao__num">1898</div><div class="cartao__rot">testes aprovados</div></div>
+    <div class="cartao"><div class="cartao__num">34</div><div class="cartao__rot">verificações do doctor</div></div>
   </div>
 
   <p style="margin-top:8px">
@@ -210,9 +210,9 @@
   não executa <code>npm publish</code>: baixe o tarball e o checksum da GitHub Release explícita.</p>
   <div class="codigo" data-copiar>
     <div class="codigo__topo"><span class="codigo__rotulo">terminal</span><button class="codigo__copiar">Copiar</button></div>
-    <pre><code><span class="tok-cmd">gh</span> release download v0.12.20 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
-(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-com">if command -v sha256sum &gt;/dev/null 2&gt;&amp;1; then</span> <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.12.20.tgz.sha256<span class="tok-com">; else</span> <span class="tok-cmd">shasum</span> <span class="tok-flag">-a 256 -c</span> expxdev-0.12.20.tgz.sha256<span class="tok-com">; fi</span>) &amp;&amp;
-<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.12.20.tgz expx init <span class="tok-flag">--skills</span> sprintx,runx,mergex <span class="tok-flag">--harness</span> claude,opencode <span class="tok-flag">--yes</span></code></pre>
+    <pre><code><span class="tok-cmd">gh</span> release download v0.13.0 <span class="tok-flag">-R</span> AxisGov/expxdev <span class="tok-flag">-D</span> ./expx-cli
+(<span class="tok-cmd">cd</span> ./expx-cli &amp;&amp; <span class="tok-com">if command -v sha256sum &gt;/dev/null 2&gt;&amp;1; then</span> <span class="tok-cmd">sha256sum</span> <span class="tok-flag">-c</span> expxdev-0.13.0.tgz.sha256<span class="tok-com">; else</span> <span class="tok-cmd">shasum</span> <span class="tok-flag">-a 256 -c</span> expxdev-0.13.0.tgz.sha256<span class="tok-com">; fi</span>) &amp;&amp;
+<span class="tok-cmd">npx</span> <span class="tok-flag">--yes --package</span> ./expx-cli/expxdev-0.13.0.tgz expx init <span class="tok-flag">--skills</span> sprintx,runx,mergex <span class="tok-flag">--harness</span> claude,opencode <span class="tok-flag">--yes</span></code></pre>
   </div>
 
   <div class="tabela-caixa"><table>
@@ -237,7 +237,7 @@
   <div class="terminal">
     <div class="terminal__barra"><span class="terminal__bolha" style="background:#ff5f57"></span><span class="terminal__bolha" style="background:#febc2e"></span><span class="terminal__bolha" style="background:#28c840"></span><span class="terminal__titulo">expx init</span></div>
     <pre><code><span class="t-ciano">  ███████ ██   ██ ██████  ██   ██</span>   <span class="t-cinza">dev</span>
-<span class="t-cinza">  o metodo Expx no seu projeto  v0.12.20</span>
+<span class="t-cinza">  o metodo Expx no seu projeto  v0.13.0</span>
 
 <span class="t-verde">?</span> <span class="t-azul">Quais skills instalar?</span> <span class="t-cinza">(espaço marca, enter confirma)</span>
  <span class="t-verde">◉</span> sprintx   <span class="t-cinza">planeja e executa features novas</span>
@@ -1647,7 +1647,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
     <div class="codigo__topo"><span class="codigo__rotulo">.expx/expx-lock.json</span><button class="codigo__copiar">Copiar</button></div>
     <pre><code>{
   <span class="tok-key">"lock_version"</span>: <span class="tok-num">2</span>,
-  <span class="tok-key">"cli_version"</span>: <span class="tok-str">"0.12.20"</span>,
+  <span class="tok-key">"cli_version"</span>: <span class="tok-str">"0.13.0"</span>,
   <span class="tok-key">"harness"</span>: [<span class="tok-str">"claude"</span>],
   <span class="tok-key">"skills"</span>: {
     <span class="tok-key">"sprintx"</span>: {
@@ -1712,7 +1712,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
 <section class="secao" id="doctor">
   <p class="eyebrow">Referência do CLI</p>
   <h1>O que o doctor verifica</h1>
-  <p class="lede">Trinta e duas verificações, cada uma com severidade e correção sugerida. Achado de severidade
+  <p class="lede">Trinta e quatro verificações, cada uma com severidade e correção sugerida. Achado de severidade
   <code>aviso</code> não derruba a saída; <code>erro</code> sim.</p>
 
   <div class="codigo" data-copiar>
@@ -1755,6 +1755,8 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
       <tr><td><code>rastro-chave-nao-declarada</code></td><td><span class="selo selo--aviso">aviso</span></td><td>chaves não declaradas no rastro</td></tr>
       <tr><td><code>integridade-final-invalida</code></td><td><span class="selo selo--aviso">aviso</span></td><td>verificação de integridade final de um agente de aprovação deu <code>divergente</code> ou <code>ausente</code>: o veredito dele é inválido</td></tr>
       <tr><td><code>rastro-nao-ignorado</code></td><td><span class="selo selo--aviso">aviso</span></td><td>com a integridade final instalada, <code>docs/eventos/</code> não está ignorado pelo git, ou está no <code>.gitignore</code> mas já tem arquivo versionado</td></tr>
+      <tr><td><code>claude-abaixo-do-piso</code></td><td><span class="selo selo--aviso">aviso</span></td><td>com a política de orquestração ativa, Claude Code abaixo de 2.1.310, ou sem como ler a versão: o envelope da invocação não é instalado</td></tr>
+      <tr><td><code>envelope-nao-instalado</code></td><td><span class="selo selo--aviso">aviso</span></td><td>com a política de orquestração ativa e o Claude Code no piso, falta o hook do envelope da invocação</td></tr>
     </tbody>
   </table></div>
 
@@ -2244,14 +2246,14 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
     <span class="selo">origem</span><span class="selo">evento</span><span class="selo">fase</span><span class="selo">task</span>
     <span class="selo">agente</span><span class="selo">resultado</span><span class="selo">detalhe</span><span class="selo">arquivos</span>
   </div>
-  <p>Dezessete chaves extras são permitidas depois das doze: <code>hook</code> (o nome do hook que decidiu, quando
+  <p>Dezenove chaves extras são permitidas depois das doze: <code>hook</code> (o nome do hook que decidiu, quando
   a origem é <code>hook</code>), <code>faixa</code> (a faixa de atenção do arquivo tocado), o par
   <code>sessao</code> · <code>harness</code> (a identidade da sessão), <code>model</code> · <code>effort</code>
   (o executor <strong>observado</strong> naquela execução, nunca a configuração), as chaves da resolução da
   orquestração — <code>resolucao_id</code>, <code>classe_declarada</code>, <code>classe_resolvida</code>,
   <code>origem_classe</code>, <code>alternativa</code>, <code>origem_alternativa</code> e, na exceção do
-  <code>agentes.json</code> v1, <code>materializado</code> — e três declaradas para o envelope da invocação, que
-  ainda nenhum escritor grava: <code>invocacao</code>, <code>modelos_observados</code> e
+  <code>agentes.json</code> v1, <code>materializado</code> — as do envelope da invocação, que o hook do núcleo grava: <code>invocacao</code>, <code>instancia</code>,
+  <code>estado_invocacao</code>, <code>modelos_observados</code> e
   <code>fora_da_politica</code> — e <code>integridade_final</code>, o resultado da comparação do início com o
   fim de um agente de aprovação, que só existe em <code>integridade_final_verificada</code>. O gravador comum inclui <code>model</code>/<code>effort</code> nas linhas que
   ele escreve, inclusive as de hook, só com o que o runtime informou (no Claude, <code>effort.level</code> pelo
@@ -2293,7 +2295,8 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
       <tr><td><code>veredito_emitido</code></td><td>o agente auditor ou o QA</td></tr>
       <tr><td><code>commit_criado</code> · <code>pr_aberto</code></td><td>a mergex</td></tr>
       <tr><td><code>artefato_gravado</code></td><td>a mergex, quando a gravação de um artefato derivado (<code>estado.json</code>) falha</td></tr>
-      <tr><td><code>invocacao_abandonada</code></td><td>o envelope da invocação de agente que nunca fechou; declarado, ainda não gravado</td></tr>
+      <tr><td><code>invocacao_fechada</code></td><td>hook do núcleo, no fim da chamada de um agente gerenciado: como terminou e em que modelo</td></tr>
+      <tr><td><code>invocacao_abandonada</code></td><td>o mesmo hook, em <code>SessionStart</code>: a chamada que nunca fechou</td></tr>
       <tr><td><code>diagrama_nao_gerado</code> · <code>diagrama_nao_atualizado</code></td><td>a runx, por <code>rastro.py</code>: o diagrama da ocorrência não foi gerado ou não foi atualizado</td></tr>
     </tbody>
   </table></div>
@@ -2525,7 +2528,7 @@ docs/contrato/  <span class="tok-com">os contratos compartilhados pelas nove ski
   </div>
 
   <div class="cartoes">
-    <div class="cartao"><div class="cartao__num">1867</div><div class="cartao__rot">testes aprovados</div></div>
+    <div class="cartao"><div class="cartao__num">1898</div><div class="cartao__rot">testes aprovados</div></div>
     <div class="cartao"><div class="cartao__num">143</div><div class="cartao__rot">arquivos aprovados</div></div>
     <div class="cartao"><div class="cartao__num">4</div><div class="cartao__rot">projetos no runner</div></div>
     <div class="cartao"><div class="cartao__num">0</div><div class="cartao__rot">testes que dependem de rede</div></div>
@@ -2566,7 +2569,7 @@ docs/contrato/  <span class="tok-com">os contratos compartilhados pelas nove ski
 <footer class="rodape">
   <p>Documentação do método <strong>Expx</strong> · gerada a partir do código-fonte do
   <a href="https://github.com/AxisGov/expxdev">expxdev</a>
-  <a href="https://github.com/AxisGov/expxdev/releases/tag/v0.12.20">v0.12.20</a>.</p>
+  <a href="https://github.com/AxisGov/expxdev/releases/tag/v0.13.0">v0.13.0</a>.</p>
   <p>
     <a href="https://github.com/AxisGov/sprintx">sprintx</a> ·
     <a href="https://github.com/AxisGov/runx">runx</a> ·
