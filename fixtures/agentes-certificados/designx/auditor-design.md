@@ -81,39 +81,45 @@ Achados nomeados — cite o codigo do tell no veredito (`T3 — grid de 3 coluna
 
 ### 3. Deteccao rapida
 
-```bash
+```text
 # Bloqueios
-grep -rn "PAGE_SIZE\s*=\s*[0-9]" src --include=*.tsx
-grep -rln "components/ui/sheet" src --include=*.tsx
-grep -rln "components/ui/tabs" src --include=*.tsx
-grep -rnE "#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b" src --include=*.tsx
-grep -rn "window.confirm" src --include=*.tsx
+Grep {"pattern": "PAGE_SIZE\\s*=\\s*[0-9]", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
+Grep {"pattern": "components/ui/sheet", "path": "src", "glob": "**/*.tsx", "output_mode": "files_with_matches", "head_limit": 0}
+Grep {"pattern": "components/ui/tabs", "path": "src", "glob": "**/*.tsx", "output_mode": "files_with_matches", "head_limit": 0}
+Grep {"pattern": "#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\\b", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
+Grep {"pattern": "window.confirm", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
 
 # Alto
-grep -rn "h-\[[0-9]\+vh\]" src --include=*.tsx
-grep -rn "text-primary\b" src --include=*.tsx | grep -v "dark:" | head -20
-grep -rn "toast(" src/components src/pages --include=*.tsx
+Grep {"pattern": "h-\\[[0-9]+vh\\]", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
+Grep {"pattern": "text-primary\\b", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
+# descarte as linhas que tambem casam com `dark:text-` (a variante dark da cor do texto); outro `dark:` na linha nao conta; das que sobram, bastam as 20 primeiras
+Grep {"pattern": "toast\\(", "path": "src/components", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
+Grep {"pattern": "toast\\(", "path": "src/pages", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
 
 # Acessibilidade (A7, A9)
-grep -rnE "outline-none|outline:\s*none" src --include=*.tsx | grep -vE "focus(-visible)?:ring-([1-9]|\[)"
-grep -rln "animate-\|transition-" src --include=*.tsx | grep -vL "motion-reduce"
+Grep {"pattern": "outline-none|outline:\\s*none", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
+# descarte as linhas que tambem casam com `focus(-visible)?:ring-([1-9]|\[)`, depois de conferir que o ring esta na mesma className do elemento com `outline-none`; a busca e por linha
+Grep {"pattern": "animate-|transition-", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
+# uma linha so sai se, havendo `animate-*`, tiver `motion-reduce:animate-none`, e, havendo `transition-*`, tiver `motion-reduce:transition-none`, na mesma className; as demais sao achado, mesmo que o arquivo tenha `motion-reduce` em outra. Antes de descartar, leia com Read a className inteira do elemento: ela pode ocupar mais de uma linha
 
 # Medio
-grep -rn "onChange=.*setSearch" src --include=*.tsx
-grep -rLn "tabular-nums" src --include=*.tsx
-grep -rn "ArrowLeft\|ChevronLeft" src/pages --include=*.tsx
+Grep {"pattern": "onChange=.*setSearch", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
+Glob {"pattern": "src/**/*.tsx"}
+Grep {"pattern": "tabular-nums", "path": "src", "glob": "**/*.tsx", "output_mode": "files_with_matches", "head_limit": 0}
+# os arquivos do Glob que o Grep nao lista sao o achado
+Grep {"pattern": "ArrowLeft|ChevronLeft", "path": "src/pages", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
 
 # Tells de IA (T1, T2, T5, T6, T7, T9, T10)
-grep -rnE "gradient.*(purple|violet|indigo|fuchsia)" src --include=*.tsx
-grep -rnE "bg-clip-text|background-clip:\s*text" src --include=*.tsx
-grep -rnE "border-l-[4-8]|border-r-[4-8]" src --include=*.tsx
-grep -rnE "min-h-screen|min-h-\[100vh\]" src --include=*.tsx
-grep -rnE "blur-3xl.*rounded-full|rounded-full.*blur-3xl" src --include=*.tsx
-grep -rn "transition-all\|hover:scale-105" src --include=*.tsx
-grep -rniE "acme|nexus|jane doe|john smith|lorem ipsum" src --include=*.tsx
+Grep {"pattern": "gradient.*(purple|violet|indigo|fuchsia)", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
+Grep {"pattern": "bg-clip-text|background-clip:\\s*text", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
+Grep {"pattern": "border-l-[4-8]|border-r-[4-8]", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
+Grep {"pattern": "min-h-screen|min-h-\\[100vh\\]", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
+Grep {"pattern": "blur-3xl.*rounded-full|rounded-full.*blur-3xl", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
+Grep {"pattern": "transition-all|hover:scale-105", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 0}
+Grep {"pattern": "acme|nexus|jane doe|john smith|lorem ipsum", "path": "src", "glob": "**/*.tsx", "-i": true, "output_mode": "content", "-n": true, "head_limit": 0}
 
 # Stamp
-grep -rn "designx ·" src --include=*.css --include=*.tsx | head -20
+Grep {"pattern": "designx ·", "path": "src", "glob": "**/*.{css,tsx}", "output_mode": "content", "-n": true, "head_limit": 20}
 ```
 
 A6 (contraste) e A8 (alvo/aria-label) exigem inspecao — pares de token e botoes so-icone, um a um.

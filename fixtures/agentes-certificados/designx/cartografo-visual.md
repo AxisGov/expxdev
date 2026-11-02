@@ -21,8 +21,8 @@ Agente de leitura apenas do designx. Analisa um projeto e extrai o vocabulario v
 
 ### 1. Tokens CSS
 
-```bash
-grep -rn "\-\-[a-z]" src/**/*.css src/**/*.scss 2>/dev/null
+```text
+Grep {"pattern": "--[a-z]", "path": "src", "glob": "**/*.{css,scss}", "output_mode": "content", "-n": true, "head_limit": 0}
 ```
 
 Para cada variavel encontrada:
@@ -35,8 +35,8 @@ Drift de tier: componente referenciando raw direto (sem passar por alias), dois 
 
 ### 2. Cores
 
-```bash
-grep -rnE "#[0-9a-fA-F]{3,8}\|rgb\|hsl" src/**/*.tsx src/**/*.css 2>/dev/null
+```text
+Grep {"pattern": "#[0-9a-fA-F]{3,8}|rgb|hsl", "path": "src", "glob": "**/*.{tsx,css}", "output_mode": "content", "-n": true, "head_limit": 0}
 ```
 
 Para cada cor:
@@ -46,8 +46,8 @@ Para cada cor:
 
 ### 3. Tipografia
 
-```bash
-grep -rn "font-family\|font-size\|font-weight\|text-\[" src/**/*.tsx src/**/*.css 2>/dev/null
+```text
+Grep {"pattern": "font-family|font-size|font-weight|text-\\[", "path": "src", "glob": "**/*.{tsx,css}", "output_mode": "content", "-n": true, "head_limit": 0}
 ```
 
 Para cada padrao:
@@ -57,17 +57,17 @@ Para cada padrao:
 
 ### 4. Espacamento
 
-```bash
-grep -rn "gap-\|p-\|m-\|space-" src/**/*.tsx 2>/dev/null | head -50
+```text
+Grep {"pattern": "gap-|p-|m-|space-", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 50}
 ```
 
 Qual o multiplo predominante? (4px, 8px, inconsistente?)
 
 ### 5. Componentes
 
-```bash
-ls src/components/ui/ 2>/dev/null
-ls src/components/ 2>/dev/null
+```text
+Glob {"pattern": "src/components/ui/*"}
+Glob {"pattern": "src/components/*"}
 ```
 
 Para cada componente:
@@ -86,26 +86,28 @@ Analise a estrutura de paginas:
 
 ### 7. Bordas vs sombras
 
-```bash
-grep -rn "shadow-\|border" src/**/*.tsx 2>/dev/null | head -30
+```text
+Grep {"pattern": "shadow-|border", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 30}
 ```
 
 Qual predominancia? (borders = denso, shadows = card/landing)
 
 ### 8. Dark mode
 
-```bash
-grep -rn "dark:" src/**/*.tsx 2>/dev/null | head -10
-grep -rn "dark\|theme" src/**/*.css 2>/dev/null | head -10
+```text
+Grep {"pattern": "dark:", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 10}
+Grep {"pattern": "dark|theme", "path": "src", "glob": "**/*.css", "output_mode": "content", "-n": true, "head_limit": 10}
 ```
 
 Existe? Como esta implementado? Tokens separados?
 
 ### 9. Framework visual
 
-```bash
-cat package.json | grep -E "tailwind|styled|css-modules|emotion"
-ls tailwind.config.* postcss.config.* 2>/dev/null
+```text
+Read {"file_path": "package.json"}
+# procure no conteudo: `tailwind|styled|css-modules|emotion`
+Glob {"pattern": "tailwind.config.*"}
+Glob {"pattern": "postcss.config.*"}
 ```
 
 ## Saida esperada
