@@ -30,7 +30,7 @@ d0b219ee94132d44c0c968e1737c6aba044721d0e8a1701ff4f6a920f2ab5a18  .claude/skills
 8a78434435e46c72e7fadf995e1c6299c1776c5659dc03ece97e6d68165210e9  .claude/skills/mergex/assets/ci/mergex-portao.yml
 69ffdc28ccc180b34a5bef2a3cc2252263628f5989589e0f076f3cfbd6af4b95  .claude/skills/mergex/assets/pre-push-gerenciado.sh
 d5af359692ed5da01c566d5cf37b25e221bf66b9fb69a7b154fe454b9876ac2c  .claude/skills/mergex/decisoes/anteriores-ao-p02.md
-c701ead21589383f8e7dc5d6a9ada477bb039c8c7912a85ad169f54ebb399bc4  .claude/skills/mergex/decisoes/endurecimento-conselhos-208-210.md
+b106b8fad96709407d939ddfb76361d97b76aa8e8d61aadcc69d92580f0632fe  .claude/skills/mergex/decisoes/endurecimento-conselhos-208-210.md
 7e047167485cae65e521815148225f0880c7e0f71c79c7851311937bf5b6a7b1  .claude/skills/mergex/decisoes/revisao-por-task-e-entrega-por-sprint.md
 a52b3a85c413a477f469620d88bbd41c4ace2ba601500b217ac6dc36cbd98650  .claude/skills/mergex/references/00-abertura.md
 047c4bce175a9b82c64e74b76365b1c5825819b183707554abe4a741679d6e64  .claude/skills/mergex/references/00-schema.md
@@ -60,7 +60,7 @@ b9717ca408eb487654d2182aebcb62f22de8efaa67ff72ccb280a70932678f3e  .claude/skills
 2d1626ab971f5eb4616e20248465619c4b02bd9036f8ad1d149d5f5c26cc65a0  .claude/skills/mergex/scripts/entrega-de-planejamento.sh
 e1c5df88441d9e4fa0eeabc4559848f584d1ec672d575ea540ad673f163bfdc7  .claude/skills/mergex/scripts/fatiamento-da-pr.sh
 271fd243ec68edf06d8afbc9b5fde294dffd6d24f4e8fb803ef604185865bdae  .claude/skills/mergex/scripts/fechamento-do-e1.sh
-0d974ec0624043e173abdb75fccd730a4d859c9f37079bc390f8bb7810aeef07  .claude/skills/mergex/scripts/fechamento-pos-merge.sh
+f37c5ed76ba20b0198a783181cd1fd6155bf37f378fff386a0a4621c9551f501  .claude/skills/mergex/scripts/fechamento-pos-merge.sh
 fb56232de4a744efd25b4dec50c1f92536c98f8087458d4907d5586d1a1c8c32  .claude/skills/mergex/scripts/leitor-do-projeto.sh
 6d1b4828e93761451a17088c258dcdbcb3db025da38a029207f69cb07c2ea214  .claude/skills/mergex/scripts/ownership-da-task.sh
 2278d60ea00ac044aeb2927d489e1bf9a11dde9cf0db1827b5bbbc957fe8cfc0  .claude/skills/mergex/scripts/persistir-metodo.sh

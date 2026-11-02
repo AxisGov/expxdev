@@ -64,11 +64,13 @@ Uma task só fecha com os dois (emenda, 3):
 **O que o `ok` atesta:** a chamada cobriu os arquivos e terminou sem erro visível, e não
 sobrou achado aberto. **Não atesta que a mudança não tem defeito.** A CLI 0.5.14 pode perder
 sugestões sem avisar: uma execução do Rejector sem nenhum `output` vira lista vazia, e um
-gerador sem `output` tira o lote do fluxo. A mesma revisão também pode variar de uma chamada
-para outra. Relato do Conselhos, sem reprodução aqui: 15 arquivos deram zero achado, e os
-mesmos em lotes menores deram quatro, dois deles sem nenhum `[error]` na chamada maior. A
-causa desses dois não está determinada. Zero achado é um sinal a mais, e não substitui os
-testes nem a revisão humana.
+gerador sem `output` tira o lote do fluxo. A mesma revisão também varia de uma chamada para
+outra. Medido em 2026-11-02, cinco chamadas no mesmo commit, sem `[error]` nem `403` no
+stderr: 3 arquivos deram 2, 2 e 3 achados, e 13 arquivos deram 0 e 2. Dos 9 achados, só um
+apareceu em duas rodadas. Relato do Conselhos: uma sonda de 5 linhas deu zero, um e um
+achado, e 15 arquivos deram zero achado, contra quatro nos mesmos arquivos em lotes menores.
+A causa não está determinada. Uma rodada é amostra: zero achado é um sinal a mais, e não
+substitui os testes nem a revisão humana.
 
 ## A evidência (v2)
 
@@ -360,3 +362,4 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-11-01 | Falha de lote passa a ser qualquer `[error]` no stderr e `Warning: parsing error in rejector`; o `ok` passa a dizer que atesta a chamada sem erro visível, não a ausência de defeito (relatos do Conselhos, 0.12.15). |
 | 2026-11-01 | A revisão seguinte remove o snapshot de um `revisar` morto antes de limpar (SIGKILL, queda da máquina): o worktree ficava registrado e segurava o commit. Rota do HTTP 403 e regra de mudança de modo no contrato. |
 | 2026-11-01 | Só snapshot com `dono` válido é removido: sem ele o worktree não é deste script, e o `--force` levava arquivo de quem usou o mesmo nome (conselhos#230, regressão da 0.12.17). |
+| 2026-11-02 | A variação da CLI entre rodadas passa de relato a medição, com os números no texto de `ok`. |

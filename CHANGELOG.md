@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.20 — o fechamento da runx no mundo real
+
+O Conselhos exercitou o `gh` real na 0.12.19 (conselhos#236) e achou três defeitos do script novo, reproduzidos antes de corrigir.
+
+- Certifica a MergeX em AxisGov/mergex@b5d9e65 (mergex#70, DM-307):
+  - **`branch_base: origin/main`** é forma real no E0 e dava rc 6, com a mensagem falsa de que o PR não era da entrega. Agora vale nome, ref do remoto ou SHA, que precisa estar na base do PR.
+  - **Dois E5 ao mesmo tempo:** o perdedor apagava a marca do vencedor, e a retomada falhava. Agora ele não mexe nela.
+- Certifica a runx em AxisGov/runx@cdc6034 (runx#14, DR-95): o Passo 0 do E5 parte da raiz do repositório. De uma subpasta, dava rc 127.
+- **A CLI do CodeAnt varia entre rodadas.** Medido na 0.5.14, no mesmo commit, sem `[error]` nem `403` no stderr: 3 arquivos deram 2, 2 e 3 achados, e 13 arquivos deram 0 e 2. Dos 9 achados, só um apareceu em duas rodadas. Zero achado não é prova de ausência de defeito, e o contrato de revisão passa a dizer isso com esses números. A causa não foi determinada, e o método não passa a exigir várias rodadas.
+
 ## 0.12.19 — o fechamento da runx depois do merge
 
 A primeira runx do Conselhos (OC-2026-0001) fechou por um PR aberto à mão, porque o método não dizia o caminho.
