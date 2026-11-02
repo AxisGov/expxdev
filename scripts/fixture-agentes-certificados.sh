@@ -9,7 +9,8 @@
 # Só `.claude/agents/*.md`: é o que o resolvedor lê, e o que falhou na 0.13.0
 # (`sem_classe`). A instalação inteira das nove skills fica na prova de release,
 # porque os snapshots completos passariam do limite L3 de um PR. Os bytes saem
-# do objeto Git e são conferidos contra o blob; `<nome>.sha` guarda o commit.
+# do objeto Git e são conferidos contra o blob; `<nome>.sha` guarda o commit, e
+# `<nome>.MANIFESTO`, o blob de cada agente.
 set -euo pipefail
 REPO="$1"; SHA="$2"; NOME="$3"
 # o nome vira caminho de `rm -rf`: sem separador, nunca sai de fixtures/agentes-certificados
@@ -31,4 +32,6 @@ if git -C "$REPO" cat-file -e "$SHA:.claude/agents" 2>/dev/null; then
   done < <(git -C "$REPO" ls-tree "$SHA" -- .claude/agents/)
 fi
 printf '%s\n' "$SHA" > "$BASE/$NOME.sha"
+# o blob de cada agente, para o teste acusar arquivo editado, a mais ou faltando
+( cd "$DEST" && for f in *.md; do [ -f "$f" ] && printf '%s  %s\n' "$(git hash-object --no-filters "$f")" "$f"; done ) > "$BASE/$NOME.MANIFESTO"
 echo "$NOME: $(find "$DEST" -name '*.md' | wc -l) agente(s) em $SHA"

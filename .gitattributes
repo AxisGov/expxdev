@@ -7,3 +7,6 @@ nucleo/** text eol=lf
 # JSONs devolvidos pela CLI do CodeAnt, versionados byte a byte (a suíte os
 # serve por uma CLI falsa): LF em qualquer checkout.
 fixtures/conformidade/** text eol=lf
+# Os agentes certificados são cópia byte a byte do commit de cada skill, e o
+# manifesto guarda o blob: nenhuma conversão de fim de linha no checkout.
+fixtures/agentes-certificados/** -text

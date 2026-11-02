@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { CATALOGO } from "../nucleo/catalogo.js";
 import { planejarAgentes } from "../harness/agentes.js";
 import { validarPolitica } from "../orquestracao/politica.js";
@@ -42,6 +43,19 @@ describe("certificação da orquestração: as nove skills certificadas", () => 
     }
   });
 
+  // Revisão do CodeAnt no expxdev#130: o pin sozinho não prova o conteúdo. O blob
+  // de cada agente fica no manifesto, e arquivo editado, a mais ou faltando falha.
+  it("cada agente do snapshot é o blob que o manifesto registra, sem arquivo a mais nem faltando", () => {
+    const blob = (c: Buffer): string => createHash("sha1").update(`blob ${String(c.length)}\0`).update(c).digest("hex");
+    for (const s of CATALOGO) {
+      const manifesto = join(BASE, `${s.nome}.MANIFESTO`);
+      expect(existsSync(manifesto), `rode scripts/fixture-agentes-certificados.sh para ${s.nome}`).toBe(true);
+      const registrado = readFileSync(manifesto, "utf8").split("\n").filter((l) => l !== "").sort();
+      const presente = agentesDa(s.nome).map((a) => `${blob(readFileSync(a))}  ${basename(a)}`).sort();
+      expect(presente, s.nome).toEqual(registrado);
+    }
+  });
+
   it("com a política mínima, todo agente resolve, sem erro e sem nome repetido", () => {
     const politica = validarPolitica({ expx_orquestracao: 1 });
     if (!politica.ok) throw new Error(politica.erro);
@@ -57,7 +71,7 @@ describe("certificação da orquestração: as nove skills certificadas", () => 
     for (const s of CATALOGO) {
       for (const a of agentesDa(s.nome)) {
         const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(readFileSync(a, "utf8"))?.[1] ?? "";
-        if (!/^classe:\s*\S/m.test(fm)) sem.push(`${s.nome}/${a.slice(a.lastIndexOf("/") + 1)}`);
+        if (!/^classe:\s*\S/m.test(fm)) sem.push(`${s.nome}/${basename(a)}`);
       }
     }
     expect(sem).toEqual([]);
