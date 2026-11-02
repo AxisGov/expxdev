@@ -169,6 +169,12 @@ const EXECUTORES: Partial<Record<Subcomando, Executor>> = {
       interativo: process.stdout.isTTY === true,
       ...(f.opcoes.to !== undefined ? { to: f.opcoes.to } : {}),
     });
+    // O relatório do SessionStart (0.13.2): uma linha de JSON, sem texto nem registro.
+    if (f.opcoes.json) {
+      const pendencias = r.pendencias ?? [];
+      saida.escrever(`${JSON.stringify({ ok: r.ok, pendente: pendencias.length > 0, pendencias, bloqueadas: r.bloqueadas })}\n`);
+      return r.ok ? 0 : 1;
+    }
     for (const m of r.mensagens) saida.escrever(`${m}\n`);
     for (const b of r.bloqueadas) saida.escrever(`bloqueada ${b.nome}: ${b.motivo}\n`);
     if (r.emDia.length > 0) saida.escrever(`em dia: ${r.emDia.join(", ")}\n`);

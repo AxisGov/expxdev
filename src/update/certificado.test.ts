@@ -75,6 +75,7 @@ describe("update pelo commit certificado", () => {
     expect(check.aplicou).toBe(false);
     expect(check.emDia).toEqual(["sprintx"]);
     expect(check.mensagens.join("\n")).toContain("normalizacao pendente: sprintx");
+    expect(check.pendencias).toContain("normalizacao:sprintx");
     expect(lerLockJson(c.raiz)).toEqual(antes);
 
     const r = await executarUpdate({ raiz: c.raiz, sim: true, certificados: { sprintx: c.v1 } });

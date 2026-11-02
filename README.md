@@ -677,6 +677,7 @@ travada em versão publicada, o commit exato, a data e **o hash de cada arquivo*
 | `--check` | Só mostra o que mudaria, não aplica nada |
 | `--to <ref>` | Fixa uma skill numa tag ou commit específico — exige nomear exatamente uma skill |
 | `--yes` / `--sim` | Aplica sem exigir terminal interativo |
+| `--json` | Só com `--check`: uma linha `{"ok", "pendente", "pendencias", "bloqueadas"}`, que o SessionStart lê |
 
 > **CLI nova, skills em dia.** O plugin e os hooks do núcleo vêm da CLI. Com o lock gravado
 > por uma CLI anterior, o `update` remonta a instalação com as mesmas skills, nos mesmos
@@ -696,8 +697,12 @@ skill encolhe entre versões.
 > certificado. Já no certificado, com um lock de antes dele (`main` não travada, ou uma tag), só
 > o lock é regravado ("normalizacao pendente"), sem remontar a árvore. Instalado adiante do
 > certificado (o topo da `main` antes da release), a skill **recua** para ele, e a saída diz
-> "recuo para o certificado" e quantas mudanças desfaz. A sincronização do SessionStart roda o
-> CLI da **última release** do `expxdev`, nunca a ponta da `main`.
+> "recuo para o certificado" e quantas mudanças desfaz.
+
+> **SessionStart só avisa (0.13.2).** O hook roda o `expx update --check --json` do CLI da
+> **última release** do `expxdev`, nunca a ponta da `main`, e diz o que há a instalar; nada é
+> aplicado. A instalação é sempre o `expx update --yes` de quem vai commitar o resultado. Até a
+> 0.13.1, o hook aplicava sozinho, e ele continua assim no projeto até a 0.13.2 ser instalada.
 
 > **Rollback.** Como `.expx/` é commitado, desfazer uma atualização é revertê-lo pelo
 > versionador (`git checkout -- .expx`). O `update` diz isso em toda execução que aplica.

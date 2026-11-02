@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export const AXIS_REPOSITORIO = "https://github.com/AxisGov/expxdev.git";
 const CACHE_OWNER = "AxisGov/expxdev\n";
@@ -303,10 +303,6 @@ function resposta(contexto) {
   })}\n`;
 }
 
-function arvoreSuja(raiz, executar) {
-  return executar("git", ["-C", raiz, "status", "--porcelain"]).trim() !== "";
-}
-
 function raizGit(cwd, executar) {
   return executar("git", ["-C", cwd, "rev-parse", "--show-toplevel"]).trim();
 }
@@ -375,12 +371,55 @@ export function lerOrigemDoLock(caminho) {
   return { ok: true, locais };
 }
 
-function houveAtualizacao(saida) {
-  return saida.includes("para desfazer esta atualizacao");
+function caminhoRealDoQueExiste(caminho) {
+  const resto = [];
+  let atual = caminho;
+  for (;;) {
+    try {
+      return join(realpathSync(atual), ...resto.reverse());
+    } catch {
+      const pai = dirname(atual);
+      if (pai === atual) return caminho;
+      resto.push(atual.slice(pai.length).replace(/^[\\/]+/, ""));
+      atual = pai;
+    }
+  }
 }
 
-function nomesAtualizados(saida) {
-  return [...saida.matchAll(/^([a-z0-9-]+): .*→/gm)].map(([, nome]) => nome).filter(Boolean);
+/** O cache absoluto e fora da raiz do projeto, comparado pelo caminho real do projeto. */
+function cacheForaDoProjeto(projeto, cache) {
+  if (!isAbsolute(cache)) return false;
+  // `resolve` tira o `..` antes de seguir o link, e o bootstrap recebe o caminho cru:
+  // `<fora>/atalho/../x`, com o atalho para dentro do projeto, escreveria nele.
+  if (cache.split(/[\\/]+/).includes("..")) return false;
+  let raiz = resolve(projeto);
+  try {
+    raiz = realpathSync(raiz);
+  } catch {
+    // inexistente: fica o resolvido
+  }
+  // O ancestral mais próximo que existe, pelo caminho real, mais o resto: uma pasta
+  // ainda inexistente sob um link para dentro do projeto também é dentro dele.
+  const alvos = [resolve(cache), caminhoRealDoQueExiste(resolve(cache))];
+  return alvos.every((alvo) => {
+    const trecho = relative(raiz, alvo);
+    // `..cache` dentro do projeto também começa com "..": só `..` inteiro sai dele
+    return trecho === ".." || trecho.startsWith(`..${sep}`) || isAbsolute(trecho);
+  });
+}
+
+/**
+ * O relatório do `update --check --json`: a última linha da saída, em JSON. Um
+ * CLI de antes da 0.13.2 não conhece `--json` e não responde nessa forma.
+ */
+function lerRelatorio(saida) {
+  const ultima = saida.trim().split("\n").pop() ?? "";
+  try {
+    const r = JSON.parse(ultima);
+    return r !== null && typeof r === "object" && typeof r.ok === "boolean" && Array.isArray(r.pendencias) ? r : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function sincronizarSessao({ entrada, plataforma = "claude", raiz, cwd, ambiente = process.env, executar = comandoPadrao }) {
@@ -410,15 +449,32 @@ export function sincronizarSessao({ entrada, plataforma = "claude", raiz, cwd, a
         `[Expx/Axis] Sincronizacao automatica nao aplicada: instalacao contem origem local travada pelo lock (${origem.locais.join(", ")}). Use \`expx update\` explicitamente para alterar a distribuicao.`,
       );
     }
-    if (arvoreSuja(projeto, executar)) {
-      return resposta("[Expx/Axis] Atualizacao automatica adiada porque o working tree possui alteracoes nao commitadas.");
+    // O bootstrap cria, busca e constrói no cache: dentro do projeto, ou relativo à
+    // pasta da sessão, ele escreveria no próprio projeto (revisão do Codex na 0.13.2).
+    const caminhoCache = cachePadrao(ambiente);
+    if (!cacheForaDoProjeto(projeto, caminhoCache)) {
+      return resposta(`[Expx/Axis] Verificacao adiada: EXPX_AXIS_CACHE (${caminhoCache}) e relativo ou fica dentro do projeto, e o cache Axis precisa ficar fora dele. Nada foi aplicado.`);
     }
-    const cache = bootstrapAxis(cachePadrao(ambiente), executar);
-    const saida = executar(process.execPath, [join(cache, "dist", "cli", "expx-bin.js"), "update", "--yes"], { cwd: projeto });
-    if (houveAtualizacao(saida)) {
-      const nomes = nomesAtualizados(saida);
-      const detalhe = nomes.length > 0 ? ` Skills atualizadas: ${nomes.join(", ")}.` : "";
-      return resposta(`[Expx/Axis] Distribuicao sincronizada com AxisGov.${detalhe}`);
+    // 0.13.2: só avisa. O `--check` não escreve no projeto, então a árvore suja não
+    // impede a verificação, e a atualização é sempre explícita, de quem instala.
+    const cache = bootstrapAxis(caminhoCache, executar);
+    const saida = executar(process.execPath, [join(cache, "dist", "cli", "expx-bin.js"), "update", "--check", "--json"], { cwd: projeto });
+    const relatorio = lerRelatorio(saida);
+    if (relatorio === undefined) {
+      return resposta("[Expx/Axis] Verificacao adiada: o CLI da release nao respondeu o relatorio do `update --check --json`. Nada foi aplicado.");
+    }
+    if (!relatorio.ok) {
+      const motivos = Array.isArray(relatorio.bloqueadas) ? relatorio.bloqueadas.map((b) => `${b?.nome}: ${b?.motivo}`).join("; ") : "";
+      return resposta(`[Expx/Axis] Verificacao adiada: ${motivos || "o update --check falhou"}. Nada foi aplicado.`);
+    }
+    // A skill bloqueada por modificação local não entra nas pendências, e o
+    // silêncio esconderia a atualização que espera por ela (CodeAnt no #131).
+    const bloqueadas = Array.isArray(relatorio.bloqueadas) ? relatorio.bloqueadas.map((b) => `${b?.nome}: ${b?.motivo}`) : [];
+    if (relatorio.pendencias.length > 0 || bloqueadas.length > 0) {
+      const partes = [];
+      if (relatorio.pendencias.length > 0) partes.push(`Ha atualizacao da distribuicao AxisGov (${relatorio.pendencias.join(", ")}).`);
+      if (bloqueadas.length > 0) partes.push(`Atualizacao bloqueada: ${bloqueadas.join("; ")}.`);
+      return resposta(`[Expx/Axis] ${partes.join(" ")} Nada foi aplicado: para instalar, rode \`expx update --yes\` e commite o resultado.`);
     }
     return "";
   } catch (erro) {

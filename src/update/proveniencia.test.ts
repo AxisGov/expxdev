@@ -121,6 +121,8 @@ describe("migracao idempotente de proveniencia", () => {
       const certificados = { [nome]: commit };
       const check = await executarUpdate({ raiz: projeto.raiz, check: true, certificados });
       expect(check.aplicou).toBe(false);
+      // o relatório do SessionStart (0.13.2) diz a migração pendente
+      expect(check.pendencias).toContain(`proveniencia:${nome}`);
       expect(JSON.parse(readFileSync(caminho, "utf8"))).toEqual(anterior);
 
       const primeira = await executarUpdate({ raiz: projeto.raiz, sim: true, certificados });
