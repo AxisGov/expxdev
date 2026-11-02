@@ -543,16 +543,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.13.1 -R AxisGov/expxdev -D ~/expx-cli/v0.13.1
+gh release download v0.13.2 -R AxisGov/expxdev -D ~/expx-cli/v0.13.2
 (
-  cd ~/expx-cli/v0.13.1
+  cd ~/expx-cli/v0.13.2
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.13.1.tgz.sha256
+    sha256sum -c expxdev-0.13.2.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.13.1.tgz.sha256
+    shasum -a 256 -c expxdev-0.13.2.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.13.1/expxdev-0.13.1.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.13.2/expxdev-0.13.2.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -566,7 +566,7 @@ npx --yes --package ~/expx-cli/v0.13.1/expxdev-0.13.1.tgz expx init --skills bui
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.13.1 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.13.2 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -643,6 +643,9 @@ npx --yes --package ~/expx-cli/v0.13.1/expxdev-0.13.1.tgz expx init --skills bui
 - `0.13.1` corrige o que a 0.13.0 deixou no consumidor: o `update` entrega CLI nova com as skills em
   dia, e o `init` com a política ligada funciona com as nove skills, que agora declaram a classe dos
   agentes. Os comandos de rastro da runx rodam de subpasta.
+- `0.13.2` faz o SessionStart só avisar, sem nunca aplicar, deixa de usar o `claude` do Windows no
+  WSL, e certifica as buscas da designx como chamadas de Grep e Glob e a auditoria da SprintX com um
+  achado por defeito de teste.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

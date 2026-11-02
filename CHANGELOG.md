@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.13.2 — o SessionStart só avisa
+
+**Instale por PR antes de abrir sessão nova.** O hook da 0.13.1 ainda instalado aplica a versão sozinho na primeira sessão em árvore limpa, e publicar a 0.13.2 não o desliga. Depois de instalada, nenhuma sessão aplica mais nada.
+
+- **SessionStart só avisa** (decisão do dono). O `expx-session-sync` aplicava `update --yes` sozinho em árvore limpa. No Login, deixou a 0.12.14 sem commit por dois dias, contra o `AGENTS.md` de lá. Agora roda `expx update --check --json` com o CLI da última release e diz o que há (pendências e skills bloqueadas por modificação local). Nada é aplicado: a instalação é sempre o `expx update --yes` de quem vai commitar. A árvore suja não impede mais a verificação.
+- **`expx update --check --json`**: uma linha `{"ok", "pendente", "pendencias", "bloqueadas"}`, com `skill:`, `cli:`, `proveniencia:` e `normalizacao:`. O `--json` só vale com `--check`.
+- **O cache Axis fica fora do projeto.** Com `EXPX_AXIS_CACHE` relativo, dentro do projeto, sob link para dentro dele ou com `..`, o hook adia antes do bootstrap, que escreveria no próprio projeto.
+- **WSL sem o `claude` do Windows.** O registro do plugin e a leitura do piso deixam de usar o `claude` (ou `claude.exe`) sob `/mnt/`, inclusive por link. No Login, o `remove` e o `add` rodaram no Claude do Windows. Só com o do Windows no PATH, nada roda, e a instrução manda pôr o Claude Code do Linux no PATH. A entrada vazia do PATH conta como a pasta atual.
+- **designx@257b205** (designx#6): as buscas dos agentes `cartografo-visual` e `auditor-design` viram chamadas das ferramentas Grep e Glob. Esses agentes não têm shell, e a busca de cor com `\|` não achava nada. Toda chamada declara `output_mode` e `head_limit`: a ferramenta corta em 250 e, sem `output_mode`, só lista arquivos.
+  - A animação sem `motion-reduce:animate-none` ou `motion-reduce:transition-none` na mesma `className` é achado.
+  - A sessão principal, que no Claude Code 2.1.310 não tem Grep nem Glob, faz a mesma busca com `rg`.
+  - O `install.sh --opencode` volta a levar a skill.
+- **sprintx@b54d61f** (sprintx#66, DS-202): na F5, um defeito de teste vira um achado só, o do revisor de testes, e o `valida-auditoria` recusa a repetição.
+- **runx@a214196** (runx#16, DR-98): o investigador pode escrever o teste temporário da prova 1, em `mktemp -d /tmp/...` fora do projeto.
+- **stackx@1c49fba** (stackx#8, D-20): o cartógrafo procura o roteiro na cópia do plugin quando falta o de `.claude/skills`.
+- **Não exercitado:** o Claude do Windows de verdade, por decisão do dono, já que o trabalho é no WSL. O resolvedor foi provado com binários falsos sob uma raiz de Windows injetada.
+
 ## 0.13.1 — o que a 0.13.0 deixou no consumidor
 
 O Conselhos instalou a 0.13.0 e achou dois defeitos, reproduzidos no pacote publicado. Esta versão os corrige e fecha as pendências pequenas.
