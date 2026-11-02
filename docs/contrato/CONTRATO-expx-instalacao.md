@@ -489,14 +489,25 @@ pessoa, e rodar o `init` de novo trava o arquivo com a escolha dela.
 ## 10. SessionStart e instalação com origem local (D-03)
 
 O hook do núcleo `expx-session-sync` roda no `startup`/`resume` e, numa
-instalação comum com árvore limpa (o repositório-fonte do CLI fica fora, sem mensagem:
-ele só muda por `expx update` explícito), sincroniza a distribuição com o ExpxDev da
-AxisGov: o cache busca a `main` do ExpxDev com as tags, vai para a **última release**
-(a maior tag `vX.Y.Z`, nunca a ponta da `main`) e roda o CLI dela com `expx update
---yes`, que segue os commits certificados dessa release. Sem release publicada, a
-sincronização adia. Os hooks de antes da 0.12.10 rodam `update --latest --yes` com o CLI
-da `main`, e o `--latest` não muda nada: seguem o catálogo da `main`. Essa sincronização é **conveniência**, e não pode romper uma
-instalação congelada.
+instalação comum (o repositório-fonte do CLI fica fora, sem mensagem: ele só muda por
+`expx update` explícito), **verifica e avisa, sem nunca aplicar** (0.13.2, decisão do
+dono): o cache busca a `main` do ExpxDev com as tags, vai para a **última release** (a
+maior tag `vX.Y.Z`, nunca a ponta da `main`) e roda o CLI dela com `expx update --check
+--json`. O `--check` não escreve no projeto, então a árvore suja não impede a
+verificação. Com `pendencias` no relatório (`skill:<nome>`, `cli:<versão do lock>`,
+`proveniencia:<nome>`, `normalizacao:<nome>`), o hook devolve contexto dizendo o que há
+e que nada foi aplicado; sem pendência, fica em silêncio. Um CLI que não responde o
+relatório (anterior à 0.13.2) ou um `--check` que falha adiam com mensagem. A instalação
+é sempre `expx update --yes`, explícito, de quem vai commitar o resultado.
+
+**Hooks já instalados:** até a 0.13.1, o hook rodava `update --yes` em árvore limpa, e
+esse hook continua instalado no consumidor até a próxima instalação. Publicar uma versão
+não o desliga: a primeira sessão depois da release ainda pode aplicá-la. Quem não quer
+isso instala a 0.13.2 explicitamente antes de abrir sessão nova.
+
+O `--json` só vale com `--check` e imprime uma linha: `{"ok", "pendente", "pendencias",
+"bloqueadas"}`. Essa verificação é **conveniência**, e não pode tocar uma instalação
+congelada.
 
 **SessionStart não aplica atualização automática a instalações que contenham
 origem local (`commit *-local`). O lock congelado vence a conveniência de

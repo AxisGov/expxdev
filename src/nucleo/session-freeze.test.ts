@@ -50,7 +50,9 @@ function cenario(lock: Record<string, unknown> | string, opcoes: { sujo?: boolea
   mkdirSync(join(raiz, ".expx"));
   const bytes = typeof lock === "string" ? lock : `${JSON.stringify(lock, null, 2)}\n`;
   writeFileSync(join(raiz, ".expx", "expx-lock.json"), bytes);
-  const cache = join(raiz, "fora-do-projeto", "cache-axis");
+  // fora da raiz de verdade: dentro dela, o hook recusa o cache (0.13.2)
+  const fora = mkdtempSync(join(tmpdir(), "expx-session-freeze-cache-"));
+  const cache = join(fora, "cache-axis");
   const chamadas: string[][] = [];
   const executar = (arquivo: string, argumentos: string[]): string => {
     if (argumentos.includes("tag")) return "v0.12.9\n";
@@ -65,7 +67,7 @@ function cenario(lock: Record<string, unknown> | string, opcoes: { sujo?: boolea
     if (argumentos.includes("remote")) return `${AXIS_REPOSITORIO}\n`;
     if (argumentos.includes("rev-parse")) return "mesmo\n";
     if (argumentos.includes("branch")) return "main\n";
-    if (argumentos.some((a) => a.endsWith("expx-bin.js"))) return "sprintx: main → novo\npara desfazer esta atualizacao, reverta\n";
+    if (argumentos.some((a) => a.endsWith("expx-bin.js"))) return '{"ok":true,"pendente":true,"pendencias":["skill:sprintx"],"bloqueadas":[]}\n';
     return "";
   };
   return {
@@ -75,7 +77,10 @@ function cenario(lock: Record<string, unknown> | string, opcoes: { sujo?: boolea
     chamadas,
     executar,
     ambiente: { EXPX_AXIS_CACHE: cache, HOME: raiz },
-    descartar: () => rmSync(raiz, { recursive: true, force: true }),
+    descartar: () => {
+      rmSync(raiz, { recursive: true, force: true });
+      rmSync(fora, { recursive: true, force: true });
+    },
   };
 }
 
@@ -177,11 +182,13 @@ describe("D-03: SessionStart não atualiza instalação com origem local", () =>
     }
   });
 
-  it("funcional: árvore suja com lock remoto continua adiando sem update", () => {
+  // 0.13.2: o --check não escreve no projeto, então a árvore suja não adia mais.
+  it("funcional: árvore suja com lock remoto verifica e avisa, sem aplicar", () => {
     const c = cenario(lockCom({ sprintx: SPRINTX_REMOTA }), { sujo: true });
     try {
-      expect(contexto(sessao(c, "startup"))).toContain("working tree possui alteracoes");
-      esperarCongelado(c);
+      expect(contexto(sessao(c, "startup"))).toContain("skill:sprintx");
+      expect(readFileSync(join(c.raiz, ".expx", "expx-lock.json"), "utf8")).toBe(c.lock);
+      expect(c.chamadas.some((a) => a.includes("--yes"))).toBe(false);
     } finally {
       c.descartar();
     }
@@ -294,17 +301,18 @@ describe("D-03: SessionStart não atualiza instalação com origem local", () =>
     }
   });
 
-  it("funcional: lock remoto normal mantém o fluxo legado — bootstrap Axis e update --yes, sem --latest", () => {
+  it("funcional: lock remoto normal faz o bootstrap Axis e só o update --check --json, sem --yes nem --latest", () => {
     const c = cenario(lockCom({ sprintx: SPRINTX_REMOTA, mergex: MERGEX_REMOTA }));
     try {
       const saida = sessao(c, "startup");
-      expect(contexto(saida)).toContain("Skills atualizadas: sprintx.");
+      expect(contexto(saida)).toContain("skill:sprintx");
+      expect(contexto(saida)).toContain("Nada foi aplicado");
       expect(c.chamadas[0]).toEqual(["git", "-C", c.raiz, "rev-parse", "--show-toplevel"]);
-      expect(c.chamadas[1]).toEqual(["git", "-C", c.raiz, "status", "--porcelain"]);
       expect(c.chamadas.some((a) => a[1] === "clone" && a.includes(AXIS_REPOSITORIO))).toBe(true);
       const cli = c.chamadas.find((a) => a.some((v) => v.endsWith("expx-bin.js")));
-      expect(cli?.slice(-2)).toEqual(["update", "--yes"]);
+      expect(cli?.slice(-3)).toEqual(["update", "--check", "--json"]);
       expect(cli).not.toContain("--latest");
+      expect(c.chamadas.some((a) => a.includes("--yes"))).toBe(false);
     } finally {
       c.descartar();
     }

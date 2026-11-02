@@ -42,6 +42,13 @@ describe("flags do update", () => {
     expect(e.ok && e.opcoes.sim).toBe(true);
   });
 
+  it("funcional: --json vale só com --check, que é o relatório que o SessionStart lê", () => {
+    const r = interpretarFlagsUpdate(["--check", "--json"]);
+    expect(r.ok && r.opcoes.check && r.opcoes.json).toBe(true);
+    expect(interpretarFlagsUpdate(["--json"]).ok).toBe(false);
+    expect(interpretarFlagsUpdate(["--yes", "--json"]).ok).toBe(false);
+  });
+
   it("funcional: --to sem skill nomeada é recusado, porque fixaria todas de uma vez", () => {
     const r = interpretarFlagsUpdate(["--to", "v2.0.0"]);
     expect(r.ok).toBe(false);
@@ -391,6 +398,21 @@ describe("update depois de uma CLI nova", () => {
     expect(saida).toContain("0.0.1");
     expect(saida).toContain("junto com as skills acima");
     expect(saida).not.toContain("com as mesmas skills");
+  });
+
+  // 0.13.2: o SessionStart só avisa, e decide pelo que o --check lista, sem ler texto.
+  it("funcional: o --check lista as pendências, e sem nada a aplicar a lista é vazia", async () => {
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    repos.push(repo);
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: repo } });
+    expect((await executarUpdate({ raiz: p.raiz, check: true, origens: { sprintx: repo } })).pendencias).toEqual([]);
+
+    instalacaoDeCliAnterior(p.raiz);
+    novaTag(repo, "v1.1.0");
+    const r = await executarUpdate({ raiz: p.raiz, check: true, origens: { sprintx: repo } });
+    expect(r.aplicou).toBe(false);
+    expect(r.pendencias).toEqual(["skill:sprintx", "cli:0.0.1"]);
   });
 
   it("funcional: --check relata a remontagem e não escreve", async () => {
