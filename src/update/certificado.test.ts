@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { executarInit } from "../cli/init.js";
 import { executarUpdate } from "./flags.js";
+import { versaoDoCli } from "../nucleo/lock.js";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
 
@@ -88,6 +89,26 @@ describe("update pelo commit certificado", () => {
     const segunda = await executarUpdate({ raiz: c.raiz, sim: true, certificados: { sprintx: c.v1 } });
     expect(segunda.aplicou).toBe(false);
     expect(readFileSync(caminhoDoLock(c.raiz), "utf8")).toBe(bytes);
+  });
+
+  // Revisão do Codex na 0.13.1: a CLI anterior é o único motivo de remontar, e a
+  // normalização pendente vai junto, na mesma escrita do lock.
+  it("integracao: lock de CLI anterior e normalizacao pendente remontam juntos, no certificado", async () => {
+    const c = await instalado("v1.0.0", true);
+    const lock = lerLockJson(c.raiz);
+    lock.cli_version = "0.0.1";
+    writeFileSync(caminhoDoLock(c.raiz), `${JSON.stringify(lock, null, 2)}\n`);
+    const hook = join(c.raiz, ".expx/marketplace/plugins/expx/nucleo/hooks/expx-rastro.sh");
+    rmSync(hook);
+
+    const r = await executarUpdate({ raiz: c.raiz, sim: true, certificados: { sprintx: c.v1 } });
+
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    expect(r.aplicou).toBe(true);
+    expect(existsSync(hook)).toBe(true);
+    const depois = lerLockJson(c.raiz);
+    expect(depois.cli_version).toBe(versaoDoCli());
+    expect(depois.skills["sprintx"]).toMatchObject({ referencia: c.v1, commit: c.v1, travado: true });
   });
 
   it("integracao: lock adiante do certificado recua para ele, e a saida diz que e recuo", async () => {

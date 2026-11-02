@@ -130,7 +130,7 @@
     <div class="cartao"><div class="cartao__num">9</div><div class="cartao__rot">skills no catálogo</div></div>
     <div class="cartao"><div class="cartao__num">8</div><div class="cartao__rot">subcomandos do CLI</div></div>
     <div class="cartao"><div class="cartao__num">1903</div><div class="cartao__rot">testes aprovados</div></div>
-    <div class="cartao"><div class="cartao__num">34</div><div class="cartao__rot">verificações do doctor</div></div>
+    <div class="cartao"><div class="cartao__num">35</div><div class="cartao__rot">verificações do doctor</div></div>
   </div>
 
   <p style="margin-top:8px">
@@ -1712,7 +1712,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
 <section class="secao" id="doctor">
   <p class="eyebrow">Referência do CLI</p>
   <h1>O que o doctor verifica</h1>
-  <p class="lede">Trinta e quatro verificações, cada uma com severidade e correção sugerida. Achado de severidade
+  <p class="lede">Trinta e cinco verificações, cada uma com severidade e correção sugerida. Achado de severidade
   <code>aviso</code> não derruba a saída; <code>erro</code> sim.</p>
 
   <div class="codigo" data-copiar>
@@ -1727,6 +1727,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
       <tr><td><code>sem-expx</code></td><td><span class="selo selo--erro">erro</span></td><td>a pasta <code>.expx/</code> não existe — o diagnóstico para aqui</td></tr>
       <tr><td><code>lock-ilegivel</code></td><td><span class="selo selo--erro">erro</span></td><td>lock ausente, JSON inválido ou fora do formato — o diagnóstico para aqui</td></tr>
       <tr><td><code>lock-futuro</code></td><td><span class="selo selo--erro">erro</span></td><td>o lock foi criado por uma versão mais nova do CLI</td></tr>
+      <tr><td><code>instalacao-de-cli-anterior</code></td><td><span class="selo selo--aviso">aviso</span></td><td>o lock foi gravado por um CLI anterior: o plugin e os hooks do núcleo podem estar velhos, e o <code>expx update --yes</code> os remonta</td></tr>
       <tr><td><code>plugin-json-invalido</code></td><td><span class="selo selo--erro">erro</span></td><td><code>plugin.json</code> ausente ou fora do schema</td></tr>
       <tr><td><code>marketplace-json-invalido</code></td><td><span class="selo selo--erro">erro</span></td><td><code>marketplace.json</code> ausente ou fora do schema</td></tr>
       <tr><td><code>skill-ausente</code></td><td><span class="selo selo--erro">erro</span></td><td>skill do lock sem pasta em disco</td></tr>

@@ -675,6 +675,12 @@ travada em versão publicada, o commit exato, a data e **o hash de cada arquivo*
 | `--to <ref>` | Fixa uma skill numa tag ou commit específico — exige nomear exatamente uma skill |
 | `--yes` / `--sim` | Aplica sem exigir terminal interativo |
 
+> **CLI nova, skills em dia.** O plugin e os hooks do núcleo vêm da CLI. Com o lock gravado
+> por uma CLI anterior, o `update` remonta a instalação com as mesmas skills, nos mesmos
+> commits, mesmo que todas estejam em dia, e o `doctor` avisa `instalacao-de-cli-anterior`
+> até isso acontecer. Até a 0.13.0, o `update` dizia `em dia` e não entregava o núcleo novo:
+> nessas versões, use `expx init` com as skills do lock.
+
 A aplicação **remonta o plugin do zero** com a seleção inteira do lock, em vez de editar a
 árvore montada. É mais lento e é de propósito: editar no lugar deixa arquivo órfão quando uma
 skill encolhe entre versões.
@@ -722,7 +728,7 @@ skill encolhe entre versões.
 npx expxdev doctor
 ```
 
-Trinta e quatro verificações, cada uma com severidade e correção sugerida. Achado de severidade
+Trinta e cinco verificações, cada uma com severidade e correção sugerida. Achado de severidade
 `aviso` não derruba a saída; `erro` sim.
 
 | Verificação | Severidade |
@@ -731,6 +737,7 @@ Trinta e quatro verificações, cada uma com severidade e correção sugerida. A
 | `.expx/` existe | erro |
 | lock legível | erro |
 | lock não é de uma versão futura do CLI | erro |
+| lock gravado por um CLI anterior: plugin e hooks do núcleo podem estar velhos | aviso |
 | `plugin.json` válido | erro |
 | `marketplace.json` válido | erro |
 | skill do lock presente em disco | erro |

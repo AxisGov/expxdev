@@ -1,10 +1,10 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
-import { lerLock } from "../nucleo/lock.js";
+import { lerLock, versaoDoCli } from "../nucleo/lock.js";
 import { pastaDaSkill } from "./modificacao.js";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
 import { executarInit } from "../cli/init.js";
@@ -331,5 +331,110 @@ describe("update de uma skill e as outras", () => {
 
     expect(r.ok).toBe(true);
     expect(r.mensagens.join("\n")).toMatch(/runx: origem local/);
+  });
+});
+
+/**
+ * O lock como se a instalação fosse de uma CLI anterior, com as skills em dia: é
+ * a 0.12.20 depois da 0.13.0 no Conselhos, em que o `update` dizia `em dia` e não
+ * entregava os hooks do núcleo novos.
+ */
+function instalacaoDeCliAnterior(raiz: string): string {
+  const caminho = join(raiz, ".expx/expx-lock.json");
+  const lock = JSON.parse(readFileSync(caminho, "utf8")) as { cli_version: string };
+  lock.cli_version = "0.0.1";
+  writeFileSync(caminho, `${JSON.stringify(lock, null, 2)}\n`);
+  const hook = join(raiz, ".expx/marketplace/plugins/expx/nucleo/hooks/expx-rastro.sh");
+  expect(existsSync(hook)).toBe(true);
+  rmSync(hook);
+  return hook;
+}
+
+describe("update depois de uma CLI nova", () => {
+  it("funcional: skills em dia e lock de CLI anterior remontam a instalação e entregam o núcleo", async () => {
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    repos.push(repo);
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    expect((await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: repo } })).ok).toBe(true);
+    const hook = instalacaoDeCliAnterior(p.raiz);
+
+    const r = await executarUpdate({ raiz: p.raiz, sim: true, origens: { sprintx: repo } });
+
+    expect(r.ok).toBe(true);
+    expect(r.aplicou).toBe(true);
+    expect(existsSync(hook)).toBe(true);
+    const l = lerLock(p.raiz);
+    if (!l.ok) throw new Error(l.erro);
+    expect(l.lock.cli_version).toBe(versaoDoCli());
+    expect(l.lock.skills["sprintx"]?.referencia).toBe("v1.0.0");
+    const saida = r.mensagens.join("\n");
+    expect(saida).toContain("0.0.1");
+    // o SessionStart reconhece a aplicação pelo aviso de rollback, e lê como
+    // skill toda linha `<nome>: ... →`: a remontagem não pode parecer uma skill
+    expect(saida).toContain(AVISO_ROLLBACK);
+    expect(saida).not.toMatch(/^[a-z0-9-]+: .*→/m);
+  });
+
+  it("funcional: --check relata a remontagem e não escreve", async () => {
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    repos.push(repo);
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: repo } });
+    const hook = instalacaoDeCliAnterior(p.raiz);
+    const lock = readFileSync(join(p.raiz, ".expx/expx-lock.json"), "utf8");
+
+    const r = await executarUpdate({ raiz: p.raiz, check: true, origens: { sprintx: repo } });
+
+    expect(r.aplicou).toBe(false);
+    expect(r.mensagens.join("\n")).toContain("0.0.1");
+    expect(existsSync(hook)).toBe(false);
+    expect(readFileSync(join(p.raiz, ".expx/expx-lock.json"), "utf8")).toBe(lock);
+  });
+
+  it("funcional: sem --yes e sem terminal, diz que nada foi aplicado", async () => {
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    repos.push(repo);
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: repo } });
+    const hook = instalacaoDeCliAnterior(p.raiz);
+
+    const r = await executarUpdate({ raiz: p.raiz, interativo: false, sim: false, origens: { sprintx: repo } });
+
+    expect(r.aplicou).toBe(false);
+    expect(r.mensagens.join(" ")).toContain("nada foi aplicado");
+    expect(existsSync(hook)).toBe(false);
+  });
+
+  it("funcional: modificação local numa skill em dia barra a remontagem da CLI nova", async () => {
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    repos.push(repo);
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: repo } });
+    const hook = instalacaoDeCliAnterior(p.raiz);
+    const ajuste = join(pastaDaSkill(p.raiz, "sprintx"), "references", "01.md");
+    writeFileSync(ajuste, "# ajuste manual\n");
+
+    const r = await executarUpdate({ raiz: p.raiz, sim: true, origens: { sprintx: repo } });
+
+    expect(r.ok).toBe(false);
+    expect(r.aplicou).toBe(false);
+    expect(r.bloqueadas.map((b) => b.nome)).toEqual(["sprintx"]);
+    expect(readFileSync(ajuste, "utf8")).toBe("# ajuste manual\n");
+    expect(existsSync(hook)).toBe(false);
+  });
+
+  it("funcional: lock da mesma CLI e skills em dia seguem sem tocar nada", async () => {
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    repos.push(repo);
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: { sprintx: repo } });
+    const lock = readFileSync(join(p.raiz, ".expx/expx-lock.json"), "utf8");
+
+    const r = await executarUpdate({ raiz: p.raiz, sim: true, origens: { sprintx: repo } });
+
+    expect(r.ok).toBe(true);
+    expect(r.aplicou).toBe(false);
+    expect(r.emDia).toEqual(["sprintx"]);
+    expect(readFileSync(join(p.raiz, ".expx/expx-lock.json"), "utf8")).toBe(lock);
   });
 });

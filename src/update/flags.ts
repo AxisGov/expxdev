@@ -1,4 +1,4 @@
-import { caminhoDoLock, lerLock, versaoDoCli, type Lock } from "../nucleo/lock.js";
+import { caminhoDoLock, compararVersoes, lerLock, versaoDoCli, type Lock } from "../nucleo/lock.js";
 import { repositorioCanonico, resolverOrigem } from "../nucleo/catalogo.js";
 import { ehCaminhoLocal, executarInit } from "../cli/init.js";
 import { compararComRemoto, type ItemComparacao } from "./comparar.js";
@@ -139,6 +139,11 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   if (!l.ok) {
     return { ok: false, aplicou: false, atualizadas: [], emDia: [], bloqueadas: [], mensagens: [l.erro] };
   }
+  // Lock gravado por uma CLI anterior: o plugin e os hooks do núcleo vêm da CLI,
+  // não das skills, e só chegam remontando. Com as skills em dia, o `update`
+  // dizia `em dia` e deixava o núcleo antigo (0.13.0 no Conselhos).
+  const cliAnterior = compararVersoes(l.lock.cli_version, versaoDoCli()) < 0 ? l.lock.cli_version : undefined;
+  const remontar = (candidatas: readonly ItemComparacao[]): boolean => candidatas.length > 0 || cliAnterior !== undefined;
   // o git aceita SHA em maiúsculas, mas devolve e grava em minúsculas: sem
   // normalizar, o lock e a conferência do commit buscado divergiriam
   const to = op.to !== undefined && SHA_COMPLETO.test(op.to) ? op.to.toLowerCase() : op.to;
@@ -196,7 +201,7 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   // O `init` remonta TODAS as skills do lock, não só as candidatas: uma
   // modificação local em qualquer outra — em dia, ou fora do filtro — também
   // seria sobrescrita.
-  if (candidatas.length > 0) {
+  if (remontar(candidatas)) {
     const vistas = new Set(comparacao.aAplicar.map((i) => i.nome));
     for (const nome of Object.keys(l.lock.skills)) {
       if (!vistas.has(nome)) bloquearSeModificada(nome);
@@ -222,6 +227,10 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
     mensagens.push(`${i.nome}: ${versoes}${detalhe}`);
   }
 
+  if (cliAnterior !== undefined) {
+    mensagens.push(`instalacao gravada pelo CLI ${cliAnterior}, e este e ${versaoDoCli()}: o plugin e os hooks do nucleo sao remontados, com as mesmas skills`);
+  }
+
   const podeAplicar = (op.sim ?? false) || (op.interativo ?? false);
   if (proveniencias.length > 0) {
     mensagens.push(`proveniencia canonica pendente: ${proveniencias.join(", ")}`);
@@ -231,7 +240,7 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
     mensagens.push(`normalizacao pendente: ${normalizadas.join(", ")} (ja no commit certificado; o lock passa a dize-lo)`);
   }
   if (op.check === true || !podeAplicar) {
-    if (op.check !== true && (candidatas.length > 0 || migracao.migradas.length > 0) && !podeAplicar) {
+    if (op.check !== true && (remontar(candidatas) || migracao.migradas.length > 0) && !podeAplicar) {
       mensagens.push("sem confirmacao disponivel: nada foi aplicado (use --yes para aplicar sem perguntar)");
     }
     return { ok: true, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens };
@@ -240,13 +249,13 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   // e a saída precisa dizer isso (o `--check`, só relatório, já saiu acima).
   if (modificadas.length > 0) {
     mensagens.push(
-      candidatas.length > 0
+      remontar(candidatas)
         ? `nada foi aplicado: o update remonta todas as skills e sobrescreveria a modificacao local em ${modificadas.join(", ")}`
         : `nada foi aplicado: modificacao local em ${modificadas.join(", ")}`,
     );
     return { ok: false, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens };
   }
-  if (candidatas.length === 0) {
+  if (!remontar(candidatas)) {
     if (migracao.migradas.length === 0) {
       return { ok: true, aplicou: false, atualizadas: [], emDia, bloqueadas, mensagens };
     }

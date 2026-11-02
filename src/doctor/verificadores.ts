@@ -3,7 +3,7 @@ import { conferirPisoDoClaude, PISO_CLAUDE } from "../harness/versao-claude.js";
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { lerLock, type InstalacaoTravada } from "../nucleo/lock.js";
+import { compararVersoes, lerLock, versaoDoCli, type InstalacaoTravada } from "../nucleo/lock.js";
 import { hashDoArquivo } from "../nucleo/integridade.js";
 import {
   comandoDeReparo,
@@ -112,6 +112,17 @@ export function diagnosticar(raiz: string, env: NodeJS.ProcessEnv = process.env)
       severidade: "erro",
       problema: "o .expx/ foi criado por uma versao MAIS NOVA deste CLI",
       correcao: "atualize o CLI (`npx expxdev@latest`) antes de operar este projeto",
+    });
+  }
+  // O plugin e os hooks do núcleo vêm da CLI: um lock de CLI anterior diz que
+  // eles podem estar velhos, mesmo com todas as skills no commit certificado.
+  const cli = versaoDoCli();
+  if (compararVersoes(l.lock.cli_version, cli) < 0) {
+    push({
+      id: "instalacao-de-cli-anterior",
+      severidade: "aviso",
+      problema: `a instalacao foi gravada pelo CLI ${l.lock.cli_version}, e este e ${cli}: o plugin e os hooks do nucleo podem estar desatualizados`,
+      correcao: "rode `expx update --yes`, que remonta a instalacao com as mesmas skills",
     });
   }
 

@@ -469,6 +469,15 @@ certificado, recua para ele e diz que é recuo. O certificado que o remoto não 
 sem cair para a ponta. A preparação da release confere que cada certificado é ancestral da
 `main` da skill.
 
+**CLI nova, skills em dia.** O plugin e os hooks do núcleo vêm da CLI, não das skills.
+Com o `cli_version` do lock menor que a versão da CLI em uso, o `update` remonta a
+instalação com as mesmas skills, nos mesmos commits, e regrava o lock; a modificação local
+em qualquer skill barra, como numa remontagem por skill nova. O `--check` só relata. A
+mensagem não tem a forma `<skill>: ... →`, porque o SessionStart lê essa forma como skill
+atualizada. Lock de CLI mais nova continua recusado. O `doctor` acusa a defasagem com o
+aviso `instalacao-de-cli-anterior`. Até a 0.13.0, o `update` dizia `em dia` e não
+entregava o núcleo novo.
+
 O `expx doctor` confere o lock contra o disco: arquivo ausente ou alterado,
 hook gerenciado ausente ou alterado no settings, `.expx/hooks.json` diferente
 do composto — erro. Só o `modo` de um id alterado é aviso: é decisão da
