@@ -1,3 +1,4 @@
+import { lerPolitica } from "../orquestracao/politica.js";
 import { conferirPisoDoClaude, PISO_CLAUDE } from "../harness/versao-claude.js";
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -664,7 +665,9 @@ const GIT_LOCAIS = new Set([
  * observação sem dado, e isso precisa aparecer. É aviso: esta versão só observa.
  */
 function verificarEnvelopeDaInvocacao(raiz: string, push: (a: Achado) => void): void {
-  if (!existsSync(join(raiz, ".expx", "orquestracao.json"))) return;
+  // Política inválida tem achado próprio, e o envelope é do adaptador Claude.
+  const politica = lerPolitica(raiz);
+  if (!politica.ok || !politica.ativa || !existsSync(join(raiz, ".claude", "settings.json"))) return;
   const piso = conferirPisoDoClaude();
   if (!piso.ok) {
     push({ id: "claude-abaixo-do-piso", severidade: "aviso", problema: piso.aviso, correcao: `atualize o Claude Code para ${PISO_CLAUDE} ou superior e rode o expx init` });

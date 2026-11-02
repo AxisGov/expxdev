@@ -216,6 +216,49 @@ describe("expx-invocacao: observa a chamada do agente gerenciado", () => {
     expect(envelopes(raiz)).toEqual([]);
   });
 
+  it("funcional: a saída grande chega inteira pelo pipe, sem corte no fim do processo", () => {
+    const raiz = projeto();
+    const prompt = "x".repeat(500_000);
+    const r = antes(raiz, "qa", "toolu_1", { prompt });
+    expect(JSON.parse(r.stdout).hookSpecificOutput.updatedInput.prompt).toHaveLength(prompt.length);
+  });
+
+  it("funcional: GIT_DIR herdado não leva o envelope para outro repositório", () => {
+    const raiz = projeto();
+    const outro = projeto();
+    const r = spawnSync(process.execPath, [HOOK], {
+      input: JSON.stringify({ cwd: raiz, session_id: "s", hook_event_name: "PreToolUse", tool_use_id: "t", tool_input: { subagent_type: "qa" } }),
+      encoding: "utf8",
+      env: { ...process.env, GIT_DIR: join(outro, ".git") },
+    });
+    expect(r.status).toBe(0);
+    expect(envelopes(raiz)).toHaveLength(1);
+    expect(envelopes(outro)).toEqual([]);
+  });
+
+  it("funcional: se a vigente mudou no meio, o evento cita a resolução da chamada", () => {
+    const raiz = projeto();
+    antes(raiz, "qa");
+    const outra = "b".repeat(64);
+    writeFileSync(join(raiz, ".expx", "orquestracao-rastro.tsv"), `# expx-orquestracao-rastro 1\nqa\t${outra}\tsenior\tdeclarada\tsenior\tx\tembutida\t-\t-\n`);
+    depois(raiz, "qa", { status: "completed", resolvedModel: "claude-sonnet-5-5" });
+    const e = eventos(raiz)[0];
+    expect(e?.["resolucao_id"]).toBe(RES);
+    expect(e?.["fora_da_politica"]).toBeUndefined();
+  });
+
+  it.skipIf(process.platform === "win32")("robustez: rastro impossível de gravar não apaga o envelope, embora o escritor saia 0", () => {
+    const raiz = projeto();
+    antes(raiz, "qa");
+    writeFileSync(join(raiz, "docs"), "arquivo no lugar da pasta");
+    depois(raiz, "qa", { status: "completed", resolvedModel: "claude-sonnet-5-5" });
+    expect(envelopes(raiz)[0]).toMatch(/\.fechando$/);
+    rmSync(join(raiz, "docs"));
+    roda(raiz, { hook_event_name: "SessionStart", source: "resume" });
+    expect(eventos(raiz).map((x) => x["evento"])).toEqual(["invocacao_abandonada"]);
+    expect(envelopes(raiz)).toEqual([]);
+  });
+
   it("recuperação: startup e resume abandonam o que é desta sessão; compactar não", () => {
     const raiz = projeto();
     antes(raiz, "qa");

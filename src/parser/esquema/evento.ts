@@ -253,6 +253,19 @@ export const LinhaEvento = z
     path: ["materializado"],
   })
   // A verificação sem o resultado não diz nada; o resultado fora dela não tem dono.
+  // CONTRATO-expx-orquestracao §13.2: o fechamento sem a chamada ou o desfecho não correlaciona nada.
+  .refine((l) => (l.evento !== "invocacao_fechada" && l.evento !== "invocacao_abandonada") || l.invocacao !== undefined, {
+    message: "invocacao é obrigatória em invocacao_fechada e invocacao_abandonada",
+    path: ["invocacao"],
+  })
+  .refine((l) => (l.evento === "invocacao_fechada") === (l.estado_invocacao !== undefined), {
+    message: "estado_invocacao é obrigatório em invocacao_fechada e só existe nele",
+    path: ["estado_invocacao"],
+  })
+  .refine((l) => l.estado_invocacao === undefined || (l.estado_invocacao === "falha") === (l.resultado === "falha"), {
+    message: "resultado de invocacao_fechada: falha só com estado_invocacao falha",
+    path: ["resultado"],
+  })
   .refine((l) => (l.evento === "integridade_final_verificada") === (l.integridade_final !== undefined), {
     message: "integridade_final é obrigatória em integridade_final_verificada e só existe nele",
     path: ["integridade_final"],

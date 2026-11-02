@@ -31,7 +31,10 @@ const FERRAMENTA = new Map([
 const UM_DIA = 24 * 60 * 60 * 1000;
 const RASTRO = join(dirname(fileURLToPath(import.meta.url)), "expx-rastro.sh");
 
-const git = (raiz, args, input) => spawnSync("git", ["-C", raiz, ...args], { encoding: "utf8", input });
+// GIT_DIR e afins herdados venceriam o `-C`, e o envelope iria para outro repositorio.
+const GIT_LOCAIS = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_COMMON_DIR", "GIT_NAMESPACE", "GIT_PREFIX"];
+const ENV_GIT = Object.fromEntries(Object.entries(process.env).filter(([k]) => !GIT_LOCAIS.includes(k)));
+const git = (raiz, args, input) => spawnSync("git", ["-C", raiz, ...args], { encoding: "utf8", input, env: ENV_GIT });
 const hash = (texto) => createHash("sha256").update(texto).digest("hex");
 
 /** Um unico prefixo `expx:` literal; o resto e o nome exato. */
@@ -72,16 +75,14 @@ function instanciaDe(raiz, sessao, agentId) {
   return r.status === 0 ? r.stdout.trim() : "";
 }
 
-/** Devolve se o escritor rodou: sem ele, o envelope fica para a proxima recuperacao. */
 function grava(raiz, agente, evento, resultado, detalhe, extras, modelo) {
   const ferramenta = FERRAMENTA.get(agente);
-  if (ferramenta === undefined || !existsSync(RASTRO)) return false;
+  if (ferramenta === undefined || !existsSync(RASTRO)) return;
   const env = { ...process.env, EXPX_FERRAMENTA: ferramenta, EXPX_AGENTE: agente };
   env.EXPX_HARNESS = env.EXPX_HARNESS || "claude-code";
   if (modelo) env.EXPX_MODEL = modelo;
   const corpo = Object.entries(extras).map(([k, v]) => `${JSON.stringify(k)}:${JSON.stringify(v)}`).join(",");
-  const r = spawnSync("bash", ["-c", '. "$0"; expx_rastro_grava "$1" "$2" hook "$3" "$4" "[]" "$5"', RASTRO, raiz, evento, resultado, detalhe, corpo], { env, stdio: "ignore" });
-  return r.error === undefined && r.status === 0;
+  spawnSync("bash", ["-c", '. "$0"; expx_rastro_grava "$1" "$2" hook "$3" "$4" "[]" "$5"', RASTRO, raiz, evento, resultado, detalhe, corpo], { env, stdio: "ignore" });
 }
 
 /** Modelos observados: `modelsUsed` so como lista de texto nao vazia, senao `resolvedModel`. */
@@ -162,6 +163,9 @@ function depois(d, evento) {
   const estado = evento === "PostToolUseFailure" ? "falha" : resposta?.status === "async_launched" ? "lancada" : "concluida";
   const modelos = modelosDe(resposta);
   const extras = { invocacao: d.tool_use_id, estado_invocacao: estado };
+  // A resolucao da chamada: se a vigente mudou no meio, o escritor nao a usa no lugar.
+  const daChamada = tomado.envelope?.resolucao_id;
+  if (daChamada && daChamada !== resolucaoDe(raiz, agente)) extras.resolucao_id = daChamada;
   const instancia = instanciaDe(raiz, d.session_id, resposta?.agentId);
   if (instancia) extras.instancia = instancia;
   if (modelos.length > 0) extras.modelos_observados = modelos;
@@ -170,8 +174,9 @@ function depois(d, evento) {
   if (julgamento === true) extras.fora_da_politica = true;
   const semEnvelope = tomado.envelope === null ? " (sem envelope)" : "";
   const resultado = estado === "falha" ? "falha" : "ok";
-  const gravou = grava(raiz, agente, "invocacao_fechada", resultado, `invocacao de ${agente}: ${estado}${semEnvelope}`, extras, modelos.at(-1));
-  if (gravou && tomado.fechando) rmSync(tomado.fechando, { force: true });
+  grava(raiz, agente, "invocacao_fechada", resultado, `invocacao de ${agente}: ${estado}${semEnvelope}`, extras, modelos.at(-1));
+  // O escritor falha aberto e sai 0: so a linha no rastro prova que o evento existe.
+  if (tomado.fechando && jaRegistrada(raiz, d.tool_use_id)) rmSync(tomado.fechando, { force: true });
 }
 
 /** O evento dessa invocacao ja saiu? Um fechamento interrompido nao vira abandono em dobro. */
@@ -213,9 +218,12 @@ function recuperar(d) {
       // Tomada exclusiva tambem do que ficou em fechamento: dois inicios nao abandonam em dobro.
       const meu = `${arquivo.replace(/\.fechando(\.\d+)?$/, "").replace(/\.json$/, "")}.json.fechando.${process.pid}`;
       renameSync(arquivo, meu);
-      const gravou = jaRegistrada(raiz, envelope.invocacao)
-        || grava(raiz, envelope.agente, "invocacao_abandonada", "falha", `invocacao de ${envelope.agente} sem fechamento`, { invocacao: envelope.invocacao });
-      if (gravou) rmSync(meu, { force: true });
+      if (!jaRegistrada(raiz, envelope.invocacao)) {
+        const extras = { invocacao: envelope.invocacao };
+        if (envelope.resolucao_id && envelope.resolucao_id !== resolucaoDe(raiz, envelope.agente)) extras.resolucao_id = envelope.resolucao_id;
+        grava(raiz, envelope.agente, "invocacao_abandonada", "falha", `invocacao de ${envelope.agente} sem fechamento`, extras);
+      }
+      if (jaRegistrada(raiz, envelope.invocacao)) rmSync(meu, { force: true });
     } catch {
       // um envelope ruim nao impede os outros
     }
@@ -231,4 +239,4 @@ try {
 } catch {
   // falha aberta: observar nunca trava o agente
 }
-process.exit(0);
+// Sem `process.exit`: num pipe, ele cortaria a saida que leva o aprovador ao primeiro plano.

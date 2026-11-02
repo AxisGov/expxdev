@@ -166,6 +166,10 @@ describe.skipIf(process.platform === "win32")("doctor e o envelope da invocaçã
     writeFileSync(join(p.raiz, ".expx", "orquestracao.json"), JSON.stringify({ expx_orquestracao: 1 }));
     claudeFalso("2.1.287 (Claude Code)");
     expect(idsDe(p.raiz)).toContain("claude-abaixo-do-piso");
+    // política inválida tem achado próprio, e o envelope não é assunto ali
+    writeFileSync(join(p.raiz, ".expx", "orquestracao.json"), "{");
+    expect(idsDe(p.raiz)).not.toContain("claude-abaixo-do-piso");
+    writeFileSync(join(p.raiz, ".expx", "orquestracao.json"), JSON.stringify({ expx_orquestracao: 1 }));
     claudeFalso("2.1.310 (Claude Code)");
     expect(idsDe(p.raiz)).toContain("envelope-nao-instalado");
     writeFileSync(join(p.raiz, ".claude", "hooks", "expx-invocacao.mjs"), "");

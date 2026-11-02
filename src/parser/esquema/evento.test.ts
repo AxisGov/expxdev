@@ -474,11 +474,25 @@ describe("chaves da resolução (CONTRATO-expx-orquestracao §11.1)", () => {
     expect(v1.defeitos).toEqual([]);
   });
 
-  it("funcional: as chaves da F3b são declaradas, ainda que o escritor não as grave", () => {
+  it("funcional: as chaves da F3b são declaradas", () => {
     const r = validarRastro(j(linha({ ...RESOLUCAO, invocacao: "toolu_01", modelos_observados: ["claude-opus-4-6"], fora_da_politica: true })));
     expect(r.defeitos).toEqual([]);
     expect(r.desconhecidas).toEqual([]);
-    expect(validarRastro(j(linha({ evento: "invocacao_abandonada", resultado: "abandonada" }))).defeitos).toEqual([]);
+    expect(validarRastro(j(linha({ evento: "invocacao_abandonada", resultado: "falha", invocacao: "toolu_01" }))).defeitos).toEqual([]);
+  });
+
+  it("funcional: o fechamento da invocação precisa da chamada, do estado e do resultado coerente", () => {
+    const fechada = (extra: Record<string, unknown>) => validarRastro(j(linha({ evento: "invocacao_fechada", resultado: "ok", invocacao: "t", estado_invocacao: "concluida", ...extra }))).defeitos;
+    expect(fechada({})).toEqual([]);
+    expect(fechada({ estado_invocacao: "lancada", instancia: "a".repeat(40) })).toEqual([]);
+    expect(fechada({ estado_invocacao: "falha", resultado: "falha" })).toEqual([]);
+    expect(fechada({ invocacao: undefined })).not.toEqual([]);
+    expect(fechada({ estado_invocacao: undefined })).not.toEqual([]);
+    expect(fechada({ estado_invocacao: "falha" })).not.toEqual([]);
+    expect(fechada({ resultado: "falha" })).not.toEqual([]);
+    expect(fechada({ instancia: "curta" })).not.toEqual([]);
+    expect(validarRastro(j(linha({ evento: "invocacao_abandonada", resultado: "falha" }))).defeitos).not.toEqual([]);
+    expect(validarRastro(j(linha({ estado_invocacao: "concluida" }))).defeitos).not.toEqual([]);
   });
 
   it("funcional: resolução fora da forma é defeito, não dado aceito", () => {
