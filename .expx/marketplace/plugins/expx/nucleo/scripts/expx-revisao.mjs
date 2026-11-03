@@ -478,6 +478,23 @@ function revisar() {
     ev.chamada = { include: enviados, meta: j?.meta ?? null, error: j === undefined ? `json ilegivel (rc ${r.status})` : j.error ?? null, falhas_de_lote: falhas,
       issues: j?.issues ?? null, stdout_sha256: createHash("sha256").update(stdout).digest("hex") };
     // 6-9. a resposta cobre a task inteira
+    // 403 em todo lote: a revisão não aconteceu, e é indisponibilidade, como o mesmo 403 vindo em
+    // `error` no JSON (Conselhos na 0.13.1, T-01.04). O `reviewed_files` não prova nada: na CLI
+    // 0.5.14 ele repete os enviados mesmo com todos os lotes em 403. A prova são as linhas
+    // `[error] Failed to review <arquivos>: Access denied (403)`: a união dos arquivos que elas
+    // citam cobre todos os enviados, sem outro erro, com `issues` vazia e `error` nulo. Linha 403
+    // fora desse formato não prova cobertura, e continua `incompleta`.
+    const negados = new Set();
+    const todos403 = falhas.length > 0 && falhas.every((l) => {
+      // a linha inteira, como a CLI 0.5.14 a escreve; o caminho com vírgula já foi recusado antes
+      const m = /^\[error\] Failed to review (.+?): Access denied \(403\)\. Please run `codeant logout` and then `codeant login` to re-authenticate\.$/.exec(l);
+      if (!m) return false;
+      for (const f of m[1].split(", ")) negados.add(f);
+      return true;
+    });
+    if (todos403 && enviados.every((f) => negados.has(f)) && Array.isArray(j?.issues) && j.issues.length === 0 && j.error === null) {
+      return fim("indisponivel", "acesso-negado");
+    }
     if (falhas.length > 0) return fim("incompleta", "lote-falhou");
     if (j === undefined || (j.error !== null && j.error !== undefined)) return fim("indisponivel", "erro");
     if (foraDoPerfil(j, cli.perfil, r.status)) return fim("incompleta", "perfil");
