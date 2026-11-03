@@ -486,12 +486,13 @@ function revisar() {
     // fora desse formato não prova cobertura, e continua `incompleta`.
     const negados = new Set();
     const todos403 = falhas.length > 0 && falhas.every((l) => {
-      const m = /^\[error\] Failed to review (.+?): Access denied \(403\)/.exec(l);
+      // a linha inteira, como a CLI 0.5.14 a escreve; o caminho com vírgula já foi recusado antes
+      const m = /^\[error\] Failed to review (.+?): Access denied \(403\)\. Please run `codeant logout` and then `codeant login` to re-authenticate\.$/.exec(l);
       if (!m) return false;
-      for (const f of m[1].split(", ")) negados.add(f.trim());
+      for (const f of m[1].split(", ")) negados.add(f);
       return true;
     });
-    if (todos403 && enviados.every((f) => negados.has(f)) && Array.isArray(j?.issues) && j.issues.length === 0 && (j.error === null || j.error === undefined)) {
+    if (todos403 && enviados.every((f) => negados.has(f)) && Array.isArray(j?.issues) && j.issues.length === 0 && j.error === null) {
       return fim("indisponivel", "acesso-negado");
     }
     if (falhas.length > 0) return fim("incompleta", "lote-falhou");

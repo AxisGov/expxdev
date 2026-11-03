@@ -631,6 +631,8 @@ describe("expx-revisao.mjs revisar v2: depois da CLI", () => {
     ["com achado", (l: string) => `${l}\n`, { issues: [achado("src/a.js", 3)] }],
     ["sem issues", (l: string) => `${l}\n`, { issues: undefined }],
     ["com error no JSON", (l: string) => `${l}\n`, { error: "falhou" }],
+    ["sem error no JSON", (l: string) => `${l}\n`, { error: undefined }],
+    ["com sufixo depois do formato", (l: string) => `${l} (tentativa 2)\n`, {}],
   ])("funcional: 403 %s continua incompleta:lote-falhou", (_nome, stderr, topo) => {
     const c = cenario({ stderr: stderr(negado("src/a.js")), resposta: resp({}, topo) });
     altera3(c.raiz);
