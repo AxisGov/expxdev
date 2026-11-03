@@ -607,47 +607,38 @@ describe("expx-revisao.mjs revisar v2: depois da CLI", () => {
   });
 
   // Conselhos na 0.13.1, T-01.04: o 403 da CLI só no stderr dava `incompleta:lote-falhou`,
-  // FALHA nos dois modos, e o mesmo 403 no JSON dá `indisponivel:erro`. Sem nenhum lote
-  // revisado, a revisão não aconteceu: é indisponibilidade, não cobertura parcial.
-  it.each([
-    ["Access denied", "[error] Failed to review batch 1: Access denied (403)"],
-    ["só o código 403", "[error] Failed to review src/a.js: 403"],
-  ])("funcional: todo [error] é 403 (%s) e nada foi revisado → indisponivel:acesso-negado (rc 2)", (_nome, linha) => {
-    const c = cenario({ stderr: `[progress] Fetching diff...\n${linha}\n${linha.replace("1", "2")}\n`, resposta: resp({ reviewed_files: [] }) });
-    altera3(c.raiz);
-    const r = revisar(c, "src/a.js");
-    expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "acesso-negado" } });
+  // FALHA nos dois modos, e o mesmo 403 no JSON dá `indisponivel:erro`. A forma das linhas é a
+  // real da CLI 0.5.14, que repete nomes e põe um arquivo em dois lotes, e o `reviewed_files`
+  // repete os enviados mesmo com todos os lotes negados.
+  const negado = (arquivos: string) => `[error] Failed to review ${arquivos}: Access denied (403). Please run \`codeant logout\` and then \`codeant login\` to re-authenticate.`;
+  const doisArquivos = (raiz: string) => { altera3(raiz); escreve(raiz, "src/b.js", "novo\n"); };
+
+  it("funcional: os 403 cobrem todos os enviados, sem achado → indisponivel:acesso-negado (rc 2), mesmo com o reviewed_files cheio", () => {
+    const c = cenario({ stderr: `[progress] Fetching diff...\n${negado("src/a.js, src/a.js, src/b.js")}\n${negado("src/b.js")}\n`, resposta: resp({ reviewed_files: ["src/a.js", "src/b.js"], total_changed: 2 }) });
+    doisArquivos(c.raiz);
+    expect(revisar(c, "src/a.js,src/b.js")).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "acesso-negado" } });
+  });
+
+  it("funcional: os 403 não cobrem um dos enviados → continua incompleta:lote-falhou, porque ele pode ter sido revisado", () => {
+    const c = cenario({ stderr: `${negado("src/a.js")}\n`, resposta: resp({ reviewed_files: ["src/a.js", "src/b.js"], total_changed: 2 }) });
+    doisArquivos(c.raiz);
+    expect(revisar(c, "src/a.js,src/b.js")).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "lote-falhou" } });
   });
 
   it.each([
-    ["sem issues", { issues: undefined }],
-    ["issues fora da forma", { issues: "nada" }],
-  ])("funcional: 403 em todo lote, sem arquivo revisado e %s, continua incompleta:lote-falhou", (_nome, topo) => {
-    const c = cenario({ stderr: "[error] Failed to review batch 1: Access denied (403)\n", resposta: resp({ reviewed_files: [] }, topo) });
-    altera3(c.raiz);
-    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "lote-falhou" } });
-  });
-
-  it("funcional: 403 junto de outro erro continua incompleta:lote-falhou", () => {
-    const c = cenario({ stderr: "[error] Failed to review batch 1: Access denied (403)\n[error] Failed to review batch 2: 500\n" });
-    altera3(c.raiz);
-    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "lote-falhou" } });
-  });
-
-  it("funcional: 403 com arquivo revisado e zero achado continua incompleta:lote-falhou: um lote limpo não tem achado", () => {
-    const c = cenario({ stderr: "[error] Failed to review batch 2: Access denied (403)\n" });
-    altera3(c.raiz);
-    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "lote-falhou" } });
-  });
-
-  it("funcional: 403 num lote com achado de outro lote continua incompleta:lote-falhou, porque a cobertura é parcial", () => {
-    const c = cenario({ stderr: "[error] Failed to review batch 2: Access denied (403)\n", resposta: resp({}, { issues: [achado("src/a.js", 3)] }) });
+    ["junto de outro erro", (l: string) => `${l}\n[error] Failed to review src/a.js: 500\n`, {}],
+    ["fora do formato literal", () => "[error] Failed to review batch 1: Access denied (403)\n", {}],
+    ["com achado", (l: string) => `${l}\n`, { issues: [achado("src/a.js", 3)] }],
+    ["sem issues", (l: string) => `${l}\n`, { issues: undefined }],
+    ["com error no JSON", (l: string) => `${l}\n`, { error: "falhou" }],
+  ])("funcional: 403 %s continua incompleta:lote-falhou", (_nome, stderr, topo) => {
+    const c = cenario({ stderr: stderr(negado("src/a.js")), resposta: resp({}, topo) });
     altera3(c.raiz);
     expect(revisar(c, "src/a.js")).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "lote-falhou" } });
   });
 
   it("funcional: indisponivel:acesso-negado é AVISO em se_disponivel e FALHA em obrigatoria", () => {
-    const c = cenario({ stderr: "[error] Failed to review batch 1: Access denied (403)\n", resposta: resp({ reviewed_files: [] }) });
+    const c = cenario({ stderr: `${negado("src/a.js")}\n` });
     altera3(c.raiz);
     revisar(c, "src/a.js", "T-01");
     const sha = commita(c.raiz);
