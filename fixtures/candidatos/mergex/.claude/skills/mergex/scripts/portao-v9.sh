@@ -516,8 +516,29 @@ PASTA="$ARVORE_PASTA"
 # TREESAME e esconderia o 2º pai de um merge que descartou a pasta (-s ours,
 # resolução que ficou com o lado da base); a árvore da base não a tem, só a
 # história — e esta guarda é sobre a história.
-c="$(g rev-list -n1 --full-history "$BASE" $EXCL -- "$PASTA" "$DIR_E" 2>/dev/null)" || sem_prova "histórico da base $BASE ilegível" # guarda:V9FULL
-[ -z "$c" ] || sem_prova "a base $BASE contém o commit $c, que toca a pasta do trabalho ou a entrega: a base contém o trabalho" # guarda:V9SHA
+# O --full-history também lista o merge que só difere do 1º pai: o "Update
+# branch" de um PR lateral nascido antes do planejamento traz a pasta pelo 2º pai,
+# o próprio merge descontado (DM-309, conselhos 71358c1). Esse merge não conta
+# quando um pai dele está em ^EXCL e a pasta e a entrega do merge são as desse
+# pai: ele não traz nada que já não esteja descontado, e o que o outro lado mudou
+# na pasta aparece pelos commits dele, que a lista também tem.
+merge_descontado() { # <commit> — 0 se é merge com a pasta e a entrega de um pai em ^EXCL
+  local m="$1" p
+  [ -n "$EXCL" ] || return 1
+  set -- $(g rev-list --parents -n1 "$m" 2>/dev/null)
+  [ "$#" -ge 3 ] || return 1
+  shift
+  for p in "$@"; do
+    g merge-base --is-ancestor "$p" "${EXCL#^}" 2>/dev/null || continue
+    g diff --quiet --no-renames --ignore-submodules=none "$p" "$m" -- "$PASTA" "$DIR_E" >/dev/null 2>&1 && return 0
+  done
+  return 1
+}
+g rev-list --full-history "$BASE" $EXCL -- "$PASTA" "$DIR_E" > "$TMP_DIR/da-base" 2>/dev/null || sem_prova "histórico da base $BASE ilegível" # guarda:V9FULL
+while IFS= read -r c <&3; do
+  merge_descontado "$c" && continue
+  sem_prova "a base $BASE contém o commit $c, que toca a pasta do trabalho ou a entrega: a base contém o trabalho" # guarda:V9SHA
+done 3< "$TMP_DIR/da-base"
 # (c) o que as guardas descontaram (P e o que ele contém) é só planejamento:
 # todo commit do trabalho alcançável de P, e a diferença de P para o 1º pai
 # quando P é merge, só toca os artefatos de método

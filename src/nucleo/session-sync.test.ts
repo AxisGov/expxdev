@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
 // @ts-expect-error The runtime helper is intentionally shipped as a Node module beside the harness adapters.
 import { AXIS_REPOSITORIO, adquirirLock, bootstrapAxis, construirComandoNpm, lerOrigemDoLock, maiorRelease, marcadorDoBuild, sincronizarSessao } from "../../nucleo/hooks/expx-session-sync.mjs";
@@ -1034,6 +1034,9 @@ describe("sincronização Axis no SessionStart", () => {
     ["numa pasta que começa com ponto-ponto", (raiz: string) => join(raiz, "..cache")],
     // `resolve` tira o `..` antes de seguir o link, e o bootstrap recebe o caminho cru (CodeAnt no #131)
     ["com segmento ponto-ponto", (raiz: string) => `${raiz}-fora/atalho/../cache`],
+    // o ancestral contém o projeto: `relative` dá `..` e passava como fora (CodeAnt no login#50)
+    ["num ancestral do projeto", (raiz: string) => dirname(raiz)],
+    ["dois níveis acima do projeto", (raiz: string) => dirname(dirname(raiz))],
   ] as const)("funcional: cache Axis %s adia, sem bootstrap nem CLI, porque escreveria no projeto", (_caso, cacheEm) => {
     const raiz = projeto();
     try {

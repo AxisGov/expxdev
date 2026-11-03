@@ -403,8 +403,11 @@ function cacheForaDoProjeto(projeto, cache) {
   const alvos = [resolve(cache), caminhoRealDoQueExiste(resolve(cache))];
   return alvos.every((alvo) => {
     const trecho = relative(raiz, alvo);
+    if (isAbsolute(trecho)) return true;
     // `..cache` dentro do projeto também começa com "..": só `..` inteiro sai dele
-    return trecho === ".." || trecho.startsWith(`..${sep}`) || isAbsolute(trecho);
+    const partes = trecho.split(sep);
+    // um ancestral (`..`, `../..`) contém o projeto, e o bootstrap escreveria na árvore dele (CodeAnt no login#50)
+    return partes[0] === ".." && !partes.every((p) => p === "..");
   });
 }
 
