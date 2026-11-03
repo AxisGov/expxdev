@@ -1,4 +1,4 @@
-3074d4a847b3ad4869d3c4600f04c71b21eacaaf6858fd580b2664ba92c1749f  .claude/agents/auditor-plano.md
+d9ed10e329e62a888f56ba097431d14cefd5aae2738b8cb1095f978da4756cab  .claude/agents/auditor-plano.md
 cf9719e650167f53b46cab14ae7f0bc2160f5abebe826a764d3e6086d201051c  .claude/agents/sprintx-investigador.md
 b38e7c33caa22792bb3ff8d58df2643ab8af5c44f907e55ad684049394352ffc  .claude/agents/sprintx-revisor-testes.md
 1250eb67c0298c63995176bb59a77a918925551cda15efc8d6def79672dce277  .claude/commands/sprintx-auditoria.md
@@ -36,11 +36,11 @@ b2b9f7b6b8c6349316092989a7babefd495ee6c9ff89bcf2c6dc6ba76d66ac8d  .claude/hooks/
 14c07b1657547c0a90f15b18d71237f165219a67e21d87331d47fdcd0e99abc1  .claude/hooks/testes/bancada-runx-na-mesma-arvore.sh
 c4585b4985bc6187d61677ddf68430d51183c3b5a4ad4a6c295d76b523b79d85  .claude/hooks/testes/bancada-segredo-limite.sh
 f7174dee86fb586fc35fa09a029ba2438d25095351309c14a64b060961d085f6  .claude/hooks/testes/bancada-segredo-sem-git.sh
-00be89f9af166d803bbbe82a5032b82e68034465b02e8ce4556d01dcacf39aed  .claude/hooks/testes/bancada.sh
+69a874f0d8643f9bcbca1a6705cade6a4f80495b5b5a81028542dd5a9648da3d  .claude/hooks/testes/bancada.sh
 d9370952ede36c379751835d4a711550bd37b95c16f127d841883a49e962d2a5  .claude/hooks/testes/fonte.sh
 00dc2c2d5319710f73f5f54616c5b652aa3f99879f8c75444c8002abeeb13483  .claude/hooks/testes/transcrito-agente.sh
 0354c304ed52b1d41becc8df83b36f4a3bf0b3543316bf0e569347ca719fe43d  .claude/settings.json
-624fbc14fcf969af4e8dcb6da6dad768a4feb73089b2efa783c02f6cdd986d22  .claude/skills/sprintx/DECISOES-DA-SKILL.md
+829ce5deb6cffcd1d0615de5d18828858ec8c4ecea77f7e73e40b2f129c29c20  .claude/skills/sprintx/DECISOES-DA-SKILL.md
 c1cf8588ff739814135a0847b6274fd882d7b2dc6c5dcb75b44d985d771fd77d  .claude/skills/sprintx/SKILL.md
 175d6d8d357624377d97f51e893e89a01a7268ab0c80efb1762b40fbccd9fc11  .claude/skills/sprintx/assets/TEMPLATE-BLOQUEIOS.md
 87e9ed363f1a083e60fc37d2c48cb3315513a3a47950858dd445d8d5bc780de3  .claude/skills/sprintx/assets/TEMPLATE-DECISOES.md
@@ -62,7 +62,7 @@ be133494a6bda66c7b28a4317fe7369a1e2eb6132f0f2328fe62d2d373ffc33e  .claude/skills
 a4102c98bdd79bd6adb347ae31550e2c3f159a116dfe877650d19953fb6833e0  .claude/skills/sprintx/references/02-descoberta.md
 ea4f7911c1c4fdd412313c64566275b80b00f39d97e10ee69efd7c86cdd77642  .claude/skills/sprintx/references/03-plano.md
 81fc160be05bde218ab4e187eba2f84f9c565ff4de1126749ac041bd4ea1ca2e  .claude/skills/sprintx/references/04-orquestrador.md
-fc7efd0bdb5236a034fa8c2ce54bf556285ee298ae072218a21cc96689e75adc  .claude/skills/sprintx/references/05-auditoria.md
+7d1d3ae7d72553e45ac451e092275ed91283e71b525790922dd5b8771bfc7851  .claude/skills/sprintx/references/05-auditoria.md
 9c106de08a601353244d25215b759c15ec569e67c2058bdd7efb1e46a4afee3c  .claude/skills/sprintx/references/06-execucao.md
 7470ee3c03e137f825555b7f57f79aa529b54e0ecd5663b0bf9d095752fb90cf  .claude/skills/sprintx/references/07-estimativa.md
 8991177f18210ed91348742eb5f5d144962eafff604cd78406f5b9f5bf5c836a  .claude/skills/sprintx/references/08-rastro.md
@@ -72,7 +72,7 @@ ddad9ed6cc45e9ddb885698d7f49cf45898c21deb70f6686993fc85f47982040  .claude/skills
 a85f685e523ba0324e1956eff60486005afb7904943036b97faa1ff01c24ad54  .claude/skills/sprintx/scripts/caminho-git.sh
 d9b53506df9a6f69070ed39584b72d5bf5cc01bc225c2a65f168ce1cdf8f4829  .claude/skills/sprintx/scripts/lib/execucao.sh
 f0c8b51ec6ea3d8f6e91c7d619b004cc5a1f85b3f88c9f3bd88bfe5c4cde9f6d  .claude/skills/sprintx/scripts/lib/trava-autorizacao-f6.sh
-65166d8f7bb46c3f08d71b4420de59b92b8f020e7047edea5144f8e8ad33064e  .claude/skills/sprintx/scripts/planejamento.sh
+cd2ba58d72bb023bb1224d2353f30cbc0511cfa61ffbe67faf6bb83187fc3292  .claude/skills/sprintx/scripts/planejamento.sh
 e8d2dee90fb98f4c10fe15b249b72a20dc52d0c09bb84cf197ba9e04943a51ba  .claude/skills/sprintx/scripts/predecessores.sh
 4337608894dffc6b68b6d1f24858a86b73d372a1d6ea6b78fdb994ed0961b51b  .claude/skills/sprintx/scripts/rastro.sh
 04641afbcf0378878664dd21b76c320fbb42ab9e35b15fdf20041d8f45fbb843  .expx/hooks.json

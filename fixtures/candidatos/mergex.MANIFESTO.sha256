@@ -30,12 +30,12 @@ d0b219ee94132d44c0c968e1737c6aba044721d0e8a1701ff4f6a920f2ab5a18  .claude/skills
 8a78434435e46c72e7fadf995e1c6299c1776c5659dc03ece97e6d68165210e9  .claude/skills/mergex/assets/ci/mergex-portao.yml
 69ffdc28ccc180b34a5bef2a3cc2252263628f5989589e0f076f3cfbd6af4b95  .claude/skills/mergex/assets/pre-push-gerenciado.sh
 d5af359692ed5da01c566d5cf37b25e221bf66b9fb69a7b154fe454b9876ac2c  .claude/skills/mergex/decisoes/anteriores-ao-p02.md
-f82fc1fccd989f197b56c6acb2db9f2b23468767470aca190959164f738291ec  .claude/skills/mergex/decisoes/endurecimento-conselhos-208-210.md
+d69bf8a806bac10ec9d6e6abe078cd7f69728bbd49432a31b81b1e0173e4e717  .claude/skills/mergex/decisoes/endurecimento-conselhos-208-210.md
 7e047167485cae65e521815148225f0880c7e0f71c79c7851311937bf5b6a7b1  .claude/skills/mergex/decisoes/revisao-por-task-e-entrega-por-sprint.md
 a52b3a85c413a477f469620d88bbd41c4ace2ba601500b217ac6dc36cbd98650  .claude/skills/mergex/references/00-abertura.md
 047c4bce175a9b82c64e74b76365b1c5825819b183707554abe4a741679d6e64  .claude/skills/mergex/references/00-schema.md
 adbc70e9e87cb88ff9a1212e677c1b6538e46b1ce3726c5395f80016e4e139fd  .claude/skills/mergex/references/01-commits.md
-4bd891fcb95ff1f7645895e38d33797a843acaee47e68221b63c9a018035ae3d  .claude/skills/mergex/references/02-prontidao.md
+c8d14efa3ade7a8475cd2fb3d9fafd84c12d1ce89bbe25cf144607589cc56221  .claude/skills/mergex/references/02-prontidao.md
 65b7d1196cdc3126c35e69ca6a30b16b2e5f900200b00cbdced5982f5367c0e6  .claude/skills/mergex/references/03-atencao-humana.md
 7e30562defa61af67e0818b806b180e6ab653938ffeaa7011b4886958c177b8a  .claude/skills/mergex/references/04-descricao-pr.md
 901ffcc8cb9b318dea84cf16ac1bf0c46127fd8cbfc5b11c0911d725fa43c800  .claude/skills/mergex/references/05-pacote-qa.md
@@ -68,7 +68,7 @@ e413460910ed8402c7216fea8f8c08628557858bc7cbf8b88518be64783f0da4  .claude/skills
 e94aa42a816d9621e1c0402fbfc21fc087508dc70a824c9b25da79e6d8d44a6e  .claude/skills/mergex/scripts/portao-push.sh
 cf849ea5b85867f348fe11ecd43d686be89ef9bb9970b0c358027b448a4fa128  .claude/skills/mergex/scripts/portao-regras.sh
 2c0544d9c9df093b6ceaad7555bdb88d1c83c364cb2b0ac4693a3ed2e9bca088  .claude/skills/mergex/scripts/portao-v12.sh
-f5b363e037e13f0ff4311d7d1163f5bab0b1db4ff225b8bbb864c2aacc445db1  .claude/skills/mergex/scripts/portao-v9.sh
+f35ffc76d93a8759b69dd439b288b5fdba87b8bea00ac969f7ab2f511f90f9f0  .claude/skills/mergex/scripts/portao-v9.sh
 082a40a891d33b154db37a8b0269f6ae53f309430925794bc352d759ec5f82d3  .claude/skills/mergex/scripts/predecessores-sprintx.sh
 6a9966b98a05284bdb4e574747f5873021714fef122f461576e03ddf16439e06  .claude/skills/mergex/scripts/prova-de-commit.sh
 a4e0f464d4686a6bae2a345d8c43fd6f8a94d336c9967c5d28b32e3461c6a167  .claude/skills/mergex/scripts/reconciliacao-artefato.sh
