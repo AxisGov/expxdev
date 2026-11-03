@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.13.3 — o que o Conselhos e o Login acharam na 0.13.2
+
+Instale por PR, como a 0.13.2. O hook da 0.13.2 só avisa.
+
+- **mergex@0a85eab** (mergex#72, DM-309): a V9 deixa de barrar o merge do "Update branch" que não traz nada do trabalho. No Conselhos, o merge 71358c1, do #241, tem um pai que é o próprio merge do planejamento, e a pasta e a entrega nele são iguais às desse pai. Como toda base depois dele o contém, a V9 dava `v9_sem_prova` na entrega `por_sprint` da onda-0c, sem saída. Agora a guarda (b) percorre toda a lista do `rev-list --full-history`. Ela descarta só o merge que tem um pai ancestral do planejamento com pasta e entrega idênticas às dele. Se essa comparação der erro, a guarda continua barrando. Um merge que muda a pasta continua `v9_sem_prova`.
+- **sprintx@b4c62aa** (sprintx#67, DS-203): o `valida-auditoria` e o `obrigacoes-f6` voltam a aceitar a F5 da mp2-7b, que tem dois `[fraco:teste]` de T-04.01 com implementações erradas diferentes. Davam rc 0 na 0.13.1 e rc 4 na 0.13.2. Cada implementação errada é uma obrigação da F6, então o `fraco:teste` repete, uma linha por implementação distinta. Tipos diferentes na mesma task, dois `ausente`, dois `criterio` ou a mesma implementação duas vezes continuam recusados. Nos 11 relatórios F5 da main do Conselhos, só a mp2-7b muda de resultado.
+- **designx@2a0a9a8** (designx#7): o A9 (`prefers-reduced-motion`) passa a buscar `animation` e `transition` em `.css`, `.scss` e CSS-in-JS: prefixo de fornecedor, camelCase e `@apply`. O descarte segue a cascata:
+  - só `no-preference` dispensa;
+  - dentro de `reduce`, a animação tem de ser desligada no mesmo seletor, depois da original ou com `!important`, também por longhand;
+  - o reset global precisa de `*, *::before, *::after` com `!important`, e o que tem `!important` próprio vence o reset;
+  - nas classes, a proteção leva as mesmas variantes e a mesma prioridade;
+  - transições só de cor ou opacidade ficam, como a regra já dizia.
+
+  A T7 lê a className inteira, que pode estar em várias linhas. A busca sem `rg` corrige o `-e` e o glob do `--include`, que não casava nada. Sem `--include`, ela usa o `find`.
+- **O cache Axis num ancestral do projeto é recusado** (CodeAnt no katosmv/login#50). Com `EXPX_AXIS_CACHE` numa pasta que contém o projeto, o `relative` dava `..` ou `../..`, e o SessionStart aceitava esse caminho como fora do projeto. Agora o hook adia, como faz com o cache dentro do projeto.
+- **Não exercitado:**
+  - a V9 nova contra o histórico real do Conselhos, que tem só o formato reproduzido no teste;
+  - o caminho F5 → F6 com os agentes reais;
+  - uma auditoria real do A9 novo.
+
 ## 0.13.2 — o SessionStart só avisa
 
 **Instale por PR antes de abrir sessão nova.** O hook da 0.13.1 ainda instalado aplica a versão sozinho na primeira sessão em árvore limpa, e publicar a 0.13.2 não o desliga. Depois de instalada, nenhuma sessão aplica mais nada.
