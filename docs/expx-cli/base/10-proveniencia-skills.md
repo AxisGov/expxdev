@@ -11,7 +11,7 @@ próxima release do ExpxDev. `--to <ref>` sai do certificado de propósito, uma
 skill por vez. O portão da release confere que cada certificado é ancestral da
 `main` da skill, e `catalogo.test.ts` confere esta tabela contra o catálogo.
 
-Commits certificados (confirmados na organização AxisGov em 2026-11-03, depois de AxisGov/sprintx#68 e AxisGov/designx#8):
+Commits certificados (confirmados na organização AxisGov em 2026-11-03, depois de AxisGov/designx#9):
 
 | Repositório | Commit certificado |
 |---|---|
@@ -23,7 +23,7 @@ Commits certificados (confirmados na organização AxisGov em 2026-11-03, depois
 | `AxisGov/MemoX` | `897408f6bf60d0c9f4c0ed6b5cb12d6db8e8cdd4` |
 | `AxisGov/prodx` | `06ce57a42db8eaae3f98ea60fc3895f1536383c5` |
 | `AxisGov/buildx` | `caf4fbe9dfac60a0ae8f34d7a36e9eb779c3cb0b` |
-| `AxisGov/designx` | `4ddff143ef9c027abbb665b18411500ab2c35590` |
+| `AxisGov/designx` | `f6bfb45ff245fff9c204ac7e1db8b2cdae4ffdfc` |
 
 ## Catálogo completo
 

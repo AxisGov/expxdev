@@ -99,7 +99,7 @@ export const CATALOGO: readonly Skill[] = [
     nome: "designx",
     repositorio: "https://github.com/AxisGov/designx",
     origensLegadas: ["https://github.com/bittencourtthulio/designx"],
-    certificado: "4ddff143ef9c027abbb665b18411500ab2c35590",
+    certificado: "f6bfb45ff245fff9c204ac7e1db8b2cdae4ffdfc",
     papel: "camada de design, cartografa e audita o design system",
     camada: true,
   },
