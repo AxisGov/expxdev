@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.13.5 — a cor hex solta em CSS, e sombras e bordas contadas sem corte, na designx
+
+Instale por PR, como a 0.13.4. São achados de revisão do CodeAnt e do CodeRabbit; nenhum é regressão da 0.13.4.
+
+- **designx@f6bfb45** (designx#9): a cor hex e a elevação na auditoria e na cartografia.
+  - **Busca de cor:** as seis buscas de cor (o A1 no auditor, na auditoria, nas boas práticas e no checklist de QA; "Cores" na cartografia e no cartógrafo) olham `.css` e `.scss`, além de `.js`, `.jsx` e `.tsx` (CodeAnt no conselhos#249). Lá, `src/index.css` tinha 43 linhas de hex fora de variável que nenhuma busca via.
+  - **Descarte:** sai o hex que é só o valor de `--nome:` (a definição do token), o que está em comentário, o seletor de id do CSS e a referência `url(#...)` do SVG.
+  - **Variável do SCSS:** `$cor:` continua achado, porque não muda no dark mode.
+  - **Padrão da cartografia:** passa a ser o do A1, que não aceita cinco nem sete dígitos.
+  - **Sombras e bordas:** são duas buscas que contam linhas, sem o corte em 30, porque um arquivo cheio de `border` inclinava a comparação (nitpick do CodeAnt no expxdev#136).
+  - **Busca sem `rg`:** traduz a contagem (`grep -rcE` ou `-Hc`, sem as linhas `:0`) e deixa de fora o arquivo oculto ou em pasta oculta, que o `rg` pula.
+  - **Hooks:** não mudam.
+- **Não exercitado:**
+  - uma auditoria real do A1 novo num consumidor;
+  - a cartografia com os agentes reais.
+
 ## 0.13.4 — o A9 da designx em .js e .jsx, e o [item 1] sem task da SprintX
 
 Instale por PR, como a 0.13.3. São achados de revisão do CodeAnt e do CodeRabbit nos consumidores e nos próprios PRs; nenhum é regressão da 0.13.3.
