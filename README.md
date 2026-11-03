@@ -543,16 +543,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.13.3 -R AxisGov/expxdev -D ~/expx-cli/v0.13.3
+gh release download v0.13.4 -R AxisGov/expxdev -D ~/expx-cli/v0.13.4
 (
-  cd ~/expx-cli/v0.13.3
+  cd ~/expx-cli/v0.13.4
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.13.3.tgz.sha256
+    sha256sum -c expxdev-0.13.4.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.13.3.tgz.sha256
+    shasum -a 256 -c expxdev-0.13.4.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.13.3/expxdev-0.13.3.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.13.4/expxdev-0.13.4.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -566,7 +566,7 @@ npx --yes --package ~/expx-cli/v0.13.3/expxdev-0.13.3.tgz expx init --skills bui
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.13.3 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.13.4 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -649,6 +649,9 @@ npx --yes --package ~/expx-cli/v0.13.3/expxdev-0.13.3.tgz expx init --skills bui
 - `0.13.3` tira o falso positivo da V9 da MergeX com o merge de atualização da branch, aceita de novo
   na F5 da SprintX duas implementações erradas distintas da mesma task, leva o A9 da designx ao CSS,
   e recusa o cache Axis num ancestral do projeto.
+- `0.13.4` leva o A9 da designx a `.js` e `.jsx` e à chave entre aspas do CSS-in-JS, exige
+  `animation-iteration-count: 1` no reset global que protege animação, e faz a F5 da SprintX recusar o
+  `[item 1]` sem task ao lado de um `fraco:ausente`.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
