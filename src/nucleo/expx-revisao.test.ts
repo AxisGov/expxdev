@@ -606,6 +606,40 @@ describe("expx-revisao.mjs revisar v2: depois da CLI", () => {
     expect(r).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "lote-falhou", chamada: { falhas_de_lote: [linha] } } });
   });
 
+  // Conselhos na 0.13.1, T-01.04: o 403 da CLI só no stderr dava `incompleta:lote-falhou`,
+  // FALHA nos dois modos, e o mesmo 403 no JSON dá `indisponivel:erro`. Sem nenhum lote
+  // revisado, a revisão não aconteceu: é indisponibilidade, não cobertura parcial.
+  it.each([
+    ["Access denied", "[error] Failed to review batch 1: Access denied (403)"],
+    ["só o código 403", "[error] Failed to review src/a.js: 403"],
+  ])("funcional: todo [error] é 403 (%s) e nada foi revisado → indisponivel:acesso-negado (rc 2)", (_nome, linha) => {
+    const c = cenario({ stderr: `[progress] Fetching diff...\n${linha}\n${linha.replace("1", "2")}\n` });
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js");
+    expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "acesso-negado" } });
+  });
+
+  it("funcional: 403 junto de outro erro continua incompleta:lote-falhou", () => {
+    const c = cenario({ stderr: "[error] Failed to review batch 1: Access denied (403)\n[error] Failed to review batch 2: 500\n" });
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "lote-falhou" } });
+  });
+
+  it("funcional: 403 num lote com achado de outro lote continua incompleta:lote-falhou, porque a cobertura é parcial", () => {
+    const c = cenario({ stderr: "[error] Failed to review batch 2: Access denied (403)\n", resposta: resp({}, { issues: [achado("src/a.js", 3)] }) });
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "lote-falhou" } });
+  });
+
+  it("funcional: indisponivel:acesso-negado é AVISO em se_disponivel e FALHA em obrigatoria", () => {
+    const c = cenario({ stderr: "[error] Failed to review batch 1: Access denied (403)\n" });
+    altera3(c.raiz);
+    revisar(c, "src/a.js", "T-01");
+    const sha = commita(c.raiz);
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${sha}`)).toMatchObject({ rc: 3, out: "T-01 AVISO indisponivel:acesso-negado" });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA indisponivel:acesso-negado" });
+  });
+
   it("borda: o Risk planner que falha só degrada a revisão, e ela segue", () => {
     const c = cenario({ stderr: "[warning] Risk planner failed; continuing without hypotheses: 500\n[progress] Analyzing 1 file...\n" });
     altera3(c.raiz);
