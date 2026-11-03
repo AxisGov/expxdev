@@ -652,7 +652,7 @@ npx --yes --package ~/expx-cli/v0.13.5/expxdev-0.13.5.tgz expx init --skills bui
 - `0.13.4` leva o A9 da designx a `.js` e `.jsx` e à chave entre aspas do CSS-in-JS, exige
   `animation-iteration-count: 1` no reset global que protege animação, e faz a F5 da SprintX recusar o
   `[item 1]` sem task ao lado de um `fraco:ausente`.
-- `0.13.5` faz a designx achar a cor hex solta em `.css` e `.scss` e contar
+- `0.13.5` faz a designx achar a cor hex solta em `.css`, `.scss` e no CSS-in-JS de `.ts`, e contar
   sombras e bordas separadamente, sem corte.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).

@@ -1,11 +1,13 @@
 # Changelog
 
-## 0.13.5 — a cor hex solta em CSS, e sombras e bordas contadas sem corte, na designx
+## 0.13.5 — a cor hex solta em CSS e no CSS-in-JS, e sombras e bordas contadas sem corte, na designx
 
 Instale por PR, como a 0.13.4. São achados de revisão do CodeAnt e do CodeRabbit; nenhum é regressão da 0.13.4.
 
-- **designx@f6bfb45** (designx#9): a cor hex e a elevação na auditoria e na cartografia.
-  - **Busca de cor:** as seis buscas de cor (o A1 no auditor, na auditoria, nas boas práticas e no checklist de QA; "Cores" na cartografia e no cartógrafo) olham `.css` e `.scss`, além de `.js`, `.jsx` e `.tsx` (CodeAnt no conselhos#249). Lá, `src/index.css` tinha 43 linhas de hex fora de variável que nenhuma busca via.
+- **designx@344005c** (designx#9 e designx#10): a cor hex na auditoria e na cartografia, e a elevação e a tipografia na cartografia.
+  - **Busca de cor:** as seis buscas de cor (o A1 no auditor, na auditoria, nas boas práticas e no checklist de QA; "Cores" na cartografia e no cartógrafo) olham `.css`, `.scss` e `.ts`, além de `.js`, `.jsx` e `.tsx` (CodeAnt no conselhos#249 e no expxdev#137). Lá, `src/index.css` tinha 43 linhas de hex fora de variável que nenhuma busca via.
+  - **Objeto de tema:** o hex de um tema com variante dark (`createTheme`, `theme.ts`) é a definição do token, e o auditor o julga lendo o arquivo; o mesmo hex num componente é achado.
+  - **CSS-in-JS na cartografia:** a sombra casa `boxShadow`, e a tipografia, `fontFamily`, `fontSize` e `fontWeight`.
   - **Descarte:** sai o hex que é só o valor de `--nome:` (a definição do token), o que está em comentário, o seletor de id do CSS e a referência `url(#...)` do SVG.
   - **Variável do SCSS:** `$cor:` continua achado, porque não muda no dark mode.
   - **Padrão da cartografia:** passa a ser o do A1, que não aceita cinco nem sete dígitos.
