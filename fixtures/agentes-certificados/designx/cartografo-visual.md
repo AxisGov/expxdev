@@ -36,7 +36,7 @@ Drift de tier: componente referenciando raw direto (sem passar por alias), dois 
 ### 2. Cores
 
 ```text
-Grep {"pattern": "#[0-9a-fA-F]{3,8}|rgb|hsl", "path": "src", "glob": "**/*.{tsx,css}", "output_mode": "content", "-n": true, "head_limit": 0}
+Grep {"pattern": "#[0-9a-fA-F]{3,8}|rgb|hsl", "path": "src", "glob": "**/*.{css,js,jsx,tsx}", "output_mode": "content", "-n": true, "head_limit": 0}
 ```
 
 Para cada cor:
@@ -47,7 +47,7 @@ Para cada cor:
 ### 3. Tipografia
 
 ```text
-Grep {"pattern": "font-family|font-size|font-weight|text-\\[", "path": "src", "glob": "**/*.{tsx,css}", "output_mode": "content", "-n": true, "head_limit": 0}
+Grep {"pattern": "font-family|font-size|font-weight|text-\\[", "path": "src", "glob": "**/*.{css,js,jsx,tsx}", "output_mode": "content", "-n": true, "head_limit": 0}
 ```
 
 Para cada padrao:
@@ -58,7 +58,7 @@ Para cada padrao:
 ### 4. Espacamento
 
 ```text
-Grep {"pattern": "gap-|p-|m-|space-", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 50}
+Grep {"pattern": "gap-|p-|m-|space-", "path": "src", "glob": "**/*.{js,jsx,tsx}", "output_mode": "content", "-n": true, "head_limit": 50}
 ```
 
 Qual o multiplo predominante? (4px, 8px, inconsistente?)
@@ -87,7 +87,7 @@ Analise a estrutura de paginas:
 ### 7. Bordas vs sombras
 
 ```text
-Grep {"pattern": "shadow-|border", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 30}
+Grep {"pattern": "shadow|border", "path": "src", "glob": "**/*.{css,scss,js,jsx,tsx}", "output_mode": "content", "-n": true, "head_limit": 30}
 ```
 
 Qual predominancia? (borders = denso, shadows = card/landing)
@@ -95,7 +95,7 @@ Qual predominancia? (borders = denso, shadows = card/landing)
 ### 8. Dark mode
 
 ```text
-Grep {"pattern": "dark:", "path": "src", "glob": "**/*.tsx", "output_mode": "content", "-n": true, "head_limit": 10}
+Grep {"pattern": "dark:", "path": "src", "glob": "**/*.{js,jsx,tsx}", "output_mode": "content", "-n": true, "head_limit": 10}
 Grep {"pattern": "dark|theme", "path": "src", "glob": "**/*.css", "output_mode": "content", "-n": true, "head_limit": 10}
 ```
 

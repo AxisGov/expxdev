@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.13.4 — o A9 da designx em .js e .jsx, e o [item 1] sem task da SprintX
+
+Instale por PR, como a 0.13.3. São achados de revisão do CodeAnt e do CodeRabbit nos consumidores e nos próprios PRs; nenhum é regressão da 0.13.3.
+
+- **designx@4ddff14** (designx#8): o A9 (`prefers-reduced-motion`) e as demais buscas de JSX e CSS-in-JS:
+  - olham `.js` e `.jsx`, além de `.ts` e `.tsx` (CodeAnt no expxdev#135 e no conselhos#247). Os hooks não mudam;
+  - acham a chave entre aspas no CSS-in-JS (`'animation-name':`, `"transition":`), e o valor entre aspas vai até a aspa que fecha;
+  - o reset global protege a transição com `transition-duration` de no máximo `0.01ms !important`. A animação, só se o reset também tiver `animation-iteration-count: 1 !important`: uma animação `infinite` de 0.01ms continua repetindo, e `animate-spin`, `-ping`, `-pulse` e `-bounce` são todas `infinite`. Dentro de um seletor, só a duração zero desliga;
+  - o reset vale igual num objeto de estilo (`animationDuration`, `'animation-duration'`). Dentro de outro seletor (`.card { @media ... { * {...} } }`), ele não é global. As declarações do próprio reset deixam de ser achado;
+  - a cartografia de bordas e sombras passa a olhar `.css` e `.scss`, com `shadow` no lugar de `shadow-`, porque o `box-shadow:` não casava.
+- **sprintx@e552cfc** (sprintx#68, DS-204): na F5, toda `T-NN.MM` do `[item 1]` conta, não só a primeira, na forma do contrato do id (`T-1.1` não conta). Um `[item 1]` sem task é recusado só quando a tabela tem `[fraco:ausente]`, porque aí não há como provar que não é o mesmo defeito (nitpick do CodeAnt no katosmv/login#50). Sem `fraco:ausente`, o relatório antigo segue lendo.
+- **Não exercitado:**
+  - uma auditoria real do A9 novo num consumidor;
+  - o caminho F5 → F6 com os agentes reais.
+
 ## 0.13.3 — o que o Conselhos e o Login acharam na 0.13.2
 
 Instale por PR, como a 0.13.2. O hook da 0.13.2 só avisa.
