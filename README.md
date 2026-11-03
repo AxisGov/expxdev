@@ -680,7 +680,7 @@ travada em versão publicada, o commit exato, a data e **o hash de cada arquivo*
 | `--check` | Só mostra o que mudaria, não aplica nada |
 | `--to <ref>` | Fixa uma skill numa tag ou commit específico — exige nomear exatamente uma skill |
 | `--yes` / `--sim` | Aplica sem exigir terminal interativo |
-| `--json` | Só com `--check`: uma linha `{"ok", "pendente", "pendencias", "bloqueadas"}`, que o SessionStart lê |
+| `--json` | Só com `--check`: um objeto JSON numa linha, com as chaves `ok`, `pendente`, `pendencias` e `bloqueadas`, que o SessionStart lê |
 
 > **CLI nova, skills em dia.** O plugin e os hooks do núcleo vêm da CLI. Com o lock gravado
 > por uma CLI anterior, o `update` remonta a instalação com as mesmas skills, nos mesmos
