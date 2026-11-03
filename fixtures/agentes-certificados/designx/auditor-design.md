@@ -86,8 +86,8 @@ Achados nomeados — cite o codigo do tell no veredito (`T3 — grid de 3 coluna
 Grep {"pattern": "PAGE_SIZE\\s*=\\s*[0-9]", "path": "src", "glob": "**/*.{js,jsx,tsx}", "output_mode": "content", "-n": true, "head_limit": 0}
 Grep {"pattern": "components/ui/sheet", "path": "src", "glob": "**/*.{js,jsx,tsx}", "output_mode": "files_with_matches", "head_limit": 0}
 Grep {"pattern": "components/ui/tabs", "path": "src", "glob": "**/*.{js,jsx,tsx}", "output_mode": "files_with_matches", "head_limit": 0}
-Grep {"pattern": "#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\\b", "path": "src", "glob": "**/*.{css,scss,js,jsx,tsx}", "output_mode": "content", "-n": true, "head_limit": 0}
-# descarte o hex que e so o valor de uma propriedade customizada `--nome:` (a definicao do token), o que esta em comentario (`/* */` ou `//`, tambem de varias linhas: confira com Read), o seletor de id do CSS (`#add {`) e a referencia `url(#fade)`, que aponta para um elemento do SVG; a variavel do SCSS (`$nome:`) continua achado, porque e de compilacao e nao muda no dark mode
+Grep {"pattern": "#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\\b", "path": "src", "glob": "**/*.{css,scss,js,jsx,ts,tsx}", "output_mode": "content", "-n": true, "head_limit": 0}
+# descarte o hex que e so o valor de uma propriedade customizada `--nome:` (a definicao do token), o que esta em comentario (`/* */` ou `//`, tambem de varias linhas: confira com Read), o seletor de id do CSS (`#add {`) e a referencia `url(#fade)`, que aponta para um elemento do SVG; a variavel do SCSS (`$nome:`) continua achado, porque e de compilacao e nao muda no dark mode; o hex de um objeto de tema (`createTheme`, `theme.ts`) que tem variante dark e a definicao do token e nao e achado, mas o mesmo hex num componente e achado: leia o arquivo com Read para julgar
 Grep {"pattern": "window.confirm", "path": "src", "glob": "**/*.{js,jsx,tsx}", "output_mode": "content", "-n": true, "head_limit": 0}
 
 # Alto

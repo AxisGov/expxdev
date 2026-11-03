@@ -36,8 +36,8 @@ Drift de tier: componente referenciando raw direto (sem passar por alias), dois 
 ### 2. Cores
 
 ```text
-Grep {"pattern": "#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\\b|rgb|hsl", "path": "src", "glob": "**/*.{css,scss,js,jsx,tsx}", "output_mode": "content", "-n": true, "head_limit": 0}
-# descarte a cor que e so o valor de uma propriedade customizada `--nome:` (a definicao do token), o que esta em comentario (`/* */` ou `//`, tambem de varias linhas: confira com Read), o seletor de id do CSS (`#add {`) e a referencia `url(#fade)`, que aponta para um elemento do SVG; a variavel do SCSS (`$nome:`) fica: e de compilacao e nao muda no dark mode
+Grep {"pattern": "#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\\b|rgb|hsl", "path": "src", "glob": "**/*.{css,scss,js,jsx,ts,tsx}", "output_mode": "content", "-n": true, "head_limit": 0}
+# descarte a cor que e so o valor de uma propriedade customizada `--nome:` (a definicao do token), o que esta em comentario (`/* */` ou `//`, tambem de varias linhas: confira com Read), o seletor de id do CSS (`#add {`) e a referencia `url(#fade)`, que aponta para um elemento do SVG; a variavel do SCSS (`$nome:`) fica: e de compilacao e nao muda no dark mode; a cor de um objeto de tema (`createTheme`, `theme.ts`) e a definicao do token: liste-a com os tokens
 ```
 
 Para cada cor:
@@ -48,7 +48,7 @@ Para cada cor:
 ### 3. Tipografia
 
 ```text
-Grep {"pattern": "font-family|font-size|font-weight|text-\\[", "path": "src", "glob": "**/*.{css,js,jsx,tsx}", "output_mode": "content", "-n": true, "head_limit": 0}
+Grep {"pattern": "font-family|font-size|font-weight|fontFamily|fontSize|fontWeight|text-\\[", "path": "src", "glob": "**/*.{css,scss,js,jsx,ts,tsx}", "output_mode": "content", "-n": true, "head_limit": 0}
 ```
 
 Para cada padrao:
@@ -88,8 +88,8 @@ Analise a estrutura de paginas:
 ### 7. Bordas vs sombras
 
 ```text
-Grep {"pattern": "shadow", "path": "src", "glob": "**/*.{css,scss,js,jsx,tsx}", "output_mode": "count", "head_limit": 0}
-Grep {"pattern": "border", "path": "src", "glob": "**/*.{css,scss,js,jsx,tsx}", "output_mode": "count", "head_limit": 0}
+Grep {"pattern": "[sS]hadow", "path": "src", "glob": "**/*.{css,scss,js,jsx,ts,tsx}", "output_mode": "count", "head_limit": 0}
+Grep {"pattern": "border", "path": "src", "glob": "**/*.{css,scss,js,jsx,ts,tsx}", "output_mode": "count", "head_limit": 0}
 # some as contagens de cada busca, que sao de linhas (`className="border border-t"` conta 1): as duas na mesma unidade, sem corte, um arquivo cheio de `border` nao esconde as sombras dos outros
 ```
 
