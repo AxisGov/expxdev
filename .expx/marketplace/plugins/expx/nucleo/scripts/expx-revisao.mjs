@@ -484,8 +484,9 @@ function revisar() {
     // vazio, com achado ou com outro erro junto, a cobertura é parcial e continua `incompleta`.
     const acessoNegado = (l) => l.startsWith("[error]") && /\b403\b|access denied/i.test(l);
     const revisados = Array.isArray(j?.meta?.reviewed_files) ? j.meta.reviewed_files.length : 0;
-    const achados = Array.isArray(j?.issues) ? j.issues.length : 0;
-    if (falhas.length > 0 && falhas.every(acessoNegado) && revisados === 0 && achados === 0) return fim("indisponivel", "acesso-negado");
+    // "nenhum achado" só com a lista vazia de verdade: `issues` ausente ou fora da forma não prova nada
+    const semAchado = Array.isArray(j?.issues) && j.issues.length === 0;
+    if (falhas.length > 0 && falhas.every(acessoNegado) && revisados === 0 && semAchado) return fim("indisponivel", "acesso-negado");
     if (falhas.length > 0) return fim("incompleta", "lote-falhou");
     if (j === undefined || (j.error !== null && j.error !== undefined)) return fim("indisponivel", "erro");
     if (foraDoPerfil(j, cli.perfil, r.status)) return fim("incompleta", "perfil");

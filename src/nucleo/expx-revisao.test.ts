@@ -619,6 +619,15 @@ describe("expx-revisao.mjs revisar v2: depois da CLI", () => {
     expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "acesso-negado" } });
   });
 
+  it.each([
+    ["sem issues", { issues: undefined }],
+    ["issues fora da forma", { issues: "nada" }],
+  ])("funcional: 403 em todo lote, sem arquivo revisado e %s, continua incompleta:lote-falhou", (_nome, topo) => {
+    const c = cenario({ stderr: "[error] Failed to review batch 1: Access denied (403)\n", resposta: resp({ reviewed_files: [] }, topo) });
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "lote-falhou" } });
+  });
+
   it("funcional: 403 junto de outro erro continua incompleta:lote-falhou", () => {
     const c = cenario({ stderr: "[error] Failed to review batch 1: Access denied (403)\n[error] Failed to review batch 2: 500\n" });
     altera3(c.raiz);
