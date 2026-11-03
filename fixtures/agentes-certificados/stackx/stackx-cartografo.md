@@ -21,8 +21,8 @@ Siga `.claude/skills/stackx/references/01-deteccao.md` **inteiro**, na ordem das
 não reconstrua a varredura de cabeça.
 
 Se ele não existir no caminho acima, procure `references/01-deteccao.md` sob
-`.claude/skills/stackx/` ou `.opencode/skill/stackx/`. Sem ele, pare e diga que
-o roteiro não foi encontrado.
+`.expx/marketplace/plugins/expx/skills/stackx/`, a cópia do plugin que o
+`expx init` instala. Sem ele, pare e diga que o roteiro não foi encontrado.
 
 ## A regra que governa tudo que você escreve
 

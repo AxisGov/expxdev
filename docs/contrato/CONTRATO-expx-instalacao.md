@@ -507,8 +507,7 @@ esse hook continua instalado no consumidor até a próxima instalação. Publica
 não o desliga: a primeira sessão depois da release ainda pode aplicá-la. Quem não quer
 isso instala a 0.13.2 explicitamente antes de abrir sessão nova.
 
-O `--json` só vale com `--check` e imprime uma linha: `{"ok", "pendente", "pendencias",
-"bloqueadas"}`. Essa verificação é **conveniência**, e não pode tocar uma instalação
+O `--json` só vale com `--check` e imprime um objeto JSON numa linha, com as chaves `ok`, `pendente`, `pendencias` e `bloqueadas`. Essa verificação é **conveniência**, e não pode tocar uma instalação
 congelada.
 
 **SessionStart não aplica atualização automática a instalações que contenham
