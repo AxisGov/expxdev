@@ -613,7 +613,7 @@ describe("expx-revisao.mjs revisar v2: depois da CLI", () => {
     ["Access denied", "[error] Failed to review batch 1: Access denied (403)"],
     ["só o código 403", "[error] Failed to review src/a.js: 403"],
   ])("funcional: todo [error] é 403 (%s) e nada foi revisado → indisponivel:acesso-negado (rc 2)", (_nome, linha) => {
-    const c = cenario({ stderr: `[progress] Fetching diff...\n${linha}\n${linha.replace("1", "2")}\n` });
+    const c = cenario({ stderr: `[progress] Fetching diff...\n${linha}\n${linha.replace("1", "2")}\n`, resposta: resp({ reviewed_files: [] }) });
     altera3(c.raiz);
     const r = revisar(c, "src/a.js");
     expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "acesso-negado" } });
@@ -625,6 +625,12 @@ describe("expx-revisao.mjs revisar v2: depois da CLI", () => {
     expect(revisar(c, "src/a.js")).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "lote-falhou" } });
   });
 
+  it("funcional: 403 com arquivo revisado e zero achado continua incompleta:lote-falhou: um lote limpo não tem achado", () => {
+    const c = cenario({ stderr: "[error] Failed to review batch 2: Access denied (403)\n" });
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "lote-falhou" } });
+  });
+
   it("funcional: 403 num lote com achado de outro lote continua incompleta:lote-falhou, porque a cobertura é parcial", () => {
     const c = cenario({ stderr: "[error] Failed to review batch 2: Access denied (403)\n", resposta: resp({}, { issues: [achado("src/a.js", 3)] }) });
     altera3(c.raiz);
@@ -632,7 +638,7 @@ describe("expx-revisao.mjs revisar v2: depois da CLI", () => {
   });
 
   it("funcional: indisponivel:acesso-negado é AVISO em se_disponivel e FALHA em obrigatoria", () => {
-    const c = cenario({ stderr: "[error] Failed to review batch 1: Access denied (403)\n" });
+    const c = cenario({ stderr: "[error] Failed to review batch 1: Access denied (403)\n", resposta: resp({ reviewed_files: [] }) });
     altera3(c.raiz);
     revisar(c, "src/a.js", "T-01");
     const sha = commita(c.raiz);

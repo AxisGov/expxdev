@@ -478,12 +478,14 @@ function revisar() {
     ev.chamada = { include: enviados, meta: j?.meta ?? null, error: j === undefined ? `json ilegivel (rc ${r.status})` : j.error ?? null, falhas_de_lote: falhas,
       issues: j?.issues ?? null, stdout_sha256: createHash("sha256").update(stdout).digest("hex") };
     // 6-9. a resposta cobre a task inteira
-    // 403 em todo `[error]`, sem nenhum achado: a revisão não aconteceu, e é indisponibilidade,
-    // como o mesmo 403 vindo em `error` no JSON (Conselhos na 0.13.1). Com outro erro junto, ou
-    // com achado de outro lote, a cobertura é parcial e continua `incompleta`.
+    // 403 em todo `[error]`, sem nenhum arquivo revisado: a revisão não aconteceu, e é
+    // indisponibilidade, como o mesmo 403 vindo em `error` no JSON (Conselhos na 0.13.1). Um lote
+    // limpo não tem achado, então só `reviewed_files` refuta "nada foi revisado"; com ele não
+    // vazio, com achado ou com outro erro junto, a cobertura é parcial e continua `incompleta`.
     const acessoNegado = (l) => l.startsWith("[error]") && /\b403\b|access denied/i.test(l);
-    const semAchado = j === undefined || !Array.isArray(j.issues) || j.issues.length === 0;
-    if (falhas.length > 0 && falhas.every(acessoNegado) && semAchado) return fim("indisponivel", "acesso-negado");
+    const revisados = Array.isArray(j?.meta?.reviewed_files) ? j.meta.reviewed_files.length : 0;
+    const achados = Array.isArray(j?.issues) ? j.issues.length : 0;
+    if (falhas.length > 0 && falhas.every(acessoNegado) && revisados === 0 && achados === 0) return fim("indisponivel", "acesso-negado");
     if (falhas.length > 0) return fim("incompleta", "lote-falhou");
     if (j === undefined || (j.error !== null && j.error !== undefined)) return fim("indisponivel", "erro");
     if (foraDoPerfil(j, cli.perfil, r.status)) return fim("incompleta", "perfil");
