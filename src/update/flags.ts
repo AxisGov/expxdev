@@ -1,6 +1,6 @@
 import { caminhoDoLock, compararVersoes, lerLock, versaoDoCli, type Lock } from "../nucleo/lock.js";
 import { repositorioCanonico, resolverOrigem } from "../nucleo/catalogo.js";
-import { ehCaminhoLocal, executarInit } from "../cli/init.js";
+import { ehCaminhoLocal, executarInit, retratoDoLock } from "../cli/init.js";
 import { compararComRemoto, type ItemComparacao } from "./comparar.js";
 import { verificarModificacaoLocal } from "./modificacao.js";
 import { escreverArquivoAtomico } from "../plugin/atomico.js";
@@ -154,9 +154,15 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   const mensagens: string[] = [];
   const bloqueadas: Array<{ nome: string; motivo: string }> = [];
 
+  // O retrato que decide a seleção: o init confere, sob o bloqueio, que o lock
+  // ainda é este (nitpick do CodeAnt no expxdev#141).
+  const retrato = retratoDoLock(op.raiz);
   const l = lerLock(op.raiz);
   if (!l.ok) {
     return { ok: false, aplicou: false, atualizadas: [], emDia: [], bloqueadas: [], mensagens: [l.erro] };
+  }
+  if (!retrato.ok) {
+    return { ok: false, aplicou: false, atualizadas: [], emDia: [], bloqueadas: [], mensagens: [retrato.erro] };
   }
   // Lock gravado por uma CLI anterior: o plugin e os hooks do núcleo vêm da CLI,
   // não das skills, e só chegam remontando. Com as skills em dia, o `update`
@@ -351,6 +357,7 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
     // a checagem acima roda antes da busca; o init repete-a sob a trava, já
     // perto da escrita, para a edição feita no meio não ser sobrescrita
     recusarModificacaoLocal: true,
+    retratoDoLock: { bytes: retrato.bytes },
   });
 
   // O `update` remonta pelo `init`, então os avisos dele são os mesmos avisos —
@@ -358,6 +365,9 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   // de ser reescritos. Engoli-los aqui esconderia o defeito justamente no
   // comando que traz artefato novo.
   mensagens.push(...init.avisos);
+  // A recusa do init (lock regravado, modificação local sob a trava, skill que
+  // falhou) é a causa da saída 1: sem ela, o update falhava calado.
+  mensagens.push(...init.falhas.map((f) => `falhou ${f.nome}: ${f.erro}`), ...init.erros);
   if (init.ok) mensagens.push(AVISO_ROLLBACK);
   return {
     ok: init.ok,

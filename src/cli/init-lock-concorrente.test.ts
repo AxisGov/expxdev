@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
@@ -47,6 +47,16 @@ describe("init e o lock regravado por outra operação", () => {
     expect(r.ok).toBe(false);
     expect(r.erros.join("\n")).toContain("o .expx/expx-lock.json mudou");
     expect(readFileSync(caminho, "utf8")).toBe(outro);
+  });
+
+  it("funcional: lock que não se lê (um diretório) vira resultado com erro, não exceção", async () => {
+    const repo = criarRepoSkill({ nome: "alfa", tags: [] });
+    const p = mkdtempSync(join(tmpdir(), "expx-init-concorrente-"));
+    criados.push(repo, p);
+    mkdirSync(join(p, ".expx", "expx-lock.json"), { recursive: true });
+    const r = await executarInit({ raiz: p, skills: ["alfa"], harness: ["claude"], origens: { alfa: repo } });
+    expect(r.ok).toBe(false);
+    expect(r.erros.join("\n")).toContain("expx-lock.json");
   });
 
   it("funcional: sem ninguém no meio, o init repetido segue", async () => {
