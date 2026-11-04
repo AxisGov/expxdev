@@ -33,7 +33,7 @@ import { artefatosOpenCode, pontesDeHooks } from "../harness/opencode.js";
 import { entradasPorNome, formaSemAspas, gravarSettings, planejarSettings, type PlanoSettings } from "../harness/settings.js";
 import { verificarModificacaoLocal } from "../update/modificacao.js";
 import { artefatosDeHooks, comHooks, hooksPorNome } from "../harness/hooks.js";
-import { conferirPisoDoClaude } from "../harness/versao-claude.js";
+import { conferirPisoDoClaude, PISO_CLAUDE } from "../harness/versao-claude.js";
 import {
   caminhosReferenciados,
   hashDasEntradas,
@@ -218,6 +218,12 @@ function anterioresDoLock(raiz: string): { settings: EntradaGerenciada[]; modos?
   return inst.modos !== undefined ? { settings, modos: inst.modos.publicados } : { settings };
 }
 
+/** A instalação anterior, segundo o lock dela, gerenciava o envelope da invocação? */
+function envelopeNoLockAnterior(raiz: string): boolean {
+  const l = lerLock(raiz);
+  return l.ok && l.lock.instalacao?.arquivos[".claude/hooks/expx-invocacao.mjs"] !== undefined;
+}
+
 const PREFIXO_DO_PLUGIN = `.expx/marketplace/${ORIGEM_DO_PLUGIN.replace(/^\.\//, "")}`;
 
 /** Os destinos executáveis do plano, em ordem canônica. */
@@ -282,8 +288,17 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
     if (!pol.ok) erros.push(pol.erro);
     // O envelope da invocação pede a política e o Claude Code no piso; sem o piso, o resto segue.
     const piso = pol.ok && pol.ativa ? conferirPisoDoClaude() : undefined;
-    if (piso !== undefined && !piso.ok) avisosDoPlano.push(piso.aviso);
-    candidatos.push(...artefatosDeHooks(montaveis, piso?.ok === true));
+    let comEnvelope = piso?.ok === true;
+    if (piso !== undefined && !piso.ok) {
+      // Sem versão legível (CI, outra máquina), o envelope que a instalação anterior
+      // gerenciava fica: removê-lo desligava a observação em silêncio (Conselhos na
+      // 0.13.6). O lock prova que era gerenciado; abaixo do piso, ele sai.
+      if (piso.motivo === "ilegivel" && envelopeNoLockAnterior(op.raiz)) {
+        comEnvelope = true;
+        avisosDoPlano.push(`envelope da invocacao mantido: nao foi possivel ler a versao do claude, e a instalacao anterior ja o gerenciava (piso atual ${PISO_CLAUDE})`);
+      } else avisosDoPlano.push(piso.aviso);
+    }
+    candidatos.push(...artefatosDeHooks(montaveis, comEnvelope));
     const politica = pol.ok && pol.ativa ? pol.politica : undefined;
     // Agentes resolvidos pela política (se houver) e com o override do projeto
     // (`.expx/agentes.json`) aplicado.

@@ -17,6 +17,8 @@ export type OpcoesInitCli = {
   sim: boolean;
   /** Mostra o que faria e sai sem escrever. */
   simular: boolean;
+  /** Não roda nenhum `claude plugin ...`: o registro do plugin fica a cargo de quem instala. */
+  semRegistro: boolean;
 };
 
 export type ResultadoFlags =
@@ -41,6 +43,7 @@ export function interpretarFlagsInit(argv: readonly string[]): ResultadoFlags {
     painel: false,
     sim: false,
     simular: false,
+    semRegistro: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -78,6 +81,9 @@ export function interpretarFlagsInit(argv: readonly string[]): ResultadoFlags {
       case "--check":
       case "--simular":
         opcoes.simular = true;
+        break;
+      case "--sem-registro":
+        opcoes.semRegistro = true;
         break;
       default:
         return { ok: false, erro: `opcao desconhecida em init: ${nome}` };

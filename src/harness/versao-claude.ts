@@ -7,7 +7,11 @@ import { resolverClaude, type ResolucaoClaude } from "./binario-claude.js";
  */
 export const PISO_CLAUDE = "2.1.310";
 
-export type PisoDoClaude = { ok: true; versao: string } | { ok: false; aviso: string };
+/**
+ * Fora do piso, o motivo separa a versão lida e menor (`abaixo`) da que não deu
+ * para ler (`ilegivel`: sem `claude`, só o do Windows no WSL, ou saída sem versão).
+ */
+export type PisoDoClaude = { ok: true; versao: string } | { ok: false; motivo: "ilegivel" | "abaixo"; aviso: string };
 
 /** `a` é menor que `b`, em números separados por ponto? */
 function menor(a: string, b: string): boolean {
@@ -25,15 +29,15 @@ export function conferirPisoDoClaude(resolver: () => ResolucaoClaude = resolverC
   const claude = resolver();
   if (!claude.ok) {
     const motivo = claude.motivo === "so-windows" ? "so o claude do Windows (sob /mnt/) esta no PATH do WSL" : "nao foi possivel ler a versao do claude";
-    return { ok: false, aviso: `envelope da invocacao nao instalado: ${motivo} (piso ${PISO_CLAUDE})` };
+    return { ok: false, motivo: "ilegivel", aviso: `envelope da invocacao nao instalado: ${motivo} (piso ${PISO_CLAUDE})` };
   }
   const r = spawnSync(claude.caminho, ["--version"], { encoding: "utf8", timeout: 15_000, shell: process.platform === "win32" });
   const versao = r.status === 0 ? /^(\d+\.\d+\.\d+)/.exec(r.stdout.trim())?.[1] : undefined;
   if (versao === undefined) {
-    return { ok: false, aviso: `envelope da invocacao nao instalado: nao foi possivel ler a versao do claude (piso ${PISO_CLAUDE})` };
+    return { ok: false, motivo: "ilegivel", aviso: `envelope da invocacao nao instalado: nao foi possivel ler a versao do claude (piso ${PISO_CLAUDE})` };
   }
   if (menor(versao, PISO_CLAUDE)) {
-    return { ok: false, aviso: `envelope da invocacao nao instalado: claude ${versao}, abaixo do piso ${PISO_CLAUDE}; atualize e rode o expx init de novo` };
+    return { ok: false, motivo: "abaixo", aviso: `envelope da invocacao nao instalado: claude ${versao}, abaixo do piso ${PISO_CLAUDE}; atualize e rode o expx init de novo` };
   }
   return { ok: true, versao };
 }

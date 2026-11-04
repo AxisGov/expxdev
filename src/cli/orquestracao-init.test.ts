@@ -392,6 +392,61 @@ describe.skipIf(process.platform === "win32")("init e o envelope da invocação"
     expect(r.avisos.some((a) => a.includes("envelope da invocacao nao instalado"))).toBe(true);
   });
 
+  // Sem `claude` legível (CI, outra máquina), a reinstalação desligava em silêncio o
+  // envelope que a anterior gerenciava (Conselhos na 0.13.6). O lock prova que ele
+  // era gerenciado; abaixo do piso é informação real, e ele sai.
+  function semClaude(): void {
+    process.env["PATH"] = (PATH_ORIGINAL ?? "").split(":").filter((d) => d !== "" && !existsSync(join(d, "claude"))).join(":");
+  }
+  const arquivosDoLock = (p: string) => Object.keys((lerLock(p)["instalacao"] as { arquivos?: Record<string, string> } | undefined)?.arquivos ?? {});
+  it.each([["sem claude no PATH", semClaude], ["saida sem versao", () => claudeFalso("nao e versao")]])(
+    "ilegível (%s) depois de instalado: o envelope fica, e o aviso diz mantido",
+    async (_nome, ilegivel) => {
+      claudeFalso("2.1.310 (Claude Code)");
+      const p = produto();
+      gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+      const o = origens();
+      expect((await init(p, o)).ok).toBe(true);
+      ilegivel();
+      const r = await init(p, o);
+      expect(r.ok).toBe(true);
+      expect(comHook(p)).toBe(true);
+      expect(existsSync(join(p, ".expx/marketplace/plugins/expx/nucleo/hooks/expx-invocacao.mjs"))).toBe(true);
+      expect(JSON.stringify(settings(p).hooks ?? {})).toContain("expx-invocacao");
+      expect(arquivosDoLock(p)).toContain(".claude/hooks/expx-invocacao.mjs");
+      expect(r.avisos.some((a) => a.includes("envelope da invocacao mantido"))).toBe(true);
+      expect(r.avisos.some((a) => a.includes("nao instalado"))).toBe(false);
+    },
+  );
+
+  it("abaixo do piso depois de instalado: o envelope sai", async () => {
+    claudeFalso("2.1.310 (Claude Code)");
+    const p = produto();
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+    const o = origens();
+    expect((await init(p, o)).ok).toBe(true);
+    claudeFalso("2.1.309 (Claude Code)");
+    const r = await init(p, o);
+    expect(r.ok).toBe(true);
+    expect(comHook(p)).toBe(false);
+    expect(JSON.stringify(settings(p).hooks ?? {})).not.toContain("expx-invocacao");
+    expect(r.avisos.some((a) => a.includes("envelope da invocacao nao instalado"))).toBe(true);
+  });
+
+  it("ilegível e a instalação anterior sem o envelope: continua sem ele", async () => {
+    claudeFalso("2.1.310 (Claude Code)");
+    const p = produto();
+    const o = origens();
+    expect((await init(p, o)).ok).toBe(true);
+    expect(comHook(p)).toBe(false);
+    gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });
+    semClaude();
+    const r = await init(p, o);
+    expect(r.ok).toBe(true);
+    expect(comHook(p)).toBe(false);
+    expect(r.avisos.some((a) => a.includes("envelope da invocacao nao instalado"))).toBe(true);
+  });
+
   it("sem política: nem pergunta a versão, e nada muda", async () => {
     claudeFalso("2.1.310 (Claude Code)");
     const p = produto();

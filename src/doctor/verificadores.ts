@@ -680,9 +680,15 @@ function verificarEnvelopeDaInvocacao(raiz: string, push: (a: Achado) => void): 
   const politica = lerPolitica(raiz);
   if (!politica.ok || !politica.ativa || !existsSync(join(raiz, ".claude", "settings.json"))) return;
   const piso = conferirPisoDoClaude();
-  if (!piso.ok) {
+  if (!piso.ok && piso.motivo === "abaixo") {
     push({ id: "claude-abaixo-do-piso", severidade: "aviso", problema: piso.aviso, correcao: `atualize o Claude Code para ${PISO_CLAUDE} ou superior e rode o expx init` });
     return;
+  }
+  // Sem versão legível, o update mantém o envelope que a instalação gerenciava: o
+  // achado é a versão não verificada, e a falta do hook, se houver, é outro achado.
+  if (!piso.ok) {
+    const causa = piso.aviso.replace(/^envelope da invocacao nao instalado: /, "");
+    push({ id: "claude-versao-ilegivel", severidade: "aviso", problema: `${causa}: a compatibilidade do envelope da invocacao nao pode ser verificada`, correcao: `ponha no PATH o claude do Claude Code, ${PISO_CLAUDE} ou superior, e rode o expx doctor de novo` });
   }
   if (!existsSync(join(raiz, ".claude", "hooks", "expx-invocacao.mjs"))) {
     push({ id: "envelope-nao-instalado", severidade: "aviso", problema: "politica de orquestracao ativa, sem o hook do envelope da invocacao", correcao: "rode o expx init de novo" });

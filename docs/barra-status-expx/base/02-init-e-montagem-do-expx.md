@@ -26,7 +26,7 @@ type OpcoesInitCli = {
 };
 ```
 
-Flags aceitas hoje (`init-flags.ts:53-84`): `--skills`, `--harness`, `--painel`, `--yes`/`--sim`, `--check`/`--simular`. Qualquer outro token é erro: `opcao desconhecida em init: <nome>` (`init-flags.ts:82-83`). **Uma flag nova precisa entrar neste switch ou o init recusa a linha inteira.**
+Flags aceitas hoje (`init-flags.ts:56-90`): `--skills`, `--harness`, `--painel`, `--yes`/`--sim`, `--check`/`--simular`, `--sem-registro`. Qualquer outro token é erro: `opcao desconhecida em init: <nome>` (`init-flags.ts:88-89`). **Uma flag nova precisa entrar neste switch ou o init recusa a linha inteira.**
 
 ### Wizard interativo — `src/cli/wizard.ts:105`
 

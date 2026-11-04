@@ -50,6 +50,14 @@ export function usarPerguntador(fabrica: () => Perguntador): void {
   criarPerguntador = fabrica;
 }
 
+/**
+ * `--sem-registro` (Conselhos na 0.13.6): quem não pode tocar o registro do escopo
+ * do usuário instala sem nenhum `claude plugin ...`. Sai só quando um registro
+ * foi de fato suprimido.
+ */
+const AVISO_SEM_REGISTRO =
+  "o plugin nao foi registrado no Claude Code (--sem-registro); ate registra-lo, o Claude Code pode continuar usando a copia anterior em cache. Rode o expx update sem --sem-registro, ou registre-o a mao";
+
 function comoEscolherSkills(): string {
   return [
     "escolha as skills com --skills, ou rode num terminal para responder na hora:",
@@ -115,7 +123,9 @@ const EXECUTORES: Partial<Record<Subcomando, Executor>> = {
     if (!r.ok) return 1;
 
     const fecho = [`instaladas: ${r.instaladas.join(", ")}`];
-    if (harness.includes("claude")) {
+    if (harness.includes("claude") && opcoes.semRegistro) {
+      saida.escrever(`aviso: ${AVISO_SEM_REGISTRO}\n`);
+    } else if (harness.includes("claude")) {
       const { avisos, instalacao: inst } = await registrarPluginNoClaude(process.cwd());
       for (const a of avisos) saida.escrever(`aviso: ${a}\n`);
       if (inst.instrucao !== undefined) {
@@ -181,7 +191,9 @@ const EXECUTORES: Partial<Record<Subcomando, Executor>> = {
     // O Claude Code roda o plugin de um cache: sem reinstalar, a versão nova não
     // carrega. O registro segue a mesma regra do init (worktree -> principal).
     const lock = lerLock(process.cwd());
-    if (lock.ok && deveRegistrarNoUpdate(r, f.opcoes.check, lock.lock.harness)) {
+    if (lock.ok && deveRegistrarNoUpdate(r, f.opcoes.check, lock.lock.harness) && f.opcoes.semRegistro) {
+      saida.escrever(`aviso: ${AVISO_SEM_REGISTRO}\n`);
+    } else if (lock.ok && deveRegistrarNoUpdate(r, f.opcoes.check, lock.lock.harness)) {
       const { avisos, instalacao } = await registrarPluginNoClaude(process.cwd());
       for (const a of avisos) saida.escrever(`aviso: ${a}\n`);
       if (instalacao.instrucao !== undefined) saida.escrever(`\n${instalacao.instrucao}\n`);
