@@ -110,6 +110,11 @@ const EXECUTORES: Partial<Record<Subcomando, Executor>> = {
     }
     for (const a of aval.avisos) saida.escrever(`aviso: ${a}\n`);
 
+    // `--check`/`--simular` mostra o que faria e sai sem escrever nem registrar.
+    if (opcoes.simular) {
+      saida.escrever(`instalaria: ${opcoes.skills.join(", ")}\n`);
+      return 0;
+    }
     if (!opcoes.sim && !ehInterativo()) {
       saida.escrever(`instalaria: ${opcoes.skills.join(", ")}\nuse --yes para aplicar sem perguntar\n`);
       return 0;

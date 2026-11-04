@@ -137,6 +137,22 @@ describe("a CLI com --sem-registro", () => {
     expect(s.texto.join("")).not.toContain(AVISO);
   });
 
+  // `--check` no init era lido e ignorado: instalava e, com --sem-registro, avisava
+  // de um registro que nem ia acontecer (revisão do Codex).
+  it("init --check: so mostra o que instalaria, sem instalar, registrar nem avisar", async () => {
+    const { executarInit } = await import("./init.js");
+    vi.mocked(executarInit).mockClear();
+    for (const flags of [["--check"], ["--simular", "--sem-registro"]]) {
+      const s = saida();
+      const rc = await executarExpx(["init", "--skills", "mergex", "--yes", ...flags], s);
+      expect(rc).toBe(0);
+      expect(s.texto.join("")).toContain("instalaria: mergex");
+      expect(s.texto.join("")).not.toContain(AVISO);
+    }
+    expect(vi.mocked(executarInit)).not.toHaveBeenCalled();
+    expect(registro.chamadas).toEqual([]);
+  });
+
   it("update --check --json: aceita, e a saida e so a linha de JSON", async () => {
     const s = saida();
     expect(await executarExpx(["update", "--check", "--json", "--sem-registro"], s)).toBe(0);

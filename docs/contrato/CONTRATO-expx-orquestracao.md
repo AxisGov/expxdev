@@ -539,9 +539,12 @@ negação por outro hook e queda chegam aqui: sem evento terminal, o envelope fi
 **Claude Code 2.1.310**, por decisão do dono: é a versão em que este fluxo foi provado
 ponta a ponta. Esta versão não usa `onFailure`, mas a recusa vai usar, e em 2026-11-02 a
 2.1.269 e a 2.1.287 o ignoraram enquanto a 2.1.310 o respeitou; a 2.1.295, citada no
-desenho, não foi medida. Abaixo do piso, ou sem `claude`, o `init` instala o resto e
-avisa, e o `doctor` acusa `claude-abaixo-do-piso`. Com a política ativa e sem o hook,
-`envelope-nao-instalado`.
+desenho, não foi medida. Abaixo do piso, o `init` instala o resto sem o envelope e
+avisa, e o `doctor` acusa `claude-abaixo-do-piso`. Sem versão legível (sem `claude`, só o do
+Windows no WSL, ou saída sem versão), o `init` e o `update` mantêm o envelope que o lock
+anterior gerenciava, e só ele: sem esse lock, o envelope não entra. O `doctor` acusa
+`claude-versao-ilegivel`, sem dizer que o envelope falta (Conselhos na 0.13.6). Com a
+política ativa e sem o hook, no piso ou sem versão legível, `envelope-nao-instalado`.
 
 ### 13.5 O que falta para recusar
 

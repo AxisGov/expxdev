@@ -22,7 +22,8 @@ type OpcoesInitCli = {
   harness: Harness[];   // "claude" | "opencode"
   painel: boolean;
   sim: boolean;
-  simular: boolean;
+  simular: boolean;     // --check/--simular: mostra o que instalaria e sai sem escrever
+  semRegistro: boolean; // --sem-registro: nenhum `claude plugin ...`
 };
 ```
 
