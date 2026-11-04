@@ -130,7 +130,7 @@
     <div class="cartao"><div class="cartao__num">9</div><div class="cartao__rot">skills no catálogo</div></div>
     <div class="cartao"><div class="cartao__num">8</div><div class="cartao__rot">subcomandos do CLI</div></div>
     <div class="cartao"><div class="cartao__num">1955</div><div class="cartao__rot">testes aprovados</div></div>
-    <div class="cartao"><div class="cartao__num">35</div><div class="cartao__rot">verificações do doctor</div></div>
+    <div class="cartao"><div class="cartao__num">36</div><div class="cartao__rot">verificações do doctor</div></div>
   </div>
 
   <p style="margin-top:8px">
@@ -1712,7 +1712,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
 <section class="secao" id="doctor">
   <p class="eyebrow">Referência do CLI</p>
   <h1>O que o doctor verifica</h1>
-  <p class="lede">Trinta e cinco verificações, cada uma com severidade e correção sugerida. Achado de severidade
+  <p class="lede">Trinta e seis verificações, cada uma com severidade e correção sugerida. Achado de severidade
   <code>aviso</code> não derruba a saída; <code>erro</code> sim.</p>
 
   <div class="codigo" data-copiar>
@@ -1756,8 +1756,9 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
       <tr><td><code>rastro-chave-nao-declarada</code></td><td><span class="selo selo--aviso">aviso</span></td><td>chaves não declaradas no rastro</td></tr>
       <tr><td><code>integridade-final-invalida</code></td><td><span class="selo selo--aviso">aviso</span></td><td>verificação de integridade final de um agente de aprovação deu <code>divergente</code> ou <code>ausente</code>: o veredito dele é inválido</td></tr>
       <tr><td><code>rastro-nao-ignorado</code></td><td><span class="selo selo--aviso">aviso</span></td><td>com a integridade final instalada, <code>docs/eventos/</code> não está ignorado pelo git, ou está no <code>.gitignore</code> mas já tem arquivo versionado</td></tr>
-      <tr><td><code>claude-abaixo-do-piso</code></td><td><span class="selo selo--aviso">aviso</span></td><td>com a política de orquestração ativa, Claude Code abaixo de 2.1.310, ou sem como ler a versão: o envelope da invocação não é instalado</td></tr>
-      <tr><td><code>envelope-nao-instalado</code></td><td><span class="selo selo--aviso">aviso</span></td><td>com a política de orquestração ativa e o Claude Code no piso, falta o hook do envelope da invocação</td></tr>
+      <tr><td><code>claude-abaixo-do-piso</code></td><td><span class="selo selo--aviso">aviso</span></td><td>com a política de orquestração ativa, Claude Code abaixo de 2.1.310: o envelope da invocação não é instalado</td></tr>
+      <tr><td><code>claude-versao-ilegivel</code></td><td><span class="selo selo--aviso">aviso</span></td><td>com a política de orquestração ativa, sem como ler a versão do Claude Code: a compatibilidade do envelope não pode ser verificada, e o envelope que a instalação anterior gerenciava fica</td></tr>
+      <tr><td><code>envelope-nao-instalado</code></td><td><span class="selo selo--aviso">aviso</span></td><td>com a política de orquestração ativa e o Claude Code no piso ou sem versão legível, falta o hook do envelope da invocação</td></tr>
     </tbody>
   </table></div>
 

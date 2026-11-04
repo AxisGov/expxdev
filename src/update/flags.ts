@@ -30,6 +30,8 @@ export type OpcoesUpdateCli = {
   sim: boolean;
   /** Só com `--check`: o relatório em JSON que o SessionStart lê para avisar. */
   json: boolean;
+  /** Não roda nenhum `claude plugin ...`: o registro do plugin fica a cargo de quem instala. */
+  semRegistro: boolean;
 };
 
 export type ResultadoFlagsUpdate =
@@ -37,7 +39,7 @@ export type ResultadoFlagsUpdate =
   | { ok: false; erro: string };
 
 export function interpretarFlagsUpdate(argv: readonly string[]): ResultadoFlagsUpdate {
-  const opcoes: OpcoesUpdateCli = { skills: [], check: false, latest: false, sim: false, json: false };
+  const opcoes: OpcoesUpdateCli = { skills: [], check: false, latest: false, sim: false, json: false, semRegistro: false };
 
   for (let i = 0; i < argv.length; i++) {
     const bruto = argv[i] ?? "";
@@ -55,6 +57,9 @@ export function interpretarFlagsUpdate(argv: readonly string[]): ResultadoFlagsU
         break;
       case "--json":
         opcoes.json = true;
+        break;
+      case "--sem-registro":
+        opcoes.semRegistro = true;
         break;
       case "--yes":
       case "--sim":

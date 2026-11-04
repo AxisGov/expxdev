@@ -100,6 +100,70 @@ describe("a CLI registra o plugin pela regra comum", () => {
 });
 
 /**
+ * `--sem-registro`: instala ou atualiza sem rodar nenhum `claude plugin ...`, para
+ * quem não pode tocar o registro do escopo do usuário (Conselhos na 0.13.6, com um
+ * `claude` que só responde a versão). O rc é o da instalação, e o aviso só sai
+ * quando um registro foi de fato suprimido.
+ */
+describe("a CLI com --sem-registro", () => {
+  beforeEach(() => {
+    registro.chamadas.length = 0;
+    registro.instalacao = { ok: false, executados: [], erro: "o expx-local nao ficou registrado com o caminho local /x" };
+    update.aplicou = true;
+  });
+  const AVISO = "o plugin nao foi registrado no Claude Code (--sem-registro)";
+
+  it("init: nao registra, sai 0 e avisa, sem dizer que registrou", async () => {
+    const s = saida();
+    const rc = await executarExpx(["init", "--skills", "mergex", "--yes", "--sem-registro"], s);
+    expect(rc).toBe(0);
+    expect(registro.chamadas).toEqual([]);
+    expect(s.texto.join("")).toContain(AVISO);
+    expect(s.texto.join("")).not.toContain("plugin registrado");
+  });
+
+  it("update que aplicou: nao registra, sai 0 e avisa", async () => {
+    const s = saida();
+    const rc = await executarExpx(["update", "--yes", "--sem-registro"], s);
+    expect(rc).toBe(0);
+    expect(registro.chamadas).toEqual([]);
+    expect(s.texto.join("")).toContain(AVISO);
+  });
+
+  it("update que nao aplicou: nada a suprimir, sem aviso", async () => {
+    update.aplicou = false;
+    const s = saida();
+    expect(await executarExpx(["update", "--yes", "--sem-registro"], s)).toBe(0);
+    expect(s.texto.join("")).not.toContain(AVISO);
+  });
+
+  // `--check` no init era lido e ignorado: instalava e, com --sem-registro, avisava
+  // de um registro que nem ia acontecer (revisão do Codex).
+  it("init --check: so mostra o que instalaria, sem instalar, registrar nem avisar", async () => {
+    const { executarInit } = await import("./init.js");
+    vi.mocked(executarInit).mockClear();
+    for (const flags of [["--check"], ["--simular", "--sem-registro"]]) {
+      const s = saida();
+      const rc = await executarExpx(["init", "--skills", "mergex", "--yes", ...flags], s);
+      expect(rc).toBe(0);
+      expect(s.texto.join("")).toContain("instalaria: mergex");
+      expect(s.texto.join("")).not.toContain(AVISO);
+    }
+    expect(vi.mocked(executarInit)).not.toHaveBeenCalled();
+    expect(registro.chamadas).toEqual([]);
+  });
+
+  it("update --check --json: aceita, e a saida e so a linha de JSON", async () => {
+    const s = saida();
+    expect(await executarExpx(["update", "--check", "--json", "--sem-registro"], s)).toBe(0);
+    expect(registro.chamadas).toEqual([]);
+    const texto = s.texto.join("");
+    expect(texto.trim().split("\n")).toHaveLength(1);
+    expect(() => JSON.parse(texto) as unknown).not.toThrow();
+  });
+});
+
+/**
  * No `update`, registrar é o que ativa a versão nova no cache do Claude Code:
  * se o registro falha, o update não cumpriu o que prometia e sai 1. Binário
  * ausente tem saída manual explícita e continua 0. No `init`, o registro é o

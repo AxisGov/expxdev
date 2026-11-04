@@ -482,6 +482,12 @@ materializado se você escolheu o OpenCode.
 > caminho absoluto na configuração do usuário, ele não viaja no commit: cada pessoa roda
 > `expx init` na própria máquina. Sem o binário `claude` no PATH, o `.expx/` é montado
 > normalmente e o CLI imprime os dois comandos para você rodar à mão.
+>
+> Quem não pode tocar a configuração do usuário (CI, ou por decisão do projeto) usa
+> `--sem-registro` no `init` e no `update`: nenhum `claude plugin ...` roda, e o registro fica a
+> cargo de quem instala. Com a política de orquestração ativa, o envelope da invocação que a
+> instalação anterior gerenciava fica quando o `claude` do PATH não responde a versão; abaixo do
+> piso, ele sai.
 
 ---
 
@@ -691,6 +697,7 @@ travada em versão publicada, o commit exato, a data e **o hash de cada arquivo*
 | `--to <ref>` | Fixa uma skill numa tag ou commit específico — exige nomear exatamente uma skill |
 | `--yes` / `--sim` | Aplica sem exigir terminal interativo |
 | `--json` | Só com `--check`: um objeto JSON numa linha, com as chaves `ok`, `pendente`, `pendencias` e `bloqueadas`, que o SessionStart lê |
+| `--sem-registro` | Não roda nenhum `claude plugin ...`: grava tudo e sai pelo resultado da atualização, com um aviso de que o Claude Code pode seguir com a cópia anterior em cache até o registro. Vale também no `init` |
 
 > **CLI nova, skills em dia.** O plugin e os hooks do núcleo vêm da CLI. Com o lock gravado
 > por uma CLI anterior, o `update` remonta a instalação com as mesmas skills, nos mesmos
@@ -749,7 +756,7 @@ skill encolhe entre versões.
 npx expxdev doctor
 ```
 
-Trinta e cinco verificações, cada uma com severidade e correção sugerida. Achado de severidade
+Trinta e seis verificações, cada uma com severidade e correção sugerida. Achado de severidade
 `aviso` não derruba a saída; `erro` sim.
 
 | Verificação | Severidade |
@@ -788,6 +795,7 @@ Trinta e cinco verificações, cada uma com severidade e correção sugerida. Ac
 | nenhuma integridade final de agente de aprovação divergente ou ausente no rastro | aviso |
 | com a integridade final instalada, `docs/eventos/` ignorado pelo git e sem arquivo versionado | aviso |
 | com a política de orquestração ativa, Claude Code em 2.1.310 ou superior | aviso |
+| com a política de orquestração ativa, a versão do Claude Code legível no PATH | aviso |
 | com a política de orquestração ativa, o hook do envelope da invocação instalado | aviso |
 
 > **Os três achados de modo executável, e por que são três.** Os reparos são diferentes, e um

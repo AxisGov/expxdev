@@ -194,7 +194,7 @@ export async function executarWizard(
 
     return {
       ok: true,
-      opcoes: { skills: [...skills], harness: [...harness], painel, sim: true, simular: parciais.simular },
+      opcoes: { skills: [...skills], harness: [...harness], painel, sim: true, simular: parciais.simular, semRegistro: parciais.semRegistro },
     };
   } catch (e) {
     if (foiCancelado(e)) return { ok: false, erro: "cancelado: nada foi alterado" };

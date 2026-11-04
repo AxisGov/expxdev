@@ -176,4 +176,24 @@ describe.skipIf(process.platform === "win32")("doctor e o envelope da invocaçã
     expect(idsDe(p.raiz)).not.toContain("envelope-nao-instalado");
     expect(idsDe(p.raiz)).not.toContain("claude-abaixo-do-piso");
   });
+
+  // O update sem versão legível mantém o envelope que a instalação gerenciava: o
+  // doctor não pode dizer que ele não está instalado (Conselhos na 0.13.6).
+  it("funcional: versão ilegível com o hook acusa só a versão; sem o hook, acusa as duas coisas", async () => {
+    p = await projeto();
+    mkdirSync(join(p.raiz, ".expx"), { recursive: true });
+    writeFileSync(join(p.raiz, ".expx", "orquestracao.json"), JSON.stringify({ expx_orquestracao: 1 }));
+    claudeFalso("nao e versao");
+    writeFileSync(join(p.raiz, ".claude", "hooks", "expx-invocacao.mjs"), "");
+    const comHook = diagnosticar(p.raiz, {}).achados;
+    expect(comHook.map((a) => a.id)).toContain("claude-versao-ilegivel");
+    expect(comHook.map((a) => a.id)).not.toContain("claude-abaixo-do-piso");
+    expect(comHook.map((a) => a.id)).not.toContain("envelope-nao-instalado");
+    expect(comHook.find((a) => a.id === "claude-versao-ilegivel")?.problema).not.toContain("nao instalado");
+    rmSync(join(p.raiz, ".claude", "hooks", "expx-invocacao.mjs"));
+    const semHook = idsDe(p.raiz);
+    expect(semHook).toContain("claude-versao-ilegivel");
+    expect(semHook).toContain("envelope-nao-instalado");
+    expect(semHook).not.toContain("claude-abaixo-do-piso");
+  });
 });
