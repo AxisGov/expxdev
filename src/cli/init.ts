@@ -112,6 +112,12 @@ export type OpcoesInit = {
    */
   recusarModificacaoLocal?: boolean;
   /**
+   * Os bytes do lock que o chamador leu para decidir (`undefined`: não havia
+   * lock). O `update` passa o seu: ele lê o lock bem antes de chamar o init, e é
+   * esse retrato que precisa estar intacto sob o bloqueio.
+   */
+  retratoDoLock?: { bytes: string | undefined };
+  /**
    * O ambiente em que as dependências de runtime são provadas. Padrão: o do
    * próprio processo, que é o que importa — ver `nucleo/runtime.ts`.
    */
@@ -470,7 +476,26 @@ function dataIsoValida(valor: string): boolean {
   return data.getUTCFullYear() === ano && data.getUTCMonth() === mes - 1 && data.getUTCDate() === dia;
 }
 
+/**
+ * Os bytes do lock agora (`undefined` sem lock): o retrato em que o plano se
+ * baseia. Lock que existe e não se lê (um diretório, sem permissão) é erro, não
+ * exceção.
+ */
+export function retratoDoLock(raiz: string): { ok: true; bytes: string | undefined } | { ok: false; erro: string } {
+  const caminho = caminhoDoLock(raiz);
+  if (!existsSync(caminho)) return { ok: true, bytes: undefined };
+  try {
+    return { ok: true, bytes: readFileSync(caminho, "utf8") };
+  } catch (e: unknown) {
+    return { ok: false, erro: `nao foi possivel ler o .expx/expx-lock.json: ${String(e)}` };
+  }
+}
+
 export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
+  // O plano lê o lock antes do bloqueio da operação; com o bloqueio na mão, ele tem
+  // de ser o mesmo (nitpicks do CodeAnt no expxdev#140 e #141). O do chamador vale.
+  const retrato = op.retratoDoLock !== undefined ? { ok: true as const, bytes: op.retratoDoLock.bytes } : retratoDoLock(op.raiz);
+  if (!retrato.ok) return { ok: false, instaladas: [], falhas: [], erros: [retrato.erro], naoTravadas: [], avisos: [] };
   const lockAnterior = lerLock(op.raiz);
   const travadasAntes = lockAnterior.ok ? lockAnterior.lock.skills : {};
   const instaladas: string[] = [];
@@ -607,6 +632,17 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     return { ok: false, instaladas: [], falhas, erros: [bloqueio.erro], naoTravadas, avisos };
   }
   try {
+    const agora = retratoDoLock(op.raiz);
+    if (!agora.ok || agora.bytes !== retrato.bytes) {
+      return {
+        ok: false,
+        instaladas: [],
+        falhas,
+        erros: ["o .expx/expx-lock.json mudou durante o planejamento (outro init ou update terminou no meio): nada foi escrito; rode de novo"],
+        naoTravadas,
+        avisos,
+      };
+    }
     if (op.recusarModificacaoLocal === true) {
       const modificadas = Object.keys(travadasAntes).filter((n) => verificarModificacaoLocal(op.raiz, n).temModificacao);
       if (modificadas.length > 0) {
