@@ -1274,6 +1274,15 @@ Sem essa confirmação, **não ofereça o merge** deste PR. Passe para o próxim
    base no merge, relida no serviço como no bloco):
    `entrega-de-planejamento.sh --registrar-merge --entrega <ENTREGA.md> --merge-sha <commit de merge> --base-sha <base>`
    ("O PR de planejamento (e o da sprint) do trabalho atual", no passo 2).
+   Logo depois, e antes de qualquer merge de integração da base, persista o registro (DM-311),
+   **na branch da entrega** (`ENTREGA.branch`, a worktree do trabalho):
+   `persistir-metodo.sh --persistir --entrega <ENTREGA.md> --origem sprintx --trabalho <trabalho_id> --checkpoint e9-merge`.
+   O E9 que revisa o PR de outro trabalho, fora da branch dele, não roda o checkpoint (o
+   executor recusa a branch divergente): o registro fica para a sessão daquele trabalho, na branch
+   dele, antes do merge de integração.
+   Sem esse commit, o `ENTREGA.md` fica sujo, o `reconciliacao-base.sh --registrar` o recusa
+   (o arquivo difere do de `M` fora das chaves que ele grava) e o E0 da sprint seguinte, que exige
+   a reconciliação, não abre. O mesmo vale depois do `--completar-base`.
 
    **E, somente se o PR mergeado for o do trabalho atual**, grave `pr_estado: merged`
    também em `.expx/estado.json`. O E9 percorre PRs de vários trabalhos e de outras

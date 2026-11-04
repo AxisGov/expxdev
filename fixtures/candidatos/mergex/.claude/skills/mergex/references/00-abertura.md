@@ -99,7 +99,8 @@ e em `por_trabalho`. Entrega com `reconciliacoes` não vazio (a main entrou na b
 planejamento por reconciliação) não é reancorada: a base dela vem da cadeia, e o E0 recusa.
 
 As três pré-condições e a base nova, em toda retomada sem `--planejamento` (`<base>` é a base
-buscada, por exemplo `origin/main`). Saída 0 com as duas linhas: grave-as. Saída 0 sem nada: não
+buscada: a ref remota depois do `git fetch`, por exemplo `origin/main`, e não a branch local, que
+numa worktree pode estar atrás — DM-312). Saída 0 com as duas linhas: grave-as. Saída 0 sem nada: não
 é a primeira sprint depois do planejamento, e a base fica como está. Saída 1: recusa, sem escrever
 nada. Saída 2: entrega ilegível ou base inexistente; relate o motivo.
 
@@ -163,6 +164,9 @@ retomada de um arquivo sem a chave), com o modo que o mesmo `--modo-efetivo` dis
 4. com `reconciliacoes` não vazio, a atualização da branch a partir da main nova já foi
    registrada como a reconciliação seguinte e a cadeia passa em `reconciliacao-base.sh
    --verificar`; a `base_validada_sha` da cadeia é a base buscada (DM-266). Sem cadeia, nada muda.
+   A ordem é: o E9 registra o merge da sprint anterior e o persiste pelo checkpoint `e9-merge`;
+   depois vêm o merge de integração da main nova, o `--registrar`, o checkpoint
+   `reconciliacao-base` e, por fim, o E0 (DM-311).
 
 Então grava `entrega: por_sprint`, `sprint_atual: <NN>`, o item novo `{sprint: <NN>, url: null,
 estado: null, merge_sha: null, merge: null, base_sha: null}` no fim de `prs`, volta `pr_url` e

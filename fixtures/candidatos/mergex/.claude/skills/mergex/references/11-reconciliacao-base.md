@@ -58,7 +58,13 @@ Condições estruturais, todas obrigatórias:
 - `B0` é ancestral de `P1`.
 - `M` está na linha de primeiro pai de `HEAD` (o merge pertence à branch do trabalho, não a um
   ramo lateral).
-- `B1` é ancestral da ponta atual da ref de base (`branch_base`) no momento do registro.
+- `B1` é ancestral da ponta atual da base **publicada** no momento do registro: com `branch_base`
+  em nome simples (`main`), a ref remota `refs/remotes/<remoto>/<branch_base>` é exigida quando
+  existe (o `<remoto>` da branch atual, ou `origin`), porque a branch local da base pode estar atrás
+  numa worktree, e a local em dia sozinha não prova que `B1` foi publicado. Sem a ref remota, vale a
+  local; `refs/heads/main` segue a mesma regra do nome simples, e `branch_base` que já é ref remota
+  (`origin/main`) vale como está (DM-312). Antes do
+  `--registrar`, rode `git fetch <remoto>`.
 - A mensagem de `M` tem exatamente um `Trabalho: <trabalho_id>` igual ao da `ENTREGA.md`, um
   `Integra-base:` seguido do SHA completo de `B1`, e nenhum `Task:` nem `Metodo:` (a classe
   "integração de base" de `references/01-commits.md`).
@@ -259,7 +265,7 @@ Os mesmos nos dois modos:
 ## Checkpoint de método `reconciliacao-base`
 
 O enum de `persistir-metodo.sh`, `contrato-de-commit.sh` e `catalogo-de-metodo.sh` é
-`pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | pre-e6 | e8`.
+`pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | e9-merge | pre-e6 | e8`.
 
 - Catálogo do checkpoint: `docs/entregas/<trabalho_id>/ENTREGA.md` e os
   `RECONCILIACAO-BASE-NNN.md` de `ENTREGA.reconciliacoes`, sujos. Nada de produto, de teste ou de

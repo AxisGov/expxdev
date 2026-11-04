@@ -21,7 +21,7 @@ Ao longo do trabalho, sempre no mesmo arquivo — e **nunca recriado do zero**:
 
 O resultado do E2 (`portao`, `portao_sha`, `falhas_portao`) é gravado só por `registrar-portao.sh`
 (`references/02-prontidao.md`). Os checkpoints de método que levam o arquivo ao histórico formam o
-enum fechado `pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | pre-e6 | e8`.
+enum fechado `pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | e9-merge | pre-e6 | e8`.
 
 ## O contrato — `kind: entrega`
 
@@ -293,7 +293,11 @@ bash .claude/skills/mergex/scripts/persistir-metodo.sh --persistir \
 
 O executor usa a trava C5, exige stage vazio, deriva paths exatos, roda a varredura de segredo e
 valida `Trabalho:` + `Metodo: e8`, sem `Task:`. Sem mudanças elegíveis devolve `noop=true`; nunca
-cria commit vazio. O commit não entra em `ENTREGA.commits`, não consome `seq` e não inclui produto.
+cria commit vazio. **Antes, inclusive no `noop` e no `--verificar`, ele exige o estado terminal
+(DM-311):** `estado: entregue` com `portao: pronto`, `entregue_em` AAAA-MM-DD, `causa: null` e `push_feito`
+`true` ou `false`, ou `estado: bloqueado` com `portao: bloqueado`, a `causa` que `falhas_portao`
+deriva (`causa-do-portao.sh --validar`), `entregue_em: null` e `push_feito: false`. A `entregue_em` é uma data do calendário, e cada campo terminal aparece uma vez no frontmatter. Um `ENTREGA.md` que voltou a `aberto` (uma reconciliação pós-E8, por exemplo)
+não fecha: grave de novo os campos terminais. O commit não entra em `ENTREGA.commits`, não consome `seq` e não inclui produto.
 
 ### Passo 3 — Publicar o commit final
 
