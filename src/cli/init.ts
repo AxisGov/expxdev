@@ -470,7 +470,15 @@ function dataIsoValida(valor: string): boolean {
   return data.getUTCFullYear() === ano && data.getUTCMonth() === mes - 1 && data.getUTCDate() === dia;
 }
 
+/** Os bytes do lock agora, ou `undefined` sem lock: o retrato que o plano usa. */
+function bytesDoLock(raiz: string): string | undefined {
+  return existsSync(caminhoDoLock(raiz)) ? readFileSync(caminhoDoLock(raiz), "utf8") : undefined;
+}
+
 export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
+  // O plano lê o lock antes do bloqueio da operação; com o bloqueio na mão, ele tem
+  // de ser o mesmo (nitpick do CodeAnt no expxdev#140).
+  const retratoDoLock = bytesDoLock(op.raiz);
   const lockAnterior = lerLock(op.raiz);
   const travadasAntes = lockAnterior.ok ? lockAnterior.lock.skills : {};
   const instaladas: string[] = [];
@@ -607,6 +615,16 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     return { ok: false, instaladas: [], falhas, erros: [bloqueio.erro], naoTravadas, avisos };
   }
   try {
+    if (bytesDoLock(op.raiz) !== retratoDoLock) {
+      return {
+        ok: false,
+        instaladas: [],
+        falhas,
+        erros: ["o .expx/expx-lock.json mudou durante o planejamento (outro init ou update terminou no meio): nada foi escrito; rode de novo"],
+        naoTravadas,
+        avisos,
+      };
+    }
     if (op.recusarModificacaoLocal === true) {
       const modificadas = Object.keys(travadasAntes).filter((n) => verificarModificacaoLocal(op.raiz, n).temModificacao);
       if (modificadas.length > 0) {
