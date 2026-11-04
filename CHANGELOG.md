@@ -4,7 +4,7 @@
 
 Instale por PR, como a 0.13.5. São achados de revisão do CodeAnt e do CodeRabbit e relatos dos consumidores; nenhum é regressão da 0.13.5. O `e9-merge`, o `e8` terminal (mergex#74) e a ponta remota da base no `--registrar` (mergex#75) ficam para a 0.13.7: no Conselhos, o contorno do E9 com `persistir-metodo --checkpoint e8` continua valendo até lá.
 
-- **mergex@915fcff** (mergex#73, DM-310): no pre-push da branch empilhada, a parcela (a) da seleção usa a `base_validada_sha` do ENTREGA.md da própria branch, quando ela é ancestral do SHA enviado e não da base padrão. Uma `branch_base` com byte de controle não estreita a seleção. Relato do Login (login#53).
+- **mergex@915fcff** (mergex#73, DM-310): no pre-push da branch empilhada, a parcela (a) da seleção usa a `base_validada_sha` do ENTREGA.md da própria branch, quando ela é ancestral do SHA enviado e não da base padrão. Uma `branch_base` com byte de controle não estreita a seleção. Relato do Login (login#53). Limite: o NUL o Bash descarta antes da checagem (`feature/a\0b` vira `feature/ab`), e o nome passa sem ele. A seleção só estreita com uma `base_validada_sha` empilhada válida, e o Git não aceita NUL em nome de ref; a recusa do NUL nos bytes brutos entra na 0.13.7 (revisão do Codex).
 - **designx@0d649e3** (designx#11): os hooks.
   - O `designx-audit` lê `.tool_input.file_path`: no Claude Code, ele nunca rodava.
   - Os dois hooks leem o modo do `.expx/hooks.json`, com fallback em `DESIGNX_*_MODO`, e falham abertos sem `jq` ou com JSON inválido. O aviso sai em `additionalContext`, no stdout.
