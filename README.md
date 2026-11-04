@@ -543,16 +543,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.13.5 -R AxisGov/expxdev -D ~/expx-cli/v0.13.5
+gh release download v0.13.6 -R AxisGov/expxdev -D ~/expx-cli/v0.13.6
 (
-  cd ~/expx-cli/v0.13.5
+  cd ~/expx-cli/v0.13.6
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.13.5.tgz.sha256
+    sha256sum -c expxdev-0.13.6.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.13.5.tgz.sha256
+    shasum -a 256 -c expxdev-0.13.6.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.13.5/expxdev-0.13.5.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.13.6/expxdev-0.13.6.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -566,7 +566,7 @@ npx --yes --package ~/expx-cli/v0.13.5/expxdev-0.13.5.tgz expx init --skills bui
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.13.5 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.13.6 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -654,6 +654,8 @@ npx --yes --package ~/expx-cli/v0.13.5/expxdev-0.13.5.tgz expx init --skills bui
   `[item 1]` sem task ao lado de um `fraco:ausente`.
 - `0.13.5` faz a designx achar a cor hex solta em `.css`, `.scss` e no CSS-in-JS de `.ts`, e contar
   sombras e bordas separadamente, sem corte.
+- `0.13.6` corrige o pre-push da MergeX na branch empilhada, faz os hooks da designx rodarem no Claude
+  Code com o modo do `.expx/hooks.json`, e só conta a task do `[item 1]` da SprintX quando ela está solta.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

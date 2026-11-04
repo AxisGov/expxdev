@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.13.6 — o pre-push da branch empilhada na MergeX, os hooks da designx no Claude Code, e a task do [item 1] só solta na SprintX
+
+Instale por PR, como a 0.13.5. São achados de revisão do CodeAnt e do CodeRabbit e relatos dos consumidores; nenhum é regressão da 0.13.5. O `e9-merge`, o `e8` terminal (mergex#74) e a ponta remota da base no `--registrar` (mergex#75) ficam para a 0.13.7: no Conselhos, o contorno do E9 com `persistir-metodo --checkpoint e8` continua valendo até lá.
+
+- **mergex@915fcff** (mergex#73, DM-310): no pre-push da branch empilhada, a parcela (a) da seleção usa a `base_validada_sha` do ENTREGA.md da própria branch, quando ela é ancestral do SHA enviado e não da base padrão. Uma `branch_base` com byte de controle não estreita a seleção. Relato do Login (login#53).
+- **designx@0d649e3** (designx#11): os hooks.
+  - O `designx-audit` lê `.tool_input.file_path`: no Claude Code, ele nunca rodava.
+  - Os dois hooks leem o modo do `.expx/hooks.json`, com fallback em `DESIGNX_*_MODO`, e falham abertos sem `jq` ou com JSON inválido. O aviso sai em `additionalContext`, no stdout.
+  - O descarte do A1 é um awk de uma passada (o `jq` levava 8 s em 4500 linhas) e trata strings, `@scope`, `@supports selector()`, at-rules do SCSS e CRLF.
+- **sprintx@a6f852a** (sprintx#69, DS-204): no `valida-auditoria` da F5, uma `T-NN.MM` só cita a task do `[item 1]` quando está solta: sem letra (também acentuada), dígito ou `_` grudado, nem `.` seguido de dígito depois. `XT-01.01`, `T-01.01oops`, `T-01.01é` e `T-01.01.02` deixam de citar a T-01.01, e o achado volta a ser recusado ao lado de um `[fraco:ausente]`; `T-01.01.` e `(T-01.01)` seguem citando. Achado do CodeAnt no login#54.
+- **Não exercitado:**
+  - o awk do BSD (macOS) nos hooks da designx, e o plugin do OpenCode da designx;
+  - o pre-push empilhado num push real de consumidor.
+
 ## 0.13.5 — a cor hex solta em CSS e no CSS-in-JS, e sombras e bordas contadas sem corte, na designx
 
 Instale por PR, como a 0.13.4. São achados de revisão do CodeAnt e do CodeRabbit; nenhum é regressão da 0.13.4.
