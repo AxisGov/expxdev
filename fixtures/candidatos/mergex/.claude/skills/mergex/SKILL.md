@@ -91,7 +91,7 @@ Definição normativa completa — os seis estados, R1–R6, o formato da respos
 
 ## Lifecycle executável dos artefatos de método
 
-O executor único é `.claude/skills/mergex/scripts/persistir-metodo.sh`. O trabalho vem dos argumentos explícitos conferidos contra `ENTREGA.md`; a branch apenas prova consistência. Os checkpoints formam o enum fechado `pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | pre-e6 | e8`, usam a mesma trava C5 do índice e só adicionam paths dirty do catálogo fechado. Commit de método é classe própria, com `Trabalho:` e `Metodo:` (um dos seis checkpoints), sem `Task:`; não entra em `ENTREGA.commits`, não consome `seq` e não satisfaz V11.
+O executor único é `.claude/skills/mergex/scripts/persistir-metodo.sh`. O trabalho vem dos argumentos explícitos conferidos contra `ENTREGA.md`; a branch apenas prova consistência. Os checkpoints formam o enum fechado `pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | e9-merge | pre-e6 | e8`, usam a mesma trava C5 do índice e só adicionam paths dirty do catálogo fechado. O `e9-merge` persiste o registro do merge pelo E9 antes do merge de integração da sprint seguinte, e o `e8` exige o estado terminal, também no `noop` (DM-311). Commit de método é classe própria, com `Trabalho:` e `Metodo:` (um dos sete checkpoints), sem `Task:`; não entra em `ENTREGA.commits`, não consome `seq` e não satisfaz V11.
 
 ## Reconciliação de base pós-E8
 

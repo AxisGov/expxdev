@@ -615,12 +615,15 @@ _pr_nota_base() {
 # ENTREGA.md `branch_base` e `base_validada_sha`; contra refs/remotes/<remoto>/HEAD,
 # a entrega da predecessora entrava na seleção e barrava o push de um SHA válido.
 # Só estreita a seleção, e só quando tudo vale: o ENTREGA.md que declara
-# `branch: <b>` na árvore ENVIADA (uma só); `base_validada_sha` com 40 hex, um
-# commit presente, ancestral do SHA enviado e NÃO ancestral da base padrão (a
-# predecessora já integrada volta à regra de sempre); `branch_base` que não é a
-# branch padrão do remoto com outro nome (main, <remoto>/main, refs/heads/main,
-# refs/remotes/<remoto>/main), sem byte de controle. Fora disso, PR_BASE_DECL fica
-# vazio e nada muda.
+# `branch: <b>` na árvore ENVIADA (uma só), sem NUL em lugar nenhum;
+# `base_validada_sha` com o tamanho do OID do repositório (40 hex no SHA-1, 64 no
+# SHA-256), um commit presente, ancestral do SHA enviado e NÃO ancestral da base
+# padrão (a predecessora já integrada volta à regra de sempre); `branch_base` que
+# não é a branch padrão do remoto com outro nome (main, <remoto>/main,
+# refs/heads/main, refs/remotes/<remoto>/main), sem byte de controle. Os prefixos
+# saem por caso (DM-313): refs/heads/origin/main é a branch local de nome literal
+# origin/main, e refs/remotes/<outro>/X fica inteiro. Fora disso, PR_BASE_DECL
+# fica vazio e nada muda.
 _pr_base_declarada() {
   local raiz="$1" b="$2" sl="$3" remoto="$4" padrao="$5" tmp e bb bv nome
   PR_BASE_DECL=""; PR_BASE_DECL_DE=""; PR_BASE_DECL_NOME=""
@@ -629,12 +632,23 @@ _pr_base_declarada() {
   if ! _pr_entregas_em "$raiz" "$sl" "$b" "$tmp/um" || [ "$(wc -l < "$tmp/um" | tr -d ' ')" != 1 ]; then rm -rf "$tmp"; return 0; fi
   e="$(sed -n 1p "$tmp/um")"
   _pr_g -C "$raiz" cat-file blob "$sl:$e" > "$tmp/e" 2>/dev/null || { rm -rf "$tmp"; return 0; }
+  # o NUL o `$(...)` descartaria antes da checagem de byte de controle (DM-313)
+  LC_ALL=C tr -d '\000' < "$tmp/e" | cmp -s - "$tmp/e" || { rm -rf "$tmp"; return 0; }
   bb="$(catalogo_fm "$tmp/e" branch_base)"; bv="$(catalogo_fm "$tmp/e" base_validada_sha)"
   rm -rf "$tmp"
-  [[ "$bv" =~ ^[0-9a-f]{40}$ ]] || return 0
+  case "$(_pr_g -C "$raiz" rev-parse --show-object-format 2>/dev/null)" in
+    sha1) [[ "$bv" =~ ^[0-9a-f]{40}$ ]] || return 0 ;;
+    sha256) [[ "$bv" =~ ^[0-9a-f]{64}$ ]] || return 0 ;;
+    *) return 0 ;;
+  esac
   # byte de controle no nome não estreita nada, nem chega ao diagnóstico (ESC no terminal)
   case "$bb" in *[[:cntrl:]]*) return 0 ;; esac
-  bb="${bb#refs/heads/}"; bb="${bb#refs/remotes/}"; bb="${bb#"$remoto"/}"
+  case "$bb" in
+    refs/heads/*) bb="${bb#refs/heads/}" ;;
+    refs/remotes/"$remoto"/*) bb="${bb#refs/remotes/"$remoto"/}" ;;
+    refs/remotes/*) ;;
+    "$remoto"/*) bb="${bb#"$remoto"/}" ;;
+  esac
   nome="$(_pr_g -C "$raiz" symbolic-ref -q "refs/remotes/$remoto/HEAD" 2>/dev/null)" || nome=""
   nome="${nome#refs/remotes/"$remoto"/}"
   case "$bb" in ''|null|"$nome") return 0 ;; esac

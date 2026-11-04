@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.13.7 — o E9 persistido e o E8 terminal na MergeX, a ponta publicada da base, e o update sem `claude` legível no ExpxDev
+
+Instale por PR, como a 0.13.6. Fecha o impasse E9/E0 do Conselhos (onda-0c) e traz os achados do Conselhos e do CodeAnt na instalação da 0.13.6. Nenhum item é regressão da 0.13.6.
+
+- **mergex@2ddb8dc** (mergex#74, #75 e #76):
+  - **Checkpoint `e9-merge`** (DM-311): o registro do merge pelo E9 (`--registrar-merge`, `--completar-base`) é persistido com `persistir-metodo --checkpoint e9-merge`, só o ENTREGA.md e só na branch da entrega, com prova por replay; aceita CRLF e o registro feito noutro dia. O contorno do Conselhos (`--checkpoint e8` antes do merge de integração) deixa de ser necessário.
+  - **O `e8` exige o estado terminal** (DM-311), no persistir e no `--verificar`, antes do `noop`: entregue com `portao: pronto`, `entregue_em` que é data do calendário, `causa: null` e `push_feito` booleano; bloqueado com `portao: bloqueado`, `entregue_em: null`, `push_feito: false` e a causa que `falhas_portao` deriva. Campo terminal repetido no frontmatter, em qualquer grafia YAML, recusa.
+  - **A ponta publicada da base** (DM-312): o `reconciliacao-base.sh --registrar` exige `refs/remotes/<remoto>/<branch_base>` quando ela existe, também com `branch_base: refs/heads/<base>`. A recusa manda rodar `git fetch`. A `main` local atrás da origem deixa de barrar um B1 publicado.
+  - **A base declarada da branch empilhada** (DM-313): ENTREGA.md com NUL não estreita a seleção; a `base_validada_sha` tem o tamanho do OID do repositório (40 hex no SHA-1, 64 no SHA-256); `refs/heads/origin/main` é a branch de nome literal `origin/main`. O SHA-256 de ponta a ponta continua fora do método: o schema, o E0, a reconciliação e os fechamentos seguem em 40 hex.
+- **ExpxDev** (expxdev#140 e #141):
+  - **Envelope mantido**: com a política de orquestração ativa e sem `claude` legível no PATH (CI, outra máquina), o `init` e o `update` mantêm o envelope da invocação que o lock anterior gerenciava, com o aviso `envelope da invocacao mantido`. Abaixo do piso, ele sai. O `doctor` ganha `claude-versao-ilegivel` (trinta e seis verificações).
+  - **`--sem-registro`** no `init` e no `update`: nenhum `claude plugin ...` roda, e o rc é o da instalação. Para quem não pode tocar a configuração do usuário.
+  - **`init --check`** só mostra o que instalaria; antes, instalava.
+  - **O lock regravado no meio**: o `init` recusa escrever se o lock mudou entre o planejamento e o bloqueio da operação; o retrato que vale no `update` é o dele. Lock ilegível vira erro, e a recusa do `init` chega à saída do `update`.
+- **Não exercitado:**
+  - o `e9-merge` encadeado com uma reconciliação real (a fixture por sprint tem um merge comum sem `Integra-base:`);
+  - `branch_base: origin/main` no `--registrar`, e o pre-push inteiro num repositório SHA-256 (a função foi provada direto).
+
 ## 0.13.6 — o pre-push da branch empilhada na MergeX, os hooks da designx no Claude Code, e a task do [item 1] só solta na SprintX
 
 Instale por PR, como a 0.13.5. São achados de revisão do CodeAnt e do CodeRabbit e relatos dos consumidores; nenhum é regressão da 0.13.5. O `e9-merge`, o `e8` terminal (mergex#74) e a ponta remota da base no `--registrar` (mergex#75) ficam para a 0.13.7: no Conselhos, o contorno do E9 com `persistir-metodo --checkpoint e8` continua valendo até lá.

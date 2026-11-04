@@ -67,7 +67,7 @@ export const CATALOGO: readonly Skill[] = [
     nome: "mergex",
     repositorio: "https://github.com/AxisGov/mergex",
     origensLegadas: ["https://github.com/bittencourtthulio/mergex"],
-    certificado: "915fcfff7a845dcb6457431c0657a60c3fb0fbc6",
+    certificado: "2ddb8dc84b777f8340ed7e7e3ee38285f6b5588a",
     papel: "versionamento, entrega e revisao de pull requests",
     camada: false,
   },

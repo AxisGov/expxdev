@@ -18,6 +18,7 @@ PROVA_SH="$AQUI/prova-de-commit.sh"
 # Só nos checkpoints pre-e6 e e8 com `portao: pronto`: sem ele (ou sem o
 # validador ao lado), a prova falha e o checkpoint é recusado (falha fechada).
 ATIVACAO_SH="$AQUI/ativacao-pre-push.sh"
+PLANEJAMENTO_SH="$AQUI/entrega-de-planejamento.sh"
 
 for dependencia in "$BASE_SH" "$TRAVA_SH" "$CONTRATO_SH" "$SEGREDO_SH" "$CATALOGO_SH" "$PROVA_SH"; do
   [ -r "$dependencia" ] || { printf 'persistir-metodo: dependência indisponível: %s\n' "$dependencia" >&2; exit 1; }
@@ -39,7 +40,7 @@ TRAVA_TOKEN_RECEBIDO=""
 
 uso() {
   printf '%s\n' \
-    'uso: persistir-metodo.sh --listar|--persistir|--verificar --entrega <ENTREGA.md> --origem <sprintx|runx> --trabalho <id> --checkpoint <pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|pre-e6|e8> [--trava-token <token>]' >&2
+    'uso: persistir-metodo.sh --listar|--persistir|--verificar --entrega <ENTREGA.md> --origem <sprintx|runx> --trabalho <id> --checkpoint <pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|e9-merge|pre-e6|e8> [--trava-token <token>]' >&2
   exit 64
 }
 
@@ -59,7 +60,7 @@ done
 
 case "$MODO" in listar|persistir|verificar) ;; *) uso ;; esac
 case "$ORIGEM" in sprintx|runx) ;; *) uso ;; esac
-case "$CHECKPOINT" in pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|pre-e6|e8) ;; *) uso ;; esac
+case "$CHECKPOINT" in pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|e9-merge|pre-e6|e8) ;; *) uso ;; esac
 [ -z "$TRAVA_TOKEN_RECEBIDO" ] \
   || { [ "$MODO" = persistir ] && [ "$CHECKPOINT" = retomar-v9-predecessores ]; } \
   || uso
@@ -724,7 +725,7 @@ fi
 # índice real não escondem alterações da working tree. O status em NUL e sem
 # renames preserva nomes arbitrários em um registro por caminho.
 case "$CHECKPOINT" in
-predecessores|retomar-v9-predecessores)
+predecessores|retomar-v9-predecessores|e9-merge)
   if [ "$CHECKPOINT" = predecessores ]; then
     ARTEFATO_ESTREITO="$PASTA/00-PREDECESSORES.md"
   else
@@ -773,6 +774,119 @@ predecessores|retomar-v9-predecessores)
   fi
   ;;
 esac
+
+# DM-311: o e9-merge persiste só o registro do merge que o E9 grava
+# (entrega-de-planejamento.sh --registrar-merge, ou --completar-base no item
+# histórico), para ele entrar na branch antes do merge de integração: sem isso, o
+# `reconciliacao-base.sh --registrar` recusa o ENTREGA.md sujo, e o E0 da sprint
+# seguinte exige a reconciliação. A prova é refazer a escrita: a mesma ação, com o
+# merge_sha e a base_sha do único item de `prs` que mudou, sobre o ENTREGA.md de
+# HEAD, tem de dar o do disco, salvo a data de `atualizado_em`.
+prova_e9_merge() {
+  [ "$CHECKPOINT" = e9-merge ] && [ "$MODO" = persistir ] || return 0
+  sujo "$ENTREGA" || return 0
+  local t s est sha base acao
+  t="$(mktemp -d "${TMPDIR:-/tmp}/mergex-e9-merge.XXXXXX")" || para 'não foi possível preparar a prova do e9-merge'
+  if ! git -C "$RAIZ" show "HEAD:$ENTREGA" > "$t/ENTREGA.md" 2>/dev/null; then
+    rm -rf "$t"; para "$ENTREGA ausente de HEAD: o e9-merge só persiste o registro de um ENTREGA.md versionado"
+  fi
+  if ! bash "$PLANEJAMENTO_SH" --entrega "$t/ENTREGA.md" > "$t/antes" 2>/dev/null \
+    || ! bash "$PLANEJAMENTO_SH" --entrega "$RAIZ/$ENTREGA" > "$t/depois" 2>/dev/null; then
+    rm -rf "$t"; para "$ENTREGA não se lê como entrega de planejamento ou de sprint: e9-merge recusado"
+  fi
+  grep '^pr=' "$t/antes" | LC_ALL=C sort > "$t/antes.pr"
+  grep '^pr=' "$t/depois" | LC_ALL=C sort > "$t/depois.pr"
+  LC_ALL=C comm -13 "$t/antes.pr" "$t/depois.pr" > "$t/mudou"
+  if [ "$(wc -l < "$t/mudou" | tr -d ' ')" != 1 ]; then
+    rm -rf "$t"; para "e9-merge: o registro do E9 muda exatamente um item de prs; aqui mudaram $(LC_ALL=C comm -3 "$t/antes.pr" "$t/depois.pr" 2>/dev/null | wc -l | tr -d ' ') linha(s)"
+  fi
+  IFS="$(printf '\t')" read -r s est sha base < "$t/mudou"
+  s="${s#pr=}"
+  [ "$est" = merged ] || { rm -rf "$t"; para "e9-merge: o item $s de prs não está merged ($est)"; }
+  # a data com ou sem CR no fim: num ENTREGA.md CRLF, o E9 de ontem e o replay de hoje diferem só nela
+  sed -E 's/^atualizado_em: [0-9]{4}-[0-9]{2}-[0-9]{2}(\r?)$/atualizado_em: -\1/' "$RAIZ/$ENTREGA" > "$t/disco"
+  for acao in registrar-merge completar-base; do
+    cp "$t/ENTREGA.md" "$t/refeito.md"
+    if [ "$acao" = registrar-merge ]; then
+      bash "$PLANEJAMENTO_SH" --registrar-merge --merge-sha "$sha" --base-sha "$base" --entrega "$t/refeito.md" >/dev/null 2>&1 || continue
+    else
+      bash "$PLANEJAMENTO_SH" --completar-base "$s" --merge-sha "$sha" --base-sha "$base" --entrega "$t/refeito.md" >/dev/null 2>&1 || continue
+    fi
+    sed -E 's/^atualizado_em: [0-9]{4}-[0-9]{2}-[0-9]{2}(\r?)$/atualizado_em: -\1/' "$t/refeito.md" > "$t/refeito"
+    if cmp -s "$t/refeito" "$t/disco"; then rm -rf "$t"; return 0; fi
+  done
+  rm -rf "$t"
+  para "e9-merge: $ENTREGA muda além do registro do merge pelo E9 (só pr_estado, o item $s de prs e atualizado_em mudam, como o --registrar-merge ou o --completar-base gravam)" # guarda:E9MERGE
+}
+prova_e9_merge
+
+# DM-311: o e8 fecha o fluxo. Sem o estado terminal gravado, um `noop=true`
+# passava por fechamento (no Conselhos, depois de uma reconciliação pós-E8 o
+# ENTREGA.md ficou `estado: aberto` com o PR publicado e mesclado). Vale nos
+# modos persistir e verificar, antes do noop (08-registro.md, campos terminais).
+
+# data_do_calendario <AAAA-MM-DD> — a data existe (ano a partir de 0001, mês 01-12,
+# dia do mês, 29 de fevereiro só em ano bissexto). Só aritmética: `date -d` não é o
+# mesmo no BSD.
+data_do_calendario() {
+  [[ "$1" =~ ^([0-9]{4})-([0-9]{2})-([0-9]{2})$ ]] || return 1
+  local a=$((10#${BASH_REMATCH[1]})) m=$((10#${BASH_REMATCH[2]})) d=$((10#${BASH_REMATCH[3]})) dm
+  [ "$a" -ge 1 ] || return 1
+  case "$m" in
+    1|3|5|7|8|10|12) dm=31 ;;
+    4|6|9|11) dm=30 ;;
+    2) dm=28; { [ $((a % 4)) = 0 ] && [ $((a % 100)) != 0 ]; } || [ $((a % 400)) = 0 ] && dm=29 ;;
+    *) return 1 ;;
+  esac
+  [ "$d" -ge 1 ] && [ "$d" -le "$dm" ]
+}
+
+# chaves_repetidas <arquivo> <chave...> — as chaves que aparecem mais de uma vez
+# no frontmatter. O catalogo_fm lê a primeira, e um leitor YAML comum, a última.
+# A grafia YAML equivalente conta como a mesma chave: entre aspas, com espaço
+# antes do `:`, com CRLF (revisão do Codex).
+chaves_repetidas() {
+  local f="$1"; shift
+  awk -v chaves="$*" '
+    BEGIN { n = split(chaves, k, " "); for (i = 1; i <= n; i++) q[k[i]] = 1 }
+    NR == 1 { if ($0 !~ /^---[[:space:]]*\r?$/) exit; next }
+    /^---[[:space:]]*\r?$/ { exit }
+    /^["\047]?[A-Za-z_][A-Za-z0-9_]*["\047]?[[:space:]]*:/ {
+      c = $0; sub(/[[:space:]]*:.*/, "", c); gsub(/["\047]/, "", c)
+      if ((c in q) && ++v[c] == 2) print c }' "$f"
+}
+
+confere_e8_terminal() {
+  [ "$CHECKPOINT" = e8 ] || return 0
+  [ "$MODO" = listar ] && return 0
+  local est por ent cau push rep
+  rep="$(chaves_repetidas "$RAIZ/$ENTREGA" estado portao falhas_portao causa entregue_em push_feito | tr '\n' ' ')"
+  [ -z "$rep" ] || para "e8 com chave terminal repetida no frontmatter de $ENTREGA (${rep% }): cada campo terminal aparece uma vez (CodeAnt no mergex#76)" # guarda:E8TERM
+  est="$(catalogo_fm "$RAIZ/$ENTREGA" estado)"; por="$(catalogo_fm "$RAIZ/$ENTREGA" portao)"
+  ent="$(catalogo_fm "$RAIZ/$ENTREGA" entregue_em)"; cau="$(catalogo_fm "$RAIZ/$ENTREGA" causa)"
+  push="$(catalogo_fm "$RAIZ/$ENTREGA" push_feito)"
+  case "$est" in
+    entregue)
+      if [[ "$ent" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] && ! data_do_calendario "$ent"; then
+        para "e8 com estado: entregue e entregue_em $ent, que não é uma data do calendário" # guarda:E8TERM
+      fi
+      # push_feito é true ou false: false é legítimo sem remoto (08-registro), mas tem de existir
+      [ "$por" = pronto ] && [[ "$ent" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] && [ "$cau" = null ] \
+        && { [ "$push" = true ] || [ "$push" = false ]; } \
+        || para "e8 com estado: entregue exige portao: pronto, entregue_em AAAA-MM-DD, causa: null e push_feito true ou false (está portao: ${por:-ausente}, entregue_em: ${ent:-ausente}, causa: ${cau:-ausente}, push_feito: ${push:-ausente})" # guarda:E8TERM
+      # causa: null só com falhas_portao vazia: o portão pronto não tem falha
+      bash "$AQUI/causa-do-portao.sh" --validar "$RAIZ/$ENTREGA" >/dev/null 2>&1 \
+        || para "e8 com estado: entregue e falhas_portao que não bate com causa: null: rode causa-do-portao.sh --validar" ;; # guarda:E8TERM
+    bloqueado)
+      [ "$por" = bloqueado ] && [ -n "$cau" ] && [ "$cau" != null ] && [ "$ent" = null ] && [ "$push" = false ] \
+        || para "e8 com estado: bloqueado exige portao: bloqueado, causa preenchida, entregue_em: null e push_feito: false (está portao: ${por:-ausente}, causa: ${cau:-ausente}, entregue_em: ${ent:-ausente}, push_feito: ${push:-ausente})" # guarda:E8TERM
+      # a causa é a que falhas_portao deriva (00-schema, "A causa do bloqueio")
+      bash "$AQUI/causa-do-portao.sh" --validar "$RAIZ/$ENTREGA" >/dev/null 2>&1 \
+        || para "e8 com estado: bloqueado e causa ($cau) que não deriva de falhas_portao: rode causa-do-portao.sh --validar" ;; # guarda:E8TERM
+    *) para "e8 sem estado terminal (estado: ${est:-ausente}): o E8 grava estado entregue ou bloqueado, com os campos terminais, antes do checkpoint (08-registro.md, passo 2)" ;; # guarda:E8TERM
+  esac
+}
+confere_e8_terminal
 
 # DM-184: nos checkpoints pre-e6 e e8, um ENTREGA.md com `portao: pronto` (lido
 # como a validade do portão o lê) só é persistido — ou aceito pelo --verificar

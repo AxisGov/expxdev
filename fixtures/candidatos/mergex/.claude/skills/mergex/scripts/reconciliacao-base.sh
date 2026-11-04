@@ -1452,8 +1452,29 @@ if [ "$PROXIMO" != "$M" ]; then
   para 5 "ordem: M $M não é o merge mais antigo ainda não registrado na linha de primeiro pai de HEAD (o próximo é ${PROXIMO:-nenhum}); registre os merges um por vez, do mais antigo, com --merge" # guarda:ORDEM
 fi
 estrutura_resto "$M" "$B0" || exit 1
-PONTA_BASE="$(g rev-parse --verify -q "$BRANCH_BASE^{commit}")" || estrutura base "ref de base $BRANCH_BASE ilegível"
-g merge-base --is-ancestor "$B1" "$PONTA_BASE" 2>/dev/null || estrutura base "B1 $B1 não é ancestral da ponta de $BRANCH_BASE ($PONTA_BASE)" # guarda:EST
+# A ponta da base é a publicada (DM-312). Com `branch_base` em nome simples
+# (`main`), a ref remota refs/remotes/<remoto>/<branch_base> é exigida quando
+# existe: numa worktree, a branch local da base fica atrás sem ninguém notar, e a
+# local em dia sozinha não prova que B1 foi publicado. O <remoto> é o da branch
+# atual, ou `origin`. `refs/heads/main` é a mesma main local e segue a mesma regra
+# (CodeAnt no mergex#76). `branch_base` que já é ref remota (`origin/main`), outra
+# ref completa, ou que não tem ref remota correspondente vale como está.
+PONTA_REF="$BRANCH_BASE"
+if ! g rev-parse --verify -q "refs/remotes/$BRANCH_BASE^{commit}" >/dev/null 2>&1; then
+  REMOTO_BASE="$(g config "branch.$(g branch --show-current 2>/dev/null).remote" 2>/dev/null)" || REMOTO_BASE=""
+  [ -n "$REMOTO_BASE" ] && [ "$REMOTO_BASE" != . ] || REMOTO_BASE=origin
+  case "$BRANCH_BASE" in
+    refs/heads/?*) NOME_BASE="${BRANCH_BASE#refs/heads/}" ;;
+    refs/*) NOME_BASE="" ;;
+    *) NOME_BASE="$BRANCH_BASE" ;;
+  esac
+  if [ -n "$NOME_BASE" ] && g rev-parse --verify -q "refs/remotes/$REMOTO_BASE/$NOME_BASE^{commit}" >/dev/null 2>&1; then
+    PONTA_REF="refs/remotes/$REMOTO_BASE/$NOME_BASE"
+  fi
+fi
+PONTA_BASE="$(g rev-parse --verify -q "$PONTA_REF^{commit}")" || estrutura base "ref de base $PONTA_REF ilegível"
+g merge-base --is-ancestor "$B1" "$PONTA_BASE" 2>/dev/null \
+  || estrutura base "B1 $B1 não é ancestral da ponta de $PONTA_REF ($PONTA_BASE)$(case "$(g rev-parse --symbolic-full-name "$PONTA_REF" 2>/dev/null)" in refs/remotes/*) printf '; a ponta é a ref remota, que pode estar desatualizada: rode git fetch e confira que o merge da base foi enviado' ;; esac)" # guarda:EST
 
 # União das tasks e catálogo de método, as quatro provas e o inventário.
 uniao_e_catalogo "$RAIZ_M" "$PASTA" || exit 1

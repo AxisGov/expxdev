@@ -245,11 +245,14 @@ aplicabilidade não está provada, e o diagnóstico sugere `git remote set-head 
 **Branch empilhada (DM-310).** Quando o E0 abriu a branch sobre outra branch de trabalho (base
 informada), o `ENTREGA.md` que declara `branch: <b>` na árvore enviada tem `branch_base` e
 `base_validada_sha`. A parcela (a) usa então `base_validada_sha` como base, no lugar de
-`refs/remotes/<remoto>/HEAD`, quando tudo vale: um só `ENTREGA.md` declara a branch; o SHA tem
-40 hex, existe, é ancestral do SHA enviado e não é ancestral de `refs/remotes/<remoto>/HEAD` (a
-predecessora já integrada volta à regra de sempre); e `branch_base` não é a branch padrão do remoto
-com outro nome (`main`, `<remoto>/main`, `refs/heads/main`, `refs/remotes/<remoto>/main`) nem tem
-byte de controle, que chegaria ao terminal no diagnóstico. Isso só
+`refs/remotes/<remoto>/HEAD`, quando tudo vale: um só `ENTREGA.md` declara a branch, sem NUL em
+lugar nenhum; o SHA tem o tamanho do OID do repositório (40 hex no SHA-1, 64 no SHA-256), existe,
+é ancestral do SHA enviado e não é ancestral de `refs/remotes/<remoto>/HEAD` (a predecessora já
+integrada volta à regra de sempre); e `branch_base` não é a branch padrão do remoto com outro nome
+(`main`, `<remoto>/main`, `refs/heads/main`, `refs/remotes/<remoto>/main`) nem tem byte de
+controle, que chegaria ao terminal no diagnóstico. Os prefixos saem por caso (DM-313):
+`refs/heads/origin/main` é a branch local de nome literal `origin/main`, e
+`refs/remotes/<outro remoto>/X` fica inteiro. Isso só
 estreita a seleção: sai a entrega trazida pela predecessora, cujo portão vale para outro SHA, e
 continuam a entrega da branch (pelo nome e pelo trailer) e toda `ENTREGA.md` que os commits da
 branch tocam depois da base. O diagnóstico cita a base declarada e o `ENTREGA.md` que a declara.

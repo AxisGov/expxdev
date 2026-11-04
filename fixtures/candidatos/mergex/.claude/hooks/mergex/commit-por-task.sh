@@ -188,7 +188,7 @@ Um commit declarou Task ou Metodo, mas sua classe não pode ser provada." >&2
 
 $SAIDA_CONTRATO
 
-Commit de método exige exatamente Trabalho + Metodo (pre-e2, pre-e6 ou e8)
+Commit de método exige exatamente Trabalho + Metodo (pre-e2, reconciliacao-base, predecessores, retomar-v9-predecessores, e9-merge, pre-e6 ou e8)
 e nunca aceita Task." >&2
       exit 2
     fi
