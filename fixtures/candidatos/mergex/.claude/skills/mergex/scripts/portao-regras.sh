@@ -109,7 +109,9 @@
 #         nunca isentam:
 #           (a) pr_entregas_do_intervalo com <base> = refs/remotes/<remoto>/HEAD,
 #               quando resolve para commit (push para URL não tem; nunca se
-#               adivinha main ou master);
+#               adivinha main ou master); na branch empilhada, a
+#               base_validada_sha que a entrega dela declara (_pr_base_declarada,
+#               DM-310);
 #           (b) a regra legada pelo nome (pr_entrega_da_ref);
 #           (c) o trailer `Trabalho: <id>` do commit enviado, que seleciona
 #               docs/entregas/<id>/ENTREGA.md.
@@ -591,14 +593,55 @@ _pr_barra_selecao() {
 }
 
 # _pr_nota_base <remoto> <base> — a decisão do pre-push que barra ou avisa passa
-# a citar a base da parcela (a): refs/remotes/<remoto>/HEAD e o SHA dela. Se a
+# a citar a base da parcela (a): refs/remotes/<remoto>/HEAD e o SHA dela, ou a
+# base_validada_sha declarada pela branch empilhada (DM-310). Se a
 # base está defasada ou não é a base de integração da branch, entregas trazidas
 # pela base podem ter sido selecionadas (falso bloqueio, nunca aprovação). Só
 # acrescenta texto ao diagnóstico: a decisão não muda.
 _pr_nota_base() {
   case "${PR_DEC:-}" in barra|avisa) ;; *) return 0 ;; esac
-  PR_DIAG="$PR_DIAG [base da seleção: refs/remotes/$1/HEAD = $2; se essa base está defasada ou não é a base de integração desta branch, entregas trazidas pela base podem ter sido selecionadas: rode 'git fetch $1' e 'git remote set-head $1 -a' antes de rodar o E2 (/mergex-check) de novo]"
+  if [ -n "${PR_BASE_DECL:-}" ]; then
+    PR_DIAG="$PR_DIAG [base da seleção: base_validada_sha = $2, declarada em $PR_BASE_DECL_DE (branch_base: $PR_BASE_DECL_NOME); só as entregas trazidas por essa base ficaram de fora, e as que os commits desta branch tocam continuam selecionadas]"
+  else
+    PR_DIAG="$PR_DIAG [base da seleção: refs/remotes/$1/HEAD = $2; se essa base está defasada ou não é a base de integração desta branch, entregas trazidas pela base podem ter sido selecionadas: rode 'git fetch $1' e 'git remote set-head $1 -a' antes de rodar o E2 (/mergex-check) de novo]"
+  fi
   if [ "$PR_DEC" = barra ]; then PR_ERRO="$PR_DIAG"; fi
+  return 0
+}
+
+# _pr_base_declarada <raiz> <b> <sha_local> <remoto> <base_padrao> — a base da
+# parcela (a) declarada pela entrega da própria branch (DM-310). Uma branch
+# empilhada sobre outra branch de trabalho (E0 com base informada) grava no
+# ENTREGA.md `branch_base` e `base_validada_sha`; contra refs/remotes/<remoto>/HEAD,
+# a entrega da predecessora entrava na seleção e barrava o push de um SHA válido.
+# Só estreita a seleção, e só quando tudo vale: o ENTREGA.md que declara
+# `branch: <b>` na árvore ENVIADA (uma só); `base_validada_sha` com 40 hex, um
+# commit presente, ancestral do SHA enviado e NÃO ancestral da base padrão (a
+# predecessora já integrada volta à regra de sempre); `branch_base` que não é a
+# branch padrão do remoto com outro nome (main, <remoto>/main, refs/heads/main,
+# refs/remotes/<remoto>/main), sem byte de controle. Fora disso, PR_BASE_DECL fica
+# vazio e nada muda.
+_pr_base_declarada() {
+  local raiz="$1" b="$2" sl="$3" remoto="$4" padrao="$5" tmp e bb bv nome
+  PR_BASE_DECL=""; PR_BASE_DECL_DE=""; PR_BASE_DECL_NOME=""
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/mergex-portao-base.XXXXXX")" || return 0
+  : > "$tmp/um"
+  if ! _pr_entregas_em "$raiz" "$sl" "$b" "$tmp/um" || [ "$(wc -l < "$tmp/um" | tr -d ' ')" != 1 ]; then rm -rf "$tmp"; return 0; fi
+  e="$(sed -n 1p "$tmp/um")"
+  _pr_g -C "$raiz" cat-file blob "$sl:$e" > "$tmp/e" 2>/dev/null || { rm -rf "$tmp"; return 0; }
+  bb="$(catalogo_fm "$tmp/e" branch_base)"; bv="$(catalogo_fm "$tmp/e" base_validada_sha)"
+  rm -rf "$tmp"
+  [[ "$bv" =~ ^[0-9a-f]{40}$ ]] || return 0
+  # byte de controle no nome não estreita nada, nem chega ao diagnóstico (ESC no terminal)
+  case "$bb" in *[[:cntrl:]]*) return 0 ;; esac
+  bb="${bb#refs/heads/}"; bb="${bb#refs/remotes/}"; bb="${bb#"$remoto"/}"
+  nome="$(_pr_g -C "$raiz" symbolic-ref -q "refs/remotes/$remoto/HEAD" 2>/dev/null)" || nome=""
+  nome="${nome#refs/remotes/"$remoto"/}"
+  case "$bb" in ''|null|"$nome") return 0 ;; esac
+  _pr_g -C "$raiz" cat-file -e "$bv^{commit}" 2>/dev/null || return 0
+  _pr_g -C "$raiz" merge-base --is-ancestor "$bv" "$sl" 2>/dev/null || return 0
+  ! _pr_g -C "$raiz" merge-base --is-ancestor "$bv" "$padrao" 2>/dev/null || return 0
+  PR_BASE_DECL="$bv"; PR_BASE_DECL_DE="$e"; PR_BASE_DECL_NOME="$bb"
   return 0
 }
 
@@ -607,15 +650,18 @@ _pr_nota_base() {
 _pr_decide_push() {
   local raiz="$1" sl="$2" rr="$3" sr="$4" remoto="$5" b tmp base tem_a=0 rcb=0 motivo erro e rcd
   case "$rr" in refs/heads/?*) b="${rr#refs/heads/}" ;; *) _pr_sai passa ref_nao_aplicavel - ""; return ;; esac
-  : "$b"
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/mergex-portao-push-sel.XXXXXX")" \
     || { _pr_sai barra erro_ambiente - "$(_pr_diag_invalido erro_ambiente): não foi possível criar diretório temporário"; return; }
   : > "$tmp/lista"
   # (a) o conteúdo contra refs/remotes/<remoto>/HEAD, quando resolve para
   # commit; sem ela a parcela não existe (nunca se adivinha main ou master)
   base="$(_pr_g -C "$raiz" rev-parse -q --verify "refs/remotes/$remoto/HEAD^{commit}" 2>/dev/null)" || base=""
+  PR_BASE_DECL=""; PR_BASE_DECL_DE=""; PR_BASE_DECL_NOME=""
   if [ -n "$base" ]; then
     tem_a=1
+    # a base declarada pela entrega da branch empilhada, quando serve (DM-310)
+    _pr_base_declarada "$raiz" "$b" "$sl" "$remoto" "$base"
+    [ -z "$PR_BASE_DECL" ] || base="$PR_BASE_DECL"
     pr_entregas_do_intervalo "$raiz" "$base" "$sl" >> "$tmp/lista" || { motivo="$PR_SEL_MOTIVO"; erro="$PR_ERRO"; rm -rf "$tmp"; _pr_barra_selecao "$motivo" "$erro"; _pr_nota_base "$remoto" "$base"; return 1; } # guarda:PPBASE
   fi
   # (b) a regra legada pelo nome

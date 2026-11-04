@@ -18,12 +18,12 @@ Commits certificados (confirmados na organização AxisGov em 2026-11-03, depois
 | `AxisGov/runx` | `a21419600626036ba79ea7c1b72fdf75590e8c0b` |
 | `AxisGov/legadox` | `e43d17e381d34485216f4b935729b719fc9c1dee` |
 | `AxisGov/stackx` | `1c49fba3bf4a88313657527cbfe29f9f3fe2b89a` |
-| `AxisGov/mergex` | `0a85eabcb5b7b91efb78f370ac37f58ce09027c3` |
-| `AxisGov/sprintx` | `e552cfce2a2bbae5213822613621455f6fda9cac` |
+| `AxisGov/mergex` | `915fcfff7a845dcb6457431c0657a60c3fb0fbc6` |
+| `AxisGov/sprintx` | `a6f852add5cd60dda64fc208f85a75d627bacc5e` |
 | `AxisGov/MemoX` | `897408f6bf60d0c9f4c0ed6b5cb12d6db8e8cdd4` |
 | `AxisGov/prodx` | `06ce57a42db8eaae3f98ea60fc3895f1536383c5` |
 | `AxisGov/buildx` | `caf4fbe9dfac60a0ae8f34d7a36e9eb779c3cb0b` |
-| `AxisGov/designx` | `344005c8848bfdcc158f77e737c8d1cee1c459da` |
+| `AxisGov/designx` | `0d649e3d30c16329dd5b8c49c62b47241b04d424` |
 
 ## Catálogo completo
 

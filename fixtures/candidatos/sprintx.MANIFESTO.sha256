@@ -36,11 +36,11 @@ b2b9f7b6b8c6349316092989a7babefd495ee6c9ff89bcf2c6dc6ba76d66ac8d  .claude/hooks/
 14c07b1657547c0a90f15b18d71237f165219a67e21d87331d47fdcd0e99abc1  .claude/hooks/testes/bancada-runx-na-mesma-arvore.sh
 c4585b4985bc6187d61677ddf68430d51183c3b5a4ad4a6c295d76b523b79d85  .claude/hooks/testes/bancada-segredo-limite.sh
 f7174dee86fb586fc35fa09a029ba2438d25095351309c14a64b060961d085f6  .claude/hooks/testes/bancada-segredo-sem-git.sh
-77b6d74c9614231fb54929a260d966bcbb7d239fd81504b33c54a38f02a49ad1  .claude/hooks/testes/bancada.sh
+db1b0102aaf39f13fc9fb7a107b3321e10caf1a8ff27ef2609b1760c17724a88  .claude/hooks/testes/bancada.sh
 d9370952ede36c379751835d4a711550bd37b95c16f127d841883a49e962d2a5  .claude/hooks/testes/fonte.sh
 00dc2c2d5319710f73f5f54616c5b652aa3f99879f8c75444c8002abeeb13483  .claude/hooks/testes/transcrito-agente.sh
 0354c304ed52b1d41becc8df83b36f4a3bf0b3543316bf0e569347ca719fe43d  .claude/settings.json
-c193f9d6109b184af9278be508abc6de323387af902ff92c55c0ccbefba355ba  .claude/skills/sprintx/DECISOES-DA-SKILL.md
+8ff3229b2addf9dd7df09587837f32e7c23b2ea30901ebc7b9085e373d36b3f6  .claude/skills/sprintx/DECISOES-DA-SKILL.md
 c1cf8588ff739814135a0847b6274fd882d7b2dc6c5dcb75b44d985d771fd77d  .claude/skills/sprintx/SKILL.md
 175d6d8d357624377d97f51e893e89a01a7268ab0c80efb1762b40fbccd9fc11  .claude/skills/sprintx/assets/TEMPLATE-BLOQUEIOS.md
 87e9ed363f1a083e60fc37d2c48cb3315513a3a47950858dd445d8d5bc780de3  .claude/skills/sprintx/assets/TEMPLATE-DECISOES.md
@@ -72,7 +72,7 @@ ddad9ed6cc45e9ddb885698d7f49cf45898c21deb70f6686993fc85f47982040  .claude/skills
 a85f685e523ba0324e1956eff60486005afb7904943036b97faa1ff01c24ad54  .claude/skills/sprintx/scripts/caminho-git.sh
 d9b53506df9a6f69070ed39584b72d5bf5cc01bc225c2a65f168ce1cdf8f4829  .claude/skills/sprintx/scripts/lib/execucao.sh
 f0c8b51ec6ea3d8f6e91c7d619b004cc5a1f85b3f88c9f3bd88bfe5c4cde9f6d  .claude/skills/sprintx/scripts/lib/trava-autorizacao-f6.sh
-b8fc44bd6a17f7d7e4cab0fcb202672cabbcadce8bf62e3aa8cf67c679a978ea  .claude/skills/sprintx/scripts/planejamento.sh
+239ac46d9203f26f76e9a63e3717a396b371f49d22c98f559da16b38faea5951  .claude/skills/sprintx/scripts/planejamento.sh
 e8d2dee90fb98f4c10fe15b249b72a20dc52d0c09bb84cf197ba9e04943a51ba  .claude/skills/sprintx/scripts/predecessores.sh
 4337608894dffc6b68b6d1f24858a86b73d372a1d6ea6b78fdb994ed0961b51b  .claude/skills/sprintx/scripts/rastro.sh
 04641afbcf0378878664dd21b76c320fbb42ab9e35b15fdf20041d8f45fbb843  .expx/hooks.json

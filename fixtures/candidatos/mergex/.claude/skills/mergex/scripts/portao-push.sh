@@ -17,7 +17,7 @@
 # ref refs/heads/<b> são a UNIÃO de três parcelas, que só acrescentam e nunca
 # isentam (DM-185): (a) a seleção pelo conteúdo contra refs/remotes/<remoto>/HEAD,
 # quando resolve para commit (push para URL não tem; nunca se adivinha main ou
-# master); (b) a regra legada pelo nome (o ENTREGA.md que declara branch: <b>
+# master), ou contra a base_validada_sha da branch empilhada (DM-310); (b) a regra legada pelo nome (o ENTREGA.md que declara branch: <b>
 # na árvore enviada, na remota anterior ou na ponta local); (c) o trailer
 # Trabalho: <id> do commit enviado. Cada entrega é validada sobre o SHA
 # enviado e a decisão da ref é a agregada (qualquer barra vence, depois avisa,
