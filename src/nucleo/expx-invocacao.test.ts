@@ -24,8 +24,8 @@ function projeto(agentes = ["qa", "stackx-cartografo"]): string {
   return raiz;
 }
 
-function roda(raiz: string, payload: object) {
-  const env: NodeJS.ProcessEnv = { ...process.env, CLAUDECODE: "1" };
+function roda(raiz: string, payload: object, extraEnv: NodeJS.ProcessEnv = {}) {
+  const env: NodeJS.ProcessEnv = { ...process.env, CLAUDECODE: "1", ...extraEnv };
   delete env["EXPX_SESSAO"];
   return spawnSync(process.execPath, [HOOK], { input: JSON.stringify({ cwd: raiz, session_id: "sess-1", ...payload }), encoding: "utf8", env });
 }
@@ -45,6 +45,57 @@ const envelopes = (raiz: string): string[] => {
 };
 
 describe("expx-invocacao: observa a chamada do agente gerenciado", () => {
+  it("funcional: EXPX_MODEL e EXPX_EFFORT herdados da sessão não viram executor observado", () => {
+    const raiz = projeto();
+    const herdado = { EXPX_MODEL: "modelo-velho", EXPX_EFFORT: "xhigh" };
+    roda(raiz, { hook_event_name: "PreToolUse", tool_name: "Agent", tool_use_id: "toolu_1", tool_input: { subagent_type: "qa", prompt: "p", description: "d" } }, herdado);
+    roda(raiz, { hook_event_name: "PostToolUse", tool_name: "Agent", tool_use_id: "toolu_1", tool_input: { subagent_type: "qa" }, tool_response: { status: "completed" } }, herdado);
+    const e = eventos(raiz)[0];
+    expect(e).toMatchObject({ evento: "invocacao_fechada", estado_invocacao: "concluida" });
+    expect(e?.["model"] ?? null).toBeNull();
+    expect(e?.["effort"] ?? null).toBeNull();
+    roda(raiz, { hook_event_name: "PreToolUse", tool_name: "Agent", tool_use_id: "toolu_2", tool_input: { subagent_type: "qa", prompt: "p", description: "d" } }, herdado);
+    roda(raiz, { hook_event_name: "PostToolUse", tool_name: "Agent", tool_use_id: "toolu_2", tool_input: { subagent_type: "qa" }, tool_response: { status: "completed", resolvedModel: "claude-sonnet-5-5" } }, herdado);
+    const f = eventos(raiz)[1];
+    expect(f?.["model"]).toBe("claude-sonnet-5-5");
+    expect(f?.["effort"] ?? null).toBeNull();
+  });
+
+  it("funcional: linha malformada da projeção não é gerenciada no hook, como não é no rastro", () => {
+    for (const linha of [
+      `qa\t${RES}\tsenior\tdeclarada\tsenior\tclaude-sonnet\tembutida\t-`,
+      `qa\t${RES}\tsenior\tdeclarada\tsenior\tclaude-sonnet\tembutida\t-\t-\textra`,
+      `qa\t${RES}\tsen ior\tdeclarada\tsenior\tclaude-sonnet\tembutida\t-\t-`,
+      `qa\t${RES}\t-\tdeclarada\tsenior\tclaude-sonnet\tembutida\t-\t-`,
+      `qa\t${RES}\tsenior\tdeclarada\tsenior\tclaude-sonnet\tembutida\t-\thigh`,
+      `qa\t${RES}\tsenior\tdeclarada\tsenior\tclaude-sonnet\tembutida\tsonnet\thigh`,
+    ]) {
+      const raiz = projeto([]);
+      writeFileSync(join(raiz, ".expx", "orquestracao-rastro.tsv"), `# expx-orquestracao-rastro 1\n${linha}\n`);
+      expect(antes(raiz, "qa").stdout, linha).toBe("");
+      expect(envelopes(raiz), linha).toEqual([]);
+      depois(raiz, "qa", { status: "completed", resolvedModel: "claude-sonnet-5-5" });
+      expect(eventos(raiz), linha).toEqual([]);
+    }
+  });
+
+  it("funcional: projeção CRLF com o CR final sem quebra de linha vale como no rastro", () => {
+    const raiz = projeto([]);
+    writeFileSync(join(raiz, ".expx", "orquestracao-rastro.tsv"), `# expx-orquestracao-rastro 1\r\nqa\t${RES}\tsenior\tdeclarada\tsenior\tclaude-sonnet\tembutida\t-\t-\r`);
+    expect(antes(raiz, "qa").stdout).not.toBe("");
+    expect(envelopes(raiz)).toHaveLength(1);
+    depois(raiz, "qa", { status: "completed", resolvedModel: "claude-sonnet-5-5" });
+    expect(eventos(raiz)[0]).toMatchObject({ evento: "invocacao_fechada", resolucao_id: RES });
+  });
+
+  it("funcional: a projeção que estraga no meio da chamada não apaga a resolução da chamada", () => {
+    const raiz = projeto();
+    antes(raiz, "qa");
+    writeFileSync(join(raiz, ".expx", "orquestracao-rastro.tsv"), `# expx-orquestracao-rastro 1\nqa\t${RES}\tsenior\tdeclarada\n`);
+    depois(raiz, "qa", { status: "completed", resolvedModel: "claude-sonnet-5-5" });
+    expect(eventos(raiz)[0]).toMatchObject({ evento: "invocacao_fechada", resolucao_id: RES });
+  });
+
   it("funcional: agente que nenhuma skill instalou passa sem envelope, sem saída e sem evento", () => {
     const raiz = projeto();
     expect(antes(raiz, "general-purpose")).toMatchObject({ status: 0, stdout: "" });

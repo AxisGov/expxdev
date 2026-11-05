@@ -53,19 +53,35 @@ function pastaDe(raiz) {
   return isAbsolute(p) ? p : join(raiz, p);
 }
 
-/** O `resolucao_id` vigente do agente, da projecao; vazio se ele nao e gerenciado. */
+/**
+ * O `resolucao_id` vigente do agente, da projecao; vazio se ele nao e gerenciado.
+ * A linha vale pelas mesmas regras do leitor do rastro (`expx_resolucao_extras`,
+ * em expx-rastro.sh): o hook e o rastro tem de concordar sobre ela. Se o hook
+ * aceitasse uma linha que o rastro recusa, suprimiria o id explicito da chamada
+ * (iguais) e o evento sairia sem `resolucao_id`.
+ */
 function resolucaoDe(raiz, agente) {
   let linhas;
   try {
-    linhas = readFileSync(join(raiz, ".expx", "orquestracao-rastro.tsv"), "utf8").split(/\r?\n/);
+    // como o `read` do shell: uma linha por \n, sem o \r do fim (CRLF, e o CR
+    // final sem quebra de linha)
+    linhas = readFileSync(join(raiz, ".expx", "orquestracao-rastro.tsv"), "utf8").split("\n").map((l) => l.replace(/\r$/, ""));
   } catch {
     return "";
   }
   if (linhas[0] !== "# expx-orquestracao-rastro 1") return "";
-  const dele = linhas.slice(1).filter((l) => l.split("\t")[0] === agente);
+  if (!/^[A-Za-z0-9._-]+$/.test(agente)) return "";
+  const dele = linhas.slice(1).filter((l) => l.startsWith(`${agente}\t`));
   if (dele.length !== 1) return "";
-  const id = dele[0].split("\t")[1] ?? "";
-  return /^[0-9a-f]{64}$/.test(id) ? id : "";
+  const campos = dele[0].split("\t");
+  if (campos.length !== 9) return "";
+  const [, id, cd, oc, cr, alt, oa, mm, me] = campos;
+  if (!/^[0-9a-f]{64}$/.test(id)) return "";
+  if (![campos[0], cd, oc, cr, alt, oa, mm, me].every((v) => /^[A-Za-z0-9._:/-]+$/.test(v))) return "";
+  if ([cd, oc, cr, alt, oa].includes("-")) return "";
+  if (mm === "-" && me !== "-") return "";
+  if (mm !== "-" && oa !== "agentes-json-v1") return "";
+  return id;
 }
 
 /** Os dois hooks calculam a instancia pela mesma conta, com o formato de hash do repositorio. */
@@ -80,6 +96,10 @@ function grava(raiz, agente, evento, resultado, detalhe, extras, modelo) {
   if (ferramenta === undefined || !existsSync(RASTRO)) return;
   const env = { ...process.env, EXPX_FERRAMENTA: ferramenta, EXPX_AGENTE: agente };
   env.EXPX_HARNESS = env.EXPX_HARNESS || "claude-code";
+  // o executor observado e so o que este hook viu: modelo e esforco herdados da
+  // sessao nao entram no evento
+  delete env.EXPX_MODEL;
+  delete env.EXPX_EFFORT;
   if (modelo) env.EXPX_MODEL = modelo;
   const corpo = Object.entries(extras).map(([k, v]) => `${JSON.stringify(k)}:${JSON.stringify(v)}`).join(",");
   spawnSync("bash", ["-c", '. "$0"; expx_rastro_grava "$1" "$2" hook "$3" "$4" "[]" "$5"', RASTRO, raiz, evento, resultado, detalhe, corpo], { env, stdio: "ignore" });
