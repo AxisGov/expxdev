@@ -667,8 +667,8 @@ npx --yes --package ~/expx-cli/v0.13.9/expxdev-0.13.9.tgz expx init --skills bui
   `--sem-registro` no `init` e no `update`.
 - `0.13.8` leva a MergeX ao SHA-256 de ponta a ponta, confere o blob provado no `e9-merge`, aceita
   `core.autocrlf=true` no E9 e deixa de gravar `pr_estado` depois do merge na entrega por trabalho.
-- `0.13.9` mede o SHA de `commits` da MergeX pelo formato do repositório da ENTREGA e fixa a árvore e o
-  pai do commit de método logo depois do `add`.
+- `0.13.9` mede o SHA de `commits` da MergeX pelo formato do repositório da ENTREGA e fixa o pai do
+  commit de método antes do `add` e a árvore logo depois.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
