@@ -669,8 +669,9 @@ npx --yes --package ~/expx-cli/v0.13.10/expxdev-0.13.10.tgz expx init --skills b
   `core.autocrlf=true` no E9 e deixa de gravar `pr_estado` depois do merge na entrega por trabalho.
 - `0.13.9` mede o SHA de `commits` da MergeX pelo formato do repositório da ENTREGA e fixa o pai do
   commit de método antes do `add` e a árvore logo depois.
-- `0.13.10` faz o CI da MergeX barrar o PR cuja base não contém a base validada da entrega e consulta o
-  servidor pela base sem ref remota no registro da reconciliação.
+- `0.13.10` faz o CI da MergeX barrar o PR cuja base não contém a base validada da entrega, consulta o
+  servidor pela base sem ref remota no registro da reconciliação, e corrige o envelope da invocação
+  (executor herdado e resolução perdida no rastro).
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

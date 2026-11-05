@@ -2,7 +2,7 @@
 
 ## 0.13.10 — a base do PR e a base publicada na MergeX
 
-Instale por PR, como a 0.13.9. Só a MergeX muda, e o README passa a documentar o `--harness codex`. Nenhum item é regressão da 0.13.9.
+Instale por PR, como a 0.13.9. Mudam a MergeX e o envelope da invocação do núcleo, e o README passa a documentar o `--harness codex`. Nenhum item é regressão da 0.13.9.
 
 - **mergex@b30e951** (mergex#84 e #85):
   - **A base do PR contém a base validada** (DM-320, relato do Login no login#58):
@@ -15,7 +15,10 @@ Instale por PR, como a 0.13.9. Só a MergeX muda, e o README passa a documentar 
     - sem a ref remota da base, o `--registrar` consulta o servidor antes da trava C5;
     - a base que existe lá, mas não foi buscada, recusa e manda rodar `git fetch`. A consulta que falha também recusa;
     - a base que não existe no servidor (a empilhada nunca enviada) vale pela local, e a DM-320 barra no CI o PR que não a contém.
-- **ExpxDev:** o README documenta o `--harness codex`, que a CLI já aceitava. Hoje ele só registra o hook de sincronização de sessão; os agentes do método no Codex são a F7 da orquestração.
+- **ExpxDev** (expxdev#145, achados do CodeAnt no login#62):
+  - **O envelope da invocação não grava executor herdado:** o `expx-invocacao.mjs` tira o `EXPX_MODEL` e o `EXPX_EFFORT` herdados da sessão. Antes, quando o hook não via modelo, um valor velho ia ao evento como executor observado.
+  - **O envelope não perde a resolução:** o hook valida a linha da projeção pelas mesmas regras do leitor do rastro (`expx_resolucao_extras`), inclusive o CR final sem quebra de linha. Antes, numa linha malformada, ele suprimia o `resolucao_id` explícito da chamada e o evento saía sem ele. Os dois falhavam aberto: o envelope só observa.
+  - O README documenta o `--harness codex`, que a CLI já aceitava. Hoje ele só registra o hook de sincronização de sessão; os agentes do método no Codex são a F7 da orquestração.
 - **Efeito no consumidor:** um PR aberto contra outra base que não a registrada passa a falhar no CI da MergeX. O caminho é abrir contra a `branch_base`, ou entregar a predecessora antes e reconciliar.
 - **Não exercitado:**
   - a consulta ao servidor com credencial interativa real: o teste usa um `git` falso;
