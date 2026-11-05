@@ -155,13 +155,17 @@ eh_historico_global_sprintx() {
 FECHAMENTO_ATIVO=0
 FECHAMENTO_ISENTOS=""
 fechamento_apurar() {
-  local branch oc marca msg trailers pr entrega achou=0 status caminho origem modo
+  local branch oc marca msg trailers pr entrega achou=0 status caminho origem modo n
   branch="$(git -C "$RAIZ" branch --show-current 2>/dev/null)"
   [[ "$branch" =~ ^docs/(OC-[0-9]{4}-[0-9]{4})-fechamento$ ]] || return 0
   oc="${BASH_REMATCH[1]}"
   git -C "$RAIZ" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && return 0
   marca="$(git -C "$RAIZ" config --get "branch.$branch.expxFechamento" 2>/dev/null)"
-  [[ "$marca" =~ ^[0-9a-f]{40}$ ]] || return 0
+  # a marca é o SHA completo do merge, no tamanho do formato do repositório (DM-315)
+  case "$(git -C "$RAIZ" rev-parse --show-object-format 2>/dev/null)" in
+    sha1) n=40 ;; sha256) n=64 ;; *) return 0 ;;
+  esac
+  [[ "$marca" =~ ^[0-9a-f]{$n}$ ]] || return 0
   git -C "$RAIZ" merge-base --is-ancestor "$marca" HEAD 2>/dev/null || return 0
   msg="$(integracao_mensagem_do_comando "$CMD")"
   trailers="$(printf '%s\n' "$msg" | git interpret-trailers --parse 2>/dev/null)"

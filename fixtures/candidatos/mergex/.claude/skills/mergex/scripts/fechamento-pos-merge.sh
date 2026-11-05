@@ -4,8 +4,9 @@
 #
 # O E5 da runx só roda depois da entrega aceita, e a essa altura a branch já foi
 # integrada. O fechamento vai numa branch própria, docs/<OC-ID>-fechamento, a
-# partir da base. ENTREGA.md não é tocado: `pr_estado` continua com o E9 ou com
-# uma pessoa, e o portão não seleciona o PR de fechamento.
+# partir da base. ENTREGA.md não é tocado: `pr_estado` fica com o retrato do E7
+# (a entrega da runx é por trabalho, DM-317), e o portão não seleciona o PR de
+# fechamento.
 #
 #   fechamento-pos-merge.sh --trabalho <pasta em docs/entregas> [--raiz <dir>]
 #
@@ -82,7 +83,12 @@ ESTADO="$(campo .state)"
 # `branch_base` é a base efetiva do E0: nome, ref do remoto ou SHA. O PR só diz o nome.
 BASE_PR="$(campo .baseRefName)"
 BASE_SHA=""
-if [[ "$BASE" =~ ^[0-9a-f]{40}$ ]]; then
+# SHA local no tamanho do formato do repositório (DM-315)
+case "$(g rev-parse --show-object-format 2>/dev/null)" in
+  sha1) OID_LEN=40 ;; sha256) OID_LEN=64 ;;
+  *) para 5 "formato de objetos Git ilegível ou não suportado" ;;
+esac
+if [[ "$BASE" =~ ^[0-9a-f]{$OID_LEN}$ ]]; then
   BASE_SHA="$BASE"
 else
   # Ref completa não tem dúvida; sem ela, `origin/main` pode ser a branch `main` do
@@ -97,7 +103,12 @@ else
 fi
 [ "$ESTADO" = MERGED ] || para 4 "o PR está $ESTADO: a ocorrência só fecha depois do merge. $PR_URL"
 MERGE="$(campo .mergeCommit.oid)"
-[[ "$MERGE" =~ ^[0-9a-f]{40}$ ]] || para 5 "o serviço não informou o commit de merge de $PR_URL"
+# O serviço é o GitHub, que só hospeda SHA-1: o merge dele tem 40 hex. Num
+# repositório SHA-256 o merge do serviço não se prova aqui (DM-315).
+[[ "$MERGE" =~ ^[0-9a-f]{40}$ ]] \
+  || para 5 "o serviço não informou o commit de merge de $PR_URL em SHA-1 de 40 hex${MERGE:+ (informou $MERGE)}"
+[ "$OID_LEN" = 40 ] \
+  || para 5 "repositório SHA-256: o merge que o serviço informa é SHA-1 e não se prova aqui; o fechamento depois do merge não está disponível neste formato"
 
 REF_BASE="refs/remotes/$REMOTO/$BASE_PR"
 # A refspec explícita: em clone de uma branch só, o fetch atualizaria só o FETCH_HEAD.

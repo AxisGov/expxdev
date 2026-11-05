@@ -162,11 +162,11 @@ Ele recusa `.`, `-A` e `-u`: o staging continua sendo por caminho explícito.
 **A varredura de segredo (passo 2) é julgamento, e roda DENTRO da seção** — ela lê `git diff --cached`, que só existe depois do staging. Para isso a seção abre em dois tempos, com a mesma trava atravessando os dois:
 
 ```
-bash .../fechamento-do-e1.sh --preparar --entrega <ENTREGA.md> \
+bash .claude/skills/mergex/scripts/fechamento-do-e1.sh --preparar --entrega <ENTREGA.md> \
   --task <id> --mensagem <arquivo> -- <caminho-1> ...
 # imprime token=<...>; a trava CONTINUA adquirida
 # → varredura de segredo sobre `git diff --cached`
-bash .../fechamento-do-e1.sh --concluir --entrega <ENTREGA.md> \
+bash .claude/skills/mergex/scripts/fechamento-do-e1.sh --concluir --entrega <ENTREGA.md> \
   --task <id> --mensagem <arquivo> --token <token>
 ```
 
@@ -429,7 +429,7 @@ Trabalho: <trabalho_id>
 Metodo: retomar-v9-predecessores
 ```
 
-**7. `e9-merge`, logo depois de o E9 registrar o merge de um PR de planejamento ou de sprint.** Persiste somente `docs/entregas/<trabalho_id>/ENTREGA.md`, e só a transição que `entrega-de-planejamento.sh --registrar-merge` (ou `--completar-base`) grava (DM-311):
+**7. `e9-merge`, logo depois de o E9 registrar o merge de um PR de planejamento ou de sprint.** Persiste somente `docs/entregas/<trabalho_id>/ENTREGA.md`, e só a transição que `entrega-de-planejamento.sh --registrar-merge` (ou `--completar-base`) grava (DM-311). O commit leva o conteúdo que a prova leu: se o `ENTREGA.md` mudar entre a prova e o `git add`, o executor para sem commitar e preserva o stage (DM-314):
 
 ```
 chore(mergex): persiste metodo e9-merge
@@ -533,7 +533,7 @@ Testes: <o que os dois testes cobrem, resumido>
 |---|---|---|
 | **E1** | exatamente um `Task:` e um `Trabalho:`; nenhum `Metodo:` | o E1, uma task por commit |
 | **método** | exatamente um `Trabalho:` e um `Metodo:` (`pre-e2`, `reconciliacao-base`, `predecessores`, `retomar-v9-predecessores`, `e9-merge`, `pre-e6` ou `e8`); nenhum `Task:` | `persistir-metodo.sh` |
-| **integração de base** | exatamente um `Trabalho:` e um `Integra-base:` com o SHA completo (40 hex) da base integrada; nenhum `Task:`, nenhum `Metodo:` | a pessoa (ou o agente, sob autorização) que concluiu o merge da base |
+| **integração de base** | exatamente um `Trabalho:` e um `Integra-base:` com o SHA completo da base integrada (40 hex no SHA-1, 64 no SHA-256, o formato do repositório); nenhum `Task:`, nenhum `Metodo:` | a pessoa (ou o agente, sob autorização) que concluiu o merge da base |
 
 O commit de integração da base é o merge `M` da reconciliação (`references/11-reconciliacao-base.md`): tem **exatamente dois pais**, e o segundo é o `Integra-base:`. Não é E1, não entra em `ENTREGA.commits`, não consome `seq` e não satisfaz V11. A MergeX não o cria — valida e registra.
 
@@ -541,7 +541,7 @@ O commit de integração da base é o merge `M` da reconciliação (`references/
 <título do merge>
 
 Trabalho: <trabalho_id>
-Integra-base: <sha de 40 hex do segundo pai>
+Integra-base: <sha completo do segundo pai>
 ```
 
 Os hooks de commit reconhecem a classe pela mensagem (`.claude/hooks/README.md`): o `commit-por-task` não a trata como mistura de tasks, e o `arquivo-fora-do-plano` avalia só os caminhos que diferem do segundo pai — o que a integração mudou, não tudo o que veio da base. Arquivo nascido na base e ajustado pela integração, que nenhuma task declara, nunca é acrescentado a uma task: o único caminho para ele passar na V9 é a reconciliação (`reconciliacao-base.sh --registrar`, com as quatro provas). Sem ela, continua fora do plano.
@@ -664,7 +664,7 @@ Isto não muda o schema e não cria campo: `references/00-schema.md` descreve `c
 bash .claude/skills/mergex/scripts/fechamento-do-e1.sh --registrar-existente \
   --entrega docs/entregas/<trabalho_id>/ENTREGA.md \
   --origem <sprintx|runx> --trabalho <trabalho_id> \
-  --task <T-NN.MM> --sha <40-hex>
+  --task <T-NN.MM> --sha <sha completo: 40 hex no SHA-1, 64 no SHA-256>
 ```
 
 Sob a mesma trava C5, ela exige stage vazio, contexto explícito coerente com `ENTREGA.md`, branch consistente, SHA completo existente e alcançável de `HEAD`, commit não-merge, exatamente um `Task:` e um `Trabalho:` correspondentes e nenhum `Metodo:`. O ownership é reexecutado sobre os paths do commit — em rename, origem e destino. Ela não cria, amenda, reseta, rebasa nem aplica commit algum.

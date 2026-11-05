@@ -120,16 +120,16 @@ escreva nem o edite à mão.
 | `branch` | texto | igual a `ENTREGA.branch` |
 | `branch_base` | texto | nome da ref de base, só informativo; as provas usam os SHAs |
 | `origem_base` | enum | `registrada_e0` \| `inferida_legado` (só no `001`) \| `reconciliacao_anterior` (do `002` em diante) |
-| `b0_sha` | SHA-1, 40 hex | `B0` |
-| `p1_sha` | SHA-1, 40 hex | `P1` |
-| `b1_sha` | SHA-1, 40 hex | `B1` |
-| `m_sha` | SHA-1, 40 hex | `M` |
+| `b0_sha` | SHA completo | `B0` |
+| `p1_sha` | SHA completo | `P1` |
+| `b1_sha` | SHA completo | `B1` |
+| `m_sha` | SHA completo | `M` |
 | `estado` | enum | `ativa` \| `superada` |
 | `arquivos` | lista | um item por caminho reconciliado; `[]` quando a integração não exigiu ajuste |
 | `arquivos[].caminho` | texto | caminho relativo à raiz, exatamente como no Git |
 | `arquivos[].status_base` | enum | `A` (nasceu entre `B0` e `B1`) \| `M` (mudou entre `B0` e `B1`) |
-| `arquivos[].blob_b1` | SHA-1, 40 hex | `git rev-parse B1:<caminho>` |
-| `arquivos[].blob_m` | SHA-1, 40 hex | `git rev-parse M:<caminho>` |
+| `arquivos[].blob_b1` | SHA completo | `git rev-parse B1:<caminho>` |
+| `arquivos[].blob_m` | SHA completo | `git rev-parse M:<caminho>` |
 | `arquivos[].diff_b1_m_sha256` | sha256, 64 hex | ver abaixo |
 | `arquivos[].motivo` | texto | uma linha: o que da feature tornou o ajuste necessário |
 | `registrado_em` | data ISO | data do sistema no registro |
@@ -139,7 +139,9 @@ Regras:
 
 - Todas as chaves sempre presentes; lista vazia é `[]`. Um merge de base sem arquivo a reconciliar
   gera o artefato com `arquivos: []`: é ele que avança a base validada.
-- SHAs sempre completos (40 hex), nunca nome de ref.
+- SHAs sempre completos, nunca nome de ref, e todos do mesmo tamanho: 40 hex no SHA-1, 64 no SHA-256.
+  Artefato com tamanhos misturados é inválido; o `--verificar` e a V9 exigem o tamanho do
+  formato do repositório (DM-315).
 - `motivo` é texto de uma linha, não vazio, sem marcador de template; é para o revisor, não entra
   em prova.
 - `diff_b1_m_sha256` é o sha256 da saída de

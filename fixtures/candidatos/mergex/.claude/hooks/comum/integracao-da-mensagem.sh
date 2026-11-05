@@ -3,8 +3,9 @@
 #
 # Reconhece a classe "integração de base" pela MENSAGEM do commit, nunca pelo
 # estado do Git: só vale a mensagem que declara `Integra-base:` como trailer
-# isolado e limpo. O que a leitura não isola (aspas soltas, lixo depois dos 40
-# hex, trailers que o Git não acha) é classe "nenhuma": regras de sempre.
+# isolado e limpo. O que a leitura não isola (aspas soltas, lixo depois do SHA
+# completo — 40 hex no SHA-1, 64 no SHA-256 —, trailers que o Git não acha) é
+# classe "nenhuma": regras de sempre.
 # Bloquear só com prova.
 #
 # Requer RAIZ (raiz do repositório) definida pelo chamador.
@@ -84,7 +85,7 @@ integracao_entrega_desta_branch() {
 # Define INT_CLASSE (nenhuma | valida | invalida) e INT_SAIDA.
 integracao_da_mensagem() {
   INT_CLASSE=nenhuma; INT_SAIDA=""
-  local txt tr integra trab tmp mh rc
+  local txt tr integra trab tmp mh rc n
   # Invólucro do heredoc `-m "$(cat <<'EOF' ... EOF)"`.
   txt="$(awk 'NR==1 && /^\$\(cat[[:space:]]*<</ { h=$0; tab=(h ~ /<<-/); sub(/^\$\(cat[[:space:]]*<<-?[[:space:]]*/, "", h); gsub(/[\047"\\[:space:]]/, "", h); next } h != "" { t=$0; if (tab) sub(/^\t+/, "", t); if (t == h) exit } { print }' <<<"$1")"
   tr="$(printf '%s\n' "$txt" | git interpret-trailers --parse 2>/dev/null)"
@@ -92,8 +93,11 @@ integracao_da_mensagem() {
   # pipeline devolve 141 — rodada extra da revisão): o grep lê até o fim.
   printf '%s\n' "$tr" | grep -E '^Integra-base:' >/dev/null || return 0
   integra="$(printf '%s\n' "$tr" | sed -n 's/^Integra-base:[[:space:]]*//p' | awk 'NR == 1')"
-  # Lixo depois dos 40 hex: a leitura não isolou o trailer.
-  printf '%s' "$integra" | grep -E '^[0-9a-f]{40}[^0-9a-f]' >/dev/null && return 0
+  # Lixo depois do SHA completo: a leitura não isolou o trailer. O tamanho é o do
+  # formato do repositório (DM-315); formato ilegível fica com 40, e o contrato,
+  # que exige o formato, decide.
+  case "$(git -C "$RAIZ" rev-parse --show-object-format 2>/dev/null)" in sha256) n=64 ;; *) n=40 ;; esac
+  printf '%s' "$integra" | grep -E "^[0-9a-f]{$n}[^0-9a-f]" >/dev/null && return 0
   trab="$2"
   if [ -z "$trab" ]; then
     trab="$(printf '%s\n' "$tr" | sed -n 's/^Trabalho:[[:space:]]*//p' | awk 'NR == 1')"

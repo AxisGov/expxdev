@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.13.8 — o SHA-256 de ponta a ponta, o blob provado no `e9-merge` e a entrega por trabalho depois do merge na MergeX
+
+Instale por PR, como a 0.13.7. Traz os achados do Conselhos e do CodeAnt na instalação da 0.13.7 (conselhos#256) e dois defeitos anteriores achados no caminho. Nenhum item é regressão da 0.13.7. Só a MergeX muda: o ExpxDev e as outras skills seguem como na 0.13.7.
+
+- **mergex@66b26a0** (mergex#77 a #81):
+  - **Os scripts não estão no PATH** (DM-314): o SKILL.md manda rodar cada um como `bash .claude/skills/mergex/scripts/<nome>.sh`, e os comandos feitos para copiar trazem o caminho completo. Os dois do passo 7 do E9 davam "command not found".
+  - **O blob provado no `e9-merge`** (DM-314): depois do `git add`, o stage tem de ser o blob que a prova leu do disco. Um escritor entre a prova e o add para o checkpoint sem commitar, e o stage fica preservado.
+  - **SHA-256 de ponta a ponta** (DM-315): o tamanho do SHA vem do formato do repositório (40 hex no SHA-1, 64 no SHA-256) na reconciliação da base, no `Integra-base`, no E1 de recuperação, nos hooks, nos fechamentos e no `--abrir-sprint`. Num repositório SHA-256, o `--registrar-existente` aceitava 40 hex, uma abreviação, como SHA completo. O GitHub não hospeda SHA-256: o fechamento depois do merge para com rc 5 nesse formato.
+  - **`e9-merge` com `core.autocrlf=true`** (DM-316): a prova recusava sempre, porque comparava o blob cru em LF com o disco em CRLF. Agora ela lê o blob como o checkout o escreve.
+  - **A entrega por trabalho depois do merge** (DM-317): na runx e na entrega por trabalho da sprintx, o E9 não grava `pr_estado` no `ENTREGA.md`. Ele fica com o retrato do E7, e o estado final é o do serviço. O `e9-merge` numa entrega por trabalho recusa citando a regra. No Conselhos, a OC-2026-0001, a 0002 e a 0003 ficam com `aberto`, e nenhum commit à mão é necessário.
+- **Não exercitado:**
+  - o fechamento depois do merge num repositório SHA-256 real hospedado: o GitHub não hospeda esse formato;
+  - o pre-push da branch empilhada num repositório SHA-256, provado só por chamada direta à função (DM-313).
+
 ## 0.13.7 — o E9 persistido e o E8 terminal na MergeX, a ponta publicada da base, e o update sem `claude` legível no ExpxDev
 
 Instale por PR, como a 0.13.6. Fecha o impasse E9/E0 do Conselhos (onda-0c) e traz os achados do Conselhos e do CodeAnt na instalação da 0.13.6. Nenhum item é regressão da 0.13.6.

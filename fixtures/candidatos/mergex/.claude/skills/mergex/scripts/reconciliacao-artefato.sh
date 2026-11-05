@@ -12,7 +12,13 @@
 #                                     arquivo<TAB>caminho<TAB>status_base<TAB>blob_b1
 #                                       <TAB>blob_m<TAB>diff_sha<TAB>motivo
 #   rb_assinatura <arquivo>           sha256 das linhas canônicas (spec 7.1)
-#   rb_validar <arquivo> <trabalho> <numero>
+#   rb_validar <arquivo> <trabalho> <numero> [<tamanho do OID>]
+#
+# Os OIDs do Git (b0_sha p1_sha b1_sha m_sha blob_b1 blob_m) têm todos o mesmo
+# tamanho, 40 hex (SHA-1) ou 64 (SHA-256); artefato misto é inválido. Quem tem
+# o repositório à mão passa o tamanho do formato dele, e outro tamanho é
+# inválido (DM-315). `diff_b1_m_sha256` e `assinatura` são sha256 de conteúdo,
+# sempre 64.
 #
 # Formato do TSV de escalares: `chave<TAB>valor`, uma por linha, com as chaves
 # expx_tool trabalho_id numero anterior branch branch_base origem_base b0_sha
@@ -275,8 +281,8 @@ rb_emitir() { # <saida> <tsv-escalares> <tsv-arquivos>
 _rb_hex() { grep -Eq "^[0-9a-f]{$1}\$" <<<"$2"; }
 
 # Schema e assinatura; não olha o nome do arquivo.
-_rb_validar_conteudo() { # <arquivo> <trabalho> <numero>
-  local tl tipo arq="$1" trab="$2" num="$3" lido k v ant esperada n_arq l st bb bm ds mo caminho_vistos="" assin
+_rb_validar_conteudo() { # <arquivo> <trabalho> <numero> [<tamanho do OID>]
+  local tl tipo arq="$1" trab="$2" num="$3" oid="${4:-}" lido k v ant esperada n_arq l st bb bm ds mo caminho_vistos="" assin
   tl="$(mktemp)" || { RB_ERRO="mktemp falhou"; return 1; }
   _rb_ler_arq "$arq" "$tl" || { rm -f "$tl"; return 1; }
   lido="$(cat "$tl")"; rm -f "$tl"
@@ -303,8 +309,13 @@ _rb_validar_conteudo() { # <arquivo> <trabalho> <numero>
   [ -n "$(_rb_val branch)" ] || { RB_ERRO="branch vazio"; return 1; }
   [ -n "$(_rb_val branch_base)" ] || { RB_ERRO="branch_base vazio"; return 1; }
   case "$(_rb_val origem_base)" in registrada_e0|inferida_legado|reconciliacao_anterior) ;; *) RB_ERRO="origem_base inválida: $(_rb_val origem_base)"; return 1 ;; esac
+  # o tamanho dos OIDs: o do repositório, ou o do b0_sha (40 ou 64) para todos
+  if [ -z "$oid" ]; then
+    oid="$(_rb_val b0_sha)"; oid="${#oid}"
+    case "$oid" in 40|64) ;; *) oid=40 ;; esac
+  fi
   for k in b0_sha p1_sha b1_sha m_sha; do
-    _rb_hex 40 "$(_rb_val "$k")" || { RB_ERRO="$k não é SHA de 40 hex"; return 1; }
+    _rb_hex "$oid" "$(_rb_val "$k")" || { RB_ERRO="$k não é SHA de $oid hex"; return 1; }
   done
   case "$(_rb_val estado)" in ativa|superada) ;; *) RB_ERRO="estado inválido: $(_rb_val estado)"; return 1 ;; esac
   grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}([T ][0-9:.+Z-]+)?$' <<<"$(_rb_val registrado_em)" \
@@ -328,8 +339,8 @@ $caminho
     caminho_vistos="$caminho_vistos
 $caminho"
     case "$st" in A|M) ;; *) RB_ERRO="status_base inválido em $caminho: '$st'"; return 1 ;; esac
-    _rb_hex 40 "$bb" || { RB_ERRO="blob_b1 de $caminho não é SHA de 40 hex"; return 1; }
-    _rb_hex 40 "$bm" || { RB_ERRO="blob_m de $caminho não é SHA de 40 hex"; return 1; }
+    _rb_hex "$oid" "$bb" || { RB_ERRO="blob_b1 de $caminho não é SHA de $oid hex"; return 1; }
+    _rb_hex "$oid" "$bm" || { RB_ERRO="blob_m de $caminho não é SHA de $oid hex"; return 1; }
     _rb_hex 64 "$ds" || { RB_ERRO="diff_b1_m_sha256 de $caminho não é sha256"; return 1; }
     [ -n "$mo" ] || { RB_ERRO="motivo vazio em $caminho"; return 1; }
     case "$mo" in *'{{'*) RB_ERRO="motivo com marcador de template em $caminho"; return 1 ;; esac
@@ -343,13 +354,14 @@ EOF
   return 0
 }
 
-rb_validar() { # <arquivo> <trabalho> <numero esperado>
-  [ "$#" -eq 3 ] || { RB_ERRO="rb_validar: uso <arquivo> <trabalho> <numero>"; return 1; }
+rb_validar() { # <arquivo> <trabalho> <numero esperado> [<tamanho do OID>]
+  { [ "$#" -eq 3 ] || { [ "$#" -eq 4 ] && case "$4" in 40|64) true ;; *) false ;; esac; }; } \
+    || { RB_ERRO="rb_validar: uso <arquivo> <trabalho> <numero> [40|64]"; return 1; }
   local nome nnn
   nome="$(basename "$1")"
   grep -Eq '^RECONCILIACAO-BASE-[0-9]{3}\.md$' <<<"$nome" \
     || { RB_ERRO="nome fora do padrão RECONCILIACAO-BASE-NNN.md: $nome"; return 1; }
   nnn="$(printf '%s' "$nome" | sed 's/^RECONCILIACAO-BASE-0*\([0-9][0-9]*\)\.md$/\1/')"
   [ "$nnn" = "$3" ] || { RB_ERRO="NNN do nome ($nnn) diverge do número esperado ($3)"; return 1; }
-  _rb_validar_conteudo "$1" "$2" "$3"
+  _rb_validar_conteudo "$1" "$2" "$3" "${4:-}"
 }

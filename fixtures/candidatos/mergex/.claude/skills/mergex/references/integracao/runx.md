@@ -39,7 +39,7 @@ Quando o E5 roda, a branch da entrega já foi integrada. O caminho é `scripts/f
 - **Prova o merge no serviço:** confere o `pr_url` de `ENTREGA.md`, a branch, a base e o commit de merge na base. Sem isso, não cria nada, e o rc diz por quê.
 - **Abre a área:** `docs/<OC-ID>-fechamento`, a partir da base, sem rastrear, em worktree próprio, com a marca `branch.<branch>.expxFechamento`.
 - **O commit** leva os trailers `Fechamento-de: <pr_url>` e `Merge: <sha>`, e só os quatro documentos do E5: `ORQUESTRADOR.md`, `tecnico.md`, `uso.md` e `docs/relatorios/INDICE.md`. O `arquivo-fora-do-plano` só os isenta nessa condição.
-- **`ENTREGA.md` não muda:** o portão não seleciona esse PR, e `pr_estado` segue com o E9 ou com uma pessoa, como em qualquer entrega mesclada sem o `/mergex-revisar`.
+- **`ENTREGA.md` não muda:** o portão não seleciona esse PR, e `pr_estado` fica com o retrato do E7. O E9 também não o grava: a entrega da runx é por trabalho, e o estado final é o do serviço (DM-317). O merge chega à base pelos trailers deste commit.
 - **O merge desse PR é humano.**
 
 **Limite assumido:** fora do harness, ou com o hook em aviso, alguém pode abrir o mesmo PR sem o script, e o CI não barra, porque barrar exigiria uma exceção no portão. Quem revisa vê a falta dos trailers.

@@ -51,7 +51,7 @@
 #   fechamento-do-e1.sh --status      # diagnóstico da trava desta worktree
 #
 #   fechamento-do-e1.sh --registrar-existente --entrega <ENTREGA.md> \
-#       --origem <sprintx|runx> --trabalho <id> --task <id> --sha <40-hex>
+#       --origem <sprintx|runx> --trabalho <id> --task <id> --sha <sha completo: 40 hex no SHA-1, 64 no SHA-256>
 #       recupera somente o registro de um commit E1 já existente e alcançável.
 #
 # Ordem normativa combinada (P0.2-C7-B — compõe contexto, C1 e C5):
@@ -275,24 +275,36 @@ carrega_contexto_explicito() { # <entrega> <origem> <trabalho>
     "Ativa: $branch" "ENTREGA.branch: $(fm "$entrega" branch)"
 }
 
+# O tamanho do SHA completo vem do formato do repositório (DM-315): 40 hex no
+# SHA-1, 64 no SHA-256.
+oid_len() {
+  case "$(git rev-parse --show-object-format 2>/dev/null)" in
+    sha1) printf '40' ;;
+    sha256) printf '64' ;;
+    *) return 1 ;;
+  esac
+}
+
 sha_registrado_resolve() { # <identificador armazenado>
-  local registrado="$1"
+  local registrado="$1" n
   case "$registrado" in ''|*[!0-9a-f]*) return 1 ;; esac
-  [ "${#registrado}" -ge 7 ] && [ "${#registrado}" -le 40 ] || return 1
+  n="$(oid_len)" || return 1
+  [ "${#registrado}" -ge 7 ] && [ "${#registrado}" -le "$n" ] || return 1
   git rev-parse --verify "$registrado^{commit}" 2>/dev/null
 }
 
 registra_existente() { # <entrega> <origem> <trabalho> <task> <sha completo>
   local entrega="$1" origem_dada="$2" trabalho_dado="$3" task="$4" sha="$5"
-  local pais status caminho origem_nome destino_nome linha ordem seq task_reg commit_reg objeto saida rc
+  local pais status caminho origem_nome destino_nome linha ordem seq task_reg commit_reg objeto saida rc n
   local -a caminhos
 
   abre_secao "recovery:$task"          # mesma trava C5, antes de qualquer prova mutável
   confere_stage_de_entrada
   carrega_contexto_explicito "$entrega" "$origem_dada" "$trabalho_dado"
 
-  grep -Eq '^[0-9A-Fa-f]{40}$' <<<"$sha" \
-    || para 4 'PARADO — --sha precisa ter exatamente 40 hexadecimais'
+  n="$(oid_len)" || para 4 'PARADO — formato de objetos Git ilegível ou não suportado'
+  grep -Eq "^[0-9A-Fa-f]{$n}\$" <<<"$sha" \
+    || para 4 "PARADO — --sha precisa ter exatamente $n hexadecimais"
   sha="$(printf '%s' "$sha" | tr 'A-F' 'a-f')"
   git cat-file -e "$sha^{commit}" 2>/dev/null \
     || para 4 'PARADO — o SHA informado não existe como commit'

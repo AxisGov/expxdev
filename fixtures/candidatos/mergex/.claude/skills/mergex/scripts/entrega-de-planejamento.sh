@@ -104,7 +104,13 @@ case "$ACAO" in
     case "$ESTADO" in aberto|rascunho|aguardando_merge|null) ;; *) uso "estado do E8 fora de aberto|rascunho|aguardando_merge|null: ${ESTADO:-ausente}" ;; esac ;;
   abrir-sprint)
     case "$NN" in [0-9][0-9]) [ "$NN" != 00 ] || uso 'sprint 00' ;; *) uso "sprint fora da forma NN: $NN" ;; esac
-    sha_uso base_validada_sha "$BASE_VALIDADA" ;;
+    # SHA local: o tamanho do formato do repositório (DM-315); o merge_sha e o
+    # base_sha acima vêm do serviço, e ficam em 40|64
+    case "$(git rev-parse --show-object-format 2>/dev/null)" in
+      sha1) sha_uso base_validada_sha "$BASE_VALIDADA" 40 ;;
+      sha256) sha_uso base_validada_sha "$BASE_VALIDADA" 64 ;;
+      *) uso '--abrir-sprint fora de um repositório Git: a base validada não tem formato' ;;
+    esac ;;
   modo-efetivo)
     [ -n "$PLANO" ] || uso 'falta --plano'
     case "$PROJETO" in por_trabalho|por_sprint) ;; *) uso "modo do projeto fora de por_trabalho|por_sprint: ${PROJETO:-ausente}" ;; esac ;;

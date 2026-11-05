@@ -165,10 +165,10 @@ entregue_em: 2026-08-29
 | `estado` | `aberto` no E0; `entregue` quando o fluxo completou; `bloqueado` quando o portão barrou |
 | `versionado` | `false` em repositório sem versionador |
 | `branch`, `branch_base` | `null` quando `versionado: false` |
-| `base_validada_sha` | SHA de 40 hex da base em que o trabalho foi validado; gravado no E0 (`git merge-base HEAD <branch_base>`); atualizado pelo `reconciliacao-base.sh --registrar` para o `b1_sha` registrado. Nunca nome de ref. `null` sem versionador |
+| `base_validada_sha` | SHA completo, no tamanho do formato do repositório (40 hex no SHA-1, 64 no SHA-256), da base em que o trabalho foi validado; gravado no E0 (`git merge-base HEAD <branch_base>`); atualizado pelo `reconciliacao-base.sh --registrar` para o `b1_sha` registrado. Nunca nome de ref. `null` sem versionador |
 | `origem_base` | `registrada_e0` \| `registrada_sprint` (a base reancorada pelo E0 na primeira retomada depois do PR de planejamento `merged`, sobre a main que contém o `merge_sha` — DM-261) \| `inferida_legado` (gravado uma única vez, pela primeira reconciliação de uma entrega anterior a esta chave — DM-183). Uma reconciliação aberta sobre uma base `registrada_sprint` grava no `RECONCILIACAO-BASE-001.md` `origem_base: registrada_e0`, como sobre qualquer base registrada |
 | `reconciliacoes` | Lista `{numero, arquivo, b1_sha, m_sha}`, na ordem da cadeia; `[]` sem reconciliação. Escrita só pelo `--registrar` |
-| `portao_sha` | SHA de 40 hex do `HEAD` que o E2 avaliou, gravado com `portao` só por `registrar-portao.sh`; `null` antes do E2 e depois de um `--registrar`. O `--resultado bloqueado` também grava `portao_sha` = `HEAD` avaliado, sem efeito na validade (`portao_nao_pronto` vem antes do SHA). O portão vale só para ele e para os commits de método `pre-e6`/`e8` de um pai que o seguem (DM-181) |
+| `portao_sha` | SHA completo (40 ou 64 hex, o formato do repositório) do `HEAD` que o E2 avaliou, gravado com `portao` só por `registrar-portao.sh`; `null` antes do E2 e depois de um `--registrar`. O `--resultado bloqueado` também grava `portao_sha` = `HEAD` avaliado, sem efeito na validade (`portao_nao_pronto` vem antes do SHA). O portão vale só para ele e para os commits de método `pre-e6`/`e8` de um pai que o seguem (DM-181) |
 | `commits` | Um item por task commitada, na ordem em que fecharam, cada um com a chave de ordem `seq` e, no item novo, a `revisao` da task; `[]` sem versionador. Ver "A ordem de registro" |
 | `modulo_afetado` | Os módulos que a entrega toca (ver abaixo) |
 | `arquivos_alterados` | **O diff real** — ver abaixo. É o campo mais importante deste kind |
@@ -181,7 +181,7 @@ entregue_em: 2026-08-29
 | `desvios` | Arquivos alterados fora da lista declarada, detectados no E1 e no E2; `[]` quando não houve |
 | `push_feito` | `true` só quando o E6 confirmou que o remoto tem o mesmo commit |
 | `pr_url` | A URL devolvida pelo E7; `null` quando o PR não foi aberto — **não é falha** |
-| `pr_estado` | `rascunho` na abertura normal; `aberto` quando o QA já aprovou; `merged`/`fechado` quando o E9 ou uma pessoa atualizarem. O PR de fechamento da runx não toca este arquivo (`references/integracao/runx.md`) |
+| `pr_estado` | `rascunho` na abertura normal; `aberto` quando o QA já aprovou; `merged`/`fechado` na entrega de planejamento e na de sprint, quando o E9 ou uma pessoa atualizarem. Depois do merge, na entrega por trabalho, fica com o retrato do E7: o estado final é o do serviço, e a branch já integrada não recebe commit (DM-317). O PR de fechamento da runx não toca este arquivo (`references/integracao/runx.md`) |
 | `sprint_atual` | `planejamento` no PR de planejamento, `NN` na sprint que o E0 abriu, ou `null` fora dessas entregas. Nunca é relido do plano depois de registrado |
 | `prs` | Os PRs do trabalho, um item `{sprint, url, estado, merge_sha, merge, base_sha}` por PR, em YAML de bloco e em sequência. O de planejamento é sempre o primeiro; numa entrega `por_sprint`, seguem `01`, `02`, ... . `pr_url`/`pr_estado` de topo são os da entrega atual |
 | `entregue_em` | A data em que o fluxo completou; `null` enquanto `estado` não for `entregue` |
@@ -356,11 +356,11 @@ grava `seq: 1`.
 Uma interpretação mecânica só, num script só — `scripts/sequencia-de-commits.sh`:
 
 ```
-sequencia-de-commits.sh --ler <ENTREGA.md>     # ordem_efetiva, seq, task, commit por item
-sequencia-de-commits.sh --validar <ENTREGA.md> # a invariante acima; PARA quando quebra
-sequencia-de-commits.sh --proximo <ENTREGA.md> # o maior seq efetivo + 1
-sequencia-de-commits.sh --acrescentar <ENTREGA.md> <task> <commit> [<revisao>]
-sequencia-de-commits.sh --revisao <valor>      # o valor de revisao como seria gravado
+bash .claude/skills/mergex/scripts/sequencia-de-commits.sh --ler <ENTREGA.md>     # ordem_efetiva, seq, task, commit por item
+bash .claude/skills/mergex/scripts/sequencia-de-commits.sh --validar <ENTREGA.md> # a invariante acima; PARA quando quebra
+bash .claude/skills/mergex/scripts/sequencia-de-commits.sh --proximo <ENTREGA.md> # o maior seq efetivo + 1
+bash .claude/skills/mergex/scripts/sequencia-de-commits.sh --acrescentar <ENTREGA.md> <task> <commit> [<revisao>]
+bash .claude/skills/mergex/scripts/sequencia-de-commits.sh --revisao <valor>      # o valor de revisao como seria gravado
 ```
 
 - **`--acrescentar` é o escritor do E1** (e do E1 tardio). Ele acrescenta no **fim**, com `seq`,
@@ -633,7 +633,7 @@ Um `ENTREGA.md` gravado antes de `causa` e `falhas_portao` existirem, **sem as d
   duas chaves;
 - **não há migração em massa**: vale a regra de migração abaixo. A mergex acrescenta as chaves na
   próxima vez que gravar aquele arquivo — e só grava onde o valor é `null`/`[]` por definição (E0
-  na retomada, E9 atualizando `pr_estado` de uma entrega `entregue`). **Um bloqueio legado nunca
+  na retomada, E9 atualizando `pr_estado` de uma entrega `entregue` de planejamento ou de sprint). **Um bloqueio legado nunca
   ganha causa retroativa**: a causa só existe quando o portão roda de novo.
 
 Um arquivo com **uma** das duas chaves e sem a outra não é legado: é gravação incompleta, e
@@ -660,16 +660,16 @@ anterior: null
 branch: "feature/ft-exemplo"
 branch_base: "main"
 origem_base: registrada_e0
-b0_sha: <sha de 40 hex>
-p1_sha: <sha de 40 hex>
-b1_sha: <sha de 40 hex>
-m_sha: <sha de 40 hex>
+b0_sha: <sha completo: 40 hex no SHA-1, 64 no SHA-256>
+p1_sha: <sha completo>
+b1_sha: <sha completo>
+m_sha: <sha completo>
 estado: ativa
 arquivos:
   - caminho: "tests/ui/exemplo.test.tsx"
     status_base: A
-    blob_b1: <sha de 40 hex>
-    blob_m: <sha de 40 hex>
+    blob_b1: <sha completo>
+    blob_m: <sha completo>
     diff_b1_m_sha256: <sha256 de 64 hex>
     motivo: "a feature dividiu o botao em duas etapas"
 registrado_em: 2026-10-07
@@ -736,5 +736,5 @@ Ao abrir um `ENTREGA.md` que já existe e não tem os campos de indexação:
       derivada de `falhas_portao` (`scripts/causa-do-portao.sh --validar` passa).
 - [ ] Todo item **novo** de `commits` tem `seq`; nenhum item legado ganhou `seq` retroativo
       (`scripts/sequencia-de-commits.sh --validar` passa).
-- [ ] `base_validada_sha` e `portao_sha` são SHA de 40 hex ou `null`, nunca nome de ref; nenhum
+- [ ] `base_validada_sha` e `portao_sha` são SHA completo no formato do repositório (40 hex no SHA-1, 64 no SHA-256) ou `null`, nunca nome de ref; nenhum
       dos dois, nem `reconciliacoes`, foi escrito à mão.

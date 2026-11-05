@@ -154,8 +154,10 @@ limpa() { # <valor> — tira aspas e espaço das pontas
 # A prova: um identificador de commit válido.
 #
 # O E1 registra o que `git rev-parse --short HEAD` devolveu — hexadecimal
-# minúsculo, do tamanho curto do versionador ao SHA-1 inteiro. Vazio, `null`,
-# marcador de template e qualquer coisa fora disso NÃO é prova.
+# minúsculo, do tamanho curto do versionador ao SHA inteiro (40 no SHA-1, 64 no
+# SHA-256; o --registrar-existente grava o completo). A validação é só de
+# sintaxe: quem resolve o valor no Git recusa o que não for do repositório.
+# Vazio, `null`, marcador de template e qualquer coisa fora disso NÃO é prova.
 # ---------------------------------------------------------------------------
 sha_valido() { # <valor>
   case "$1" in
@@ -163,7 +165,7 @@ sha_valido() { # <valor>
     *[!0-9a-f]*) return 1 ;;
   esac
   case "${#1}" in
-    7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40) return 0 ;;
+    [7-9]|[1-5][0-9]|6[0-4]) return 0 ;;
     *) return 1 ;;
   esac
 }

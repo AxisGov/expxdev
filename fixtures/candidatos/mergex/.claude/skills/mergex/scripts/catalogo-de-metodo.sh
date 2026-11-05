@@ -234,6 +234,10 @@ catalogo_metodo() { # <raiz> <origem> <trabalho> <pasta> <checkpoint>
     printf '%s\n' "$pasta/00-PREDECESSORES.md"
     return 0
   fi
+  if [ "$checkpoint" = e9-merge ] && [ "$origem" != sprintx ]; then
+    CATALOGO_ERRO="e9-merge exige origem sprintx: a $origem só tem entrega por trabalho, e nela o E9 não grava pr_estado depois do merge (DM-317)"
+    return 1
+  fi
   if [ "$checkpoint" = retomar-v9-predecessores ] || [ "$checkpoint" = e9-merge ]; then
     [ "$origem" = sprintx ] || { CATALOGO_ERRO="$checkpoint exige origem sprintx"; return 1; }
     printf '%s\n' "docs/entregas/$trabalho/ENTREGA.md"
