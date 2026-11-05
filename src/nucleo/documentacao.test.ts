@@ -105,10 +105,12 @@ describe("identidade da release no docs-site", () => {
   // O download sem `&&` deixava a verificação e o `npx` rodarem sobre arquivos
   // antigos da pasta quando o `gh release download` falhava (CodeAnt no #146).
   it("funcional: o download do release encadeia a verificação, no site e no README", () => {
-    const leiaMe = readFileSync("README.md", "utf8");
+    // o checkout do Windows traz CRLF: a regra é sobre o fim da linha, não sobre o byte
+    const leiaMe = readFileSync("README.md", "utf8").replace(/\r\n/g, "\n");
+    const pagina = site.replace(/\r\n/g, "\n");
     expect(leiaMe).toContain(`gh release download v${pacote.version} -R AxisGov/expxdev -D ~/expx-cli/v${pacote.version} &&\n`);
-    expect(site.split(`-D</span> ~/expx-cli/v${pacote.version} &amp;&amp;\n`).length - 1).toBe(2);
-    expect(site).not.toMatch(new RegExp(`-D</span> ~/expx-cli/v${pacote.version.replace(/\./g, "\\.")}\n`));
+    expect(pagina.split(`-D</span> ~/expx-cli/v${pacote.version} &amp;&amp;\n`).length - 1).toBe(2);
+    expect(pagina).not.toMatch(new RegExp(`-D</span> ~/expx-cli/v${pacote.version.replace(/\./g, "\\.")}\n`));
   });
 
   it("funcional: site e apresentação publicam a versão do package", () => {
