@@ -12,10 +12,10 @@
 #     --origem <sprintx|runx> --trabalho <id>
 #
 # --registrar
-#   M é HEAD, ou o commit dado em --merge (SHA hex, 7 a 40 dígitos, resolvido
+#   M é HEAD, ou o commit dado em --merge (SHA hex, de 7 dígitos ao tamanho do OID, resolvido
 #   para o SHA completo); P1 = M^1; B1 = M^2. Na primeira reconciliação, B0 é o
 #   base_validada_sha do ENTREGA.md de P1 (origem_base registrada_e0; chave
-#   presente vazia, null ou fora de 40 hex: rc 5). Entrega legada (spec, seção
+#   presente vazia, null ou fora do tamanho do OID: rc 5). Entrega legada (spec, seção
 #   14: o ENTREGA.md de P1 sem base_validada_sha, sem origem_base, e nenhum
 #   RECONCILIACAO-BASE no histórico de P1; senão rc 5): o 001, e só ele, infere
 #   B0 = o merge-base de P1 e B1 e grava origem_base: inferida_legado no
@@ -675,7 +675,7 @@ legado_base() {
   n="$(grep -c . "$TMP_DIR/legado-mb")"
   [ "$n" = 1 ] || { LEG_ERRO="$n merge-bases entre P1 $p1 e B1 $b1 (a inferência exige exatamente um)"; return 1; } # guarda:LEG2
   mg="$(sed -n 1p "$TMP_DIR/legado-mb")"
-  grep -Eq '^[0-9a-f]{40}$' <<<"$mg" || { LEG_ERRO="merge-base de P1 e B1 fora de 40 hex: $mg"; return 1; }
+  grep -Eq "^[0-9a-f]{$OID_LEN}\$" <<<"$mg" || { LEG_ERRO="merge-base de P1 e B1 fora de $OID_LEN hex: $mg"; return 1; }
   g rev-list --first-parent --merges "$p1" "^$mg" > "$TMP_DIR/legado-merges" 2>/dev/null \
     || { LEG_ERRO="linha de primeiro pai de P1 ilegível"; return 1; }
   [ ! -s "$TMP_DIR/legado-merges" ] || { LEG_ERRO="a linha de primeiro pai de P1 desde o merge-base $mg contém o merge $(sed -n 1p "$TMP_DIR/legado-merges")"; return 1; } # guarda:LEG3
@@ -778,7 +778,7 @@ cadeia_le() {
     if [ ! -f "$arq" ] || [ -L "$arq" ]; then motivo 5 contrato "não é arquivo regular"; continue; fi
     num="$(printf '%s' "$nome" | sed 's/^RECONCILIACAO-BASE-0*\([0-9][0-9]*\)\.md$/\1/')"
     RB_ERRO=""
-    rb_validar "$arq" "$TRABALHO" "$num" || { motivo 5 contrato "$RB_ERRO"; continue; }
+    rb_validar "$arq" "$TRABALHO" "$num" "$OID_LEN" || { motivo 5 contrato "$RB_ERRO"; continue; }
     RB_ERRO=""
     rb_ler "$arq" > "$TMP_DIR/r$n.lido" || { rm -f "$TMP_DIR/r$n.lido"; motivo 5 contrato "$RB_ERRO"; continue; }
     awk -F'\t' '$1 == "arquivo" { print $2 }' "$TMP_DIR/r$n.lido" > "$TMP_DIR/lista$n"
@@ -1082,7 +1082,7 @@ prepara_superada() {
     END { exit (n != 1) }
   ' "$arq" > "$TMP_DIR/anterior-superada.md" 2>/dev/null || para 5 "$nome: estado ativa não encontrado uma vez só"
   RB_ERRO=""
-  _rb_validar_conteudo "$TMP_DIR/anterior-superada.md" "$TRABALHO" "$num" || para 5 "$nome superada não valida: $RB_ERRO"
+  _rb_validar_conteudo "$TMP_DIR/anterior-superada.md" "$TRABALHO" "$num" "$OID_LEN" || para 5 "$nome superada não valida: $RB_ERRO"
   [ "$(sed -n 's/^assinatura: //p' "$arq")" = "$(sed -n 's/^assinatura: //p' "$TMP_DIR/anterior-superada.md")" ] \
     || para 5 "$nome: a assinatura mudaria ao marcar superada"
   TMP_ANT="$arq.superada.$$"
@@ -1133,7 +1133,8 @@ completa_interrompido() {
 # P1 = M^1, nunca do disco nem de M (o próprio merge poderia reescrevê-lo; a
 # estrutura exige depois que M e P1 tenham o mesmo). Com a chave
 # base_validada_sha, em qualquer forma: o valor gravado (registrada_e0), que
-# tem de ser SHA de 40 hex (vazio, null ou ilegível: rc 5). Sem ela, a entrega
+# tem de ser SHA completo no formato do repositório, 40 hex no SHA-1 e 64 no
+# SHA-256 (vazio, null ou ilegível: rc 5). Sem ela, a entrega
 # legada (spec, seção 14) infere B0 = o merge-base de P1 e B1, uma única vez
 # (inferida_legado): P1 que não é legado, rc 5; base ambígua, rc 6. Tudo antes
 # de qualquer escrita; `para` libera a trava.
@@ -1151,7 +1152,7 @@ base_do_registro() {
   [ "$p1_com_entrega" = 1 ] || cp "$ENTREGA_M" "$ENTREGA_P1"
   if _entrega_chave_qualquer "$ENTREGA_P1" base_validada_sha; then
     B0="$(catalogo_fm "$ENTREGA_P1" base_validada_sha)"
-    grep -Eq '^[0-9a-f]{40}$' <<<"$B0" || para 5 "ENTREGA.base_validada_sha não é SHA de 40 hex: ${B0:-vazia ou ilegível}"
+    grep -Eq "^[0-9a-f]{$OID_LEN}\$" <<<"$B0" || para 5 "ENTREGA.base_validada_sha não é SHA de $OID_LEN hex: ${B0:-vazia ou ilegível}"
     ORIGEM_BASE=registrada_e0
     return 0
   fi
@@ -1205,10 +1206,11 @@ case "$MODO" in
     case "$CHECKPOINT" in ''|reconciliacao-base) ;; *) uso "--checkpoint só aceita reconciliacao-base: $CHECKPOINT" ;; esac ;;
   *) uso 'falta --registrar ou --verificar' ;;
 esac
-# --merge é um SHA (nunca nome de ref): hex, de 7 a 40 dígitos
+# --merge é um SHA (nunca nome de ref): hex, de 7 dígitos ao tamanho do OID do
+# repositório (conferido depois de achar a raiz)
 if [ -n "$MERGE_ARG" ]; then
   case "$MERGE_ARG" in *[!0-9a-f]*) uso "--merge exige um SHA hexadecimal: $MERGE_ARG" ;; esac
-  { [ "${#MERGE_ARG}" -ge 7 ] && [ "${#MERGE_ARG}" -le 40 ]; } || uso "--merge exige um SHA de 7 a 40 dígitos: $MERGE_ARG"
+  [ "${#MERGE_ARG}" -ge 7 ] || uso "--merge exige um SHA de pelo menos 7 dígitos: $MERGE_ARG"
 fi
 case "$ORIGEM" in sprintx|runx) ;; *) uso "origem inválida: ${ORIGEM:-ausente}" ;; esac
 case "$TRABALHO" in
@@ -1230,6 +1232,13 @@ done
 RAIZ="$(git rev-parse --show-toplevel 2>/dev/null)" \
   || { printf 'reconciliacao-base: fora de um repositório Git\n' >&2; exit 1; }
 cd "$RAIZ" || { printf 'reconciliacao-base: raiz inacessível: %s\n' "$RAIZ" >&2; exit 1; }
+# o tamanho do OID vem do formato do repositório (DM-315)
+case "$(git rev-parse --show-object-format 2>/dev/null)" in
+  sha1) OID_LEN=40 ;;
+  sha256) OID_LEN=64 ;;
+  *) printf 'reconciliacao-base: formato de objetos Git não suportado: %s\n' "$(git rev-parse --show-object-format 2>/dev/null || echo ilegível)" >&2; exit 1 ;;
+esac
+[ -z "$MERGE_ARG" ] || [ "${#MERGE_ARG}" -le "$OID_LEN" ] || uso "--merge exige um SHA de 7 a $OID_LEN dígitos: $MERGE_ARG"
 
 # Só leitura: nenhuma trava, nenhuma pré-condição de stage ou pasta limpa.
 if [ "$MODO" = verificar ]; then

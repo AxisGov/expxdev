@@ -252,6 +252,8 @@ docs/entregas/
 
 Os caminhos são relativos à raiz desta skill. O detalhe operacional de cada etapa mora **exclusivamente** no reference correspondente; leia-o quando a etapa chegar, e somente o da etapa atual.
 
+**Os scripts não estão no PATH.** Rode cada um da raiz do repositório como `bash .claude/skills/mergex/scripts/<nome>.sh`, também quando o reference o cita só pelo nome (`persistir-metodo.sh --persistir ...`): o nome solto dá "command not found" (DM-314).
+
 | Etapa | Roteiro operacional | Templates usados |
 |---|---|---|
 | contrato do frontmatter (E0, E1, E8) | `references/00-schema.md` | — |

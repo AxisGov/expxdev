@@ -1261,28 +1261,34 @@ Sem essa confirmação, **não ofereça o merge** deste PR. Passe para o próxim
    reverta por conta própria (a decisão de reverter é humana). **Releitura posterior
    impossível** (falha, ou alguma página do gate não obtida) é tratada como mudança, com a
    mesma conduta: sem ela, não há como provar que nada mudou. Encerrar a passagem não pula o
-   item 7 **deste** PR: o merge aconteceu, e `pr_estado: merged` registra o fato — o que se
+   item 7 **deste** PR: o merge aconteceu, e o item 7 o registra conforme a entrega — o que se
    encerra é a oferta dos PRs seguintes. Check obrigatório e resolução
    de conversa exigidos pela proteção da base o serviço já barra na própria operação; isso
    reduz a janela, mas não dispensa (a) nem (b).
 6. Revalidado sem mudança **e com o merge atomicamente preso ao HEAD revalidado** (item 5), faça o merge com a estratégia que o repositório usa (detecte em `CONVENCOES.md` da stackx ou nos merges anteriores; na ausência, use o padrão do serviço). Nunca force, nunca reescreva histórico já enviado.
-7. Atualize `pr_estado: merged` no `ENTREGA.md` correspondente, quando ele existir localmente.
-   Se esse `ENTREGA.md` é a entrega de planejamento ou a de uma sprint (`entrega-de-planejamento.sh`
+7. Registre o merge conforme a entrega do `ENTREGA.md` correspondente, quando ele existir localmente.
+   Na entrega de planejamento ou na de uma sprint (`entrega-de-planejamento.sh`
    diz `sprint_atual=planejamento` ou `sprint_atual=<NN>`), o registro é o do script, que grava
-   também o item dela em `prs`
+   `pr_estado: merged` no topo e o item dela em `prs`
    (`estado: merged`, `merge_sha` = o commit de merge, `merge: humano`, `base_sha` = a ponta da
    base no merge, relida no serviço como no bloco):
-   `entrega-de-planejamento.sh --registrar-merge --entrega <ENTREGA.md> --merge-sha <commit de merge> --base-sha <base>`
+   `bash .claude/skills/mergex/scripts/entrega-de-planejamento.sh --registrar-merge --entrega <ENTREGA.md> --merge-sha <commit de merge> --base-sha <base>`
    ("O PR de planejamento (e o da sprint) do trabalho atual", no passo 2).
    Logo depois, e antes de qualquer merge de integração da base, persista o registro (DM-311),
    **na branch da entrega** (`ENTREGA.branch`, a worktree do trabalho):
-   `persistir-metodo.sh --persistir --entrega <ENTREGA.md> --origem sprintx --trabalho <trabalho_id> --checkpoint e9-merge`.
+   `bash .claude/skills/mergex/scripts/persistir-metodo.sh --persistir --entrega <ENTREGA.md> --origem sprintx --trabalho <trabalho_id> --checkpoint e9-merge`.
    O E9 que revisa o PR de outro trabalho, fora da branch dele, não roda o checkpoint (o
    executor recusa a branch divergente): o registro fica para a sessão daquele trabalho, na branch
    dele, antes do merge de integração.
    Sem esse commit, o `ENTREGA.md` fica sujo, o `reconciliacao-base.sh --registrar` o recusa
    (o arquivo difere do de `M` fora das chaves que ele grava) e o E0 da sprint seguinte, que exige
    a reconciliação, não abre. O mesmo vale depois do `--completar-base`.
+
+   Na entrega por trabalho, o E9 não grava `pr_estado` no `ENTREGA.md` (DM-317). A branch da
+   entrega já foi integrada: um commit nela só chegaria à base por outro PR, e o pre-push o barra
+   como produto, porque nada o prova como método. O estado final é o do serviço, que o E9 acabou
+   de conferir, e o `ENTREGA.md` fica com o retrato do E7. Na runx, o fechamento depois do merge
+   (`references/integracao/runx.md`) leva o merge à base pelos trailers do commit dele.
 
    **E, somente se o PR mergeado for o do trabalho atual**, grave `pr_estado: merged`
    também em `.expx/estado.json`. O E9 percorre PRs de vários trabalhos e de outras

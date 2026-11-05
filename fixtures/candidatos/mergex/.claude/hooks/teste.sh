@@ -2370,13 +2370,41 @@ MSG_LIXO="git commit -m \"merge(mergex): integra a base
 
 Trabalho: ft-02
 Integra-base: ${SHA_MH}XYZ\""
-caso "aviso: Integra-base com lixo apos os 40 hex nao bloqueia" mergex/commit-por-task.sh "$(bash_json "$MSG_LIXO")" 0
+caso "aviso: Integra-base com lixo apos os 40 hex (SHA-1) nao bloqueia" mergex/commit-por-task.sh "$(bash_json "$MSG_LIXO")" 0
 echo '{"expx_hooks":1,"hooks":{"commit-por-task":{"modo":"bloqueio"},"arquivo-fora-do-plano":{"modo":"bloqueio"}}}' > .expx/hooks.json
 rm -f msg-zeros.txt msg-outro-sha.txt msg-plana.txt
 git merge --abort >/dev/null 2>&1 || exit 1
 rm -f msg-integracao.txt msg-integracao-com-task.txt .expx/hooks.json
 cd "$RAIZ_T" || exit 1
 HOOK_CWD="$RAIZ_T"
+
+echo
+echo "integração em SHA-256: o SHA completo no tamanho do formato (DM-315)"
+# A biblioteca dos dois hooks, direto, num merge em andamento num repositório
+# SHA-256: o Integra-base de 64 é a integração, o de 40 é abreviação (não é
+# prova), e o lixo depois dos 64 é trailer que a leitura não isolou.
+I256="$SEMGIT_T/int256"
+if git init -q --object-format=sha256 -b main "$I256" 2>/dev/null \
+  && ( cd "$I256" && git config user.email t@t && git config user.name t && git config commit.gpgsign false \
+    && printf 'a\n' > a && git add a && git commit -qm a && git branch feature/ft-02 \
+    && printf 'b\n' > b && git add b && git commit -qm b && git checkout -q feature/ft-02 \
+    && printf 'c\n' > c && git add c && git commit -qm c && git merge -q --no-ff --no-commit main ) >/dev/null 2>&1; then
+  MH256="$(git -C "$I256" rev-parse -q --verify MERGE_HEAD)"
+  int256() { # <descrição> <Integra-base> <classe esperada>
+    local obtido
+    obtido="$(cd "$I256" && RAIZ="$I256" && . "$H/comum/integracao-da-mensagem.sh" \
+      && integracao_da_mensagem "$(printf 'merge(mergex): integra a base\n\nTrabalho: ft-02\nIntegra-base: %s\n' "$2")" ft-02 \
+        "$H/../skills/mergex/scripts/contrato-de-commit.sh" && printf '%s' "$INT_CLASSE")"
+    if [ "$obtido" = "$3" ]; then OK=$((OK+1)); printf '  ok    %s\n' "$1"
+    else FALHOU=$((FALHOU+1)); printf '  FALHA %s (esperava %s, obteve %s)\n' "$1" "$3" "$obtido"; fi
+  }
+  int256 "SHA-256: Integra-base de 64 igual ao MERGE_HEAD é integração" "$MH256" valida
+  int256 "SHA-256: Integra-base de 40 (abreviação) não é integração" "${MH256:0:40}" invalida
+  int256 "SHA-256: lixo depois dos 64 hex é trailer não isolado" "${MH256}XYZ" nenhuma
+  git -C "$I256" merge --abort >/dev/null 2>&1
+else
+  FALHOU=$((FALHOU+1)); printf '  FALHA %s\n' "o git daqui não cria repositório SHA-256 com merge em andamento"
+fi
 
 echo
 echo "registro dos hooks — tempo do pr-so-com-portao"

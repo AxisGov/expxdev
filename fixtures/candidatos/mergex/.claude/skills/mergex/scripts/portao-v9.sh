@@ -301,7 +301,7 @@ if [ -n "$ULTIMO" ]; then
   # com reconciliação: o b1_sha da última, do artefato validado
   num="$(printf '%s' "$ULTIMO" | sed 's/^RECONCILIACAO-BASE-0*\([0-9][0-9]*\)\.md$/\1/')"
   RB_ERRO=""
-  rb_validar "$TMP_DIR/antes/$ULTIMO" "$TRABALHO" "$num" || sem_prova "$ULTIMO inválido: $RB_ERRO"
+  rb_validar "$TMP_DIR/antes/$ULTIMO" "$TRABALHO" "$num" "$OID_LEN" || sem_prova "$ULTIMO inválido: $RB_ERRO"
   rb_ler "$TMP_DIR/antes/$ULTIMO" > "$TMP_DIR/ultimo.lido" || sem_prova "$ULTIMO ilegível: $RB_ERRO"
   B_CADEIA="$(awk -F'\t' '$1 == "escalar" && $2 == "b1_sha" { print $3; exit }' "$TMP_DIR/ultimo.lido")"
   BASE="$B_CADEIA"; ORIGEM_BASE=reconciliacao # guarda:V9SHA

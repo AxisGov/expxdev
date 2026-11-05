@@ -781,22 +781,37 @@ esac
 # `reconciliacao-base.sh --registrar` recusa o ENTREGA.md sujo, e o E0 da sprint
 # seguinte exige a reconciliação. A prova é refazer a escrita: a mesma ação, com o
 # merge_sha e a base_sha do único item de `prs` que mudou, sobre o ENTREGA.md de
-# HEAD, tem de dar o do disco, salvo a data de `atualizado_em`.
+# HEAD, tem de dar o do disco, salvo a data de `atualizado_em`. A prova lê uma
+# cópia do disco tirada uma vez só, e E9_BLOB guarda o blob dela: depois do
+# `git add`, o stage tem de ter esse blob (a C5 trava o índice, não o arquivo;
+# um escritor entre a prova e o add faria entrar conteúdo não provado).
+E9_BLOB=""
 prova_e9_merge() {
   [ "$CHECKPOINT" = e9-merge ] && [ "$MODO" = persistir ] || return 0
   sujo "$ENTREGA" || return 0
   local t s est sha base acao
   t="$(mktemp -d "${TMPDIR:-/tmp}/mergex-e9-merge.XXXXXX")" || para 'não foi possível preparar a prova do e9-merge'
-  if ! git -C "$RAIZ" show "HEAD:$ENTREGA" > "$t/ENTREGA.md" 2>/dev/null; then
+  cp "$RAIZ/$ENTREGA" "$t/provado.md" 2>/dev/null \
+    && E9_BLOB="$(git -C "$RAIZ" hash-object --path="$ENTREGA" -- "$t/provado.md" 2>/dev/null)" && [ -n "$E9_BLOB" ] \
+    || { rm -rf "$t"; para "não foi possível copiar $ENTREGA para a prova do e9-merge"; }
+  # o ENTREGA.md de HEAD como o checkout o escreve (--filters: autocrlf, eol,
+  # .gitattributes), para comparar com o disco nos mesmos fins de linha
+  if ! git -C "$RAIZ" cat-file --filters "HEAD:$ENTREGA" > "$t/ENTREGA.md" 2>/dev/null; then
     rm -rf "$t"; para "$ENTREGA ausente de HEAD: o e9-merge só persiste o registro de um ENTREGA.md versionado"
   fi
   if ! bash "$PLANEJAMENTO_SH" --entrega "$t/ENTREGA.md" > "$t/antes" 2>/dev/null \
-    || ! bash "$PLANEJAMENTO_SH" --entrega "$RAIZ/$ENTREGA" > "$t/depois" 2>/dev/null; then
+    || ! bash "$PLANEJAMENTO_SH" --entrega "$t/provado.md" > "$t/depois" 2>/dev/null; then
     rm -rf "$t"; para "$ENTREGA não se lê como entrega de planejamento ou de sprint: e9-merge recusado"
   fi
   grep '^pr=' "$t/antes" | LC_ALL=C sort > "$t/antes.pr"
   grep '^pr=' "$t/depois" | LC_ALL=C sort > "$t/depois.pr"
   LC_ALL=C comm -13 "$t/antes.pr" "$t/depois.pr" > "$t/mudou"
+  # Nenhum item de `prs` mudou, fora de planejamento e de sprint: é o merge da entrega
+  # por trabalho, que o E9 não grava (DM-317). Entre o planejamento e a sprint 01 a
+  # entrega por sprint também tem sprint_atual=null, mas o --completar-base muda um item.
+  if [ ! -s "$t/mudou" ] && grep -qx 'sprint_atual=null' "$t/depois"; then
+    rm -rf "$t"; para "e9-merge: $ENTREGA é entrega por trabalho, e nela o E9 não grava pr_estado depois do merge (DM-317): o estado final é o do serviço, e a branch já integrada não recebe commit"
+  fi
   if [ "$(wc -l < "$t/mudou" | tr -d ' ')" != 1 ]; then
     rm -rf "$t"; para "e9-merge: o registro do E9 muda exatamente um item de prs; aqui mudaram $(LC_ALL=C comm -3 "$t/antes.pr" "$t/depois.pr" 2>/dev/null | wc -l | tr -d ' ') linha(s)"
   fi
@@ -804,7 +819,7 @@ prova_e9_merge() {
   s="${s#pr=}"
   [ "$est" = merged ] || { rm -rf "$t"; para "e9-merge: o item $s de prs não está merged ($est)"; }
   # a data com ou sem CR no fim: num ENTREGA.md CRLF, o E9 de ontem e o replay de hoje diferem só nela
-  sed -E 's/^atualizado_em: [0-9]{4}-[0-9]{2}-[0-9]{2}(\r?)$/atualizado_em: -\1/' "$RAIZ/$ENTREGA" > "$t/disco"
+  sed -E 's/^atualizado_em: [0-9]{4}-[0-9]{2}-[0-9]{2}(\r?)$/atualizado_em: -\1/' "$t/provado.md" > "$t/disco"
   for acao in registrar-merge completar-base; do
     cp "$t/ENTREGA.md" "$t/refeito.md"
     if [ "$acao" = registrar-merge ]; then
@@ -932,6 +947,9 @@ STAGED="$(git diff --cached --name-only 2>/dev/null | LC_ALL=C sort -u)"
 ESPERADO="$(cat "$TMP_LISTA")"
 [ -n "$STAGED" ] || para 'nenhuma mudança elegível entrou no stage'
 [ "$STAGED" = "$ESPERADO" ] || para 'o staged diff diverge do catálogo exato; stage preservado'
+# o e9-merge commita o conteúdo que a prova leu, e nenhum outro
+[ -z "$E9_BLOB" ] || [ "$(git rev-parse -q --verify ":$ENTREGA" 2>/dev/null)" = "$E9_BLOB" ] \
+  || para "e9-merge: $ENTREGA mudou entre a prova e o git add; o stage tem conteúdo não provado. Nenhum commit foi criado e o stage foi preservado" # guarda:E9MERGE
 
 # Reutiliza literalmente o gate de segurança dos hooks sobre o staged diff.
 # Falha de jq ou do hook também é fechada: método não ganha atalho de segredo.

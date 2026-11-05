@@ -135,7 +135,7 @@ entregue_em: 2026-08-29
 | `desvios` | Arquivos alterados fora da lista declarada, detectados no E1 e no E2; `[]` quando não houve |
 | `push_feito` | Durante o E6, `true` afirma que a publicação executada até ali está sincronizada. **Ao encerrar o E8, `true` afirma que o HEAD final — o commit que carrega este registro — está em `origin/<branch>`**, e o E8 revalida isso; falhou a publicação final, vira `false` (ver "O que `push_feito` afirma") |
 | `pr_url` | A URL devolvida pelo E7; `null` quando o PR não foi aberto — **não é falha** |
-| `pr_estado` | `rascunho` na abertura normal; `aberto` quando o QA já aprovou; `merged`/`fechado` quando o E9 ou uma pessoa atualizarem |
+| `pr_estado` | `rascunho` na abertura normal; `aberto` quando o QA já aprovou; `merged`/`fechado` na entrega de planejamento e na de sprint, quando o E9 ou uma pessoa atualizarem. Depois do merge, na entrega por trabalho, fica com o retrato do E7: o estado final é o do serviço (DM-317) |
 | `sprint_atual`, `prs` | Ver abaixo, "O PR da entrega atual". O E8 preserva a sprint fixada pelo E0 e registra URL/estado no item dela pelo escritor único |
 | `entregue_em` | A data em que o fluxo completou; `null` enquanto `estado` não for `entregue` |
 

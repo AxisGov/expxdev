@@ -47,7 +47,7 @@ estado: {{aberto | entregue | bloqueado}}
 versionado: {{true | false}}
 branch: {{nome da branch | null}}
 branch_base: {{nome da base | null}}
-base_validada_sha: {{sha de 40 hex de git merge-base HEAD <branch_base>, gravado no E0 | null sem versionador}}
+base_validada_sha: {{sha completo (40 hex no SHA-1, 64 no SHA-256) de git merge-base HEAD <branch_base>, gravado no E0 | null sem versionador}}
 origem_base: {{registrada_e0 | registrada_sprint | inferida_legado | null sem versionador}}
 reconciliacoes: []
 commits:
@@ -66,7 +66,7 @@ atencao:
   leitura_rapida: {{n}}
   dispensavel: {{n}}
 portao: {{pronto | bloqueado | null}}
-portao_sha: {{sha de 40 hex do HEAD que o E2 avaliou, gravado so por registrar-portao.sh | null}}
+portao_sha: {{sha completo do HEAD que o E2 avaliou, gravado so por registrar-portao.sh | null}}
 falhas_portao: [{{as verificacoes com FALHA no E2: v1..v12, ou vN_sem_prova; vazio sem portao ou com PRONTO}}]
 causa: {{null | a causa derivada por scripts/causa-do-portao.sh --derivar, so com estado bloqueado}}
 desvios: []

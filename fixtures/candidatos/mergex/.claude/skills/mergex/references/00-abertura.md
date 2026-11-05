@@ -429,7 +429,7 @@ replanejamento (portão bloqueado → replaneja → F3/F4/F5 → F6 de novo → 
 - `versionado: true` (ou `false`, se o passo 1 assim determinou)
 - `commits: []` — a lista cresce no E1, e o primeiro item dela recebe `seq: 1`. **Não existe `seq` de topo**: o próximo número sai da própria lista (`00-schema.md`, "A ordem de registro")
 - `portao: null`, `falhas_portao: []`, `causa: null`, `push_feito: false`, `pr_url: null`, `pr_estado: null`
-- `base_validada_sha` com o SHA completo (40 hex) de `git merge-base HEAD <branch_base>`, e `origem_base: registrada_e0` — a base em que o trabalho é validado, fixada por SHA, nunca por nome de ref
+- `base_validada_sha` com o SHA completo (40 hex no SHA-1, 64 no SHA-256) de `git merge-base HEAD <branch_base>`, e `origem_base: registrada_e0` — a base em que o trabalho é validado, fixada por SHA, nunca por nome de ref
 - `reconciliacoes: []` e `portao_sha: null` — a lista só cresce pelo `reconciliacao-base.sh --registrar`, e `portao_sha` só é gravado pelo E2 (`registrar-portao.sh`)
 - `criado_em` e `atualizado_em` com a data de hoje
 - `sprint_atual` e `prs`: sem `--planejamento`, `sprint_atual: null` e `prs: []`. **Com
@@ -437,7 +437,7 @@ replanejamento (portão bloqueado → replaneja → F3/F4/F5 → F6 de novo → 
   `sprint: planejamento`, `url: null`, `estado: null`, `merge_sha: null`, `merge: null`,
   `base_sha: null`
   (`00-schema.md`, "A entrega de planejamento"). Confira a gravação com
-  `entrega-de-planejamento.sh --entrega docs/entregas/<trabalho_id>/ENTREGA.md`: tem de dizer
+  `bash .claude/skills/mergex/scripts/entrega-de-planejamento.sh --entrega docs/entregas/<trabalho_id>/ENTREGA.md`: tem de dizer
   `planejamento=sim`
 
 Repositório sem versionador (passo 1): `base_validada_sha` e `origem_base` ficam `null`, como `branch` e `branch_base`.
@@ -528,7 +528,7 @@ O E0 terminou quando **todas** são verdade:
 - [ ] `git status --porcelain` estava vazio na hora de criar ou trocar a branch (ou o repositório não é versionado, ou a branch foi adotada sem troca).
 - [ ] `ORQUESTRADOR.md` tem a linha da branch.
 - [ ] `docs/entregas/<trabalho_id>/ENTREGA.md` existe com `estado: aberto` e frontmatter válido.
-- [ ] Numa entrega nova, `base_validada_sha` é um SHA de 40 hex com `origem_base: registrada_e0`; numa retomada, os dois estão exatamente como estavam, salvo a primeira depois do PR de planejamento `merged`, que os grava com a saída do bloco da retomada (`origem_base: registrada_sprint`).
+- [ ] Numa entrega nova, `base_validada_sha` é um SHA completo no formato do repositório (40 ou 64 hex) com `origem_base: registrada_e0`; numa retomada, os dois estão exatamente como estavam, salvo a primeira depois do PR de planejamento `merged`, que os grava com a saída do bloco da retomada (`origem_base: registrada_sprint`).
 - [ ] O `pre-push` efetivo está ativo: `ativacao-pre-push.sh --instalar` saiu `0` (chamador gerenciado instalado ou já presente, ou integração externa válida), sem alterar `core.hooksPath` nem hook de terceiro — ou o repositório não é versionado.
 - [ ] `.expx/estado.json` tem `branch` e `pr_estado: null` — **ou** `.expx/` não existe, ou o repositório não é versionado, e nesses casos nada foi gravado. Este item nunca reprova o E0.
 

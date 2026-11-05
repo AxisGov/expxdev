@@ -298,7 +298,7 @@ seleciona as entregas **só pelo conteúdo do PR** e aplica a cada uma a mesma v
 real da cabeça do PR:
 
 ```bash
-bash .claude/skills/mergex/scripts/portao-ci.sh --verificar --sha <sha40> --branch <nome> --base <sha40>
+bash .claude/skills/mergex/scripts/portao-ci.sh --verificar --sha <sha> --branch <nome> --base <sha>
 ```
 
 - **Seleção pelo conteúdo do PR.** `<base>` é `pull_request.base.sha` e `<sha>` é

@@ -3,8 +3,9 @@
 #
 # E1:     exatamente um Task e um Trabalho; nenhum Metodo.
 # método: exatamente um Trabalho e um Metodo; nenhum Task.
-# integração da base: exatamente um Trabalho e um Integra-base (SHA completo, 40 hex
-#         minúsculo); nenhum Task, nenhum Metodo. Com --commit, o commit tem
+# integração da base: exatamente um Trabalho e um Integra-base (SHA completo e
+#         minúsculo, no tamanho do formato do repositório: 40 hex no SHA-1, 64 no
+#         SHA-256); nenhum Task, nenhum Metodo. Com --commit, o commit tem
 #         exatamente dois pais e o segundo é o Integra-base.
 #
 # --arquivo valida só a gramática da mensagem; as checagens de pais exigem --commit.
@@ -104,8 +105,14 @@ case "$ACAO" in
     [ "$V_TRABALHO" = "$TRABALHO" ] \
       || invalido "Trabalho divergente: mensagem=$V_TRABALHO contexto=$TRABALHO"
     [ "$Q_INTEGRA" = 1 ] || invalido "integração exige exatamente um Integra-base; encontrou $Q_INTEGRA" # guarda:INT
-    grep -Eq '^[0-9a-f]{40}$' <<<"$V_INTEGRA" \
-      || invalido "Integra-base não é um SHA completo de 40 hex minúsculo: $V_INTEGRA" # guarda:INT
+    # o tamanho do SHA completo vem do formato do repositório (DM-315)
+    case "$(git rev-parse --show-object-format 2>/dev/null)" in
+      sha1) OID_LEN=40 ;;
+      sha256) OID_LEN=64 ;;
+      *) uso 'formato de objetos Git ilegível ou não suportado: a integração precisa do repositório' ;;
+    esac
+    grep -Eq "^[0-9a-f]{$OID_LEN}\$" <<<"$V_INTEGRA" \
+      || invalido "Integra-base não é um SHA completo de $OID_LEN hex minúsculo: $V_INTEGRA" # guarda:INT
     if [ -n "$COMMIT" ]; then
       PAIS="$(git rev-list --parents -n1 "$COMMIT" 2>/dev/null)" \
         || uso "commit inexistente ou ilegível: $COMMIT"
