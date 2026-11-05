@@ -61,10 +61,17 @@ Condições estruturais, todas obrigatórias:
 - `B1` é ancestral da ponta atual da base **publicada** no momento do registro: com `branch_base`
   em nome simples (`main`), a ref remota `refs/remotes/<remoto>/<branch_base>` é exigida quando
   existe (o `<remoto>` da branch atual, ou `origin`), porque a branch local da base pode estar atrás
-  numa worktree, e a local em dia sozinha não prova que `B1` foi publicado. Sem a ref remota, vale a
-  local; `refs/heads/main` segue a mesma regra do nome simples, e `branch_base` que já é ref remota
-  (`origin/main`) vale como está (DM-312). Antes do
-  `--registrar`, rode `git fetch <remoto>`.
+  numa worktree, e a local em dia sozinha não prova que `B1` foi publicado. Sem a ref remota, o
+  servidor é consultado (`git ls-remote`, DM-321): a base que existe lá e não foi buscada recusa e
+  manda rodar `git fetch <remoto>`; a consulta que falha recusa. Ela roda **antes** da trava C5,
+  com a `branch_base` do `ENTREGA.md` de HEAD, e sem pergunta de credencial do Git no terminal
+  (`GIT_TERMINAL_PROMPT=0`): a rede lenta, ou um ssh do usuário que peça senha, não prende o índice. Sob a trava, o resultado só vale para a mesma base e o mesmo
+  remoto; senão, recusa e manda buscar. Com a ref remota buscada antes, não há consulta; a base que não existe no servidor
+  (a base empilhada nunca enviada) e o repositório sem esse remoto valem pela ref local, e aí `B1`
+  é só local, não publicado. A frente sobre essa base fica barrada no CI até a base do PR conter
+  `B1` (DM-320). `refs/heads/main` segue a mesma regra do nome simples, e `branch_base` que já é
+  ref remota (`origin/main`) vale como está (DM-312). Antes do `--registrar`, rode
+  `git fetch <remoto>`.
 - A mensagem de `M` tem exatamente um `Trabalho: <trabalho_id>` igual ao da `ENTREGA.md`, um
   `Integra-base:` seguido do SHA completo de `B1`, e nenhum `Task:` nem `Metodo:` (a classe
   "integração de base" de `references/01-commits.md`).

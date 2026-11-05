@@ -11,7 +11,9 @@
 # barra vence, depois avisa, depois passa. O nome da branch nunca seleciona
 # nem isenta: `--branch` é só conferência — quando não é o `branch:` de nenhuma
 # entrega selecionada, a saída traz `aviso=branch_divergente` e a decisão não
-# muda. Esta branch entrega o executável e o template, nunca ativa CI.
+# muda. A base do PR (--base) tem de conter a base_validada_sha de cada entrega
+# que a validade não barrou; senão, base_do_pr_divergente (DM-320). Esta branch
+# entrega o executável e o template, nunca ativa CI.
 #
 # Uso (a partir da raiz do checkout, com a história completa):
 #   portao-ci.sh --verificar --sha <sha40|sha64> --branch <nome> --base <sha40|sha64>
@@ -149,7 +151,8 @@ while IFS= read -r e; do [ -n "$e" ] && set -- "$@" "$e"; done < "$TMP_DIR/selec
 
 # cada entrega selecionada decidida sobre o SHA da cabeça do PR, com a agregação
 : > "$TMP_DIR/decisao"
-pr_decide_entregas "$RAIZ" "$SHA" "$@" > "$TMP_DIR/decisao" # guarda:CISHA
+# e a base do PR tem de conter a base validada de cada uma (DM-320)
+PR_BASE_DO_PR="$BASE" pr_decide_entregas "$RAIZ" "$SHA" "$@" > "$TMP_DIR/decisao" # guarda:CISHA
 
 # --branch é só conferência: não é o branch: de nenhuma entrega selecionada
 : > "$TMP_DIR/avisos"

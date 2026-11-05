@@ -398,7 +398,7 @@ npx expxdev init --skills sprintx,runx,mergex --harness claude,opencode --yes
 | Flag | Efeito |
 |---|---|
 | `--skills <lista>` | Skills a instalar, separadas por vírgula. Repetível |
-| `--harness <lista>` | `claude`, `opencode`, ou os dois. Padrão: `claude` |
+| `--harness <lista>` | `claude`, `opencode` e `codex`, separados por vírgula. Padrão: `claude`. O `codex` hoje só registra o hook de sincronização de sessão (`.codex/hooks.json` e `.codex/hooks/expx-session-sync.mjs`); os agentes do método no Codex são a F7 da orquestração, ainda não feita |
 | `--yes` / `--sim` | Aplica sem exigir terminal interativo |
 
 Todas aceitam também a forma `--flag=valor`.
@@ -549,16 +549,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.13.9 -R AxisGov/expxdev -D ~/expx-cli/v0.13.9
+gh release download v0.13.10 -R AxisGov/expxdev -D ~/expx-cli/v0.13.10 &&
 (
-  cd ~/expx-cli/v0.13.9
+  cd ~/expx-cli/v0.13.10
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.13.9.tgz.sha256
+    sha256sum -c expxdev-0.13.10.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.13.9.tgz.sha256
+    shasum -a 256 -c expxdev-0.13.10.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.13.9/expxdev-0.13.9.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.13.10/expxdev-0.13.10.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -572,7 +572,7 @@ npx --yes --package ~/expx-cli/v0.13.9/expxdev-0.13.9.tgz expx init --skills bui
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.13.9 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.13.10 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -669,6 +669,9 @@ npx --yes --package ~/expx-cli/v0.13.9/expxdev-0.13.9.tgz expx init --skills bui
   `core.autocrlf=true` no E9 e deixa de gravar `pr_estado` depois do merge na entrega por trabalho.
 - `0.13.9` mede o SHA de `commits` da MergeX pelo formato do repositório da ENTREGA e fixa o pai do
   commit de método antes do `add` e a árvore logo depois.
+- `0.13.10` faz o CI da MergeX barrar o PR cuja base não contém a base validada da entrega, consulta o
+  servidor pela base sem ref remota no registro da reconciliação, e corrige o envelope da invocação
+  (executor herdado e resolução perdida no rastro).
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

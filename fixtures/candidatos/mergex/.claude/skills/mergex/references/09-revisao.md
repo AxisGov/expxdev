@@ -1214,7 +1214,13 @@ Sem essa confirmação, **não ofereça o merge** deste PR. Passe para o próxim
    de um PR mergeado nesta passagem (ver "Antes do impacto: PRs empilhados", no passo 4); e
    o bloco de "Feature redirecionada" (passo 4), de novo, sobre o HEAD relido: a base pode ter
    andado ou sido trocada depois da primeira avaliação, e o PR só segue com `redirecionado=nao`
-   ou `redirecionado=sim elegivel`. A confirmação humana final **não congela** o estado do PR.
+   ou `redirecionado=sim elegivel`; e a base do PR contém a base validada da entrega (DM-320):
+   com o `ENTREGA.md` do PR no `headRefOid` relido declarando `base_validada_sha` (nem ausente,
+   nem `pendente`), ela tem de ser ancestral do `baseRefOid` relido (`git merge-base
+   --is-ancestor`, depois de buscar a base), senão inelegível com `base do PR sem a base
+   validada da entrega`. É a regra do CI (`references/12-barreira-de-push.md`), relida aqui
+   porque a base pode ter sido trocada depois do último CI e o `--match-head-commit` prende o
+   HEAD, não a base. A confirmação humana final **não congela** o estado do PR.
 
    A releitura **recalcula o gate R1–R6 inteiro**, com as mesmas regras e todas as páginas
    (threads, reviews, comentários e checks, inclusive os não obrigatórios), e não só o HEAD:
@@ -1230,7 +1236,7 @@ Sem essa confirmação, **não ofereça o merge** deste PR. Passe para o próxim
    - **HEAD igual, mas algum critério passou a bloquear** (virou rascunho, CI deixou de estar
      verde, pedido de mudança novo, finding novo ou reaberto, base que passou a ser a branch de
      outro PR aberto ou mergeado nesta passagem, feature redirecionada que deixou de cumprir
-     as condições dela): não faça o merge; diga
+     as condições dela, base que deixou de conter a base validada da entrega): não faça o merge; diga
      exatamente o que mudou.
    - **HEAD igual e gate igual no bloqueio, mas resultado diferente** (contagem do bloco
      `Reviews` mudou, finding novo já classificado, check novo verde): não faça o merge nesta
