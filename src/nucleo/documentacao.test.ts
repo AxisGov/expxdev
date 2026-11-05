@@ -102,6 +102,15 @@ describe("identidade da release no docs-site", () => {
     expect(site).toContain(`~/expx-cli/v${pacote.version}/expxdev-${pacote.version}.tgz`);
   });
 
+  // O download sem `&&` deixava a verificação e o `npx` rodarem sobre arquivos
+  // antigos da pasta quando o `gh release download` falhava (CodeAnt no #146).
+  it("funcional: o download do release encadeia a verificação, no site e no README", () => {
+    const leiaMe = readFileSync("README.md", "utf8");
+    expect(leiaMe).toContain(`gh release download v${pacote.version} -R AxisGov/expxdev -D ~/expx-cli/v${pacote.version} &&\n`);
+    expect(site.split(`-D</span> ~/expx-cli/v${pacote.version} &amp;&amp;\n`).length - 1).toBe(2);
+    expect(site).not.toMatch(new RegExp(`-D</span> ~/expx-cli/v${pacote.version.replace(/\./g, "\\.")}\n`));
+  });
+
   it("funcional: site e apresentação publicam a versão do package", () => {
     expect(site).toContain(`id="versao">v${pacote.version}</span>`);
     expect(site).toContain(`releases/tag/v${pacote.version}`);

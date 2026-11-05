@@ -549,7 +549,7 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.13.10 -R AxisGov/expxdev -D ~/expx-cli/v0.13.10
+gh release download v0.13.10 -R AxisGov/expxdev -D ~/expx-cli/v0.13.10 &&
 (
   cd ~/expx-cli/v0.13.10
   if command -v sha256sum >/dev/null 2>&1; then
