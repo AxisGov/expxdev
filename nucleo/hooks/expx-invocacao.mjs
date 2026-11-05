@@ -63,7 +63,9 @@ function pastaDe(raiz) {
 function resolucaoDe(raiz, agente) {
   let linhas;
   try {
-    linhas = readFileSync(join(raiz, ".expx", "orquestracao-rastro.tsv"), "utf8").split(/\r?\n/);
+    // como o `read` do shell: uma linha por \n, sem o \r do fim (CRLF, e o CR
+    // final sem quebra de linha)
+    linhas = readFileSync(join(raiz, ".expx", "orquestracao-rastro.tsv"), "utf8").split("\n").map((l) => l.replace(/\r$/, ""));
   } catch {
     return "";
   }

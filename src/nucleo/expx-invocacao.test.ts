@@ -79,6 +79,15 @@ describe("expx-invocacao: observa a chamada do agente gerenciado", () => {
     }
   });
 
+  it("funcional: projeção CRLF com o CR final sem quebra de linha vale como no rastro", () => {
+    const raiz = projeto([]);
+    writeFileSync(join(raiz, ".expx", "orquestracao-rastro.tsv"), `# expx-orquestracao-rastro 1\r\nqa\t${RES}\tsenior\tdeclarada\tsenior\tclaude-sonnet\tembutida\t-\t-\r`);
+    expect(antes(raiz, "qa").stdout).not.toBe("");
+    expect(envelopes(raiz)).toHaveLength(1);
+    depois(raiz, "qa", { status: "completed", resolvedModel: "claude-sonnet-5-5" });
+    expect(eventos(raiz)[0]).toMatchObject({ evento: "invocacao_fechada", resolucao_id: RES });
+  });
+
   it("funcional: a projeção que estraga no meio da chamada não apaga a resolução da chamada", () => {
     const raiz = projeto();
     antes(raiz, "qa");
