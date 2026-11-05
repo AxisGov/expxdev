@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.13.9 — o teto do SHA de `commits` e o commit de método com a árvore fixada na MergeX
+
+Instale por PR, como a 0.13.8. São os achados do CodeAnt na instalação da 0.13.8 (conselhos#262). Nenhum é regressão grave: o primeiro só afrouxava a sintaxe aceita, e o segundo depende de uma corrida rara. Só a MergeX muda: o ExpxDev e as outras skills seguem como na 0.13.8.
+
+- **mergex@37f2159** (mergex#82 e #83):
+  - **O teto do SHA de `commits`** (DM-318): a DM-315 tinha levado o `sha_valido` a aceitar de 7 a 64 hex em qualquer repositório, e a V11 contava de 41 a 64 hex como prova num repositório SHA-1. O teto passa a ser o OID do repositório da ENTREGA: 40 no SHA-1, 64 no SHA-256, e 40 fora de repositório. O formato é lido sem `GIT_DIR` e afins. O E1 e a V11 medem pela ENTREGA, e a V12 por `--raiz`.
+  - **O commit de método com a árvore fixada** (DM-319): o pai é lido antes do `add`, e a árvore logo depois. O catálogo do stage e o blob provado do `e9-merge` são conferidos nessa árvore, nome a nome. Depois do commit, `HEAD^1` e `HEAD^{tree}` têm de ser os fixados. Se divergirem, o `persistir-metodo` para sem desfazer o commit local e diz para não enviar. Isso vale para todo checkpoint, não só o `e9-merge`. De quebra, área da base com acento, TAB ou aspas no nome deixa de parar o checkpoint.
+  - **Textos** (DM-319): o `Integra-base:` com hex a mais depois do SHA completo é integração inválida, como o código já fazia. O "mesmo tamanho" do artefato de reconciliação vale para os OIDs do Git, e não para os dois sha256 de conteúdo.
+- **Não exercitado:**
+  - o `persistir-metodo` no macOS: a comparação foi escrita sem `sort -z` e sem process substitution, mas só roda no Linux e no Windows do CI;
+  - um hook `pre-commit` do projeto que reescreva o stage: o checkpoint para por "o índice mudou", como deve, mas não há bancada com esse hook.
+
 ## 0.13.8 — o SHA-256 de ponta a ponta, o blob provado no `e9-merge` e a entrega por trabalho depois do merge na MergeX
 
 Instale por PR, como a 0.13.7. Traz os achados do Conselhos e do CodeAnt na instalação da 0.13.7 (conselhos#256) e dois defeitos anteriores achados no caminho. Nenhum item é regressão da 0.13.7. Só a MergeX muda: o ExpxDev e as outras skills seguem como na 0.13.7.

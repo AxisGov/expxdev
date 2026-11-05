@@ -88,6 +88,7 @@ TMP_CATALOGO=""
 TMP_HIST=""
 TMP_STATUS=""
 TMP_INDEX=""
+TMP_STAGED=""
 
 encerrar() {
   local rc="$1"
@@ -97,6 +98,7 @@ encerrar() {
   [ -z "$TMP_HIST" ] || rm -rf "$TMP_HIST"
   [ -z "$TMP_STATUS" ] || rm -f "$TMP_STATUS"
   [ -z "$TMP_INDEX" ] || rm -f "$TMP_INDEX" "$TMP_INDEX.lock"
+  [ -z "$TMP_STAGED" ] || rm -f "$TMP_STAGED"
   [ -z "${TMP_PROVA:-}" ] || rm -f "$TMP_PROVA"
   if [ "$LIBERAR_NA_SAIDA" = 1 ] && [ -n "$TOKEN" ]; then
     liberar "$TOKEN" >/dev/null 2>&1
@@ -936,6 +938,10 @@ if [ ! -s "$TMP_LISTA" ]; then
   exit 0
 fi
 
+# DM-319: o pai é o HEAD de antes do add. Lido depois, um commit de fora no
+# intervalo viraria o pai esperado e passaria sem ser visto.
+PAI="$(git rev-parse -q --verify 'HEAD^{commit}' 2>/dev/null)"
+
 # O stage nasce vazio sob a trava. Cada path vem do catálogo fechado acima;
 # nenhum diretório, glob ou `git add -A` participa desta operação.
 while IFS= read -r caminho; do
@@ -943,12 +949,27 @@ while IFS= read -r caminho; do
   git add -- "$caminho" || para "falha ao preparar $caminho; stage preservado"
 done < "$TMP_LISTA"
 
-STAGED="$(git diff --cached --name-only 2>/dev/null | LC_ALL=C sort -u)"
+# DM-319: a árvore que o commit tem de ter, fixada logo depois do add. O
+# catálogo e o blob provado são conferidos nesta árvore, e não no índice: a
+# trava C5 não segura um `git add` de fora dela, e o gate de segredo e a
+# mensagem ainda rodam antes do commit. A conferência depois dele acusa o
+# índice que mudou no intervalo. Os nomes saem em NUL, crus: sem as aspas que o
+# Git põe em acento, TAB e aspas. Nome com quebra de linha não é do catálogo
+# (que o recusa) e diverge aqui, antes de virar lista por linha, onde se
+# passaria por dois caminhos.
+ARVORE="$(git write-tree 2>/dev/null)" || para 'não foi possível ler a árvore do índice; stage preservado'
+ANTES="${PAI:-$(git hash-object -t tree /dev/null 2>/dev/null)}"
+TMP_STAGED="$(mktemp "${TMPDIR:-/tmp}/mergex-staged.XXXXXX")" || para 'não foi possível criar a lista do stage'
+git diff --name-only -z "$ANTES" "$ARVORE" > "$TMP_STAGED" 2>/dev/null \
+  || para 'não foi possível ler o staged diff; stage preservado'
+[ -s "$TMP_STAGED" ] || para 'nenhuma mudança elegível entrou no stage'
+[ "$(tr -cd '\n' < "$TMP_STAGED" | wc -c | tr -d ' ')" = 0 ] \
+  || para 'o staged diff diverge do catálogo exato (nome com quebra de linha); stage preservado'
+STAGED="$(tr '\0' '\n' < "$TMP_STAGED" | LC_ALL=C sort -u)"
 ESPERADO="$(cat "$TMP_LISTA")"
-[ -n "$STAGED" ] || para 'nenhuma mudança elegível entrou no stage'
 [ "$STAGED" = "$ESPERADO" ] || para 'o staged diff diverge do catálogo exato; stage preservado'
 # o e9-merge commita o conteúdo que a prova leu, e nenhum outro
-[ -z "$E9_BLOB" ] || [ "$(git rev-parse -q --verify ":$ENTREGA" 2>/dev/null)" = "$E9_BLOB" ] \
+[ -z "$E9_BLOB" ] || [ "$(git rev-parse -q --verify "$ARVORE:$ENTREGA" 2>/dev/null)" = "$E9_BLOB" ] \
   || para "e9-merge: $ENTREGA mudou entre a prova e o git add; o stage tem conteúdo não provado. Nenhum commit foi criado e o stage foi preservado" # guarda:E9MERGE
 
 # Reutiliza literalmente o gate de segurança dos hooks sobre o staged diff.
@@ -973,6 +994,16 @@ bash "$CONTRATO_SH" --validar-metodo --trabalho "$TRABALHO" \
 
 git commit -F "$TMP_MSG" >/dev/null \
   || para 'git commit falhou; nenhum estado foi limpo automaticamente'
+
+# O commit tem o pai de antes e a árvore conferida (e, nela, o blob provado do
+# e9-merge). Divergiu: outro escritor commitou ou preparou algo depois do `git
+# add`, ou um hook do projeto reescreveu o stage. O commit fica (é local), e a
+# recuperação é humana: a branch ou o índice podem ter recebido trabalho alheio.
+FEITO="$(git rev-parse -q --verify HEAD 2>/dev/null)"
+[ "$(git rev-parse -q --verify 'HEAD^1' 2>/dev/null)" = "$PAI" ] \
+  || para "outro commit entrou na branch entre o git add e o git commit: o commit de método ${FEITO:-?} não tem como pai ${PAI:-<nenhum>}, o HEAD de antes (DM-319). Não envie. Confira os commits que entraram com git log ${PAI:+$PAI..}${FEITO:-HEAD}; desfazer é decisão humana, porque a branch pode ter recebido trabalho alheio" # guarda:ARVORE
+[ "$(git rev-parse -q --verify 'HEAD^{tree}' 2>/dev/null)" = "$ARVORE" ] \
+  || para "o índice mudou entre o git add e o git commit: o commit ${FEITO:-?} tem conteúdo que a prova e o gate de segredo não viram (DM-319). Não envie. Confira o commit com git show ${FEITO:-HEAD}; desfazê-lo é decisão humana, porque o índice pode ter recebido trabalho alheio" # guarda:ARVORE
 
 bash "$CONTRATO_SH" --validar-metodo --trabalho "$TRABALHO" \
   --checkpoint "$CHECKPOINT" --commit HEAD >/dev/null 2>&1 \

@@ -2371,6 +2371,12 @@ MSG_LIXO="git commit -m \"merge(mergex): integra a base
 Trabalho: ft-02
 Integra-base: ${SHA_MH}XYZ\""
 caso "aviso: Integra-base com lixo apos os 40 hex (SHA-1) nao bloqueia" mergex/commit-por-task.sh "$(bash_json "$MSG_LIXO")" 0
+# hex a mais depois dos 40 não é lixo: é SHA malformado, e o contrato decide (DM-319)
+int1="$(RAIZ="$PWD" && . "$H/comum/integracao-da-mensagem.sh" \
+  && integracao_da_mensagem "$(printf 'merge(mergex): integra a base\n\nTrabalho: ft-02\nIntegra-base: %sa\n' "$SHA_MH")" ft-02 \
+    "$H/../skills/mergex/scripts/contrato-de-commit.sh" && printf '%s' "$INT_CLASSE")"
+if [ "$int1" = invalida ]; then OK=$((OK+1)); printf '  ok    %s\n' "SHA-1: Integra-base com hex a mais depois dos 40 é integração inválida"
+else FALHOU=$((FALHOU+1)); printf '  FALHA %s (obteve %s)\n' "SHA-1: Integra-base com hex a mais depois dos 40" "$int1"; fi
 echo '{"expx_hooks":1,"hooks":{"commit-por-task":{"modo":"bloqueio"},"arquivo-fora-do-plano":{"modo":"bloqueio"}}}' > .expx/hooks.json
 rm -f msg-zeros.txt msg-outro-sha.txt msg-plana.txt
 git merge --abort >/dev/null 2>&1 || exit 1
@@ -2401,6 +2407,7 @@ if git init -q --object-format=sha256 -b main "$I256" 2>/dev/null \
   int256 "SHA-256: Integra-base de 64 igual ao MERGE_HEAD é integração" "$MH256" valida
   int256 "SHA-256: Integra-base de 40 (abreviação) não é integração" "${MH256:0:40}" invalida
   int256 "SHA-256: lixo depois dos 64 hex é trailer não isolado" "${MH256}XYZ" nenhuma
+  int256 "SHA-256: hex a mais depois dos 64 é integração inválida" "${MH256}a" invalida
   git -C "$I256" merge --abort >/dev/null 2>&1
 else
   FALHOU=$((FALHOU+1)); printf '  FALHA %s\n' "o git daqui não cria repositório SHA-256 com merge em andamento"

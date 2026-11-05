@@ -154,20 +154,33 @@ limpa() { # <valor> — tira aspas e espaço das pontas
 # A prova: um identificador de commit válido.
 #
 # O E1 registra o que `git rev-parse --short HEAD` devolveu — hexadecimal
-# minúsculo, do tamanho curto do versionador ao SHA inteiro (40 no SHA-1, 64 no
-# SHA-256; o --registrar-existente grava o completo). A validação é só de
-# sintaxe: quem resolve o valor no Git recusa o que não for do repositório.
+# minúsculo, do tamanho curto do versionador ao SHA inteiro do repositório (o
+# --registrar-existente grava o completo). O teto é o OID do repositório que
+# contém <dir> (DM-318): 40 no SHA-1, 64 no SHA-256. Fora de repositório, ou com
+# formato que não se lê, 40: nada prova que o projeto é SHA-256. A V11 não
+# resolve o valor no Git, e por isso o tamanho é a única barreira de formato.
+# O formato é lido sem o ambiente do Git (DM-271): GIT_DIR e afins apontariam
+# outro repositório que não o de <dir>.
 # Vazio, `null`, marcador de template e qualquer coisa fora disso NÃO é prova.
 # ---------------------------------------------------------------------------
-sha_valido() { # <valor>
+SHA_TETO_DIR=""; SHA_TETO=""
+sha_teto() { # <dir> — grava SHA_TETO; o último diretório fica em cache
+  [ -n "$SHA_TETO" ] && [ "$1" = "$SHA_TETO_DIR" ] && return 0
+  case "$(unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE
+          git -C "$1" rev-parse --show-object-format 2>/dev/null)" in
+    sha256) SHA_TETO=64 ;;
+    *) SHA_TETO=40 ;;
+  esac
+  SHA_TETO_DIR="$1"
+}
+
+sha_valido() { # <valor> [dir]
   case "$1" in
     ''|null|'~') return 1 ;;
     *[!0-9a-f]*) return 1 ;;
   esac
-  case "${#1}" in
-    [7-9]|[1-5][0-9]|6[0-4]) return 0 ;;
-    *) return 1 ;;
-  esac
+  sha_teto "${2:-.}"
+  [ "${#1}" -ge 7 ] && [ "${#1}" -le "$SHA_TETO" ]
 }
 
 # ---------------------------------------------------------------------------
@@ -342,7 +355,7 @@ acrescentar() {
   task="$(limpa "$task")"
   commit="$(limpa "$commit")"
   [ -n "$task" ] || { ERRO="item novo sem task: não há o que registrar"; return 1; }
-  sha_valido "$commit" \
+  sha_valido "$commit" "$(dirname "$arq")" \
     || { ERRO="item novo com commit que não é prova: ${commit:-<vazio>}"; return 1; }
   # O ERRO de proximo se perde no `$(...)`: no caminho de erro, a validação roda aqui.
   seq="$(proximo "$arq")" || { validar "$arq" >/dev/null; return 1; }

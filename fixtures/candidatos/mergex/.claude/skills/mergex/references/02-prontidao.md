@@ -252,7 +252,7 @@ Falha: qualquer task `concluida` sem item que a prove. **Nomeie cada uma** (id e
 | `versionado: false` | `n/a` — sem versionador o schema já define `commits: []` |
 | `ENTREGA.md` ou `tasks.md` ilegível | **FALHA**, registrada como `v11_sem_prova` |
 
-**O que conta como prova.** O item inteiro, não o texto `task: T-NN.MM`. `commit` vazio, `null`, marcador de template (`{{...}}`, `TODO`, `NÃO DETERMINADO`) ou identificador malformado **não** prova: o item existe, a prova não. O identificador válido é o que o E1 grava — o hexadecimal minúsculo que `git rev-parse --short HEAD` devolveu, do tamanho curto do versionador ao SHA inteiro (40 hex no SHA-1, 64 no SHA-256).
+**O que conta como prova.** O item inteiro, não o texto `task: T-NN.MM`. `commit` vazio, `null`, marcador de template (`{{...}}`, `TODO`, `NÃO DETERMINADO`) ou identificador malformado **não** prova: o item existe, a prova não. O identificador válido é o que o E1 grava — o hexadecimal minúsculo que `git rev-parse --short HEAD` devolveu, do tamanho curto do versionador ao SHA inteiro do repositório da `ENTREGA.md` (40 hex no SHA-1, 64 no SHA-256). Fora de repositório, o teto é 40. Como a V11 não resolve o valor no Git, um valor maior que o SHA do formato não é commit e não prova (DM-318).
 
 **Mais de um item para a mesma task não é erro.** `commits` é histórico de execução, não índice de plano: um `id` reaparece legitimamente depois de replanejamento (`references/01-commits.md`, "`commits` é histórico de execução"). A V11 exige que **exista** pelo menos um item, nunca exatamente um, e não trata duplicidade como falha dela. Ordem e sequência dos itens também não são assunto da V11.
 

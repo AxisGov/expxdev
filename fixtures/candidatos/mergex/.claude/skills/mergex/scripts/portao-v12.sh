@@ -232,7 +232,7 @@ while IFS="$(printf '\t')" read -r id _; do
 $commits
 EOI
   [ "$tem_item" = 1 ] || continue
-  sha_valido "$sha" || sem_prova "commit-invalido:$id"
+  sha_valido "$sha" "$RAIZ" || sem_prova "commit-invalido:$id"
   ALVOS="$ALVOS$id=$sha
 "
 done <<EOF
