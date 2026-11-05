@@ -139,9 +139,11 @@ Regras:
 
 - Todas as chaves sempre presentes; lista vazia é `[]`. Um merge de base sem arquivo a reconciliar
   gera o artefato com `arquivos: []`: é ele que avança a base validada.
-- SHAs sempre completos, nunca nome de ref, e todos do mesmo tamanho: 40 hex no SHA-1, 64 no SHA-256.
-  Artefato com tamanhos misturados é inválido; o `--verificar` e a V9 exigem o tamanho do
-  formato do repositório (DM-315).
+- Os OIDs do Git (`b0_sha`, `p1_sha`, `b1_sha`, `m_sha`, `blob_b1` e `blob_m`) sempre completos,
+  nunca nome de ref, e todos do mesmo tamanho: 40 hex no SHA-1, 64 no SHA-256. Artefato com
+  tamanhos misturados é inválido; o `--verificar` e a V9 exigem o tamanho do formato do
+  repositório (DM-315). `diff_b1_m_sha256` e `assinatura` são sha256 de conteúdo: 64 hex em
+  qualquer formato (DM-319).
 - `motivo` é texto de uma linha, não vazio, sem marcador de template; é para o revisor, não entra
   em prova.
 - `diff_b1_m_sha256` é o sha256 da saída de

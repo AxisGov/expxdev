@@ -68,15 +68,17 @@ ERRO=""
 # `commit` ou com `commit` malformado não sai: ele não é prova de nada.
 # ---------------------------------------------------------------------------
 commits_validos() {
-  local arq="$1" its linha t c
+  local arq="$1" its linha t c dir=.
   its="$(itens_de "$arq")" || return 1
   [ -n "$its" ] || return 0
+  # o tamanho do SHA é o do repositório da ENTREGA; stdin não tem um, vale o corrente
+  [ "$arq" = - ] || dir="$(dirname "$arq")"
   printf '%s\n' "$its" | while IFS= read -r linha; do
     [ -n "$linha" ] || continue
     campos "$linha"
     t="$(limpa "$CAMPO3")"; c="$(limpa "$CAMPO4")"
     [ -n "$t" ] || continue
-    sha_valido "$c" || continue
+    sha_valido "$c" "$dir" || continue
     printf '%s\t%s\n' "$t" "$c"
   done
 }

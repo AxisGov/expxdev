@@ -74,9 +74,10 @@ pela **mensagem**, nunca pelo estado do Git, por uma biblioteca só:
 pelo `arquivo-fora-do-plano`. Só vale a mensagem que declara `Integra-base:`
 como trailer isolado e limpo, com `MERGE_HEAD` presente; ela passa por
 `contrato-de-commit.sh --validar-integracao` e o `Integra-base:` tem de ser o
-`MERGE_HEAD`. O que a leitura não isola (aspas soltas, lixo depois do SHA completo,
-trailers que o Git não acha) é classe "nenhuma" e segue as regras de sempre:
-bloquear só com prova.
+`MERGE_HEAD`. O que a leitura não isola (aspas soltas, caractere que não é hex depois
+do SHA completo, trailers que o Git não acha) é classe "nenhuma" e segue as regras de
+sempre: bloquear só com prova. Hex a mais depois do SHA completo é SHA malformado, e a
+integração é inválida (DM-319).
 
 - `commit-por-task`: integração válida não é mistura de tasks, e as regras de
   status e suíte não se aplicam; integração que declara `Integra-base:` e não
