@@ -310,6 +310,17 @@ bash .claude/skills/mergex/scripts/portao-ci.sh --verificar --sha <sha> --branch
   inconsistente ou ilegível, `historia_incompleta` e `erro_ambiente` reprovam em qualquer modo;
   `portao: null` segue o modo de `pr-so-com-portao` em `.expx/hooks.json`, igual ao `pre-push`.
   Qualquer entrega que barra reprova o PR.
+- **A base do PR contém a base validada (DM-320).** Para cada entrega que a validade não barrou,
+  a `base_validada_sha` do `ENTREGA.md` no `<sha>` tem de ser ancestral do `<base>`. Senão, a
+  entrega barra com `base_do_pr_divergente`: o PR foi aberto contra outra base que não a
+  `branch_base` registrada (a frente empilhada contra a `main`, levando a predecessora junto) e
+  leva commits que a entrega não validou. A regra é pelo SHA, não pelo nome: o CI não sabe o
+  remoto, e a feature redirecionada (DM-245) mira a base da predecessora mergeada com a
+  `branch_base` ainda no nome dela. Valor presente que não é commit do formato do repositório
+  também barra; chave ausente ou `pendente` (entrega legada) não se aplica. A predecessora
+  integrada por squash, ou o evento com base defasada, barram até a reconciliação avançar a base
+  validada ou um novo evento: falso bloqueio, nunca aprovação. O `pre-push` não muda: ele não
+  conhece a base do PR.
 - **`--branch` é só conferência.** O nome da branch de origem do PR continua obrigatório (e precisa
   ser um nome de branch válido), mas não seleciona nem isenta: quando não é o `branch:` de nenhuma
   entrega selecionada, a saída traz `aviso=branch_divergente` e a decisão não muda. Fork e

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.13.10 — a base do PR e a base publicada na MergeX
+
+Instale por PR, como a 0.13.9. Só a MergeX muda, e o README passa a documentar o `--harness codex`. Nenhum item é regressão da 0.13.9.
+
+- **mergex@b30e951** (mergex#84 e #85):
+  - **A base do PR contém a base validada** (DM-320, relato do Login no login#58):
+    - o CI barra com `base_do_pr_divergente` o PR cuja base não contém a `base_validada_sha` da entrega. É o caso da frente empilhada aberta contra a `main`, levando a predecessora junto;
+    - a regra é pelo SHA, então o PR redirecionado depois do merge da predecessora (DM-245) passa;
+    - o E7 não retoma um PR existente cuja base não a contém, e lê a base validada do `ENTREGA.md` publicado. No GitLab, confere também a ponta do alvo;
+    - o E9 confere a mesma regra na releitura antes do merge;
+    - o pre-push não muda.
+  - **A base publicada no registro da reconciliação** (DM-321, nitpick do CodeAnt no login#57):
+    - sem a ref remota da base, o `--registrar` consulta o servidor antes da trava C5;
+    - a base que existe lá, mas não foi buscada, recusa e manda rodar `git fetch`. A consulta que falha também recusa;
+    - a base que não existe no servidor (a empilhada nunca enviada) vale pela local, e a DM-320 barra no CI o PR que não a contém.
+- **ExpxDev:** o README documenta o `--harness codex`, que a CLI já aceitava. Hoje ele só registra o hook de sincronização de sessão; os agentes do método no Codex são a F7 da orquestração.
+- **Efeito no consumidor:** um PR aberto contra outra base que não a registrada passa a falhar no CI da MergeX. O caminho é abrir contra a `branch_base`, ou entregar a predecessora antes e reconciliar.
+- **Não exercitado:**
+  - a consulta ao servidor com credencial interativa real: o teste usa um `git` falso;
+  - a predecessora integrada por squash, que barra até a reconciliação (falso bloqueio, nunca aprovação).
+
 ## 0.13.9 — o teto do SHA de `commits` e o commit de método com a árvore fixada na MergeX
 
 Instale por PR, como a 0.13.8. São os achados do CodeAnt na instalação da 0.13.8 (conselhos#262). Nenhum é regressão grave: o primeiro só afrouxava a sintaxe aceita, e o segundo depende de uma corrida rara. Só a MergeX muda: o ExpxDev e as outras skills seguem como na 0.13.8.

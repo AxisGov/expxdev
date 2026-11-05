@@ -306,6 +306,22 @@ if [ "$rc_pr" != 0 ]; then
   pr_url="$(gh pr view "$head" --repo "$destino" --json url --jq '.url')" || { echo "PR existente não recuperado no destino"; exit 1; }
   linhas_url="$(printf '%s\n' "$pr_url" | awk 'END { print NR }')"
   [ -n "$pr_url" ] && [ "$linhas_url" = 1 ] || { echo "recuperação do PR retornou zero ou múltiplas URLs"; exit 1; }
+  # DM-320: só retoma o PR cuja base contém a base validada da entrega (a feature
+  # redirecionada da DM-245 passa; o PR da frente empilhada aberto contra a main, não)
+  base_pr="$(gh pr view "$head" --repo "$destino" --json baseRefName,baseRefOid --jq '.baseRefName + " " + .baseRefOid')" \
+    || { echo "base do PR existente não lida: o E7 não retoma"; exit 1; }
+  nome_base_pr="${base_pr%% *}"; oid_base_pr="${base_pr#* }"
+  # a base validada é a do ENTREGA.md publicado (o SHA medido), não a do disco; sem a
+  # chave, ou `pendente`, é entrega legada e retoma como antes; presente e inválida, não
+  git cat-file -e "$publicado:docs/entregas/<trabalho_id>/ENTREGA.md" 2>/dev/null \
+    || { echo "ENTREGA.md ausente no SHA publicado ($publicado): o E7 não retoma"; exit 1; }
+  bv="$(git cat-file blob "$publicado:docs/entregas/<trabalho_id>/ENTREGA.md" | awk 'NR == 1 { if ($0 !~ /^---/) exit; next } /^---/ { exit } /^base_validada_sha:/ { v = $0; sub(/^base_validada_sha:[[:space:]]*/, "", v); sub(/[[:space:]]+$/, "", v); print "=" v; exit }')"
+  case "$bv" in ''|=pendente) bv="" ;; =*[!0-9a-f]*|=) echo "base_validada_sha inválida (${bv#=}) no ENTREGA.md publicado: o E7 não retoma (DM-320)"; exit 1 ;; *) bv="${bv#=}" ;; esac
+  if [ -n "$bv" ]; then
+    git fetch -q "$rb" "refs/heads/$nome_base_pr" 2>/dev/null || { echo "base do PR existente ($nome_base_pr) não buscada em $rb: o E7 não retoma"; exit 1; }
+    git merge-base --is-ancestor "$bv" "$oid_base_pr" 2>/dev/null \
+      || { echo "o PR existente ($pr_url) mira $nome_base_pr, que não contém a base validada da entrega ($bv): o E7 não o retoma (DM-320). Abra o PR contra $bb, ou entregue a base antes e reconcilie"; exit 1; }
+  fi
   echo "PR existente retomado: $pr_url"
 fi
 ```
@@ -370,7 +386,17 @@ while :; do
 done
 case "$quantidade" in
   0) glab mr create --repo "https://$destino" --head "https://$fonte" --target-branch "$bb" --source-branch "$branch_fonte" --title "$titulo" --description "$(cat docs/entregas/<trabalho_id>/PR.md)" "${opcao_rascunho[@]}" --yes ;;
-  1) [ -n "$pr_url" ] || { echo "MR única sem web_url"; exit 1; } ;;
+  1) [ -n "$pr_url" ] || { echo "MR única sem web_url"; exit 1; }
+     # DM-320: o alvo é o $bb pelo nome; a ponta dele tem de conter a base validada
+     git cat-file -e "$publicado:docs/entregas/<trabalho_id>/ENTREGA.md" 2>/dev/null \
+       || { echo "ENTREGA.md ausente no SHA publicado ($publicado): o E7 não retoma"; exit 1; }
+     bv="$(git cat-file blob "$publicado:docs/entregas/<trabalho_id>/ENTREGA.md" | awk 'NR == 1 { if ($0 !~ /^---/) exit; next } /^---/ { exit } /^base_validada_sha:/ { v = $0; sub(/^base_validada_sha:[[:space:]]*/, "", v); sub(/[[:space:]]+$/, "", v); print "=" v; exit }')"
+     case "$bv" in ''|=pendente) bv="" ;; =*[!0-9a-f]*|=) echo "base_validada_sha inválida (${bv#=}) no ENTREGA.md publicado: o E7 não retoma (DM-320)"; exit 1 ;; *) bv="${bv#=}" ;; esac
+     if [ -n "$bv" ]; then
+       git fetch -q "$rb" "refs/heads/$bb" 2>/dev/null || { echo "alvo da MR existente ($bb) não buscado em $rb: o E7 não retoma"; exit 1; }
+       git merge-base --is-ancestor "$bv" FETCH_HEAD 2>/dev/null \
+         || { echo "a MR existente ($pr_url) mira $bb, que não contém a base validada da entrega ($bv): o E7 não a retoma (DM-320)"; exit 1; }
+     fi ;;
   *) echo "mais de uma MR aberta para $projeto_fonte:$branch_fonte no destino"; exit 1 ;;
 esac
 ```
@@ -383,9 +409,9 @@ Não adicione revisor, etiqueta, marco ou responsável por conta própria: nada 
 
 Qualquer falha — sem permissão, PR já existe, base inválida, rede fora — **não interrompe a entrega**. Vá para o passo 3, registre o erro literal do comando, e siga.
 
-Se a falha for "PR já existe para esta branch" no GitHub (a saída do `gh pr create` diz `already exists`), o próprio bloco do passo 2 recupera a URL escalar no **projeto de destino**, exigindo exatamente uma linha: a recuperação mora no mesmo bloco que tenta criar, porque `head` e `destino` só existem ali. Qualquer outra falha sai do bloco com o erro literal do `gh pr create`, sem consultar o PR, e esse erro vai para o passo 3.
+Se a falha for "PR já existe para esta branch" no GitHub (a saída do `gh pr create` diz `already exists`), o próprio bloco do passo 2 recupera a URL escalar no **projeto de destino**, exigindo exatamente uma linha: a recuperação mora no mesmo bloco que tenta criar, porque `head` e `destino` só existem ali. O PR existente só é retomado se a base dele contém a `base_validada_sha` da entrega (DM-320): o bloco lê `baseRefName` e `baseRefOid`, busca essa base no remoto-base e exige a ancestralidade. A base validada é a do `ENTREGA.md` no SHA medido (`$publicado`), não a do disco; presente e vazia ou fora do formato, não retoma; a base que não pôde ser buscada também não. O PR da frente empilhada aberto contra a `main`, levando a predecessora junto, não é retomado; a feature redirecionada da DM-245 é. Entrega sem `base_validada_sha`, ou com `pendente`, retoma como antes. É a mesma regra do CI (`references/12-barreira-de-push.md`), que barra esse PR mesmo aberto à mão. Qualquer outra falha sai do bloco com o erro literal do `gh pr create`, sem consultar o PR, e esse erro vai para o passo 3.
 
-No GitLab, a consulta exata por projeto fonte e branch já ocorre antes do `glab mr create`: zero cria, uma retoma e mais de uma falha fechado. É uma retomada, não uma falha. É o caso normal depois de uma reconciliação de base (`references/11-reconciliacao-base.md`): a solicitação existente é retomada, **nunca uma segunda solicitação**.
+No GitLab, a consulta exata por projeto fonte e branch já ocorre antes do `glab mr create`: zero cria, uma retoma e mais de uma falha fechado. Ela filtra pelo alvo `$bb`, então um MR da mesma origem contra outra base nunca é retomado (DM-320): o E7 cria o MR contra a base registrada. E o MR que mira `$bb` só é retomado se a ponta buscada de `$bb` contém a base validada do `ENTREGA.md` publicado: o nome não prova o commit, e a branch pode ter sido reescrita. É uma retomada, não uma falha. É o caso normal depois de uma reconciliação de base (`references/11-reconciliacao-base.md`): a solicitação existente é retomada, **nunca uma segunda solicitação**.
 
 Na entrega `por_sprint`, isso só é retomada quando o PR existente é o da `sprint_atual` que o
 E0 registrou. Um PR `merged` da sprint anterior é histórico em `prs`, **não é retomada**: depois
@@ -411,7 +437,8 @@ O trabalho está entregue:
   pacote de QA em docs/entregas/<trabalho_id>/QA-PACOTE.md
 
 Para abrir o PR: crie o pull request de <branch> para <$bb do passo 1.5> e cole o
-conteúdo de PR.md na descrição.
+conteúdo de PR.md na descrição. A base tem de ser essa: contra outra base que não contenha
+a base validada da entrega, o CI barra o PR (DM-320).
 ```
 
 Registre `pr_url: null` e `pr_estado: null` no `ENTREGA.md`. **Isto não é uma falha da entrega** — não relate como erro.

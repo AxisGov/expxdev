@@ -497,6 +497,8 @@ _pr_diag_invalido() {
       printf '%s' "mais de um merge-base entre a base e o SHA (base_ambigua): a seleção pelo conteúdo não tem uma base única; integre a base numa só linha (merge da base atual) e repita" ;;
     caminho_com_controle)
       printf '%s' "caminho com caractere de controle (TAB, quebra de linha, CR) sob docs/entregas (caminho_com_controle): renomeie o diretório da entrega" ;;
+    base_do_pr_divergente)
+      printf '%s' "a base do PR não contém a base validada da entrega (base_do_pr_divergente): abra o PR contra a branch_base registrada; para levar a base junto, entregue-a antes no PR dela e reconcilie esta entrega com a base integrada (DM-320). Se o PR já mira a base certa, o evento tem base defasada: gere novo evento (push na branch do PR)" ;;
     cobertura_indeterminada)
       printf '%s' "a árvore enviada tem ENTREGA.md, mas nenhuma parcela da seleção a alcança (cobertura_indeterminada): sem refs/remotes/<remoto>/HEAD, sem ENTREGA.md que declare a branch e sem trailer Trabalho: no commit enviado; o push segue sem prova do portão — confira a branch de destino ou rode 'git remote set-head <remoto> --auto'" ;;
     *)
@@ -561,6 +563,37 @@ _pr_vence() {
   esac
 }
 
+# _pr_base_do_pr <raiz> <sha> <entrega> <base> — DM-320: a base do PR (o
+# pull_request.base.sha do CI) tem de conter a `base_validada_sha` da entrega no
+# SHA da cabeça. Pelo SHA, não pelo nome: o CI não sabe o remoto, e a feature
+# redirecionada (DM-245) mira a base da predecessora mergeada com a branch_base
+# ainda no nome dela. rc 0: contém, ou não se aplica (chave ausente ou
+# `pendente`, entrega legada); rc 1: não contém, o valor presente não é um commit
+# do formato do repositório, ou o ENTREGA.md não pôde ser lido no SHA (só chega
+# aqui a entrega que a validade não barrou, e ela existe no SHA: falha de leitura
+# fecha), com o diagnóstico em PR_BASE_DIAG.
+_pr_base_do_pr() {
+  local raiz="$1" sha="$2" ent="$3" base="$4" tmp bv n
+  PR_BASE_DIAG=""
+  tmp="$(mktemp "${TMPDIR:-/tmp}/mergex-base-pr.XXXXXX")" || { PR_BASE_DIAG="sem arquivo temporário"; return 1; }
+  if ! _pr_g -C "$raiz" cat-file blob "$sha:$ent" > "$tmp" 2>/dev/null; then
+    rm -f "$tmp"; PR_BASE_DIAG="$ent não pôde ser lido no SHA da cabeça ($sha)"; return 1
+  fi
+  if ! awk 'NR == 1 { if ($0 !~ /^---[[:space:]]*\r?$/) exit 1; next } /^---[[:space:]]*\r?$/ { exit 1 } /^base_validada_sha:/ { exit 0 } END { }' "$tmp"; then
+    rm -f "$tmp"; return 0
+  fi
+  bv="$(catalogo_fm "$tmp" base_validada_sha)"; rm -f "$tmp"
+  [ "$bv" != pendente ] || return 0
+  case "$(_pr_g -C "$raiz" rev-parse --show-object-format 2>/dev/null)" in sha256) n=64 ;; *) n=40 ;; esac
+  if ! [[ "$bv" =~ ^[0-9a-f]+$ ]] || [ "${#bv}" != "$n" ] || ! _pr_g -C "$raiz" cat-file -e "$bv^{commit}" 2>/dev/null; then
+    PR_BASE_DIAG="a base_validada_sha de $ent no SHA da cabeça (${bv:-vazia}) não é um commit deste repositório"
+    return 1
+  fi
+  _pr_g -C "$raiz" merge-base --is-ancestor "$bv" "$base" 2>/dev/null && return 0
+  PR_BASE_DIAG="a base do PR ($base) não contém a base validada de $ent ($bv): o PR foi aberto contra outra base que não a branch_base registrada, e leva commits que esta entrega não validou"
+  return 1
+}
+
 pr_decide_entregas() {
   local raiz="$1" sha="$2" i=0 n agg="" mot="" ent d m diag="" e
   shift 2
@@ -570,6 +603,10 @@ pr_decide_entregas() {
     i=$((i + 1))
     pr_decide_entrega "$raiz" "$sha" "$e" >/dev/null
     d="$PR_DEC"; m="$PR_MOT"
+    # só o CI informa a base do PR (PR_BASE_DO_PR); o pre-push não a conhece
+    if [ -n "${PR_BASE_DO_PR:-}" ] && [ "$d" != barra ]; then
+      _pr_base_do_pr "$raiz" "$sha" "$e" "$PR_BASE_DO_PR" || { d=barra; m=base_do_pr_divergente; PR_DIAG="$(_pr_diag_invalido base_do_pr_divergente) [$PR_BASE_DIAG]"; } # guarda:CIBASEPR
+    fi
     printf 'entrega[%s]=%s\ndecisao[%s]=%s\nmotivo[%s]=%s\n' "$i" "$e" "$i" "$d" "$i" "$m"
     [ -z "$PR_DIAG" ] || diag="${diag:+$diag; }$e: $PR_DIAG"
     [ -n "$agg" ] || { agg="$d"; mot="$m"; }
