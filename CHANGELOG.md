@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.13.11 — a base em SHA e a base do PR conferida na ponta buscada, na MergeX
+
+Instale por PR, como a 0.13.10. São os achados do CodeAnt nas instalações da 0.13.10 (conselhos#264 e login#64). Só a MergeX muda: o ExpxDev e as outras skills seguem como na 0.13.10.
+
+- **mergex@08f6fff** (mergex#86, DM-322):
+  - **A `branch_base` em SHA volta a valer sem rede.** Era regressão da 0.13.10: um SHA completo virava nome de branch, e o `--registrar` consultava `refs/heads/<sha>` no servidor. Com o remoto fora do ar, recusava. Agora o SHA no tamanho do OID do repositório (40 no SHA-1, 64 no SHA-256) conta como ref completa, sem consulta.
+  - **A consulta da base vai a um remoto congelado.** A configuração do remoto é lida uma vez e copiada num remoto sintético, e o `ls-remote` vai a ele. O `insteadOf` é aplicado uma vez, e o proxy e o `uploadpack` do remoto continuam valendo. Sob a trava C5, se a URL ou a configuração do remoto mudou, ou se ele foi removido, o registro recusa e manda rodar `git fetch`.
+  - **O pre-push ignora o `PR_BASE_DO_PR` do shell.** Só o CI define a variável. Exportada no shell, ela vazava para o pre-push local e barrava o push com `base_do_pr_divergente`.
+  - **O E7 confere a base do PR na ponta buscada.** No GitHub, o `is-ancestor` da base validada é feito contra o `FETCH_HEAD`, e não contra o `baseRefOid` lido antes do `fetch`. No GitHub e no GitLab, a base validada abreviada é recusada: ela precisa ter o tamanho do OID do repositório, como o CI exige.
+  - O diagnóstico `base_do_pr_divergente` separa as duas causas: depois de um squash da predecessora, reconcilie; com a base defasada no evento, gere um novo evento.
+- **Não procede:** o nitpick do `U+2028` no `expx-invocacao.mjs`. Sem a flag `m`, o `$` do JavaScript só casa no fim da entrada.
+- **Não exercitado:** a troca de URL do remoto durante a consulta foi testada com um `git` falso, não com uma corrida real.
+
 ## 0.13.10 — a base do PR e a base publicada na MergeX
 
 Instale por PR, como a 0.13.9. Mudam a MergeX e o envelope da invocação do núcleo, e o README passa a documentar o `--harness codex`. Nenhum item é regressão da 0.13.9.

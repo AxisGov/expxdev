@@ -1253,14 +1253,16 @@ fi
 arvore_recusa_raso || para 4 "estrutura[raso]: $ARVORE_ERRO" # guarda:EST
 
 # base_remota <branch_base> — NOME_BASE (o nome da branch, vazio para outra ref
-# completa) e REMOTO_BASE (o da branch atual, ou origin) da base em nome simples
+# completa) e REMOTO_BASE (o da branch atual, ou origin) da base em nome simples.
+# Um SHA completo, no tamanho do OID do repositório, é ref completa como refs/*
+# (DM-322): vale como está, sem consulta ao servidor
 base_remota() {
   REMOTO_BASE="$(g config "branch.$(g branch --show-current 2>/dev/null).remote" 2>/dev/null)" || REMOTO_BASE=""
   [ -n "$REMOTO_BASE" ] && [ "$REMOTO_BASE" != . ] || REMOTO_BASE=origin
   case "$1" in
     refs/heads/?*) NOME_BASE="${1#refs/heads/}" ;;
     refs/*) NOME_BASE="" ;;
-    *) NOME_BASE="$1" ;;
+    *) if [[ "$1" =~ ^[0-9a-f]+$ ]] && [ "${#1}" = "$OID_LEN" ]; then NOME_BASE=""; else NOME_BASE="$1"; fi ;;
   esac
 }
 # DM-321: a consulta ao servidor pela base sem ref remota roda ANTES da trava C5,
@@ -1268,17 +1270,51 @@ base_remota() {
 # prendem o índice. O Git não pergunta credencial no terminal
 # (GIT_TERMINAL_PROMPT=0); o ssh e as credenciais do usuário ficam como estão, e
 # um ssh que peça senha espera com o índice livre. Sob a trava, o resultado só vale para a
-# mesma base e o mesmo remoto (DM-312, ponta da base, abaixo).
-CONSULTA_NOME=""; CONSULTA_REMOTO=""; CONSULTA_RC=""
+# mesma base e o mesmo remoto, pelo nome e pela URL (DM-312, ponta da base, abaixo; DM-322).
+# A consulta vai à configuração do remoto congelada numa leitura só, num remoto
+# sintético (`-c`), não ao nome: a URL que troca durante o ls-remote e volta antes
+# da trava não faz valer a resposta de outro servidor (CodeAnt no mergex#86). O
+# url.*.insteadOf continua aplicado uma vez, sobre a URL crua, e proxy, uploadpack e
+# as demais chaves do remoto valem como no `ls-remote <remoto>` (Codex).
+CONSULTA_SINTETICO="mergex-consulta-$$-$RANDOM"
+# remoto_congelado <remoto> — CONGELADO: as chaves remote.<remoto>.* de um único
+# `git config -z --list`, como argumentos -c do remoto sintético; CONGELADO_FOTO,
+# a mesma leitura num texto comparável. Sai 1 sem URL, ou se o nome sintético já
+# existe na configuração (a consulta não se faz, e a ponta recusa sob a trava)
+remoto_congelado() {
+  local nome="$1" e k r v
+  CONGELADO=(); CONGELADO_FOTO=""
+  local url=""
+  while IFS= read -r -d '' e; do
+    k="${e%%"$NL"*}"
+    case "$k" in
+      "remote.$CONSULTA_SINTETICO."*) CONGELADO=(); CONGELADO_FOTO=""; return 1 ;;
+      "remote.$nome."*) ;;
+      *) continue ;;
+    esac
+    r="${k#"remote.$nome."}"
+    case "$r" in *.*) continue ;; esac
+    if [ "$k" = "$e" ]; then
+      CONGELADO+=(-c "remote.$CONSULTA_SINTETICO.$r")
+    else
+      v="${e#*"$NL"}"
+      CONGELADO+=(-c "remote.$CONSULTA_SINTETICO.$r=$v")
+      [ "$r" != url ] || [ -n "$url" ] || url="$v"
+    fi
+  done < <(g config -z --list 2>/dev/null)
+  [ "${#CONGELADO[@]}" = 0 ] || CONGELADO_FOTO="$(printf '%q ' "${CONGELADO[@]}")"
+  [ -n "$url" ]
+}
+CONSULTA_NOME=""; CONSULTA_REMOTO=""; CONSULTA_FOTO=""; CONSULTA_RC=""
 if bb_head="$(g cat-file blob "HEAD:$ENTREGA" 2>/dev/null)" && [ -n "$bb_head" ]; then
   printf '%s\n' "$bb_head" > "$TMP_DIR/entrega-head"
   bb_head="$(catalogo_fm "$TMP_DIR/entrega-head" branch_base)"
   if [ -n "$bb_head" ] && ! g rev-parse --verify -q "refs/remotes/$bb_head^{commit}" >/dev/null 2>&1; then
     base_remota "$bb_head"
     if [ -n "$NOME_BASE" ] && ! g rev-parse --verify -q "refs/remotes/$REMOTO_BASE/$NOME_BASE^{commit}" >/dev/null 2>&1 \
-       && g remote get-url "$REMOTO_BASE" >/dev/null 2>&1; then
-      GIT_TERMINAL_PROMPT=0 g ls-remote --exit-code --heads "$REMOTO_BASE" "refs/heads/$NOME_BASE" >/dev/null 2>&1; CONSULTA_RC=$?
-      CONSULTA_NOME="$NOME_BASE"; CONSULTA_REMOTO="$REMOTO_BASE"
+       && remoto_congelado "$REMOTO_BASE"; then
+      GIT_TERMINAL_PROMPT=0 g "${CONGELADO[@]}" ls-remote --exit-code --heads "$CONSULTA_SINTETICO" "refs/heads/$NOME_BASE" >/dev/null 2>&1; CONSULTA_RC=$?
+      CONSULTA_NOME="$NOME_BASE"; CONSULTA_REMOTO="$REMOTO_BASE"; CONSULTA_FOTO="$CONGELADO_FOTO"
     fi
   fi
 fi
@@ -1510,16 +1546,26 @@ if ! g rev-parse --verify -q "refs/remotes/$BRANCH_BASE^{commit}" >/dev/null 2>&
   base_remota "$BRANCH_BASE"
   if [ -n "$NOME_BASE" ] && g rev-parse --verify -q "refs/remotes/$REMOTO_BASE/$NOME_BASE^{commit}" >/dev/null 2>&1; then
     PONTA_REF="refs/remotes/$REMOTO_BASE/$NOME_BASE"
-  elif [ -n "$NOME_BASE" ] && g remote get-url "$REMOTO_BASE" >/dev/null 2>&1; then
-    # a consulta feita antes da trava, para esta mesma base e este mesmo remoto
+  elif [ -n "$NOME_BASE" ]; then
+    # a consulta feita antes da trava vale para esta mesma base e este mesmo
+    # remoto, pelo nome e pela configuração (DM-322): o remoto que mudou de URL, ou sumiu,
+    # depois da consulta recusa. Só o remoto que já não existia vale pela local.
+    # A branch publicada no servidor durante a espera pela trava, sem fetch, é a
+    # janela aceita: a consulta sob a trava prenderia o índice, e a DM-320 barra no
+    # CI a frente sobre uma base que não chega à base do PR
+    URL_AGORA="$(g remote get-url "$REMOTO_BASE" 2>/dev/null)" || URL_AGORA=""
     if [ -n "$CONSULTA_RC" ] && [ "$CONSULTA_NOME" = "$NOME_BASE" ] && [ "$CONSULTA_REMOTO" = "$REMOTO_BASE" ]; then
-      RC_LS="$CONSULTA_RC"
-    else
+      remoto_congelado "$REMOTO_BASE" || CONGELADO_FOTO=""
+      if [ "$CONSULTA_FOTO" = "$CONGELADO_FOTO" ]; then RC_LS="$CONSULTA_RC"; else RC_LS=mudou; fi
+    elif [ -n "$URL_AGORA" ]; then
       RC_LS=sem
+    else
+      RC_LS=2
     fi
     case "$RC_LS" in
       2) ;;
       sem) estrutura base "a base $NOME_BASE de M não é a que o ENTREGA.md de HEAD declara, e o servidor não foi consultado por ela antes da trava: rode git fetch $REMOTO_BASE e registre de novo" ;; # guarda:EST
+      mudou) estrutura base "o remoto $REMOTO_BASE mudou de URL ou de configuração, ou foi removido, entre a consulta pela base $NOME_BASE e a trava: a consulta não vale para ele; rode git fetch $REMOTO_BASE e registre de novo" ;; # guarda:EST
       0) estrutura base "a base $NOME_BASE existe em $REMOTO_BASE, mas refs/remotes/$REMOTO_BASE/$NOME_BASE não foi buscada: a branch local não prova que B1 foi publicado; rode git fetch $REMOTO_BASE e registre de novo" ;; # guarda:EST
       *) estrutura base "a consulta a $REMOTO_BASE pela base $NOME_BASE falhou (ls-remote saiu $RC_LS): sem ela, não há prova de que a base não foi publicada; rode git fetch $REMOTO_BASE, ou repita com o remoto acessível" ;; # guarda:EST
     esac

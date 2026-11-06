@@ -66,12 +66,18 @@ Condições estruturais, todas obrigatórias:
   manda rodar `git fetch <remoto>`; a consulta que falha recusa. Ela roda **antes** da trava C5,
   com a `branch_base` do `ENTREGA.md` de HEAD, e sem pergunta de credencial do Git no terminal
   (`GIT_TERMINAL_PROMPT=0`): a rede lenta, ou um ssh do usuário que peça senha, não prende o índice. Sob a trava, o resultado só vale para a mesma base e o mesmo
-  remoto; senão, recusa e manda buscar. Com a ref remota buscada antes, não há consulta; a base que não existe no servidor
+  remoto, pelo nome e pela URL; senão (outra base, a URL trocada ou o remoto removido depois da
+  consulta), recusa e manda buscar (DM-322). A consulta vai à configuração do remoto lida uma vez
+  só e copiada num remoto sintético, não ao nome: uma URL que troca durante a consulta e volta
+  antes da trava não faz valer a resposta de outro servidor, e o `url.*.insteadOf`, o proxy e o
+  `uploadpack` do remoto valem como no `git ls-remote <remoto>`. Com a ref remota buscada antes, não há consulta; a base que não existe no servidor
   (a base empilhada nunca enviada) e o repositório sem esse remoto valem pela ref local, e aí `B1`
   é só local, não publicado. A frente sobre essa base fica barrada no CI até a base do PR conter
-  `B1` (DM-320). `refs/heads/main` segue a mesma regra do nome simples, e `branch_base` que já é
-  ref remota (`origin/main`) vale como está (DM-312). Antes do `--registrar`, rode
-  `git fetch <remoto>`.
+  `B1` (DM-320). A base publicada no servidor durante a espera pela trava, sem `fetch`, é a janela
+  aceita: a consulta não se repete sob a trava, para não prender o índice. `refs/heads/main` segue a mesma regra do nome simples, e `branch_base` que já é
+  ref remota (`origin/main`), outra ref completa, ou um SHA completo do formato do repositório
+  (40 no SHA-1, 64 no SHA-256) vale como está, sem consulta (DM-312, DM-322). Antes do
+  `--registrar`, rode `git fetch <remoto>`.
 - A mensagem de `M` tem exatamente um `Trabalho: <trabalho_id>` igual ao da `ENTREGA.md`, um
   `Integra-base:` seguido do SHA completo de `B1`, e nenhum `Task:` nem `Metodo:` (a classe
   "integração de base" de `references/01-commits.md`).

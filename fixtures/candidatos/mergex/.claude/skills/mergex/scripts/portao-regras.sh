@@ -498,7 +498,7 @@ _pr_diag_invalido() {
     caminho_com_controle)
       printf '%s' "caminho com caractere de controle (TAB, quebra de linha, CR) sob docs/entregas (caminho_com_controle): renomeie o diretório da entrega" ;;
     base_do_pr_divergente)
-      printf '%s' "a base do PR não contém a base validada da entrega (base_do_pr_divergente): abra o PR contra a branch_base registrada; para levar a base junto, entregue-a antes no PR dela e reconcilie esta entrega com a base integrada (DM-320). Se o PR já mira a base certa, o evento tem base defasada: gere novo evento (push na branch do PR)" ;;
+      printf '%s' "a base do PR não contém a base validada da entrega (base_do_pr_divergente): abra o PR contra a branch_base registrada; para levar a base junto, entregue-a antes no PR dela e reconcilie esta entrega com a base integrada (DM-320). Se a predecessora entrou por squash, o alvo não contém a base validada antiga: reconcilie esta entrega com a base integrada, porque um novo evento não basta. Se o PR já mira a base certa e o evento é anterior ao avanço da base, gere novo evento (push na branch do PR) (DM-322)" ;;
     cobertura_indeterminada)
       printf '%s' "a árvore enviada tem ENTREGA.md, mas nenhuma parcela da seleção a alcança (cobertura_indeterminada): sem refs/remotes/<remoto>/HEAD, sem ENTREGA.md que declare a branch e sem trailer Trabalho: no commit enviado; o push segue sem prova do portão — confira a branch de destino ou rode 'git remote set-head <remoto> --auto'" ;;
     *)
@@ -699,7 +699,9 @@ _pr_base_declarada() {
 # _pr_decide_push <raiz> <sha_local> <ref_remota> <sha_remoto> <remoto> — a
 # ref refs/heads/<b> do pre-push: a união das parcelas (a), (b) e (c)
 _pr_decide_push() {
-  local raiz="$1" sl="$2" rr="$3" sr="$4" remoto="$5" b tmp base tem_a=0 rcb=0 motivo erro e rcd
+  # só o CI informa a base do PR: um PR_BASE_DO_PR exportado no shell não vale
+  # aqui, e o local o esconde do pr_decide_entregas chamado abaixo (DM-322)
+  local raiz="$1" sl="$2" rr="$3" sr="$4" remoto="$5" b tmp base tem_a=0 rcb=0 motivo erro e rcd PR_BASE_DO_PR=""
   case "$rr" in refs/heads/?*) b="${rr#refs/heads/}" ;; *) _pr_sai passa ref_nao_aplicavel - ""; return ;; esac
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/mergex-portao-push-sel.XXXXXX")" \
     || { _pr_sai barra erro_ambiente - "$(_pr_diag_invalido erro_ambiente): não foi possível criar diretório temporário"; return; }
