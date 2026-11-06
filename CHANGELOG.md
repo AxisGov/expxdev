@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.13.12 — o `regressao_de` na MemoX e a base trazida antes do E0 na MergeX
+
+Instale por PR, como a 0.13.11. São um relato do Conselhos sobre a MemoX (conselhos#266), um defeito da reconciliação que travou o conselhos#266 e os achados do CodeAnt no conselhos#267. Mudam a MemoX e a MergeX; o ExpxDev e as outras skills seguem como na 0.13.11.
+
+- **memox@db64a04** (MemoX#6, DM-29):
+  - **A regressão respeita a causa raiz.** O `detectar_regressoes` não lia o `regressao_de` nem o `evidencia_regressao` do `01-CAUSA-RAIZ.md`, em que a runx declara a regressão. Com `regressao_de: null`, que é a coincidência de arquivo da regra 15 da runx, a regressão era registrada mesmo assim, e o E3 da MergeX subia o arquivo para OLHO OBRIGATÓRIO. A declaração passa a ser a 4ª condição:
+    - `null` ou vazio nega;
+    - preenchido, com evidência em texto, vale só contra o trabalho nomeado;
+    - inválido ou sem evidência vira coincidência e vai para `fora_do_indice`;
+    - a causa raiz anterior ao campo fica com as três condições.
+  - **Causa raiz duplicada.** Com duas causas raiz do mesmo trabalho, a que não tem a chave não desfaz a declaração da outra, e dois `regressao_de` diferentes não afirmam regressão. O comentário YAML no fim do valor, com ou sem aspas, sai antes da comparação.
+  - **O índice antigo é reconstruído.** O `VERSAO_INDICE` vai para 2, e o índice da versão anterior não é carregado: a consulta e o hook Stop o reconstroem. As regressões falsas já gravadas somem na primeira consulta.
+- **mergex@0093795** (mergex#87, DM-323):
+  - **A base trazida antes do E0 não trava a primeira reconciliação.** Um merge que trouxe base nova à feature, com o segundo pai na base validada (o feito antes do E0, ou antes da reancoragem da DM-261), sai da fila da ordem do `001`. Na prova 2, ele não conta no arquivo que tomou da base. O merge "sem efeito" de um commit já contido na feature fica na fila e na prova 2. Trazer a base antes do E0 continua permitido.
+  - **O E7 confere a ponta buscada numa ref só da execução.** Antes, a ponta era lida do `FETCH_HEAD`, que outro fetch na mesma worktree (como o automático do editor) sobrescreve.
+  - **A consulta da base usa a configuração congelada inteira.** Ela é escrita num arquivo só do dono, nunca em argumentos de processo, e a consulta roda fora do repositório. Um `url.*.insteadOf` que mude durante a consulta não desvia o servidor, e um token de `http.*.extraHeader` não aparece no `ps`. No Git anterior ao 2.32, a consulta recusa e manda rodar `git fetch`.
+- **Não exercitado:**
+  - a troca de `insteadOf` durante a consulta foi testada com um `git` falso, não com uma corrida real;
+  - o caso do conselhos#266 foi reproduzido com fixtures sintéticas.
+
 ## 0.13.11 — a base em SHA e a base do PR conferida na ponta buscada, na MergeX
 
 Instale por PR, como a 0.13.10. São os achados do CodeAnt nas instalações da 0.13.10 (conselhos#264 e login#64). Só a MergeX muda: o ExpxDev e as outras skills seguem como na 0.13.10.

@@ -447,6 +447,28 @@ contem() { grep -Fxq -e "$2" "$1"; }
 # modo_em <commit> <caminho> — o modo do caminho na árvore do commit (vazio se ausente)
 modo_em() { g ls-tree -z "$1" -- "$2" 2>/dev/null | tr '\0' '\n' | sed -n '1s/ .*//p'; }
 
+# ja_na_base <Q> <B0> — Q é merge que trouxe base nova à feature (o segundo pai
+# não estava no primeiro) e esse segundo pai está na base validada (Q^2
+# ancestral de B0, ou B0): o merge da base anterior ao E0, ou à reancoragem da
+# primeira sprint, não integra nada além de B0 e não é reconciliação (DM-323). O
+# merge "sem efeito" de um commit já contido não traz base nenhuma: o que ele
+# muda é da feature (CodeAnt no mergex#87). Erro do Git não conta como base.
+ja_na_base() {
+  local q2 q1 rc
+  q2="$(g rev-parse -q --verify "$1^2^{commit}" 2>/dev/null)" || return 1
+  q1="$(g rev-parse -q --verify "$1^1^{commit}" 2>/dev/null)" || return 1
+  g merge-base --is-ancestor "$q2" "$q1" 2>/dev/null; rc=$?
+  [ "$rc" = 1 ] || return 1 # guarda:NOVABASE
+  g merge-base --is-ancestor "$q2" "$2" 2>/dev/null
+}
+
+# igual_ao_segundo_pai <Q> <caminho> — Q tem o caminho com o blob e o modo do
+# segundo pai (ou nenhum dos dois o tem): o merge tomou a versão da base
+igual_ao_segundo_pai() {
+  [ "$(g rev-parse -q --verify "$1:$2" 2>/dev/null)" = "$(g rev-parse -q --verify "$1^2:$2" 2>/dev/null)" ] \
+    && [ "$(modo_em "$1" "$2")" = "$(modo_em "$1^2" "$2")" ]
+}
+
 # le_entrega_m <M> <destino> — o ENTREGA.md de M em <destino>, com o contexto
 # explícito (kind, trabalho, origem) igual ao registrado.
 le_entrega_m() {
@@ -515,7 +537,7 @@ uniao_e_catalogo() {
 # caminho da lista (seção 6). Todas são calculadas e todas as reprovações são
 # relatadas; nenhuma falha de cálculo vira aprovação.
 provas() {
-  local lista="$1" b0="$2" inicio="$3" p1="$4" b1="$5" m="$6" f tb tm st rc_p4
+  local lista="$1" b0="$2" inicio="$3" p1="$4" b1="$5" m="$6" f tb tm st rc_p4 toque c
   while IFS= read -r f <&3; do
     # o caminho é de arquivo (blob), nunca de diretório nem submódulo
     case "$f" in */) reprova "arquivo: $f: caminho com barra final não é arquivo"; continue ;; esac # guarda:BLOB
@@ -532,9 +554,15 @@ provas() {
       reprova "prova 1: $f: diff B0..B1 não calculável"
     fi
 
-    # prova 2: a feature não tocou f antes do merge
+    # prova 2: a feature não tocou f antes do merge. O merge já na base
+    # validada que tomou f da base não é toque da feature (DM-323)
     if g rev-list --first-parent "$p1" "^$inicio" -- "$f" > "$SAIDA" 2>/dev/null; then # guarda:P2FP
-      [ ! -s "$SAIDA" ] || reprova "prova 2: $f: a feature tocou o caminho antes do merge ($(sed -n 1p "$SAIDA"))"
+      toque=""
+      while IFS= read -r c <&5; do
+        if ja_na_base "$c" "$b0" && igual_ao_segundo_pai "$c" "$f"; then continue; fi # guarda:P2BASE
+        toque="$c"; break
+      done 5< "$SAIDA"
+      [ -z "$toque" ] || reprova "prova 2: $f: a feature tocou o caminho antes do merge ($toque)"
     else
       reprova "prova 2: $f: histórico da feature não calculável"
     fi
@@ -1271,39 +1299,89 @@ base_remota() {
 # (GIT_TERMINAL_PROMPT=0); o ssh e as credenciais do usuário ficam como estão, e
 # um ssh que peça senha espera com o índice livre. Sob a trava, o resultado só vale para a
 # mesma base e o mesmo remoto, pelo nome e pela URL (DM-312, ponta da base, abaixo; DM-322).
-# A consulta vai à configuração do remoto congelada numa leitura só, num remoto
-# sintético (`-c`), não ao nome: a URL que troca durante o ls-remote e volta antes
-# da trava não faz valer a resposta de outro servidor (CodeAnt no mergex#86). O
-# url.*.insteadOf continua aplicado uma vez, sobre a URL crua, e proxy, uploadpack e
-# as demais chaves do remoto valem como no `ls-remote <remoto>` (Codex).
+# A consulta vai à configuração congelada numa leitura só, num remoto sintético,
+# não ao nome: a URL que troca durante o ls-remote e volta antes da trava não faz
+# valer a resposta de outro servidor (CodeAnt no mergex#86). E roda fora do
+# repositório, com a configuração congelada como o único arquivo lido (DM-323): o
+# url.*.insteadOf e o resto são os da leitura, não os que mudarem durante a
+# consulta (CodeAnt no conselhos#267). A configuração vai num arquivo só do dono,
+# nunca em argumentos: um token de http.*.extraHeader ou uma URL com credencial
+# não aparecem na lista de processos (CodeAnt no mergex#87). O insteadOf vale uma
+# vez, sobre a URL crua, e proxy, uploadpack e as demais chaves valem como no
+# `ls-remote <remoto>`.
 CONSULTA_SINTETICO="mergex-consulta-$$-$RANDOM"
-# remoto_congelado <remoto> — CONGELADO: as chaves remote.<remoto>.* de um único
-# `git config -z --list`, como argumentos -c do remoto sintético; CONGELADO_FOTO,
-# a mesma leitura num texto comparável. Sai 1 sem URL, ou se o nome sintético já
-# existe na configuração (a consulta não se faz, e a ponta recusa sob a trava)
+# _cfg_entrada <chave> [<valor>] — a entrada no formato do arquivo git-config: a
+# seção é o primeiro segmento da chave, o nome o último e a subseção o meio; o
+# valor sai entre aspas, com \, ", LF, TAB e backspace escapados. Sem <valor>, o
+# booleano implícito. Só builtins: o valor não passa por argumento de processo.
+_cfg_entrada() {
+  local k="$1" sec nome sub="" v
+  sec="${k%%.*}"; nome="${k##*.}"
+  if [ "$k" != "$sec.$nome" ]; then
+    sub="${k#"$sec".}"; sub="${sub%."$nome"}"
+    sub="${sub//\\/\\\\}"; sub="${sub//\"/\\\"}"
+    printf '[%s "%s"]\n' "$sec" "$sub"
+  else
+    printf '[%s]\n' "$sec"
+  fi
+  if [ "$#" = 1 ]; then printf '\t%s\n' "$nome"; return; fi
+  v="$2"
+  v="${v//\\/\\\\}"; v="${v//\"/\\\"}"; v="${v//$NL/\\n}"; v="${v//$'\t'/\\t}"; v="${v//$'\b'/\\b}"
+  printf '\t%s = "%s"\n' "$nome" "$v"
+}
+# remoto_congelado <remoto> — de um único `git config -z --list`: CONGELADO, a
+# configuração inteira como texto de arquivo git-config (sem include.*/includeif.*,
+# que o --list já expandiu, e sem branch.*, que não decide a consulta), mais as
+# chaves remote.<remoto>.* copiadas para o remoto sintético; CONGELADO_FOTO, as
+# chaves que decidem o servidor (remote.<remoto>.* e url.*) num texto comparável.
+# Sai 1 sem URL, ou se o nome sintético já existe (a consulta não se faz, e a
+# ponta recusa sob a trava)
 remoto_congelado() {
-  local nome="$1" e k r v
-  CONGELADO=(); CONGELADO_FOTO=""
-  local url=""
+  local nome="$1" e k r v decide url="" foto=""
+  CONGELADO=""; CONGELADO_FOTO=""
   while IFS= read -r -d '' e; do
     k="${e%%"$NL"*}"
     case "$k" in
-      "remote.$CONSULTA_SINTETICO."*) CONGELADO=(); CONGELADO_FOTO=""; return 1 ;;
-      "remote.$nome."*) ;;
-      *) continue ;;
+      "remote.$CONSULTA_SINTETICO."*) CONGELADO=""; return 1 ;;
+      include.*|includeif.*|branch.*) continue ;;
     esac
+    decide=""
+    case "$k" in "remote.$nome."*|url.*) decide=1 ;; esac
+    if [ "$k" = "$e" ]; then
+      CONGELADO+="$(_cfg_entrada "$k")$NL"
+      [ -z "$decide" ] || foto+="$k$NL"
+    else
+      v="${e#*"$NL"}"
+      CONGELADO+="$(_cfg_entrada "$k" "$v")$NL"
+      [ -z "$decide" ] || foto+="$(printf '%q' "$k=$v")$NL"
+    fi
+    case "$k" in "remote.$nome."*) ;; *) continue ;; esac
     r="${k#"remote.$nome."}"
     case "$r" in *.*) continue ;; esac
     if [ "$k" = "$e" ]; then
-      CONGELADO+=(-c "remote.$CONSULTA_SINTETICO.$r")
+      CONGELADO+="$(_cfg_entrada "remote.$CONSULTA_SINTETICO.$r")$NL"
     else
-      v="${e#*"$NL"}"
-      CONGELADO+=(-c "remote.$CONSULTA_SINTETICO.$r=$v")
+      CONGELADO+="$(_cfg_entrada "remote.$CONSULTA_SINTETICO.$r" "$v")$NL"
       [ "$r" != url ] || [ -n "$url" ] || url="$v"
     fi
   done < <(g config -z --list 2>/dev/null)
-  [ "${#CONGELADO[@]}" = 0 ] || CONGELADO_FOTO="$(printf '%q ' "${CONGELADO[@]}")"
+  CONGELADO_FOTO="$foto"
   [ -n "$url" ]
+}
+# consulta_congelada <nome-da-base> — o ls-remote com a configuração congelada
+# como o único arquivo lido (GIT_CONFIG_GLOBAL, num arquivo 0600, e
+# GIT_CONFIG_NOSYSTEM), fora do repositório (diretório vazio,
+# GIT_CEILING_DIRECTORIES, sem as variáveis locais do Git). O GIT_CONFIG_GLOBAL
+# é do Git 2.32+: antes disso o remoto sintético não existe, a consulta falha e o
+# registro recusa e manda buscar (DM-323). Devolve o código do ls-remote.
+consulta_congelada() {
+  mkdir -p "$TMP_DIR/consulta/vazio" || return 128
+  ( umask 077; printf '%s' "$CONGELADO" > "$TMP_DIR/consulta/config" ) || return 128
+  ( cd "$TMP_DIR/consulta/vazio" || exit 128
+    # shellcheck disable=SC2046
+    unset $(git rev-parse --local-env-vars 2>/dev/null)
+    GIT_CEILING_DIRECTORIES="$TMP_DIR/consulta" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="$TMP_DIR/consulta/config" \
+      GIT_TERMINAL_PROMPT=0 git ls-remote --exit-code --heads "$CONSULTA_SINTETICO" "refs/heads/$1" ) >/dev/null 2>&1
 }
 CONSULTA_NOME=""; CONSULTA_REMOTO=""; CONSULTA_FOTO=""; CONSULTA_RC=""
 if bb_head="$(g cat-file blob "HEAD:$ENTREGA" 2>/dev/null)" && [ -n "$bb_head" ]; then
@@ -1313,7 +1391,7 @@ if bb_head="$(g cat-file blob "HEAD:$ENTREGA" 2>/dev/null)" && [ -n "$bb_head" ]
     base_remota "$bb_head"
     if [ -n "$NOME_BASE" ] && ! g rev-parse --verify -q "refs/remotes/$REMOTO_BASE/$NOME_BASE^{commit}" >/dev/null 2>&1 \
        && remoto_congelado "$REMOTO_BASE"; then
-      GIT_TERMINAL_PROMPT=0 g "${CONGELADO[@]}" ls-remote --exit-code --heads "$CONSULTA_SINTETICO" "refs/heads/$NOME_BASE" >/dev/null 2>&1; CONSULTA_RC=$?
+      consulta_congelada "$NOME_BASE"; CONSULTA_RC=$?
       CONSULTA_NOME="$NOME_BASE"; CONSULTA_REMOTO="$REMOTO_BASE"; CONSULTA_FOTO="$CONGELADO_FOTO"
     fi
   fi
@@ -1520,6 +1598,17 @@ if [ "$N_CAD" -gt 0 ]; then
 fi
 g rev-list --first-parent --merges --reverse "$LIMITE..HEAD" > "$TMP_DIR/merges" 2>/dev/null \
   || estrutura ordem "merges da linha de primeiro pai de HEAD ilegíveis"
+# no 001, o merge que só traz a base validada (anterior ao E0, ou à reancoragem
+# da primeira sprint) já está em B0: sai da fila, e não se registra (DM-323). O
+# próprio M nunca sai: com B1 na base validada, quem fala é a estrutura
+if [ "$N_CAD" = 0 ]; then
+  while IFS= read -r q; do
+    pula=""
+    { [ "$q" != "$M" ] && ja_na_base "$q" "$B0"; } && pula=1 # guarda:FILABASE
+    [ -n "$pula" ] || printf '%s\n' "$q"
+  done < "$TMP_DIR/merges" > "$TMP_DIR/merges.fila"
+  mv "$TMP_DIR/merges.fila" "$TMP_DIR/merges"
+fi
 PROXIMO="$(sed -n 1p "$TMP_DIR/merges")"
 if [ "$PROXIMO" != "$M" ]; then
   # o que trava a fila é um merge que não é de integração da base: nomeá-lo

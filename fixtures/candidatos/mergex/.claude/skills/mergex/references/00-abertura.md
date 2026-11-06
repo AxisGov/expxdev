@@ -98,6 +98,12 @@ e só desconta das guardas da base o que ele contém (`02-prontidao.md`, V9). Va
 e em `por_trabalho`. Entrega com `reconciliacoes` não vazio (a main entrou na branch do
 planejamento por reconciliação) não é reancorada: a base dela vem da cadeia, e o E0 recusa.
 
+O merge que trouxe a main antes da reancoragem, ou antes do primeiro E0 (a runx ou a sprintx que
+atualizou a branch antes de abrir a entrega), fica dentro da base validada: o segundo pai dele é a
+base gravada, ou ancestral dela. Ele não é reconciliação e não trava a primeira reconciliação
+depois do E8 (DM-323, `11-reconciliacao-base.md`). Trazer a base antes do E0 é permitido; a main
+que chegar depois dele entra por reconciliação.
+
 As três pré-condições e a base nova, em toda retomada sem `--planejamento` (`<base>` é a base
 buscada: a ref remota depois do `git fetch`, por exemplo `origin/main`, e não a branch local, que
 numa worktree pode estar atrás — DM-312). Saída 0 com as duas linhas: grave-as. Saída 0 sem nada: não
