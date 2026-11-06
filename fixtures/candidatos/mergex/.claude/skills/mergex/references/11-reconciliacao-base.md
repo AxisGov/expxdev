@@ -67,17 +67,21 @@ Condições estruturais, todas obrigatórias:
   com a `branch_base` do `ENTREGA.md` de HEAD, e sem pergunta de credencial do Git no terminal
   (`GIT_TERMINAL_PROMPT=0`): a rede lenta, ou um ssh do usuário que peça senha, não prende o índice. Sob a trava, o resultado só vale para a mesma base e o mesmo
   remoto, pelo nome e pela URL; senão (outra base, a URL trocada ou o remoto removido depois da
-  consulta), recusa e manda buscar (DM-322). A consulta vai à configuração do remoto lida uma vez
-  só e copiada num remoto sintético, não ao nome: uma URL que troca durante a consulta e volta
-  antes da trava não faz valer a resposta de outro servidor, e o `url.*.insteadOf`, o proxy e o
-  `uploadpack` do remoto valem como no `git ls-remote <remoto>`. Com a ref remota buscada antes, não há consulta; a base que não existe no servidor
+  consulta), recusa e manda buscar (DM-322). A consulta vai à configuração lida uma vez só, com o
+  remoto copiado num remoto sintético, não ao nome, e roda fora do repositório, sem o arquivo de
+  configuração do sistema nem o global, com a configuração lida num arquivo só do dono e nunca em
+  argumentos de processo (DM-323): uma URL ou um `url.*.insteadOf` que troca
+  durante a consulta e volta antes da trava não faz valer a resposta de outro servidor, e o
+  `url.*.insteadOf`, o proxy e o `uploadpack` do remoto valem como no `git ls-remote <remoto>`,
+  aplicados uma vez. A foto que vale sob a trava inclui as chaves `remote.<remoto>.*` e `url.*`. Com a ref remota buscada antes, não há consulta; a base que não existe no servidor
   (a base empilhada nunca enviada) e o repositório sem esse remoto valem pela ref local, e aí `B1`
   é só local, não publicado. A frente sobre essa base fica barrada no CI até a base do PR conter
   `B1` (DM-320). A base publicada no servidor durante a espera pela trava, sem `fetch`, é a janela
   aceita: a consulta não se repete sob a trava, para não prender o índice. `refs/heads/main` segue a mesma regra do nome simples, e `branch_base` que já é
   ref remota (`origin/main`), outra ref completa, ou um SHA completo do formato do repositório
-  (40 no SHA-1, 64 no SHA-256) vale como está, sem consulta (DM-312, DM-322). Antes do
-  `--registrar`, rode `git fetch <remoto>`.
+  (40 no SHA-1, 64 no SHA-256) vale como está, sem consulta (DM-312, DM-322). Quando o
+  repositório tem esse remoto, rode `git fetch <remoto>` antes do `--registrar`; sem ele, não há o
+  que buscar, e a base vale pela ref local (DM-323).
 - A mensagem de `M` tem exatamente um `Trabalho: <trabalho_id>` igual ao da `ENTREGA.md`, um
   `Integra-base:` seguido do SHA completo de `B1`, e nenhum `Task:` nem `Metodo:` (a classe
   "integração de base" de `references/01-commits.md`).
@@ -97,7 +101,9 @@ Para cada caminho `f` declarado na reconciliação, com renomeação desligada (
 | 4 | Existe diferença real entre `B1` e `M` | `git diff --quiet --no-renames B1 M -- f` | sem diferença; ou `f` ausente em `M` (a integração removeu `f`) |
 
 `<início>` da prova 2 é `B0` na primeira reconciliação e o `M` da reconciliação anterior nas
-seguintes.
+seguintes. Um merge da base que já está na base validada (trouxe base nova à feature, e o segundo pai
+é `B0` ou ancestral dele, como o feito antes do E0) e que tem `f` com o blob e o modo do segundo pai não conta como toque da
+feature: ele tomou `f` da base. Se o merge editou `f` por conta própria, conta (DM-323).
 
 Consequências deliberadas:
 
@@ -339,6 +345,14 @@ preserva `commits`, `criado_em`, `pr_url`, `pr_estado`, `desvios`. `base_validad
 - **Múltiplas reconciliações:** cada merge de base gera o `NNN` seguinte; `b0_sha` do novo é o
   `b1_sha` do anterior; o anterior vira `superada`. Merges concluídos antes da instalação podem ser
   registrados em ordem com `--merge <sha>`, um por vez, do mais antigo para o mais novo.
+- **Base trazida antes do E0** (DM-323): o merge da base feito antes de o E0 criar o `ENTREGA.md`,
+  ou antes da reancoragem da primeira sprint depois do PR de planejamento (DM-261, que exige a
+  branch atualizada a partir da main), já está na base validada: ele trouxe base nova à feature (o
+  segundo pai não estava no primeiro), e o segundo pai é `B0` ou ancestral de `B0`. O merge "sem
+  efeito" de um commit da base já contido na feature não traz base: o que ele muda é da feature, e
+  ele fica na fila e na prova 2. Ele não é reconciliação, não entra na fila da ordem do `001` e não se
+  registra (`--merge` dele recusa: não há âncora antes dele). A ordem conta a partir
+  do primeiro merge que traz base nova. O E0 não proíbe trazer a base antes dele.
 - **Entrega sem reconciliação:** comportamento idêntico ao anterior, com a base fixada por SHA.
 
 ## Fluxo completo depois de uma reconciliação
@@ -416,6 +430,11 @@ estão documentados no cabeçalho do executável afetado:
 8. **Escala resolvida pela DM-184.** A primeira implementação da barreira de push varria todas as
    branches entregues do repositório a cada comando, e com dezenas delas estourava o prazo. O
    `pre-push` avalia só as refs do push: o custo deixou de depender das branches existentes.
+9. **Consulta congelada no Git anterior ao 2.32.** A configuração congelada é lida de um arquivo
+   só do dono, pelo `GIT_CONFIG_GLOBAL`, que só existe a partir do Git 2.32. Antes disso, o remoto
+   sintético não existe, a consulta falha, e o registro recusa e manda rodar `git fetch`, que é
+   sempre o caminho que resolve: falso bloqueio, nunca aprovação. Um `credential.helper` com
+   caminho relativo (`!./script`) roda num diretório vazio e pode falhar do mesmo jeito (DM-323).
 
 Os riscos residuais da própria barreira de push — o autor do PR que controla o modo e os scripts do
 CI, o PR sem `ENTREGA.md`, várias entregas no mesmo PR, a base do evento defasada e o hook

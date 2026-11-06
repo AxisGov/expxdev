@@ -82,7 +82,9 @@ remoto e `refs/heads/<branch>` nunca nomeia; no nome curto, o primeiro segmento 
 for um remoto configurado (`git remote`) **e** o nome inteiro não for branch do remoto do
 upstream — `feature/<slug>` é uma branch válida, e um remoto chamado `feature` não a desvia. Só a
 resposta "não há essa branch" (saída `2` do `ls-remote --exit-code`) troca o remoto; uma conferência
-que falha (rede, credencial) não prova nada e para o E7. A base medida é o `FETCH_HEAD`, o que acabou de chegar, e não a ref de rastreio: um
+que falha (rede, credencial) não prova nada e para o E7. A base medida é o que acabou de chegar,
+numa ref só desta execução (`refs/mergex/e7/…`, apagada na saída), e não o `FETCH_HEAD`, que outro
+fetch na mesma worktree (o automático do editor) sobrescreve entre a busca e a leitura (DM-323), nem a ref de rastreio: um
 `origin/HEAD` buscado não atualiza a ref simbólica local, que mediria contra o alvo antigo. E
 `origin/HEAD` normaliza para `bb=HEAD`, que não é branch no serviço: o `$bb` vai para o
 `gh pr create --base` e para a instrução manual do passo 3, então o `HEAD` do remoto é resolvido
@@ -133,8 +135,11 @@ if [ "$bb" = HEAD ]; then
   bb="$(git ls-remote --symref "$rb" HEAD | awk '$1 == "ref:" && $3 == "HEAD" { sub("^refs/heads/", "", $2); print $2; exit }')"
   [ -n "$bb" ] || { echo "o HEAD de $rb não resolveu para uma branch: o E7 não mede nem abre o PR"; exit 2; }
 fi
-git fetch "$rb" "$bb" || { echo "busca de $bb em $rb falhou: o E7 não mede nem abre o PR"; exit 2; }
-base="$(git rev-parse --verify "FETCH_HEAD^{commit}")" || exit 2
+# a ponta buscada vai para uma ref só desta execução: o FETCH_HEAD é da worktree, e outro
+# fetch nela (o automático do editor) o sobrescreve entre a busca e a leitura (DM-323)
+ref_e7="refs/mergex/e7/base-$$-$RANDOM"; trap 'git update-ref -d "$ref_e7" 2>/dev/null' EXIT
+git fetch "$rb" "+refs/heads/$bb:$ref_e7" || { echo "busca de $bb em $rb falhou: o E7 não mede nem abre o PR"; exit 2; }
+base="$(git rev-parse --verify "$ref_e7^{commit}")" || exit 2
 planejamento="$(bash .claude/skills/mergex/scripts/entrega-de-planejamento.sh --entrega "docs/entregas/<trabalho_id>/ENTREGA.md" --rev "$publicado")" || { echo "ENTREGA.md ilegível ou incoerente no SHA publicado: o E7 não mede nem abre o PR"; exit 2; }
 fatia="$(bash .claude/skills/mergex/scripts/leitor-do-projeto.sh --rev "$publicado")" || { echo "configuração do projeto (.expx/fatiamento.json) não lida: o E7 não mede nem abre o PR"; exit 2; }
 set -a; eval "$fatia"; set +a
@@ -323,8 +328,10 @@ if [ "$rc_pr" != 0 ]; then
   if [ -n "$bv" ]; then
     # a decisão é sobre a ponta buscada agora, não sobre um OID lido antes do fetch:
     # um force-push na base que tire a base validada não passa (DM-322)
-    git fetch -q "$rb" "refs/heads/$nome_base_pr" 2>/dev/null || { echo "base do PR existente ($nome_base_pr) não buscada em $rb: o E7 não retoma"; exit 1; }
-    ponta_base_pr="$(git rev-parse -q --verify 'FETCH_HEAD^{commit}')" || { echo "ponta buscada da base do PR ($nome_base_pr) ilegível: o E7 não retoma"; exit 1; }
+    # numa ref só desta execução, não no FETCH_HEAD que outro fetch sobrescreve (DM-323)
+    ref_e7="refs/mergex/e7/base-pr-$$-$RANDOM"; trap 'git update-ref -d "$ref_e7" 2>/dev/null' EXIT
+    git fetch -q "$rb" "+refs/heads/$nome_base_pr:$ref_e7" 2>/dev/null || { echo "base do PR existente ($nome_base_pr) não buscada em $rb: o E7 não retoma"; exit 1; }
+    ponta_base_pr="$(git rev-parse -q --verify "$ref_e7^{commit}")" || { echo "ponta buscada da base do PR ($nome_base_pr) ilegível: o E7 não retoma"; exit 1; }
     git merge-base --is-ancestor "$bv" "$ponta_base_pr" 2>/dev/null \
       || { echo "o PR existente ($pr_url) mira $nome_base_pr, que não contém a base validada da entrega ($bv): o E7 não o retoma (DM-320). Abra o PR contra $bb, ou entregue a base antes e reconcilie"; exit 1; }
   fi
@@ -402,8 +409,9 @@ case "$quantidade" in
      [ -z "$bv" ] || [ "${#bv}" = "$n_oid" ] \
        || { echo "base_validada_sha ($bv) não é um SHA completo do formato deste repositório: o E7 não retoma (DM-322)"; exit 1; }
      if [ -n "$bv" ]; then
-       git fetch -q "$rb" "refs/heads/$bb" 2>/dev/null || { echo "alvo da MR existente ($bb) não buscado em $rb: o E7 não retoma"; exit 1; }
-       git merge-base --is-ancestor "$bv" FETCH_HEAD 2>/dev/null \
+       ref_e7="refs/mergex/e7/alvo-mr-$$-$RANDOM"; trap 'git update-ref -d "$ref_e7" 2>/dev/null' EXIT
+       git fetch -q "$rb" "+refs/heads/$bb:$ref_e7" 2>/dev/null || { echo "alvo da MR existente ($bb) não buscado em $rb: o E7 não retoma"; exit 1; }
+       git merge-base --is-ancestor "$bv" "$ref_e7" 2>/dev/null \
          || { echo "a MR existente ($pr_url) mira $bb, que não contém a base validada da entrega ($bv): o E7 não a retoma (DM-320)"; exit 1; }
      fi ;;
   *) echo "mais de uma MR aberta para $projeto_fonte:$branch_fonte no destino"; exit 1 ;;
@@ -418,7 +426,7 @@ Não adicione revisor, etiqueta, marco ou responsável por conta própria: nada 
 
 Qualquer falha — sem permissão, PR já existe, base inválida, rede fora — **não interrompe a entrega**. Vá para o passo 3, registre o erro literal do comando, e siga.
 
-Se a falha for "PR já existe para esta branch" no GitHub (a saída do `gh pr create` diz `already exists`), o próprio bloco do passo 2 recupera a URL escalar no **projeto de destino**, exigindo exatamente uma linha: a recuperação mora no mesmo bloco que tenta criar, porque `head` e `destino` só existem ali. O PR existente só é retomado se a base dele contém a `base_validada_sha` da entrega (DM-320): o bloco lê `baseRefName`, busca essa base no remoto-base e exige a ancestralidade contra a ponta buscada (`FETCH_HEAD`), não contra um `baseRefOid` lido antes do `fetch`: um force-push na base que tire a base validada não passa (DM-322). A base validada é a do `ENTREGA.md` no SHA medido (`$publicado`), não a do disco; presente e vazia, fora do formato, ou abreviada (válido é o SHA completo do formato do repositório, 40 no SHA-1 e 64 no SHA-256, como no CI), não retoma; a base que não pôde ser buscada também não. O PR da frente empilhada aberto contra a `main`, levando a predecessora junto, não é retomado; a feature redirecionada da DM-245 é. Entrega sem `base_validada_sha`, ou com `pendente`, retoma como antes. É a mesma regra do CI (`references/12-barreira-de-push.md`), que barra esse PR mesmo aberto à mão. Qualquer outra falha sai do bloco com o erro literal do `gh pr create`, sem consultar o PR, e esse erro vai para o passo 3.
+Se a falha for "PR já existe para esta branch" no GitHub (a saída do `gh pr create` diz `already exists`), o próprio bloco do passo 2 recupera a URL escalar no **projeto de destino**, exigindo exatamente uma linha: a recuperação mora no mesmo bloco que tenta criar, porque `head` e `destino` só existem ali. O PR existente só é retomado se a base dele contém a `base_validada_sha` da entrega (DM-320): o bloco lê `baseRefName`, busca essa base no remoto-base e exige a ancestralidade contra a ponta buscada (numa ref só da execução, não no `FETCH_HEAD`, DM-323), não contra um `baseRefOid` lido antes do `fetch`: um force-push na base que tire a base validada não passa (DM-322). A base validada é a do `ENTREGA.md` no SHA medido (`$publicado`), não a do disco; presente e vazia, fora do formato, ou abreviada (válido é o SHA completo do formato do repositório, 40 no SHA-1 e 64 no SHA-256, como no CI), não retoma; a base que não pôde ser buscada também não. O PR da frente empilhada aberto contra a `main`, levando a predecessora junto, não é retomado; a feature redirecionada da DM-245 é. Entrega sem `base_validada_sha`, ou com `pendente`, retoma como antes. É a mesma regra do CI (`references/12-barreira-de-push.md`), que barra esse PR mesmo aberto à mão. Qualquer outra falha sai do bloco com o erro literal do `gh pr create`, sem consultar o PR, e esse erro vai para o passo 3.
 
 No GitLab, a consulta exata por projeto fonte e branch já ocorre antes do `glab mr create`: zero cria, uma retoma e mais de uma falha fechado. Ela filtra pelo alvo `$bb`, então um MR da mesma origem contra outra base nunca é retomado (DM-320): o E7 cria o MR contra a base registrada. E o MR que mira `$bb` só é retomado se a ponta buscada de `$bb` contém a base validada do `ENTREGA.md` publicado: o nome não prova o commit, e a branch pode ter sido reescrita. O alvo vale como a listagem o leu: o E7 não o relê antes de comparar, e um redirecionamento da MR (ou do PR, no GitHub) depois da conferência é corrida que ele não fecha. O CI a barra só quando o alvo novo não contém a `base_validada_sha` (`base_do_pr_divergente`); um alvo diferente que a contém passa, legitimamente (DM-322). É uma retomada, não uma falha. É o caso normal depois de uma reconciliação de base (`references/11-reconciliacao-base.md`): a solicitação existente é retomada, **nunca uma segunda solicitação**.
 
