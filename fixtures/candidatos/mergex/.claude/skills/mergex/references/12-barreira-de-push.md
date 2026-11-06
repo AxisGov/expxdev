@@ -317,10 +317,12 @@ bash .claude/skills/mergex/scripts/portao-ci.sh --verificar --sha <sha> --branch
   leva commits que a entrega não validou. A regra é pelo SHA, não pelo nome: o CI não sabe o
   remoto, e a feature redirecionada (DM-245) mira a base da predecessora mergeada com a
   `branch_base` ainda no nome dela. Valor presente que não é commit do formato do repositório
-  também barra; chave ausente ou `pendente` (entrega legada) não se aplica. A predecessora
-  integrada por squash, ou o evento com base defasada, barram até a reconciliação avançar a base
-  validada ou um novo evento: falso bloqueio, nunca aprovação. O `pre-push` não muda: ele não
-  conhece a base do PR.
+  também barra; chave ausente ou `pendente` (entrega legada) não se aplica. Os dois falsos
+  bloqueios, nunca aprovação, têm saídas diferentes (DM-322). A predecessora integrada por
+  squash deixa o alvo sem a base validada antiga, e um novo evento não basta: reconcilie a
+  entrega com a base integrada. O PR que já mira a base certa, num evento anterior ao avanço da
+  base, pede um novo evento (push na branch do PR). O `pre-push` não muda: ele não conhece a base
+  do PR, e um `PR_BASE_DO_PR` exportado no shell não vale lá; só o CI o informa.
 - **`--branch` é só conferência.** O nome da branch de origem do PR continua obrigatório (e precisa
   ser um nome de branch válido), mas não seleciona nem isenta: quando não é o `branch:` de nenhuma
   entrega selecionada, a saída traz `aviso=branch_divergente` e a decisão não muda. Fork e

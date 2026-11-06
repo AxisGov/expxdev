@@ -549,16 +549,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.13.10 -R AxisGov/expxdev -D ~/expx-cli/v0.13.10 &&
+gh release download v0.13.11 -R AxisGov/expxdev -D ~/expx-cli/v0.13.11 &&
 (
-  cd ~/expx-cli/v0.13.10
+  cd ~/expx-cli/v0.13.11
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.13.10.tgz.sha256
+    sha256sum -c expxdev-0.13.11.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.13.10.tgz.sha256
+    shasum -a 256 -c expxdev-0.13.11.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.13.10/expxdev-0.13.10.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.13.11/expxdev-0.13.11.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -572,7 +572,7 @@ npx --yes --package ~/expx-cli/v0.13.10/expxdev-0.13.10.tgz expx init --skills b
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.13.10 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.13.11 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -672,6 +672,9 @@ npx --yes --package ~/expx-cli/v0.13.10/expxdev-0.13.10.tgz expx init --skills b
 - `0.13.10` faz o CI da MergeX barrar o PR cuja base não contém a base validada da entrega, consulta o
   servidor pela base sem ref remota no registro da reconciliação, e corrige o envelope da invocação
   (executor herdado e resolução perdida no rastro).
+- `0.13.11` faz a `branch_base` em SHA valer sem rede no registro da reconciliação da MergeX, consulta a
+  base por um remoto congelado, ignora o `PR_BASE_DO_PR` do shell no pre-push e confere a base do PR do
+  E7 na ponta buscada.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
