@@ -549,16 +549,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.13.12 -R AxisGov/expxdev -D ~/expx-cli/v0.13.12 &&
+gh release download v0.13.13 -R AxisGov/expxdev -D ~/expx-cli/v0.13.13 &&
 (
-  cd ~/expx-cli/v0.13.12
+  cd ~/expx-cli/v0.13.13
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.13.12.tgz.sha256
+    sha256sum -c expxdev-0.13.13.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.13.12.tgz.sha256
+    shasum -a 256 -c expxdev-0.13.13.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.13.12/expxdev-0.13.12.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.13.13/expxdev-0.13.13.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -572,7 +572,7 @@ npx --yes --package ~/expx-cli/v0.13.12/expxdev-0.13.12.tgz expx init --skills b
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.13.12 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.13.13 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -678,6 +678,9 @@ npx --yes --package ~/expx-cli/v0.13.12/expxdev-0.13.12.tgz expx init --skills b
 - `0.13.12` faz a MemoX respeitar o `regressao_de` da causa raiz da runx, destrava a primeira
   reconciliação da MergeX quando a base foi trazida antes do E0, e leva a configuração da consulta da
   base para um arquivo, fora dos argumentos de processo.
+- `0.13.13` faz a reconciliação da MergeX recusar quando qualquer chave da configuração congelada, ou
+  o remoto da base, muda entre a consulta e a trava, e dá a busca da base com o refspec explícito,
+  que funciona num clone `--single-branch`.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

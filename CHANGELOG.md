@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.13.13 — a foto inteira da consulta e a busca da base com refspec, na MergeX
+
+Instale por PR, como a 0.13.12. São os dois Major do CodeAnt na instalação da 0.13.12 no Login (login#65). Só a MergeX muda: o ExpxDev e as outras skills seguem como na 0.13.12.
+
+- **mergex@582738f** (mergex#88, DM-324):
+  - **A foto conferida sob a trava é a configuração congelada inteira.** Antes, ela cobria só `remote.<remoto>.*` e `url.*`. Um `core.sshCommand` ou um `http.proxy` trocado entre a consulta e a trava, e restaurado antes dela, deixava a foto igual, e um "ausente" de outro servidor valia. Agora qualquer chave mudada recusa e manda buscar a base.
+  - **A consulta só vale para o remoto consultado.** Se o `branch.<atual>.remote` muda antes da trava, mesmo para um remoto que não existe, o registro recusa em vez de aceitar a base local.
+  - **As recusas dão a busca com o refspec explícito.** O comando sugerido passa a ser `git fetch <remoto> +refs/heads/<base>:refs/remotes/<remoto>/<base>`, com o quoting do shell. Ele cria a ref de rastreio num clone `--single-branch` ou com um `remote.<remoto>.fetch` sem a base, onde `git fetch <remoto>` não a traz e a recusa se repetia. A recusa "mudou" sugere o remoto consultado.
+- **Não exercitado:**
+  - as trocas de configuração e de `insteadOf` foram testadas com um `git` falso, não com uma corrida real;
+  - o caso do conselhos#266 continua reproduzido só com fixtures sintéticas.
+
 ## 0.13.12 — o `regressao_de` na MemoX e a base trazida antes do E0 na MergeX
 
 Instale por PR, como a 0.13.11. São um relato do Conselhos sobre a MemoX (conselhos#266), um defeito da reconciliação que travou o conselhos#266 e os achados do CodeAnt no conselhos#267. Mudam a MemoX e a MergeX; o ExpxDev e as outras skills seguem como na 0.13.11.

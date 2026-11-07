@@ -18,7 +18,7 @@ Commits certificados (confirmados na organização AxisGov em 2026-11-03, depois
 | `AxisGov/runx` | `a21419600626036ba79ea7c1b72fdf75590e8c0b` |
 | `AxisGov/legadox` | `e43d17e381d34485216f4b935729b719fc9c1dee` |
 | `AxisGov/stackx` | `1c49fba3bf4a88313657527cbfe29f9f3fe2b89a` |
-| `AxisGov/mergex` | `0093795d1c7da2f50cb13b03c51c79663dc609ff` |
+| `AxisGov/mergex` | `582738ff3d235844399a58511aa582ef4ceea5eb` |
 | `AxisGov/sprintx` | `a6f852add5cd60dda64fc208f85a75d627bacc5e` |
 | `AxisGov/MemoX` | `db64a04ff3c9bd7f7c1b8e0685c3a5ece4773f1d` |
 | `AxisGov/prodx` | `06ce57a42db8eaae3f98ea60fc3895f1536383c5` |
