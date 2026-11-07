@@ -55,6 +55,13 @@ describe("doctor — projeção dos papéis (F4)", () => {
     expect(a[0]?.correcao).toContain("expx init");
   });
 
+  it("projeção ausente com o hash no lock é erro, mesmo sem nenhum agente legível", async () => {
+    const raiz = await projeto();
+    rmSync(join(raiz, PAPEIS));
+    for (const a of ["qa", "revisor-diff", "analista-de-conflito"]) rmSync(join(raiz, ".claude/agents", `${a}.md`));
+    expect(ids(achados(raiz))).toEqual(["papeis-projecao-divergente:erro"]);
+  });
+
   it.each([
     ["papel trocado", (t: string) => t.replace("qa\trunx\ttestar", "qa\trunx\tinvestigar")],
     ["agente a menos", (t: string) => t.replace("qa\trunx\ttestar\n", "")],

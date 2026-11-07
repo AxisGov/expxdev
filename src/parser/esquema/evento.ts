@@ -58,8 +58,8 @@ export const EXTRAS_EVENTO = [
   "fora_da_politica",
   // CONTRATO-expx-orquestracao §12.3 (F3c): só em `integridade_final_verificada`.
   "integridade_final",
-  // CONTRATO-expx-orquestracao §11.4 (F4): o papel projetado na hora da verificação
-  // ou do fechamento. A projeção é o estado presente; o evento guarda o da hora.
+  // CONTRATO-expx-orquestracao §11.4 (F4): o papel projetado no início da chamada (o
+  // da foto, na integridade; o do envelope, na invocação). A projeção é o estado presente.
   "papel",
 ] as const;
 

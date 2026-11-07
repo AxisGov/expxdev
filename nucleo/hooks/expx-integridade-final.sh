@@ -125,7 +125,7 @@ grava() {
   local inst="" ext=""
   [ -n "$AGENT_ID" ] && inst="$(printf '%s\n%s' "$SESSAO" "$AGENT_ID" | git -C "$raiz" hash-object --stdin 2>/dev/null)"
   [ -n "$inst" ] && ext=",\"instancia\":\"$inst\""
-  # o papel desta verificacao: a projecao e o estado presente, o evento guarda o da hora (F5)
+  # o papel do inicio, guardado com a foto: a projecao e o estado presente (F5)
   ext="$ext,\"papel\":\"$PAPEL\""
   EXPX_AGENTE="$AGENTE" expx_rastro_grava "$raiz" integridade_final_verificada hook "$resultado" \
     "integridade final de $AGENTE: $estado${2:+ ($2)}" '[]' \

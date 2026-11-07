@@ -40,12 +40,14 @@ export function verificarPapeis(raiz: string, lock: Lock | undefined, push: (a: 
 
   const caminho = join(raiz, ...CAMINHO_PAPEIS.split("/"));
   const correcao = "rode `expx init`, que regrava a projecao a partir dos agentes das skills; nao a edite a mao";
+  const travado = lock?.instalacao?.papeis?.hash;
   if (!existsSync(caminho)) {
-    if (esperado.size > 0) {
+    if (esperado.size > 0 || travado !== undefined) {
+      const quem = esperado.size > 0 ? `com agente de papel instalado (${[...esperado.keys()].sort().join(", ")})` : "com o hash dela no lock";
       push({
         id: "papeis-projecao-divergente",
         severidade: "erro",
-        problema: `${CAMINHO_PAPEIS} ausente, com agente de papel instalado (${[...esperado.keys()].sort().join(", ")}): a integridade final e o primeiro plano deixam de valer para eles`,
+        problema: `${CAMINHO_PAPEIS} ausente, ${quem}: a integridade final e o primeiro plano deixam de valer`,
         correcao,
       });
     }
@@ -62,7 +64,6 @@ export function verificarPapeis(raiz: string, lock: Lock | undefined, push: (a: 
     push({ id: "papeis-projecao-divergente", severidade: "erro", problema: `${CAMINHO_PAPEIS} ilegivel: ${lida.erro}`, correcao });
     return;
   }
-  const travado = lock?.instalacao?.papeis?.hash;
   if (travado !== undefined && hashDeBytes(texto) !== travado) {
     push({
       id: "papeis-projecao-divergente",

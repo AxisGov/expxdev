@@ -413,8 +413,10 @@ regimes, e por isso o papel não é uma coluna da projeção do rastro (11.2).
 - O `doctor` a confere contra o hash que o `init` gravou no lock e contra os
   agentes instalados (`papeis-projecao-divergente`, `CONTRATO-expx-instalacao.md`
   §5.4).
-- O evento leva o `papel` da hora (`CONTRATO-expx-eventos.md`): a projeção é o
-  estado presente, e só o evento diz qual papel valia quando o agente rodou.
+- O evento leva o `papel` do início (`CONTRATO-expx-eventos.md`): o da foto, na
+  integridade final, e o do envelope, no fechamento e no abandono da chamada. A
+  projeção é o estado presente, e só o evento diz qual papel valia quando o agente
+  rodou.
 
 ## 12. Separação de papéis: a integridade final (F3c)
 
@@ -462,8 +464,9 @@ outra inferência, e a foto a mais é redundante, não errada.
 
 Aceita-se o nome exato, ou o nome depois de **um** prefixo literal `expx:`.
 Substring, outro prefixo ou nome parecido não casam com a linha. Sem papel de
-aprovação, o hook sai sem rodar Git e sem gravar nada: a raiz é achada pela
-procura do `.git`, sem Git. As variáveis locais do Git herdadas
+aprovação, o hook sai sem gravar nada, e sem rodar Git: a raiz é achada pela
+procura do `.git`. A única exceção é o fim com alguma foto pendente no git-dir,
+que pode ser de um início em que o agente era de aprovação (11.4). As variáveis locais do Git herdadas
 do ambiente (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE` e as demais de
 `git rev-parse --local-env-vars`) são descartadas antes da foto: com elas, a foto
 seria de outro repositório. A configuração passada pelo ambiente (`GIT_CONFIG*`)
