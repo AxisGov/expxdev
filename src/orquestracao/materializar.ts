@@ -36,7 +36,7 @@ export function lerAgenteDaSkill(origem: string, texto: string): LeituraAgente {
     }
     agente.classe = classe as Classe;
   }
-  const p = papelDosDados(origem, dados);
+  const p = papelDosDados(origem, dados, fm.ok, texto);
   if (!p.ok) return p;
   const papel = p.papel;
   const model = campoTexto("model");
@@ -49,7 +49,15 @@ export function lerAgenteDaSkill(origem: string, texto: string): LeituraAgente {
 
 type LeituraPapel = { ok: true; papel?: Papel } | { ok: false; erro: string };
 
-function papelDosDados(origem: string, dados: Record<string, unknown>): LeituraPapel {
+/**
+ * O frontmatter que o YAML não lê (uma chave repetida, por exemplo) vira dados
+ * vazios, e o papel declarado nele sumiria em silêncio: o aprovador deixaria de
+ * ser verificado. Se o bloco cru tem uma linha `papel:`, é skill inválida.
+ */
+function papelDosDados(origem: string, dados: Record<string, unknown>, yamlOk: boolean, texto: string): LeituraPapel {
+  if (!yamlOk && /^["']?papel["']?[ \t]*:/m.test(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---/.exec(texto)?.[1] ?? "")) {
+    return { ok: false, erro: `${origem}: o frontmatter declara papel, mas nao e YAML valido (chave repetida?)` };
+  }
   const papel = dados["papel"];
   if (papel === undefined) return { ok: true };
   if (typeof papel !== "string" || !(PAPEIS as readonly string[]).includes(papel)) {
@@ -68,7 +76,7 @@ export function lerPapelDoAgente(origem: string, texto: string): { ok: true; nom
   const fm = lerFrontmatter(texto);
   const dados = fm.ok && typeof fm.dados === "object" && fm.dados !== null ? (fm.dados as Record<string, unknown>) : {};
   const nome = typeof dados["name"] === "string" && dados["name"] !== "" ? dados["name"] : basename(origem, ".md");
-  const p = papelDosDados(origem, dados);
+  const p = papelDosDados(origem, dados, fm.ok, texto);
   return p.ok ? { ok: true, nome, ...(p.papel === undefined ? {} : { papel: p.papel }) } : p;
 }
 

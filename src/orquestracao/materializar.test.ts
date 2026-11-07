@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { correspondeClaude, familiaClaude } from "./adaptadores.js";
-import { lerAgenteDaSkill, lerRegistro, reescreverModeloEsforco, serializarRegistro } from "./materializar.js";
+import { lerAgenteDaSkill, lerPapelDoAgente, lerRegistro, reescreverModeloEsforco, serializarRegistro } from "./materializar.js";
 import { conferirResolucaoId, resolucaoId, resolver } from "./resolver.js";
 
 /** CONTRATO-expx-orquestracao §9 e CONTRATO-expx-instalacao §5.3 (F2). */
@@ -41,6 +41,17 @@ describe("lerAgenteDaSkill", () => {
       agente: { nome: "auditor", classe: "profundo_excepcional", frontmatter: { model: "opus" } },
       papel: "revisar",
     });
+  });
+
+  it("frontmatter inválido que declara papel é skill inválida, nos dois regimes: o papel não some em silêncio", () => {
+    const dup = "---\nname: qa\npapel: revisar\npapel: investigar\n---\nx\n";
+    const r = lerAgenteDaSkill("x/qa.md", dup);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erro).toContain("papel");
+    const s = lerPapelDoAgente("x/qa.md", dup);
+    expect(s.ok).toBe(false);
+    // sem papel no texto, o frontmatter inválido segue como antes
+    expect(lerPapelDoAgente("x/qa.md", "---\nname: qa\nname: qb\n---\nx\n").ok).toBe(true);
   });
 
   it.each(["aprovar", "Revisar", "", "[revisar]"])("papel %j fora do vocabulário é skill inválida", (papel) => {
