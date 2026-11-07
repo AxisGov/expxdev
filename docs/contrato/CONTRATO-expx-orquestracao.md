@@ -45,7 +45,11 @@ diferentes. "Piso" significa classe mínima.
 `planejar`, `implementar`, `investigar`, `testar` e `revisar`. O papel diz o que
 o agente faz e quais garantias precisa ter (independência e ausência de escrita
 para `testar`/`revisar`). Ele **não** entra na resolução: a classe é que decide
-o modelo. A skill declara o papel junto com a classe (F4).
+o modelo, e o `resolucao_id` não muda com ele. A skill declara o papel junto com a
+classe, no frontmatter do agente (`papel:`, F4). Valor fora do vocabulário é skill
+inválida, com ou sem política. Sem `papel:`, o agente não é de aprovação: o papel
+nunca é inferido do nome. `revisar` e `testar` são os papéis de aprovação: só eles
+passam pela integridade final (§12) e rodam em primeiro plano (§13.1).
 
 ### 2.3 Adaptadores
 
@@ -374,6 +378,33 @@ O painel mostra a configuração quando não há observação, e só ele:
 4. sem `resolucao_id`: o fallback anterior — a configuração instalada, só
    quando o evento não identifica outro harness.
 
+### 11.4 A projeção dos papéis `.expx/papeis.tsv` (F4)
+
+Os hooks da integridade final (§12) e do envelope (§13) leem o papel de uma projeção
+plana, que o `init` grava **com ou sem política**: a integridade final roda nos dois
+regimes, e por isso o papel não é uma coluna da projeção do rastro (11.2).
+
+- Primeira linha: `# expx-papeis 1`. Depois, uma linha por agente instalado que
+  declara `papel:`, em ordem, com três campos separados por TAB: `agente`, a
+  `skill` que o publica e o `papel`. A `skill` é a `ferramenta` dos eventos
+  desses hooks: nada é deduzido do nome.
+- Só entram o agente e a skill que o rastro aceita (`Agente` e `Ferramenta` de
+  `CONTRATO-expx-eventos.md`): o evento de outro seria inválido. O de fora fica
+  fora da projeção, com aviso no plano, e não passa pela integridade nem pelo
+  primeiro plano. O mesmo `name` com papel em duas skills recusa o plano.
+- Sem nenhum agente com papel, o arquivo não existe, e o `init` remove o anterior.
+- Os hooks aceitam o arquivo inteiro ou nada: cabeçalho diferente, CR, linha sem
+  exatamente dois TABs, campo fora de `[a-z0-9-]`, papel fora do vocabulário ou
+  agente repetido deixam todo agente sem papel. Falha aberta: sem papel, o agente
+  não é de aprovação.
+- O `init` grava a projeção antes dos hooks e do lock, cada arquivo de forma
+  atômica; o conjunto não é uma transação. Na janela entre um e outro, o hook novo
+  sem projeção só não mede.
+- O `doctor` a confere contra os agentes instalados (`papeis-projecao-divergente`,
+  `CONTRATO-expx-instalacao.md` §5.3).
+- O evento leva o `papel` da hora (`CONTRATO-expx-eventos.md`): a projeção é o
+  estado presente, e só o evento diz qual papel valia quando o agente rodou.
+
 ## 12. Separação de papéis: a integridade final (F3c)
 
 O desenho (§12) exige, de um papel `revisar` ou `testar`, a impossibilidade de
@@ -409,24 +440,23 @@ entradas e `skip-worktree` de todo arquivo presente no disco: a edição escondi
 do `status` por esses bits entra na `arvore`. Num sparse checkout, o que está
 fora do cone continua fora da foto.
 
-### 12.2 Os agentes de aprovação (lista transitória)
+### 12.2 Os agentes de aprovação (F4)
 
-| `agent_type` | `ferramenta` do evento |
-|---|---|
-| `revisor-diff` | `mergex` |
-| `qa` | `runx` |
-| `runx-revisor-testes` | `runx` |
+É de aprovação o agente com papel `revisar` ou `testar` na projeção dos papéis
+(11.4); a `ferramenta` do evento é a skill da mesma linha. Até a 0.13.13, isso era
+uma lista transitória por nome (`revisor-diff`, `qa` e `runx-revisor-testes`), que a
+F4 substituiu. Os agentes estruturais (`auditor-plano`, `auditor-design`), sem
+ferramenta de escrita nem `Bash`, também passam: decidir pelas ferramentas seria
+outra inferência, e a foto a mais é redundante, não errada.
 
 Aceita-se o nome exato, ou o nome depois de **um** prefixo literal `expx:`.
-Substring, outro prefixo ou nome parecido não viram aprovador. Fora da lista, o
-hook sai sem rodar Git e sem gravar nada. As variáveis locais do Git herdadas
+Substring, outro prefixo ou nome parecido não casam com a linha. Sem papel de
+aprovação, o hook sai sem rodar Git e sem gravar nada: a raiz é achada pela
+procura do `.git`, sem Git. As variáveis locais do Git herdadas
 do ambiente (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE` e as demais de
 `git rev-parse --local-env-vars`) são descartadas antes da foto: com elas, a foto
 seria de outro repositório. A configuração passada pelo ambiente (`GIT_CONFIG*`)
-fica, porque não escolhe repositório. A lista é transitória: a F4 a troca
-pelo `papel` declarado e projetado da política, sem inferi-lo do nome. O
-`auditor-plano` e o `sprintx-revisor-testes` não estão nela porque já são
-`estrutural` (sem ferramenta de escrita nem `Bash`).
+fica, porque não escolhe repositório.
 
 ### 12.3 O evento
 
@@ -445,8 +475,11 @@ No `SubagentStop` de um aprovador, o hook grava `integridade_final_verificada`
 
 `ausente` nunca vira `igual`: timeout, truncamento ou erro invalidam. A extra é
 obrigatória nesse evento e vedada nos demais; linhas antigas, sem ela,
-continuam válidas. O esquema também amarra o `resultado` ao `estado` e o
-`agente` à `ferramenta` da tabela 12.2: linha incoerente é defeito do rastro. O evento é próprio, e não `agente_concluido`, porque a
+continuam válidas. O esquema também amarra o `resultado` ao `estado`, e, desde a
+F4, o `papel` da linha a `revisar` ou `testar`: linha incoerente é defeito do
+rastro. A tabela agente × ferramenta da 12.2 antiga saiu do esquema, que não
+conhece a projeção do projeto; a linha de antes da F4, sem `papel`, continua
+válida. O evento é próprio, e não `agente_concluido`, porque a
 SprintX já grava `agente_concluido` para todo subagente, e o aprovador ficaria
 com duas conclusões. O `SubagentStart` não grava evento.
 
@@ -491,16 +524,18 @@ sem `onFailure: "block"`, que só faz sentido com a recusa.
 
 ### 13.1 O que acontece em cada chamada
 
-1. **Antes:** agente fora da projeção (11.2), ou fora do vocabulário `Agente` do rastro,
-   que não teria evento válido, passa sem nada. Gerenciado: grava o envelope, exclusivo, com a invocação (`tool_use_id`),
-   o `resolucao_id` vigente, o agente e a sessão.
+1. **Antes:** agente fora da projeção do rastro (11.2), ou sem papel na projeção dos
+   papéis (11.4), que dá a `ferramenta` do evento, passa sem nada. Gerenciado: grava o
+   envelope, exclusivo, com a invocação (`tool_use_id`), o `resolucao_id` vigente, o
+   agente, a sessão, e a skill e o papel da chamada, que valem no fechamento e no
+   abandono mesmo se a projeção mudar no meio.
 2. **Primeiro plano do aprovador:** o Claude Code roda `Agent` em segundo plano por
-   padrão, e aí a observação só alcança o lançamento. Para quem emite
-   `veredito_emitido` (`auditor-plano`, `sprintx-revisor-testes`, `revisor-diff`, `qa`,
-   `runx-revisor-testes`, com um prefixo `expx:` opcional), o hook devolve
-   `updatedInput` com todo o input e `run_in_background: false`. Não devolve
-   `permissionDecision`: permissão continua com quem decidia. A lista é transitória: a F4
-   a troca pelo `papel`.
+   padrão, e aí a observação só alcança o lançamento. Para o agente de papel `revisar`
+   ou `testar` na projeção dos papéis (11.4), com um prefixo `expx:` opcional, o hook
+   devolve `updatedInput` com todo o input e `run_in_background: false`. Não devolve
+   `permissionDecision`: permissão continua com quem decidia. Até a 0.13.13 era uma
+   lista por nome, dos que emitem `veredito_emitido`; desde a F4, o `auditor-design`,
+   que é `revisar` e não emite veredito, também vai para o primeiro plano.
 3. **Depois:** o envelope é tomado por `rename`, e quem não consegue não fecha. Sai
    `invocacao_fechada`, e só então o envelope é removido. Se o escritor não rodou, ele
    fica para a recuperação. O envelope vale mesmo se a projeção saiu no meio.

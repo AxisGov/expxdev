@@ -22,8 +22,10 @@
 # e por instancia (`agent_id`), com nomes que sao hash — id do payload nunca vira
 # caminho. O fim sempre remove o diretorio da instancia, inclusive divergente.
 #
-# A lista de agentes de aprovacao e TRANSITORIA (CONTRATO-expx-orquestracao §12.2): a F4 a troca
-# pelo `papel` projetado da politica. Fora dela o hook sai sem rodar git.
+# O agente de aprovacao e o de papel `revisar` ou `testar` na projecao dos
+# papeis (.expx/papeis.tsv, CONTRATO-expx-orquestracao §12.2), que o `init` grava
+# com ou sem politica; a `ferramenta` do evento e a skill da mesma linha. Nada vem
+# do nome. Fora disso o hook sai sem rodar git.
 #
 # Falha aberta: sai sempre 0 e nunca imprime. O que falha vira `ausente`, e
 # ausente invalida — nunca vira `igual`.
@@ -43,21 +45,23 @@ case "$EVENTO" in
 esac
 
 # Um unico prefixo `expx:` literal, e o nome exato. Substring, outro prefixo ou
-# nome parecido nao viram aprovador.
+# nome parecido nao casam com a linha da projecao.
 AGENTE="$(expx_json_get "$ENTRADA" agent_type)"
 case "$AGENTE" in
   expx:*) AGENTE="${AGENTE#expx:}" ;;
 esac
-case "$AGENTE" in
-  revisor-diff) EXPX_FERRAMENTA=mergex ;;
-  qa|runx-revisor-testes) EXPX_FERRAMENTA=runx ;;
+CWD="$(expx_json_get "$ENTRADA" cwd)"
+[ -n "$CWD" ] || CWD="$PWD"
+# A raiz pela procura do `.git`, sem rodar git: quem nao e de aprovacao sai aqui.
+SKILL_PAPEL="$(expx_papel_de "$(expx_raiz "$CWD")" "$AGENTE")"
+PAPEL="${SKILL_PAPEL#*$'\t'}"
+case "$SKILL_PAPEL" in
+  *$'\t'revisar|*$'\t'testar) EXPX_FERRAMENTA="${SKILL_PAPEL%%$'\t'*}" ;;
   *) exit 0 ;;
 esac
 
 AGENT_ID="$(expx_json_get "$ENTRADA" agent_id)"
 SESSAO="$(expx_json_get "$ENTRADA" session_id)"
-CWD="$(expx_json_get "$ENTRADA" cwd)"
-[ -n "$CWD" ] || CWD="$PWD"
 
 # Variaveis locais do Git herdadas do ambiente (GIT_DIR, GIT_WORK_TREE,
 # GIT_INDEX_FILE...) apontariam a foto para outro repositorio, e o fim daria
@@ -104,6 +108,8 @@ grava() {
   local inst="" ext=""
   [ -n "$AGENT_ID" ] && inst="$(printf '%s\n%s' "$SESSAO" "$AGENT_ID" | git -C "$raiz" hash-object --stdin 2>/dev/null)"
   [ -n "$inst" ] && ext=",\"instancia\":\"$inst\""
+  # o papel desta verificacao: a projecao e o estado presente, o evento guarda o da hora (F5)
+  ext="$ext,\"papel\":\"$PAPEL\""
   EXPX_AGENTE="$AGENTE" expx_rastro_grava "$raiz" integridade_final_verificada hook "$resultado" \
     "integridade final de $AGENTE: $estado${2:+ ($2)}" '[]' \
     "\"integridade_final\":{\"estado\":\"$estado\",\"diferencas\":[$lista]}$ext"

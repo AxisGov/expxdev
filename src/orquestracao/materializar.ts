@@ -2,7 +2,7 @@ import { basename } from "node:path";
 import { z } from "zod";
 import { lerFrontmatter } from "../parser/leitura/frontmatter.js";
 import { conferirResolucaoId, type AgenteDaSkill, type Resolucao } from "./resolver.js";
-import { ADAPTADORES, CLASSES, type Classe } from "./tipos.js";
+import { ADAPTADORES, CLASSES, PAPEIS, type Classe, type Papel } from "./tipos.js";
 
 /** O mesmo padrão dos nomes em `.expx/orquestracao.json` e do Claude Code: minúsculas, dígitos e hífen. */
 const NOME_AGENTE = /^[a-z0-9][a-z0-9-]*$/;
@@ -13,9 +13,14 @@ const NOME_AGENTE = /^[a-z0-9][a-z0-9-]*$/;
  * com a alternativa e guardar a resolução no registro.
  */
 
-export type LeituraAgente = { ok: true; agente: AgenteDaSkill } | { ok: false; erro: string };
+/** O `papel` vem à parte: ele não entra na resolução nem no `resolucao_id` (§2.2). */
+export type LeituraAgente = { ok: true; agente: AgenteDaSkill; papel?: Papel } | { ok: false; erro: string };
 
-/** `name`, `classe`, `model` e `effort` do frontmatter; `classe` fora do vocabulário é skill inválida. */
+/**
+ * `name`, `classe`, `papel`, `model` e `effort` do frontmatter; `classe` ou
+ * `papel` fora do vocabulário é skill inválida. Sem `papel`, o agente não é de
+ * aprovação: o papel nunca é inferido do nome.
+ */
 export function lerAgenteDaSkill(origem: string, texto: string): LeituraAgente {
   const fm = lerFrontmatter(texto);
   const dados = fm.ok && typeof fm.dados === "object" && fm.dados !== null ? (fm.dados as Record<string, unknown>) : {};
@@ -31,12 +36,40 @@ export function lerAgenteDaSkill(origem: string, texto: string): LeituraAgente {
     }
     agente.classe = classe as Classe;
   }
+  const p = papelDosDados(origem, dados);
+  if (!p.ok) return p;
+  const papel = p.papel;
   const model = campoTexto("model");
   const effort = campoTexto("effort");
   if (model !== undefined || effort !== undefined) {
     agente.frontmatter = { ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }) };
   }
-  return { ok: true, agente };
+  return { ok: true, agente, ...(papel === undefined ? {} : { papel }) };
+}
+
+type LeituraPapel = { ok: true; papel?: Papel } | { ok: false; erro: string };
+
+function papelDosDados(origem: string, dados: Record<string, unknown>): LeituraPapel {
+  const papel = dados["papel"];
+  if (papel === undefined) return { ok: true };
+  if (typeof papel !== "string" || !(PAPEIS as readonly string[]).includes(papel)) {
+    return { ok: false, erro: `${origem}: papel "${String(papel)}" fora do vocabulário (${PAPEIS.join(", ")})` };
+  }
+  return { ok: true, papel: papel as Papel };
+}
+
+/**
+ * Só o `name` (do YAML, como o Claude Code o lê) e o `papel`, para a instalação
+ * sem política: ali `classe` e `model` não são conferidos, e passar a recusá-los
+ * quebraria quem nunca ligou a orquestração. O papel inválido recusa nos dois
+ * regimes, porque a integridade final roda nos dois.
+ */
+export function lerPapelDoAgente(origem: string, texto: string): { ok: true; nome: string; papel?: Papel } | { ok: false; erro: string } {
+  const fm = lerFrontmatter(texto);
+  const dados = fm.ok && typeof fm.dados === "object" && fm.dados !== null ? (fm.dados as Record<string, unknown>) : {};
+  const nome = typeof dados["name"] === "string" && dados["name"] !== "" ? dados["name"] : basename(origem, ".md");
+  const p = papelDosDados(origem, dados);
+  return p.ok ? { ok: true, nome, ...(p.papel === undefined ? {} : { papel: p.papel }) } : p;
 }
 
 /**

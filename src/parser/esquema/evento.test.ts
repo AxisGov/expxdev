@@ -562,20 +562,33 @@ describe("integridade_final (F3c, CONTRATO-expx-orquestracao §12)", () => {
     expect(validarRastro(j(verificada({ estado: "ausente", diferencas: [] }, { resultado: "ok" }))).defeitos).toHaveLength(1);
   });
 
-  it("funcional: o aprovador vem com a ferramenta dele, e só os três da lista transitória", () => {
+  // F4: quem é de aprovação vem do papel projetado; o esquema não guarda tabela por nome.
+  it("funcional: qualquer agente do vocabulário, com a ferramenta que a projeção deu", () => {
     const igual = { estado: "igual", diferencas: [] };
-    expect(validarRastro(j(verificada(igual, { agente: "revisor-diff", ferramenta: "mergex" }))).defeitos).toEqual([]);
-    expect(validarRastro(j(verificada(igual, { agente: "runx-revisor-testes", ferramenta: "runx" }))).defeitos).toEqual([]);
-    expect(validarRastro(j(verificada(igual, { agente: "revisor-diff", ferramenta: "runx" }))).defeitos).toHaveLength(1);
-    expect(validarRastro(j(verificada(igual, { agente: "qa", ferramenta: "mergex" }))).defeitos).toHaveLength(1);
-    expect(validarRastro(j(verificada(igual, { agente: "auditor-plano", ferramenta: "sprintx" }))).defeitos).toHaveLength(1);
+    for (const [agente, ferramenta] of [["revisor-diff", "mergex"], ["auditor-plano", "sprintx"], ["qa", "sprintx"], ["auditor-design", "designx"]]) {
+      expect(validarRastro(j(verificada(igual, { agente, ferramenta, papel: "revisar" }))).defeitos, agente).toEqual([]);
+    }
+  });
+
+  it("funcional: o papel na verificação só pode ser revisar ou testar, e fora do vocabulário é defeito em qualquer evento", () => {
+    const igual = { estado: "igual", diferencas: [] };
+    expect(validarRastro(j(verificada(igual, { papel: "testar" }))).defeitos).toEqual([]);
+    expect(validarRastro(j(verificada(igual, { papel: "investigar" }))).defeitos).toHaveLength(1);
+    expect(validarRastro(j(verificada(igual, { papel: "aprovar" }))).defeitos).toHaveLength(1);
+    expect(validarRastro(j(linha({ evento: "agente_concluido", agente: "qa", papel: "investigar" }))).defeitos).toEqual([]);
+    expect(validarRastro(j(linha({ evento: "agente_concluido", agente: "qa", papel: "" }))).defeitos).toHaveLength(1);
+  });
+
+  it("funcional: a verificação sem papel, das versões anteriores à F4, continua válida", () => {
+    expect(validarRastro(j(verificada({ estado: "igual", diferencas: [] }))).defeitos).toEqual([]);
   });
 
   it("funcional: linha antiga sem a chave continua válida", () => {
     expect(validarRastro(j(linha({ evento: "agente_concluido", agente: "qa" }))).defeitos).toEqual([]);
   });
 
-  it("unitário: integridade_final é extra declarada", () => {
+  it("unitário: integridade_final e papel são extras declaradas", () => {
     expect(EXTRAS_EVENTO).toContain("integridade_final");
+    expect(EXTRAS_EVENTO).toContain("papel");
   });
 });

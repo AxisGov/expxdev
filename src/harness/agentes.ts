@@ -2,9 +2,10 @@ import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { SkillMontavel } from "../plugin/montagem.js";
 import { artefato, artefatoComConteudo, emOrdemCanonica, hashDeBytes, type Artefato } from "../plugin/plano.js";
-import { lerAgenteDaSkill, reescreverModeloEsforco } from "../orquestracao/materializar.js";
+import { lerAgenteDaSkill, lerPapelDoAgente, reescreverModeloEsforco } from "../orquestracao/materializar.js";
+import type { PapelProjetado } from "../orquestracao/papeis.js";
 import { resolver, sobreporV1, type Resolucao } from "../orquestracao/resolver.js";
-import type { Politica } from "../orquestracao/tipos.js";
+import type { Papel, Politica } from "../orquestracao/tipos.js";
 import { NOMES } from "../nucleo/catalogo.js";
 
 /**
@@ -138,6 +139,8 @@ export type PlanoDeAgentes = {
   erros: string[];
   /** Uma por agente, só com a política ativa (CONTRATO-expx-orquestracao §9). */
   resolucoes: Resolucao[];
+  /** Os agentes que declaram `papel:`, com ou sem política (CONTRATO-expx-orquestracao §11.4). */
+  papeis: PapelProjetado[];
 };
 
 /**
@@ -151,16 +154,31 @@ export type PlanoDeAgentes = {
  * Com a política de orquestração ativa (`politica`), cada agente é RESOLVIDO
  * primeiro e o frontmatter recebe a alternativa; o override v1 vem depois, como
  * exceção marcada na resolução (CONTRATO-expx-orquestracao §7.4). Sem
- * política, nada muda.
+ * política, nada muda no arquivo.
+ *
+ * O `papel:` é lido nos dois regimes (F4): a integridade final, que decide por
+ * ele, roda com ou sem política.
  */
 export function planejarAgentes(skills: readonly SkillMontavel[], overrides: Overrides, politica?: Politica): PlanoDeAgentes {
   const artefatos: Artefato[] = [];
   const conhecidos = new Set<string>();
   const erros: string[] = [];
   const resolucoes: Resolucao[] = [];
+  const papeis: PapelProjetado[] = [];
   // Com a política, o nome é a chave do lock e do registro: dois agentes com o
   // mesmo `name:` deixariam só o último no lock.
   const donoDoNome = new Map<string, string>();
+  // Sem política, o nome repetido só importa se algum dos dois tem papel: a
+  // linha da projeção precisa de uma skill só.
+  const publicados = new Map<string, { skill: string; papel: boolean }>();
+  const conferirPapel = (nome: string, skill: string, papel: Papel | undefined): void => {
+    const antes = publicados.get(nome);
+    if (antes !== undefined && (antes.papel || papel !== undefined)) {
+      erros.push(`agente ${nome} publicado pelas skills ${antes.skill} e ${skill}, e um deles declara papel: o name precisa ser unico`);
+    }
+    publicados.set(nome, { skill, papel: (antes?.papel ?? false) || papel !== undefined });
+    if (papel !== undefined && antes === undefined) papeis.push({ agente: nome, skill, papel });
+  };
   for (const s of emOrdemCanonica(skills)) {
     for (const origem of s.agentes ?? []) {
       const destino = `.claude/agents/${basename(origem)}`;
@@ -171,6 +189,7 @@ export function planejarAgentes(skills: readonly SkillMontavel[], overrides: Ove
           erros.push(lido.erro);
           continue;
         }
+        if (lido.papel !== undefined && !donoDoNome.has(lido.agente.nome)) papeis.push({ agente: lido.agente.nome, skill: s.nome, papel: lido.papel });
         // A identidade vem do YAML, como o Claude Code a lê: `name: x # nota` é `x`.
         const id = lido.agente.nome;
         conhecidos.add(id);
@@ -203,7 +222,13 @@ export function planejarAgentes(skills: readonly SkillMontavel[], overrides: Ove
         );
         continue;
       }
-      // Sem política: o nome e o override como sempre foram.
+      // Sem política: o nome e o override como sempre foram, e o papel.
+      const lido = lerPapelDoAgente(`${s.nome}/${basename(origem)}`, texto);
+      if (!lido.ok) {
+        erros.push(lido.erro);
+        continue;
+      }
+      conferirPapel(lido.nome, s.nome, lido.papel);
       const nome = nomeDoAgente(origem, texto);
       conhecidos.add(nome);
       const o = overrides[nome];
@@ -225,7 +250,7 @@ export function planejarAgentes(skills: readonly SkillMontavel[], overrides: Ove
       avisos.push(`.expx/agentes.json: "${nome}" nao e agente de nenhuma skill instalada; o override nao foi aplicado`);
     }
   }
-  return { artefatos, avisos, erros, resolucoes };
+  return { artefatos, avisos, erros, resolucoes, papeis };
 }
 
 export type Limpeza = {

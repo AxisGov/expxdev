@@ -385,6 +385,25 @@ maior precedência que o doctor consegue ler (`.claude/settings.local.json`,
 cita a origem. Settings gerenciados e `--fallback-model` de outra sessão ficam
 fora: só a observação do executor os pega.
 
+## 5.4 `.expx/papeis.tsv` — a projeção dos papéis (F4)
+
+Ao contrário da 5.3, vale **com ou sem política**, sempre com o harness `claude`:
+a integridade final, que decide por ela, é instalada nos dois regimes. A forma e as
+regras estão em `CONTRATO-expx-orquestracao.md` §11.4.
+
+- **Leitura.** O `papel:` de cada agente das skills é lido nos dois regimes. Sem
+  política, só o `name` e o `papel` são lidos: `classe` e `model` continuam sem
+  conferência. Papel fora do vocabulário recusa o plano antes de escrever, como o
+  mesmo `name` com papel publicado por duas skills.
+- **Escrita.** A projeção é gravada antes dos artefatos, de forma atômica, e
+  removida quando nenhum agente instalado declara papel. Não entra em
+  `instalacao.arquivos`.
+- **Doctor.** `papeis-projecao-divergente` é **erro** quando a projeção falta com
+  agente de papel instalado, é ilegível, ou diverge das cópias de `.claude/agents/`
+  que o lock travou e que ainda batem com o hash dele (papel trocado, agente a mais
+  ou a menos, skill fora do lock). A cópia alterada já é `artefato-alterado` e não
+  decide nada aqui. A projeção que sobrou sem nenhum agente de papel é **aviso**.
+
 ## 6. O que o `init` não apaga
 
 Só `.expx/marketplace/` é trocada de uma vez. O restante de `.expx/`

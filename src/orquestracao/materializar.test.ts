@@ -33,6 +33,21 @@ describe("lerAgenteDaSkill", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.erro).toContain("altissima");
   });
+
+  // F4: o papel decide a integridade final e o primeiro plano, e fica fora da resolução (§2.2).
+  it("lê o papel à parte do agente que vai ao resolvedor", () => {
+    expect(lerAgenteDaSkill("x/auditor.md", AGENTE("classe: profundo_excepcional\npapel: revisar # nota\nmodel: opus"))).toEqual({
+      ok: true,
+      agente: { nome: "auditor", classe: "profundo_excepcional", frontmatter: { model: "opus" } },
+      papel: "revisar",
+    });
+  });
+
+  it.each(["aprovar", "Revisar", "", "[revisar]"])("papel %j fora do vocabulário é skill inválida", (papel) => {
+    const r = lerAgenteDaSkill("x/auditor.md", AGENTE(`papel: ${papel === "" ? '""' : papel}\nmodel: opus`));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erro).toContain("papel");
+  });
 });
 
 describe("reescreverModeloEsforco", () => {

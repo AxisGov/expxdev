@@ -17,17 +17,11 @@ import {
 import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Quem emite `veredito_emitido`: precisa ser observado do inicio ao fim, e so o
-// primeiro plano permite isso (§10.2). Transitoria: a F4 a troca pelo `papel`.
-const APROVADORES = new Set(["auditor-plano", "sprintx-revisor-testes", "revisor-diff", "qa", "runx-revisor-testes"]);
-// A `ferramenta` do evento, que o esquema exige. Agente fora daqui nao grava evento.
-const FERRAMENTA = new Map([
-  ["auditor-plano", "sprintx"], ["sprintx-revisor-testes", "sprintx"], ["sprintx-investigador", "sprintx"],
-  ["runx-revisor-testes", "runx"], ["runx-investigador", "runx"], ["qa", "runx"],
-  ["revisor-diff", "mergex"], ["analista-de-conflito", "mergex"],
-  ["legadox-cartografo", "legadox"], ["avaliador-de-raio", "legadox"],
-  ["stackx-cartografo", "stackx"], ["auditor-design", "designx"], ["cartografo-visual", "designx"],
-]);
+// Os papeis de aprovacao: precisam ser observados do inicio ao fim, e so o primeiro
+// plano permite isso (§13.1). Quem tem papel e qual, e a skill que vira a `ferramenta`
+// do evento, vem da projecao dos papeis (§11.4), nunca do nome.
+const APROVACAO = new Set(["revisar", "testar"]);
+const PAPEIS = new Set(["planejar", "implementar", "investigar", "testar", "revisar"]);
 const UM_DIA = 24 * 60 * 60 * 1000;
 const RASTRO = join(dirname(fileURLToPath(import.meta.url)), "expx-rastro.sh");
 
@@ -84,6 +78,36 @@ function resolucaoDe(raiz, agente) {
   return id;
 }
 
+/**
+ * A skill e o papel do agente, da projecao dos papeis (`.expx/papeis.tsv`); `null` se
+ * ele nao tem papel. O arquivo inteiro vale ou nao vale nada, pelas mesmas regras do
+ * `expx_papel_de` (expx-rastro.sh) e do `lerPapeis` do CLI: a integridade final e o
+ * envelope tem de concordar sobre quem e de aprovacao.
+ */
+function papelDe(raiz, agente) {
+  let texto;
+  try {
+    texto = readFileSync(join(raiz, ".expx", "papeis.tsv"), "utf8");
+  } catch {
+    return null;
+  }
+  if (texto.includes("\r") || !/^[a-z0-9-]+$/.test(agente ?? "")) return null;
+  const linhas = texto.split("\n");
+  if (linhas.at(-1) === "") linhas.pop();
+  if (linhas[0] !== "# expx-papeis 1") return null;
+  const vistos = new Set();
+  let achado = null;
+  for (const linha of linhas.slice(1)) {
+    const campos = linha.split("\t");
+    if (campos.length !== 3) return null;
+    const [ag, skill, papel] = campos;
+    if (!/^[a-z0-9-]+$/.test(ag) || !/^[a-z0-9-]+$/.test(skill) || !PAPEIS.has(papel) || vistos.has(ag)) return null;
+    vistos.add(ag);
+    if (ag === agente) achado = { skill, papel };
+  }
+  return achado;
+}
+
 /** Os dois hooks calculam a instancia pela mesma conta, com o formato de hash do repositorio. */
 function instanciaDe(raiz, sessao, agentId) {
   if (typeof sessao !== "string" || typeof agentId !== "string" || agentId === "") return "";
@@ -91,9 +115,9 @@ function instanciaDe(raiz, sessao, agentId) {
   return r.status === 0 ? r.stdout.trim() : "";
 }
 
-function grava(raiz, agente, evento, resultado, detalhe, extras, modelo) {
-  const ferramenta = FERRAMENTA.get(agente);
-  if (ferramenta === undefined || !existsSync(RASTRO)) return;
+/** A `ferramenta` e a skill do papel; sem ela o esquema recusaria o evento, que nao sai. */
+function grava(raiz, agente, ferramenta, evento, resultado, detalhe, extras, modelo) {
+  if (!ferramenta || !existsSync(RASTRO)) return;
   const env = { ...process.env, EXPX_FERRAMENTA: ferramenta, EXPX_AGENTE: agente };
   env.EXPX_HARNESS = env.EXPX_HARNESS || "claude-code";
   // o executor observado e so o que este hook viu: modelo e esforco herdados da
@@ -139,19 +163,21 @@ function antes(d) {
   const raiz = raizDe(d.cwd || process.cwd());
   const entrada = d.tool_input;
   const agente = nomeDoAgente(entrada?.subagent_type);
-  // Agente fora do vocabulario do rastro nao teria evento valido: nao e observado.
-  const resolucaoId = FERRAMENTA.has(agente) ? resolucaoDe(raiz, agente) : "";
+  // Sem papel nao ha `ferramenta` para o evento: o agente nao e observado.
+  const papel = papelDe(raiz, agente);
+  const resolucaoId = papel === null ? "" : resolucaoDe(raiz, agente);
   if (resolucaoId === "") return;
   try {
     const pasta = pastaDe(raiz);
     mkdirSync(pasta, { recursive: true });
     const fd = openSync(join(pasta, `${hash(String(d.tool_use_id))}.json`), "wx");
-    writeSync(fd, JSON.stringify({ invocacao: d.tool_use_id, resolucao_id: resolucaoId, agente, session_id: d.session_id }));
+    // a skill e o papel da chamada: a projecao pode mudar antes do fechamento
+    writeSync(fd, JSON.stringify({ invocacao: d.tool_use_id, resolucao_id: resolucaoId, agente, session_id: d.session_id, skill: papel.skill, papel: papel.papel }));
     closeSync(fd);
   } catch {
     // falha aberta: o aprovador ainda vai para o primeiro plano
   }
-  if (APROVADORES.has(agente) && entrada.run_in_background !== false) {
+  if (APROVACAO.has(papel.papel) && entrada.run_in_background !== false) {
     process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", updatedInput: { ...entrada, run_in_background: false } } }));
   }
 }
@@ -174,7 +200,8 @@ function tomar(arquivo) {
 function depois(d, evento) {
   const raiz = raizDe(d.cwd || process.cwd());
   const nome = nomeDoAgente(d.tool_input?.subagent_type);
-  const gerenciado = FERRAMENTA.has(nome) && resolucaoDe(raiz, nome) !== "";
+  const vigente = papelDe(raiz, nome);
+  const gerenciado = vigente !== null && resolucaoDe(raiz, nome) !== "";
   // O envelope vem primeiro: a projecao pode ter saido durante um agente em segundo plano.
   const tomado = tomar(join(pastaDe(raiz), `${hash(String(d.tool_use_id))}.json`));
   if (tomado === null || (tomado.envelope === null && !gerenciado)) return;
@@ -183,6 +210,9 @@ function depois(d, evento) {
   const estado = evento === "PostToolUseFailure" ? "falha" : resposta?.status === "async_launched" ? "lancada" : "concluida";
   const modelos = modelosDe(resposta);
   const extras = { invocacao: d.tool_use_id, estado_invocacao: estado };
+  // o envelope de antes da F4 nao tem skill nem papel: vale a projecao vigente
+  const doPapel = tomado.envelope?.skill ? tomado.envelope : vigente;
+  if (doPapel?.papel) extras.papel = doPapel.papel;
   // A resolucao da chamada: se a vigente mudou no meio, o escritor nao a usa no lugar.
   const daChamada = tomado.envelope?.resolucao_id;
   if (daChamada && daChamada !== resolucaoDe(raiz, agente)) extras.resolucao_id = daChamada;
@@ -194,7 +224,7 @@ function depois(d, evento) {
   if (julgamento === true) extras.fora_da_politica = true;
   const semEnvelope = tomado.envelope === null ? " (sem envelope)" : "";
   const resultado = estado === "falha" ? "falha" : "ok";
-  grava(raiz, agente, "invocacao_fechada", resultado, `invocacao de ${agente}: ${estado}${semEnvelope}`, extras, modelos.at(-1));
+  grava(raiz, agente, doPapel?.skill, "invocacao_fechada", resultado, `invocacao de ${agente}: ${estado}${semEnvelope}`, extras, modelos.at(-1));
   // O escritor falha aberto e sai 0: so a linha no rastro prova que o evento existe.
   if (tomado.fechando && jaRegistrada(raiz, d.tool_use_id)) rmSync(tomado.fechando, { force: true });
 }
@@ -241,7 +271,9 @@ function recuperar(d) {
       if (!jaRegistrada(raiz, envelope.invocacao)) {
         const extras = { invocacao: envelope.invocacao };
         if (envelope.resolucao_id && envelope.resolucao_id !== resolucaoDe(raiz, envelope.agente)) extras.resolucao_id = envelope.resolucao_id;
-        grava(raiz, envelope.agente, "invocacao_abandonada", "falha", `invocacao de ${envelope.agente} sem fechamento`, extras);
+        const doPapel = envelope.skill ? envelope : papelDe(raiz, envelope.agente);
+        if (doPapel?.papel) extras.papel = doPapel.papel;
+        grava(raiz, envelope.agente, doPapel?.skill, "invocacao_abandonada", "falha", `invocacao de ${envelope.agente} sem fechamento`, extras);
       }
       if (jaRegistrada(raiz, envelope.invocacao)) rmSync(meu, { force: true });
     } catch {
