@@ -1,8 +1,10 @@
 # Changelog
 
-## 0.13.15 — o papel decide quem é de aprovação (F4 da orquestração)
+## 0.13.15 — o papel decide quem é de aprovação (F4 da orquestração), e a DM-327 na MergeX
 
-Instale por PR, como a 0.13.14. É a F4 da orquestração: a integridade final e o primeiro plano do aprovador deixam de escolher o agente por uma lista de nomes e passam a decidir pelo `papel:` que a skill declara. Mudam o ExpxDev e as seis skills com agentes.
+Instale por PR, como a 0.13.14. É a F4 da orquestração: a integridade final e o primeiro plano do aprovador deixam de escolher o agente por uma lista de nomes e passam a decidir pelo `papel:` que a skill declara. Mudam o ExpxDev e as seis skills com agentes. Vem junto a DM-327 da MergeX, os dois nitpicks do CodeAnt na instalação da 0.13.14 (conselhos#271).
+
+- **mergex@326af49** (mergex#91, DM-327): os braços `sem`, `0` e `*` da recusa do `--registrar` passam a sugerir a busca só para remoto com `remote.<r>.url`, como o `mudou` desde a DM-326. Com o remoto da branch só com `fetch`, a recusa sugeria um `git fetch` que falha. A classificação não muda: a recusa continua, e nada passa a ser aceito.
 
 - **As skills declaram o papel** (sprintx#70, runx#17, mergex#89, legadox#7, stackx#9, designx#12):
   - **`revisar`:** `auditor-plano`, `revisor-diff` e `auditor-design`;

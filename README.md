@@ -684,7 +684,8 @@ npx --yes --package ~/expx-cli/v0.13.15/expxdev-0.13.15.tgz expx init --skills b
 - `0.13.14` faz as recusas da reconciliação da MergeX sugerirem a busca no remoto certo: com o remoto
   da branch trocado, sem URL ou com `/` no nome.
 - `0.13.15` fecha a F4 da orquestração: as skills declaram o `papel:` dos agentes, o `init` o projeta
-  em `.expx/papeis.tsv`, e a integridade final e o primeiro plano decidem por ele, não pelo nome.
+  em `.expx/papeis.tsv`, e a integridade final e o primeiro plano decidem por ele, não pelo nome. Traz
+  também a DM-327 da MergeX: nenhum braço da recusa da reconciliação sugere busca em remoto sem URL.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
