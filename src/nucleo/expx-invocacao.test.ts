@@ -160,6 +160,8 @@ describe("expx-invocacao: observa a chamada do agente gerenciado", () => {
     ["CRLF", "# expx-papeis 1\r\nqa\trunx\ttestar\r\n"],
     ["agente repetido", "# expx-papeis 1\nqa\trunx\ttestar\nqa\trunx\ttestar\n"],
     ["papel fora do vocabulário", "# expx-papeis 1\nqa\trunx\taprovar\n"],
+    ["o principal com papel", "# expx-papeis 1\nprincipal\trunx\ttestar\nqa\trunx\ttestar\n"],
+    ["skill fora do vocabulário do rastro", "# expx-papeis 1\nqa\toutra\ttestar\n"],
     ["outra linha inválida", "# expx-papeis 1\nqa\trunx\ttestar\nx\n"],
   ])("funcional: %s — o agente não é gerenciado nem vai ao primeiro plano", (_, conteudo) => {
     const raiz = projeto(["qa"]);

@@ -261,6 +261,7 @@ function instalacaoTravada(plano: Plano): InstalacaoTravada {
   if (plano.modos !== undefined) {
     inst.modos = { hash: hashDeBytes(plano.modos.texto), publicados: plano.modos.publicados };
   }
+  if (plano.papeis !== undefined) inst.papeis = { hash: hashDeBytes(plano.papeis) };
   return inst;
 }
 

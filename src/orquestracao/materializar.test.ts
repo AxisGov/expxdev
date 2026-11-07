@@ -50,6 +50,8 @@ describe("lerAgenteDaSkill", () => {
     if (!r.ok) expect(r.erro).toContain("papel");
     const s = lerPapelDoAgente("x/qa.md", dup);
     expect(s.ok).toBe(false);
+    // a chave indentada também é o papel: o YAML inválido não a esconde
+    expect(lerPapelDoAgente("x/qa.md", "---\n  name: qa\n  papel: revisar\n  papel: testar\n---\nx\n").ok).toBe(false);
     // sem papel no texto, o frontmatter inválido segue como antes
     expect(lerPapelDoAgente("x/qa.md", "---\nname: qa\nname: qb\n---\nx\n").ok).toBe(true);
   });

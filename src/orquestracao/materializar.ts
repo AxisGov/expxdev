@@ -55,7 +55,7 @@ type LeituraPapel = { ok: true; papel?: Papel } | { ok: false; erro: string };
  * ser verificado. Se o bloco cru tem uma linha `papel:`, é skill inválida.
  */
 function papelDosDados(origem: string, dados: Record<string, unknown>, yamlOk: boolean, texto: string): LeituraPapel {
-  if (!yamlOk && /^["']?papel["']?[ \t]*:/m.test(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---/.exec(texto)?.[1] ?? "")) {
+  if (!yamlOk && /^[ \t]*["']?papel["']?[ \t]*:/m.test(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---/.exec(texto)?.[1] ?? "")) {
     return { ok: false, erro: `${origem}: o frontmatter declara papel, mas nao e YAML valido (chave repetida?)` };
   }
   const papel = dados["papel"];

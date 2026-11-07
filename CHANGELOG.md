@@ -17,7 +17,8 @@ Instale por PR, como a 0.13.14. É a F4 da orquestração: a integridade final e
   - o `auditor-design` passa a rodar em primeiro plano;
   - sem a projeção, nenhum agente é de aprovação: ela sai junto com o hook, no mesmo `init`.
 - **Os eventos levam o papel.** `integridade_final_verificada`, `invocacao_fechada` e `invocacao_abandonada` gravam o `papel` da hora, que é a coorte da F5. O esquema deixa de amarrar o agente à ferramenta e exige `revisar` ou `testar` na verificação com papel; as linhas antigas, sem papel, continuam válidas.
-- **Doctor:** `papeis-projecao-divergente` confere a projeção contra as cópias dos agentes que o lock travou.
+- **Doctor:** `papeis-projecao-divergente` confere a projeção contra o hash que o `init` gravou no lock (`instalacao.papeis`) e contra as cópias dos agentes que o lock travou.
+- **A projeção trocada no meio do agente** não suprime a integridade final: o papel e a skill do início ficam guardados com a foto.
 - **Não exercitado:** a F4 foi provada com hooks reais, fixtures e o `init`, mas não numa sessão do Claude Code com subagentes de verdade.
 
 ## 0.13.14 — a busca sugerida nas recusas da reconciliação vai ao remoto certo, na MergeX

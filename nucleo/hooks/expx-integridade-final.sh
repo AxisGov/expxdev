@@ -52,13 +52,30 @@ case "$AGENTE" in
 esac
 CWD="$(expx_json_get "$ENTRADA" cwd)"
 [ -n "$CWD" ] || CWD="$PWD"
+# ha_foto_pendente <raiz> — ha alguma foto de inicio no git-dir, achado sem rodar
+# git (`.git` pasta, ou arquivo `gitdir:` de worktree)
+ha_foto_pendente() {
+  local gd="$1/.git" linha=""
+  if [ -f "$gd" ]; then
+    IFS= read -r linha < "$gd" || true
+    gd="${linha#gitdir: }"
+    case "$gd" in /*|[A-Za-z]:[\\/]*) ;; *) gd="$1/$gd" ;; esac
+  fi
+  [ -d "$gd/expx/integridade-final/v1" ] && [ -n "$(ls -A "$gd/expx/integridade-final/v1" 2>/dev/null)" ]
+}
+
 # A raiz pela procura do `.git`, sem rodar git: quem nao e de aprovacao sai aqui.
-SKILL_PAPEL="$(expx_papel_de "$(expx_raiz "$CWD")" "$AGENTE")"
-PAPEL="${SKILL_PAPEL#*$'\t'}"
+# No fim, a foto de um inicio em que ele ERA de aprovacao (a projecao mudou no
+# meio) ainda precisa ser comparada e removida: so entao o git roda.
+RAIZ_SEM_GIT="$(expx_raiz "$CWD")"
+SKILL_PAPEL="$(expx_papel_de "$RAIZ_SEM_GIT" "$AGENTE")"
 case "$SKILL_PAPEL" in
-  *$'\t'revisar|*$'\t'testar) EXPX_FERRAMENTA="${SKILL_PAPEL%%$'\t'*}" ;;
-  *) exit 0 ;;
+  *$'\t'revisar|*$'\t'testar) APROVADOR=1 ;;
+  *) APROVADOR=""; SKILL_PAPEL="" ;;
 esac
+if [ -z "$APROVADOR" ]; then
+  [ "$EVENTO" = SubagentStop ] && ha_foto_pendente "$RAIZ_SEM_GIT" || exit 0
+fi
 
 AGENT_ID="$(expx_json_get "$ENTRADA" agent_id)"
 SESSAO="$(expx_json_get "$ENTRADA" session_id)"
@@ -164,10 +181,24 @@ if [ "$EVENTO" = SubagentStart ]; then
   [ -n "$INSTANCIA" ] || exit 0
   rm -rf "$INSTANCIA" 2>/dev/null
   mkdir -p "$INSTANCIA" 2>/dev/null || exit 0
-  # foto incompleta nao fica: o fim a le como ausente
-  foto "$INSTANCIA" || rm -rf "$INSTANCIA" 2>/dev/null
+  # foto incompleta nao fica: o fim a le como ausente. O papel e a skill do inicio
+  # ficam com ela: o fim vale por eles, mesmo se a projecao mudar no meio
+  { foto "$INSTANCIA" && printf '%s\n' "$SKILL_PAPEL" > "$INSTANCIA/papel"; } || rm -rf "$INSTANCIA" 2>/dev/null
   exit 0
 fi
+
+# SubagentStop: o papel guardado no inicio vence o da projecao de agora. Sem ele
+# (inicio de antes da F4), vale a projecao; e quem nao era nem e de aprovacao sai.
+if [ -n "$INSTANCIA" ] && [ -f "$INSTANCIA/papel" ]; then
+  IFS= read -r GUARDADO < "$INSTANCIA/papel" || GUARDADO=""
+  case "$GUARDADO" in
+    sprintx$'\t'*|runx$'\t'*|mergex$'\t'*|legadox$'\t'*|stackx$'\t'*|memox$'\t'*|prodx$'\t'*|buildx$'\t'*|designx$'\t'*)
+      case "$GUARDADO" in *$'\t'revisar|*$'\t'testar) SKILL_PAPEL="$GUARDADO" ;; esac ;;
+  esac
+fi
+[ -n "$SKILL_PAPEL" ] || exit 0
+PAPEL="${SKILL_PAPEL#*$'\t'}"
+EXPX_FERRAMENTA="${SKILL_PAPEL%%$'\t'*}"
 
 # SubagentStop
 if [ -z "$INSTANCIA" ] || [ ! -f "$INSTANCIA/head" ] || [ ! -f "$INSTANCIA/status.z" ] || [ ! -f "$INSTANCIA/arvore" ]; then

@@ -396,8 +396,9 @@ EXPX_PROJECAO
 # lidos da projecao que o `expx init` grava com ou sem politica
 # (.expx/papeis.tsv). Imprime "skill<TAB>papel" ou nada. O arquivo inteiro vale
 # ou nao vale nada, pelas mesmas regras do `lerPapeis` do CLI: cabecalho
-# diferente, CR, linha sem exatamente dois TABs, campo fora do alfabeto, papel
-# fora do vocabulario ou agente repetido deixam todo agente sem papel. Falha
+# diferente, CR, linha sem exatamente dois TABs, campo fora do alfabeto, o
+# `principal`, skill fora do vocabulario `ferramenta` do rastro, papel fora do
+# vocabulario ou agente repetido deixam todo agente sem papel. Falha
 # aberta: sem papel, o agente nao e de aprovacao. Nunca le o papel do nome.
 expx_papel_de() {
   local arq="$1/.expx/papeis.tsv" agente="$2" cab="" linha tabs ag sk pa achado="" vistos=$'\n'
@@ -412,8 +413,8 @@ expx_papel_de() {
       IFS=$'\t' read -r ag sk pa <<EXPX_PAPEIS
 $linha
 EXPX_PAPEIS
-      case "$ag" in ""|*[!a-z0-9-]*) return 0 ;; esac
-      case "$sk" in ""|*[!a-z0-9-]*) return 0 ;; esac
+      case "$ag" in ""|*[!a-z0-9-]*|principal) return 0 ;; esac
+      case "$sk" in sprintx|runx|mergex|legadox|stackx|memox|prodx|buildx|designx) ;; *) return 0 ;; esac
       case "$pa" in planejar|implementar|investigar|testar|revisar) ;; *) return 0 ;; esac
       case "$vistos" in *$'\n'"$ag"$'\n'*) return 0 ;; esac
       vistos="$vistos$ag"$'\n'

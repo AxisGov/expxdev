@@ -397,11 +397,13 @@ regras estão em `CONTRATO-expx-orquestracao.md` §11.4.
   mesmo `name` com papel publicado por duas skills.
 - **Escrita.** A projeção é gravada antes dos artefatos, de forma atômica, e
   removida quando nenhum agente instalado declara papel. Não entra em
-  `instalacao.arquivos`.
+  `instalacao.arquivos`; o lock guarda o hash dela em `instalacao.papeis`, porque
+  não guarda qual skill publica cada agente.
 - **Doctor.** `papeis-projecao-divergente` é **erro** quando a projeção falta com
-  agente de papel instalado, é ilegível, ou diverge das cópias de `.claude/agents/`
-  que o lock travou e que ainda batem com o hash dele (papel trocado, agente a mais
-  ou a menos, skill fora do lock). A cópia alterada já é `artefato-alterado` e não
+  agente de papel instalado, é ilegível, difere do hash de `instalacao.papeis` (a
+  skill ou o papel de um agente trocado), ou diverge das cópias de
+  `.claude/agents/` que o lock travou e que ainda batem com o hash dele (papel
+  trocado, agente a mais ou a menos, skill fora do lock). A cópia alterada já é `artefato-alterado` e não
   decide nada aqui. A projeção que sobrou sem nenhum agente de papel é **aviso**.
 
 ## 6. O que o `init` não apaga

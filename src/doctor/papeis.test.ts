@@ -60,6 +60,8 @@ describe("doctor — projeção dos papéis (F4)", () => {
     ["agente a menos", (t: string) => t.replace("qa\trunx\ttestar\n", "")],
     ["agente a mais", (t: string) => `${t}analista-de-conflito\tmergex\trevisar\n`],
     ["skill fora do lock", (t: string) => t.replace("qa\trunx", "qa\tsprintx")],
+    // a outra skill está no lock: só o hash gravado pelo init prova quem publica o agente
+    ["skill trocada por outra do lock", (t: string) => t.replace("qa\trunx", "qa\tmergex")],
     ["arquivo ilegível", () => "# expx-papeis 2\n"],
   ])("%s é erro", async (_, mudar) => {
     const raiz = await projeto();

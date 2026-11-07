@@ -22,6 +22,8 @@ import { fileURLToPath } from "node:url";
 // do evento, vem da projecao dos papeis (§11.4), nunca do nome.
 const APROVACAO = new Set(["revisar", "testar"]);
 const PAPEIS = new Set(["planejar", "implementar", "investigar", "testar", "revisar"]);
+// o vocabulario `ferramenta` do rastro: a skill da linha vira a ferramenta do evento
+const FERRAMENTAS = new Set(["sprintx", "runx", "mergex", "legadox", "stackx", "memox", "prodx", "buildx", "designx"]);
 const UM_DIA = 24 * 60 * 60 * 1000;
 const RASTRO = join(dirname(fileURLToPath(import.meta.url)), "expx-rastro.sh");
 
@@ -101,7 +103,7 @@ function papelDe(raiz, agente) {
     const campos = linha.split("\t");
     if (campos.length !== 3) return null;
     const [ag, skill, papel] = campos;
-    if (!/^[a-z0-9-]+$/.test(ag) || !/^[a-z0-9-]+$/.test(skill) || !PAPEIS.has(papel) || vistos.has(ag)) return null;
+    if (!/^[a-z0-9-]+$/.test(ag) || ag === "principal" || !FERRAMENTAS.has(skill) || !PAPEIS.has(papel) || vistos.has(ag)) return null;
     vistos.add(ag);
     if (ag === agente) achado = { skill, papel };
   }

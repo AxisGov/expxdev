@@ -21,8 +21,15 @@ export type PapelProjetado = { agente: string; skill: string; papel: Papel };
 export type ResultadoPapeis = { ok: true; texto?: string; avisos: string[] } | { ok: false; erro: string };
 
 /** Só os agentes que o rastro aceita: fora do vocabulário, o evento deles seria inválido. */
-const agenteDoRastro = (a: string): boolean => a !== "principal" && Agente.safeParse(a).success;
+export const agenteDoRastro = (a: string): boolean => a !== "principal" && Agente.safeParse(a).success;
 const skillDoRastro = (s: string): boolean => Ferramenta.safeParse(s).success;
+/**
+ * A leitura usa as mesmas regras dos hooks (`expx_papel_de` e `papelDe`): o agente
+ * no alfabeto de nome e diferente de `principal`, a skill no vocabulário do rastro.
+ * O vocabulário de agentes fica só na escrita (`projetarPapeis`): os hooks não
+ * guardam lista de nomes de agente.
+ */
+const agenteLegivel = (a: string): boolean => /^[a-z0-9-]+$/.test(a) && a !== "principal";
 
 export function projetarPapeis(itens: readonly PapelProjetado[]): ResultadoPapeis {
   const avisos: string[] = [];
@@ -57,7 +64,7 @@ export function lerPapeis(texto: string): LeituraPapeis {
     const campos = linha.split("\t");
     const [agente = "", skill = "", papel = ""] = campos;
     if (campos.length !== 3) return { ok: false, erro: `linha ${n + 2}: ${campos.length} colunas, esperadas 3` };
-    if (!agenteDoRastro(agente)) return { ok: false, erro: `linha ${n + 2}: agente "${agente}" fora do vocabulario do rastro` };
+    if (!agenteLegivel(agente)) return { ok: false, erro: `linha ${n + 2}: agente "${agente}" fora do alfabeto de nome, ou o principal` };
     if (!skillDoRastro(skill)) return { ok: false, erro: `linha ${n + 2}: skill "${skill}" fora do vocabulario do rastro` };
     if (!(PAPEIS as readonly string[]).includes(papel)) return { ok: false, erro: `linha ${n + 2}: papel "${papel}" fora do vocabulario` };
     if (vistos.has(agente)) return { ok: false, erro: `linha ${n + 2}: agente ${agente} repetido` };

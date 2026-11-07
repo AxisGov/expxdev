@@ -309,6 +309,37 @@ describe("expx-integridade-final: a foto do início contra o fim, por instância
     ]);
   });
 
+  it("funcional: a projeção trocada entre o início e o fim não suprime a verificação — vale o papel do início, e o estado sai", () => {
+    const raiz = repo();
+    inicio(raiz, "qa", "ag-1");
+    writeFileSync(join(raiz, ".expx", "papeis.tsv"), "# expx-papeis 1\nqa\tsprintx\tinvestigar\n");
+    git(raiz, "commit", "-q", "-am", "projecao nova");
+    fim(raiz, "qa", "ag-1");
+    expect(verificacoes(raiz)).toMatchObject([{ agente: "qa", ferramenta: "runx", papel: "testar", integridade_final: { estado: "divergente" } }]);
+    expect(arquivosDoEstado(raiz)).toEqual([]);
+  });
+
+  it("funcional: o fim de quem não é de aprovação, com a foto de outro pendente, não grava nada nem mexe nela", () => {
+    const raiz = repo();
+    inicio(raiz, "qa", "ag-1");
+    const antes = arquivosDoEstado(raiz);
+    inicio(raiz, "analista-de-conflito", "ag-2");
+    fim(raiz, "analista-de-conflito", "ag-2");
+    expect(verificacoes(raiz)).toEqual([]);
+    expect(arquivosDoEstado(raiz)).toEqual(antes);
+    fim(raiz, "qa", "ag-1");
+    expect(verificacoes(raiz)).toMatchObject([{ agente: "qa", papel: "testar", integridade_final: { estado: "igual" } }]);
+  });
+
+  it("funcional: a projeção removida entre o início e o fim também não suprime a verificação", () => {
+    const raiz = repo();
+    inicio(raiz, "revisor-diff", "ag-1");
+    rmSync(join(raiz, ".expx", "papeis.tsv"));
+    fim(raiz, "revisor-diff", "ag-1");
+    expect(verificacoes(raiz)).toMatchObject([{ agente: "revisor-diff", ferramenta: "mergex", papel: "revisar" }]);
+    expect(arquivosDoEstado(raiz)).toEqual([]);
+  });
+
   it("funcional: a ferramenta do evento é a skill da projeção, não uma tabela por nome", () => {
     const raiz = repo("# expx-papeis 1\nqa\tsprintx\ttestar\n");
     inicio(raiz, "qa", "ag-1");
@@ -324,6 +355,8 @@ describe("expx-integridade-final: a foto do início contra o fim, por instância
     ["papel fora do vocabulário", "# expx-papeis 1\nqa\trunx\taprovar\n"],
     ["agente repetido", "# expx-papeis 1\nqa\trunx\ttestar\nqa\trunx\ttestar\n"],
     ["campo fora do alfabeto", "# expx-papeis 1\nqa\tru nx\ttestar\n"],
+    ["o principal com papel", "# expx-papeis 1\nprincipal\trunx\ttestar\nqa\trunx\ttestar\n"],
+    ["skill fora do vocabulário do rastro", "# expx-papeis 1\nqa\toutra\ttestar\n"],
     ["outra linha inválida no arquivo", "# expx-papeis 1\nqa\trunx\ttestar\nrevisor-diff\tmergex\n"],
   ])("funcional: %s — nenhum agente é de aprovação (falha aberta, sem git)", (_, papeis) => {
     const raiz = repo(papeis);

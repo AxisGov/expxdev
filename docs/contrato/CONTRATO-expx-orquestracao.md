@@ -60,12 +60,17 @@ eles até a F6/F7. Nenhum dos dois produz uma resolução válida na v1.
 
 ## 3. Opt-in
 
-A orquestração só existe num projeto que tem `.expx/orquestracao.json`. Sem o
-arquivo, a camada fica **inteiramente inativa**: nenhuma resolução é calculada
-para materializar nem gravada; o lock não ganha a seção `orquestracao`; nenhum
-agente é reescrito além do que o `.expx/agentes.json` v1 já faz; e os hooks de
-resolução e invocação não são instalados. Arquivos de agente e lock saem byte a
-byte iguais aos de uma instalação sem orquestração.
+A resolução e o envelope da invocação só existem num projeto que tem
+`.expx/orquestracao.json`. Sem o arquivo, essa camada fica **inativa**: nenhuma
+resolução é calculada para materializar nem gravada; o lock não ganha a seção
+`orquestracao`; nenhum agente é reescrito além do que o `.expx/agentes.json` v1 já
+faz; e os hooks de resolução e invocação não são instalados. Os arquivos de agente
+saem byte a byte iguais aos de uma instalação sem orquestração.
+
+A separação de papéis não depende do arquivo: a integridade final (§12) é
+instalada sempre, e por isso a projeção dos papéis (11.4), o hash dela no lock
+(`instalacao.papeis`) e o achado `papeis-projecao-divergente` do `doctor` existem
+com ou sem política, sempre que algum agente instalado declara `papel:`.
 
 Um projeto que removeu a política volta a esse regime. As resoluções já gravadas
 não são apagadas (seção 9).
@@ -395,13 +400,19 @@ regimes, e por isso o papel não é uma coluna da projeção do rastro (11.2).
 - Sem nenhum agente com papel, o arquivo não existe, e o `init` remove o anterior.
 - Os hooks aceitam o arquivo inteiro ou nada: cabeçalho diferente, CR, linha sem
   exatamente dois TABs, campo fora de `[a-z0-9-]`, papel fora do vocabulário ou
-  agente repetido deixam todo agente sem papel. Falha aberta: sem papel, o agente
-  não é de aprovação.
+  agente repetido deixam todo agente sem papel, e o mesmo vale para o `principal` e
+  para skill fora do vocabulário `ferramenta` do rastro. O CLI lê com as mesmas
+  regras; o vocabulário de agentes fica só na escrita, e os hooks não guardam lista
+  de nomes de agente. Falha aberta: sem papel, o agente não é de aprovação.
 - O `init` grava a projeção antes dos hooks e do lock, cada arquivo de forma
   atômica; o conjunto não é uma transação. Na janela entre um e outro, o hook novo
-  sem projeção só não mede.
-- O `doctor` a confere contra os agentes instalados (`papeis-projecao-divergente`,
-  `CONTRATO-expx-instalacao.md` §5.3).
+  sem projeção só não mede. A integridade final guarda o papel e a skill junto da
+  foto do início, e o fim vale por eles: a projeção trocada ou removida durante o
+  agente não suprime a comparação nem deixa a foto para trás. Para quem não é de
+  aprovação, o fim só roda Git se houver alguma foto pendente no git-dir.
+- O `doctor` a confere contra o hash que o `init` gravou no lock e contra os
+  agentes instalados (`papeis-projecao-divergente`, `CONTRATO-expx-instalacao.md`
+  §5.4).
 - O evento leva o `papel` da hora (`CONTRATO-expx-eventos.md`): a projeção é o
   estado presente, e só o evento diz qual papel valia quando o agente rodou.
 

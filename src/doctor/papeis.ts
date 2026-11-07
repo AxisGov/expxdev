@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Lock } from "../nucleo/lock.js";
 import { lerPapelDoAgente } from "../orquestracao/materializar.js";
-import { CAMINHO_PAPEIS, lerPapeis } from "../orquestracao/papeis.js";
+import { agenteDoRastro, CAMINHO_PAPEIS, lerPapeis } from "../orquestracao/papeis.js";
 import { hashDeBytes } from "../plugin/plano.js";
 import type { Achado } from "./verificadores.js";
 
@@ -14,7 +14,10 @@ import type { Achado } from "./verificadores.js";
  * O esperado sai das cópias em `.claude/agents/` que o lock travou e que ainda
  * batem com o hash dele: a cópia alterada já é `artefato-alterado`, e o papel
  * escrito nela não é o do plano, então ela não decide nada aqui. O lock não guarda
- * a skill de cada agente; a coluna da skill só precisa ser uma skill do lock.
+ * a skill de cada agente: a coluna da skill é provada pelo hash da projeção que o
+ * plano escreveu (`instalacao.papeis`). No lock anterior à F4, sem o hash, ela só
+ * precisa ser uma skill do lock. O agente fora do vocabulário do rastro, que o
+ * plano deixa de fora, também fica fora do esperado.
  */
 export function verificarPapeis(raiz: string, lock: Lock | undefined, push: (a: Achado) => void): void {
   const arquivos = lock?.instalacao?.arquivos;
@@ -32,7 +35,7 @@ export function verificarPapeis(raiz: string, lock: Lock | undefined, push: (a: 
     const lido = lerPapelDoAgente(rel, bytes.toString("utf8"));
     if (!lido.ok) continue;
     if (hashDeBytes(bytes) !== hash) incertos.add(lido.nome);
-    else if (lido.papel !== undefined) esperado.set(lido.nome, lido.papel);
+    else if (lido.papel !== undefined && agenteDoRastro(lido.nome)) esperado.set(lido.nome, lido.papel);
   }
 
   const caminho = join(raiz, ...CAMINHO_PAPEIS.split("/"));
@@ -57,6 +60,16 @@ export function verificarPapeis(raiz: string, lock: Lock | undefined, push: (a: 
   const lida = lerPapeis(texto);
   if (!lida.ok) {
     push({ id: "papeis-projecao-divergente", severidade: "erro", problema: `${CAMINHO_PAPEIS} ilegivel: ${lida.erro}`, correcao });
+    return;
+  }
+  const travado = lock?.instalacao?.papeis?.hash;
+  if (travado !== undefined && hashDeBytes(texto) !== travado) {
+    push({
+      id: "papeis-projecao-divergente",
+      severidade: "erro",
+      problema: `${CAMINHO_PAPEIS} difere da que o init escreveu (hash do lock): a skill ou o papel de algum agente foi trocado`,
+      correcao,
+    });
     return;
   }
   if (esperado.size === 0 && incertos.size === 0) {

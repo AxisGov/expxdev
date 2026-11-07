@@ -58,12 +58,16 @@ describe("lerPapeis", () => {
     });
   });
 
+  it("agente fora do vocabulário do rastro vale na leitura, como nos hooks: só o init o deixa de fora", () => {
+    expect(lerPapeis(`${CABECALHO_PAPEIS}\nmeu-agente\trunx\ttestar\n`).ok).toBe(true);
+  });
+
   it.each([
     ["cabeçalho de outra versão", ok.replace("papeis 1", "papeis 2")],
     ["coluna a mais", `${CABECALHO_PAPEIS}\nqa\trunx\ttestar\textra\n`],
     ["coluna vazia", `${CABECALHO_PAPEIS}\nqa\t\ttestar\n`],
     ["papel fora do vocabulário", `${CABECALHO_PAPEIS}\nqa\trunx\taprovar\n`],
-    ["agente fora do vocabulário do rastro", `${CABECALHO_PAPEIS}\nmeu\trunx\ttestar\n`],
+    ["o principal", `${CABECALHO_PAPEIS}\nprincipal\trunx\ttestar\n`],
     ["skill fora do vocabulário do rastro", `${CABECALHO_PAPEIS}\nqa\toutra\ttestar\n`],
     ["agente repetido", `${CABECALHO_PAPEIS}\nqa\trunx\ttestar\nqa\trunx\trevisar\n`],
     ["CRLF", ok.replace(/\n/g, "\r\n")],
