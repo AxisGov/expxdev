@@ -407,8 +407,11 @@ regras estão em `CONTRATO-expx-orquestracao.md` §11.4.
   `instalacao.papeis` (a skill ou o papel de um agente trocado; o CRLF do checkout
   com `core.autocrlf` não conta), ou diverge das cópias de
   `.claude/agents/` que o lock travou e que ainda batem com o hash dele (papel
-  trocado, agente a mais ou a menos, skill fora do lock). A cópia alterada já é `artefato-alterado` e não
-  decide nada aqui. A projeção que sobrou sem nenhum agente de papel é **aviso**.
+  trocado, agente a mais ou a menos, skill fora do lock). A cópia alterada já é
+  `artefato-alterado` e não decide nada aqui. A projeção que sobrou sem nenhum
+  agente de papel é **aviso**, salvo quando o lock tem o hash dela e não trava
+  nenhum agente: é o `init` sem o harness `claude`, e a projeção é a que ele
+  preservou.
 
 ## 6. O que o `init` não apaga
 

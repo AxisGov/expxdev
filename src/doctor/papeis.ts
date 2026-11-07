@@ -24,8 +24,10 @@ export function verificarPapeis(raiz: string, lock: Lock | undefined, push: (a: 
   if (arquivos === undefined) return;
   const esperado = new Map<string, string>();
   const incertos = new Set<string>();
+  let travados = 0;
   for (const [rel, hash] of Object.entries(arquivos)) {
     if (!/^\.claude\/agents\/[^/]+\.md$/.test(rel)) continue;
+    travados++;
     let bytes: Buffer;
     try {
       bytes = readFileSync(join(raiz, ...rel.split("/")));
@@ -76,7 +78,7 @@ export function verificarPapeis(raiz: string, lock: Lock | undefined, push: (a: 
   }
   // Com o hash conferido e sem agente travado (o init só com OpenCode, que não
   // trava os artefatos do Claude), a projeção é a que o init escreveu: não é sobra.
-  if (esperado.size === 0 && incertos.size === 0 && travado !== undefined) return;
+  if (travados === 0 && travado !== undefined) return;
   if (esperado.size === 0 && incertos.size === 0) {
     push({
       id: "papeis-projecao-divergente",

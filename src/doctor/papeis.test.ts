@@ -102,6 +102,12 @@ describe("doctor — projeção dos papéis (F4)", () => {
     expect(ids(achados(raiz))).toEqual(["papeis-projecao-divergente:erro"]);
   });
 
+  it("com o hash no lock e agentes travados, mas sumidos do disco, a projeção que sobrou é aviso", async () => {
+    const raiz = await projeto();
+    for (const a of ["qa", "revisor-diff", "analista-de-conflito"]) rmSync(join(raiz, ".claude/agents", `${a}.md`));
+    expect(ids(achados(raiz))).toEqual(["papeis-projecao-divergente:aviso"]);
+  });
+
   it("projeção que sobrou sem nenhum agente de papel nem hash no lock é aviso", async () => {
     const raiz = await projeto();
     gravar(raiz, PAPEIS, readFileSync(join(raiz, PAPEIS), "utf8"));
