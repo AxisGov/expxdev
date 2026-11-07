@@ -63,7 +63,7 @@ Condições estruturais, todas obrigatórias:
   existe (o `<remoto>` da branch atual, ou `origin`), porque a branch local da base pode estar atrás
   numa worktree, e a local em dia sozinha não prova que `B1` foi publicado. Sem a ref remota, o
   servidor é consultado (`git ls-remote`, DM-321): a base que existe lá e não foi buscada recusa e
-  manda rodar `git fetch <remoto>`; a consulta que falha recusa. Ela roda **antes** da trava C5,
+  manda buscá-la; a consulta que falha recusa. Ela roda **antes** da trava C5,
   com a `branch_base` do `ENTREGA.md` de HEAD, e sem pergunta de credencial do Git no terminal
   (`GIT_TERMINAL_PROMPT=0`): a rede lenta, ou um ssh do usuário que peça senha, não prende o índice. Sob a trava, o resultado só vale para a mesma base e o mesmo
   remoto, pelo nome e pela URL; senão (outra base, a URL trocada ou o remoto removido depois da
@@ -73,15 +73,21 @@ Condições estruturais, todas obrigatórias:
   argumentos de processo (DM-323): uma URL ou um `url.*.insteadOf` que troca
   durante a consulta e volta antes da trava não faz valer a resposta de outro servidor, e o
   `url.*.insteadOf`, o proxy e o `uploadpack` do remoto valem como no `git ls-remote <remoto>`,
-  aplicados uma vez. A foto que vale sob a trava inclui as chaves `remote.<remoto>.*` e `url.*`. Com a ref remota buscada antes, não há consulta; a base que não existe no servidor
+  aplicados uma vez. A foto que vale sob a trava é a configuração congelada inteira: qualquer chave
+  mudada desde a consulta, um `core.sshCommand` ou um `http.proxy` e não só o remoto, recusa e
+  manda buscar, e a consulta só vale para o remoto consultado: o `branch.<atual>.remote` trocado
+  antes da trava também recusa (DM-324). Com a ref remota buscada antes, não há consulta; a base que não existe no servidor
   (a base empilhada nunca enviada) e o repositório sem esse remoto valem pela ref local, e aí `B1`
   é só local, não publicado. A frente sobre essa base fica barrada no CI até a base do PR conter
   `B1` (DM-320). A base publicada no servidor durante a espera pela trava, sem `fetch`, é a janela
   aceita: a consulta não se repete sob a trava, para não prender o índice. `refs/heads/main` segue a mesma regra do nome simples, e `branch_base` que já é
   ref remota (`origin/main`), outra ref completa, ou um SHA completo do formato do repositório
   (40 no SHA-1, 64 no SHA-256) vale como está, sem consulta (DM-312, DM-322). Quando o
-  repositório tem esse remoto, rode `git fetch <remoto>` antes do `--registrar`; sem ele, não há o
-  que buscar, e a base vale pela ref local (DM-323).
+  repositório tem esse remoto, busque a base antes do `--registrar` com
+  `git fetch <remoto> +refs/heads/<base>:refs/remotes/<remoto>/<base>`, que cria a ref de
+  rastreio mesmo num clone de refspec estreito (`--single-branch`, ou um `remote.<remoto>.fetch`
+  sem a base), onde `git fetch <remoto>` não a traz; as recusas do registro dão esse comando
+  pronto (DM-324). Sem o remoto, não há o que buscar, e a base vale pela ref local (DM-323).
 - A mensagem de `M` tem exatamente um `Trabalho: <trabalho_id>` igual ao da `ENTREGA.md`, um
   `Integra-base:` seguido do SHA completo de `B1`, e nenhum `Task:` nem `Metodo:` (a classe
   "integração de base" de `references/01-commits.md`).
@@ -432,8 +438,9 @@ estão documentados no cabeçalho do executável afetado:
    `pre-push` avalia só as refs do push: o custo deixou de depender das branches existentes.
 9. **Consulta congelada no Git anterior ao 2.32.** A configuração congelada é lida de um arquivo
    só do dono, pelo `GIT_CONFIG_GLOBAL`, que só existe a partir do Git 2.32. Antes disso, o remoto
-   sintético não existe, a consulta falha, e o registro recusa e manda rodar `git fetch`, que é
-   sempre o caminho que resolve: falso bloqueio, nunca aprovação. Um `credential.helper` com
+   sintético não existe, a consulta falha, e o registro recusa e manda buscar a base com o
+   refspec explícito (`git fetch <remoto> +refs/heads/<base>:refs/remotes/<remoto>/<base>`), que
+   cria a ref de rastreio e dispensa a consulta: falso bloqueio, nunca aprovação (DM-324). Um `credential.helper` com
    caminho relativo (`!./script`) roda num diretório vazio e pode falhar do mesmo jeito (DM-323).
 
 Os riscos residuais da própria barreira de push — o autor do PR que controla o modo e os scripts do
