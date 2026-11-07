@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { executarInit } from "./init.js";
+import { diagnosticar } from "../doctor/verificadores.js";
 
 /**
  * F4 da orquestração: o `init` projeta o `papel:` dos agentes em
@@ -84,9 +85,14 @@ describe("projeção dos papéis (F4)", () => {
     const o = origens();
     expect((await init(p, o)).ok).toBe(true);
     const antes = lerPapeis(p);
+    const lockAntes = (JSON.parse(readFileSync(join(p, ".expx/expx-lock.json"), "utf8")) as { instalacao: { papeis?: unknown } }).instalacao.papeis;
     const r = await executarInit({ raiz: p, skills: Object.keys(o), harness: ["opencode"], origens: o });
     expect(r.ok, r.erros.join("\n")).toBe(true);
     expect(lerPapeis(p)).toBe(antes);
+    // o hash dela segue no lock, e o doctor não a toma por sobra
+    const lockDepois = (JSON.parse(readFileSync(join(p, ".expx/expx-lock.json"), "utf8")) as { instalacao: { papeis?: unknown } }).instalacao.papeis;
+    expect(lockDepois).toEqual(lockAntes);
+    expect(diagnosticar(p, { HOME: p }).achados.filter((a) => a.id.startsWith("papeis-"))).toEqual([]);
   });
 
   it.each([false, true])("papel fora do vocabulário é skill inválida, com política %s, e nada é escrito", async (comPolitica) => {

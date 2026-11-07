@@ -185,6 +185,11 @@ type Plano = {
    * não toca os hooks do Claude, e removê-la desligaria os que ficaram instalados.
    */
   papeis?: string | null;
+  /**
+   * Sem o harness `claude`, o hash da projeção que o lock anterior travou: ela fica
+   * no disco, e o lock novo precisa continuar provando de onde ela veio.
+   */
+  papeisTravados?: { hash: string };
 };
 
 /** A seção `orquestracao` do lock: as versões e o `resolucao_id` vigente por agente. */
@@ -266,6 +271,7 @@ function instalacaoTravada(plano: Plano): InstalacaoTravada {
     inst.modos = { hash: hashDeBytes(plano.modos.texto), publicados: plano.modos.publicados };
   }
   if (typeof plano.papeis === "string") inst.papeis = { hash: hashDeBytes(plano.papeis) };
+  else if (plano.papeis === undefined && plano.papeisTravados !== undefined) inst.papeis = plano.papeisTravados;
   return inst;
 }
 
@@ -364,6 +370,11 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
     ...(projecao !== undefined ? { projecao } : {}),
     ...(papeis !== undefined ? { papeis } : {}),
   };
+  if (!claude) {
+    const anterior = lerLock(op.raiz);
+    const travados = anterior.ok ? anterior.lock.instalacao?.papeis : undefined;
+    if (travados !== undefined) plano.papeisTravados = travados;
+  }
   if (claude) {
     const lk = lerLock(op.raiz);
     const anteriores = lk.ok ? (lk.lock.instalacao?.arquivos ?? {}) : {};

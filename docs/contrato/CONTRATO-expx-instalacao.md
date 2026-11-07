@@ -397,7 +397,9 @@ regras estão em `CONTRATO-expx-orquestracao.md` §11.4.
   mesmo `name` com papel publicado por duas skills.
 - **Escrita.** A projeção é gravada antes dos artefatos, de forma atômica, e
   removida quando nenhum agente instalado declara papel. Sem o harness `claude`, o
-  `init` não a toca: os hooks do Claude que ficaram instalados continuam medindo. Não entra em
+  `init` não a toca, e o lock novo leva o hash dela do lock anterior: os hooks do
+  Claude que ficaram instalados continuam medindo, e o `doctor` continua conferindo.
+  O mesmo `init` não trava os outros artefatos do Claude (limite anterior à F4). Não entra em
   `instalacao.arquivos`; o lock guarda o hash dela em `instalacao.papeis`, porque
   não guarda qual skill publica cada agente.
 - **Doctor.** `papeis-projecao-divergente` é **erro** quando a projeção falta com

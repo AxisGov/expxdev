@@ -102,11 +102,12 @@ describe("doctor — projeção dos papéis (F4)", () => {
     expect(ids(achados(raiz))).toEqual(["papeis-projecao-divergente:erro"]);
   });
 
-  it("projeção que sobrou sem nenhum agente de papel é aviso", async () => {
+  it("projeção que sobrou sem nenhum agente de papel nem hash no lock é aviso", async () => {
     const raiz = await projeto();
     gravar(raiz, PAPEIS, readFileSync(join(raiz, PAPEIS), "utf8"));
-    const lock = JSON.parse(readFileSync(join(raiz, ".expx/expx-lock.json"), "utf8")) as { instalacao: { arquivos: Record<string, string> } };
+    const lock = JSON.parse(readFileSync(join(raiz, ".expx/expx-lock.json"), "utf8")) as { instalacao: { arquivos: Record<string, string>; papeis?: unknown } };
     for (const k of Object.keys(lock.instalacao.arquivos)) if (k.startsWith(".claude/agents/")) delete lock.instalacao.arquivos[k];
+    delete lock.instalacao.papeis;
     writeFileSync(join(raiz, ".expx/expx-lock.json"), `${JSON.stringify(lock, null, 2)}\n`);
     expect(ids(achados(raiz))).toEqual(["papeis-projecao-divergente:aviso"]);
   });

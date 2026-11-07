@@ -74,6 +74,9 @@ export function verificarPapeis(raiz: string, lock: Lock | undefined, push: (a: 
     });
     return;
   }
+  // Com o hash conferido e sem agente travado (o init só com OpenCode, que não
+  // trava os artefatos do Claude), a projeção é a que o init escreveu: não é sobra.
+  if (esperado.size === 0 && incertos.size === 0 && travado !== undefined) return;
   if (esperado.size === 0 && incertos.size === 0) {
     push({
       id: "papeis-projecao-divergente",
