@@ -87,7 +87,12 @@ Condições estruturais, todas obrigatórias:
   `git fetch <remoto> +refs/heads/<base>:refs/remotes/<remoto>/<base>`, que cria a ref de
   rastreio mesmo num clone de refspec estreito (`--single-branch`, ou um `remote.<remoto>.fetch`
   sem a base), onde `git fetch <remoto>` não a traz; as recusas do registro dão esse comando
-  pronto (DM-324). Sem o remoto, não há o que buscar, e a base vale pela ref local (DM-323).
+  pronto (DM-324), só para um remoto com URL agora: sem ela, pedem para configurá-lo antes. Com o
+  remoto da branch trocado entre a consulta e a trava, a recusa dá as duas saídas: buscar no remoto
+  novo, que é o que o próximo registro confere, ou voltar o `branch.<atual>.remote` ao consultado
+  e buscar nele. Com a ponta numa ref remota atrás de `B1`, o refspec só sai para
+  `refs/remotes/<remoto>/<base>` exata, sem cortar o nome do remoto na `/` (DM-326). Sem o remoto,
+  não há o que buscar, e a base vale pela ref local (DM-323).
 - A mensagem de `M` tem exatamente um `Trabalho: <trabalho_id>` igual ao da `ENTREGA.md`, um
   `Integra-base:` seguido do SHA completo de `B1`, e nenhum `Task:` nem `Metodo:` (a classe
   "integração de base" de `references/01-commits.md`).

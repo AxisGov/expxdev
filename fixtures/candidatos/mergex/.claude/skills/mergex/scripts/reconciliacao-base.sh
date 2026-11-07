@@ -1290,6 +1290,31 @@ arvore_recusa_raso || para 4 "estrutura[raso]: $ARVORE_ERRO" # guarda:EST
 # Cada argumento sai com o quoting do shell: um nome de branch válido pode ter
 # `;` ou `$(...)`, e o comando é para ser colado (Codex)
 busca_da_base() { printf 'git fetch %q %q' "$1" "+refs/heads/$2:refs/remotes/$1/$2"; }
+# tem_url <remoto> — o remoto tem `remote.<r>.url`. O `git remote get-url` não serve:
+# sem URL, ele devolve o próprio nome e sai 0 (CodeAnt no mergex#90)
+tem_url() { [ -n "$(g config --get "remote.$1.url" 2>/dev/null)" ]; }
+# sugere_busca <remoto> <base> — "rode <busca>", só para remoto com URL agora; sem
+# ela, só o pedido de configurá-lo: `git fetch` num remoto que não existe não
+# resolve (DM-326, Codex)
+sugere_busca() {
+  if tem_url "$1"; then printf 'rode %s' "$(busca_da_base "$1" "$2")"
+  else printf 'configure o remoto %q, que não tem URL agora (git remote add ou set-url), e busque a base %q nele' "$1" "$2"
+  fi
+}
+# dica_ponta_remota <ref> — com a ponta numa ref remota, o que buscar. O refspec só
+# sai no caso exato, refs/remotes/<remoto da base>/<base> com o remoto configurado:
+# cortar o nome na primeira `/` erra o remoto com barra (time/origin), e outra ref
+# remota não prova que veio de refs/heads (DM-326, Codex)
+dica_ponta_remota() {
+  local sim
+  sim="$(g rev-parse --symbolic-full-name "$1" 2>/dev/null)" || return 0
+  case "$sim" in refs/remotes/*) ;; *) return 0 ;; esac
+  if [ -n "${NOME_BASE:-}" ] && [ "$sim" = "refs/remotes/${REMOTO_BASE:-}/$NOME_BASE" ] && tem_url "$REMOTO_BASE"; then
+    printf '; a ponta é a ref remota, que pode estar desatualizada: rode %s e confira que o merge da base foi enviado' "$(busca_da_base "$REMOTO_BASE" "$NOME_BASE")"
+  else
+    printf '; a ponta é a ref remota %s, que pode estar desatualizada: busque-a de novo no remoto dela e confira que o merge da base foi enviado' "$sim"
+  fi
+}
 base_remota() {
   REMOTO_BASE="$(g config "branch.$(g branch --show-current 2>/dev/null).remote" 2>/dev/null)" || REMOTO_BASE=""
   [ -n "$REMOTO_BASE" ] && [ "$REMOTO_BASE" != . ] || REMOTO_BASE=origin
@@ -1661,7 +1686,13 @@ if ! g rev-parse --verify -q "refs/remotes/$BRANCH_BASE^{commit}" >/dev/null 2>&
     case "$RC_LS" in
       2) ;;
       sem) estrutura base "a base $NOME_BASE de M não é a que o ENTREGA.md de HEAD declara, e o servidor não foi consultado por ela antes da trava: rode $(busca_da_base "$REMOTO_BASE" "$NOME_BASE") e registre de novo" ;; # guarda:EST
-      mudou) estrutura base "o remoto $CONSULTA_REMOTO mudou de URL ou de configuração, ou foi removido, ou deixou de ser o remoto da branch (agora $REMOTO_BASE), entre a consulta pela base $NOME_BASE e a trava: a consulta não vale; confira o remoto da branch (branch.<atual>.remote) e a URL dele, rode $(busca_da_base "$CONSULTA_REMOTO" "$NOME_BASE") com o remoto certo e registre de novo" ;; # guarda:EST
+      mudou)
+        # o próximo registro confere a ref do remoto da branch: a busca no consultado
+        # só resolve se a troca foi desfeita (DM-326, CodeAnt no conselhos#271)
+        if [ "$CONSULTA_REMOTO" = "$REMOTO_BASE" ]; then saida="$(sugere_busca "$REMOTO_BASE" "$NOME_BASE")"
+        else saida="para registrar com $REMOTO_BASE, $(sugere_busca "$REMOTO_BASE" "$NOME_BASE"); se a troca do branch.<atual>.remote foi engano, volte-o para $CONSULTA_REMOTO e $(sugere_busca "$CONSULTA_REMOTO" "$NOME_BASE")"
+        fi
+        estrutura base "o remoto $CONSULTA_REMOTO mudou de URL ou de configuração, ou foi removido, ou deixou de ser o remoto da branch (agora $REMOTO_BASE), entre a consulta pela base $NOME_BASE e a trava: a consulta não vale; $saida; depois registre de novo" ;; # guarda:EST
       0) estrutura base "a base $NOME_BASE existe em $REMOTO_BASE, mas refs/remotes/$REMOTO_BASE/$NOME_BASE não foi buscada: a branch local não prova que B1 foi publicado; rode $(busca_da_base "$REMOTO_BASE" "$NOME_BASE") e registre de novo" ;; # guarda:EST
       *) estrutura base "a consulta a $REMOTO_BASE pela base $NOME_BASE falhou (ls-remote saiu $RC_LS): sem ela, não há prova de que a base não foi publicada; rode $(busca_da_base "$REMOTO_BASE" "$NOME_BASE"), ou repita com o remoto acessível" ;; # guarda:EST
     esac
@@ -1669,7 +1700,7 @@ if ! g rev-parse --verify -q "refs/remotes/$BRANCH_BASE^{commit}" >/dev/null 2>&
 fi
 PONTA_BASE="$(g rev-parse --verify -q "$PONTA_REF^{commit}")" || estrutura base "ref de base $PONTA_REF ilegível"
 g merge-base --is-ancestor "$B1" "$PONTA_BASE" 2>/dev/null \
-  || estrutura base "B1 $B1 não é ancestral da ponta de $PONTA_REF ($PONTA_BASE)$(case "$(g rev-parse --symbolic-full-name "$PONTA_REF" 2>/dev/null)" in refs/remotes/*) r_p="${PONTA_REF#refs/remotes/}"; printf '; a ponta é a ref remota, que pode estar desatualizada: rode %s e confira que o merge da base foi enviado' "$(busca_da_base "${r_p%%/*}" "${r_p#*/}")" ;; esac)" # guarda:EST
+  || estrutura base "B1 $B1 não é ancestral da ponta de $PONTA_REF ($PONTA_BASE)$(dica_ponta_remota "$PONTA_REF")" # guarda:EST
 
 # União das tasks e catálogo de método, as quatro provas e o inventário.
 uniao_e_catalogo "$RAIZ_M" "$PASTA" || exit 1
