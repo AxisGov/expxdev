@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.13.14 — a busca sugerida nas recusas da reconciliação vai ao remoto certo, na MergeX
+
+Instale por PR, como a 0.13.13. São os três nitpicks do CodeAnt na instalação da 0.13.13 no Conselhos (conselhos#271), mais um que o CodeAnt achou no próprio PR da correção (mergex#90), o do remoto sem URL. Só a MergeX muda: o ExpxDev e as outras skills seguem como na 0.13.13. A recusa já estava certa, e nada passa a ser aceito: muda só o comando sugerido.
+
+- **mergex@0e8dffb** (mergex#90, DM-326):
+  - **Remoto da branch trocado entre a consulta e a trava.** A recusa sugeria buscar no remoto consultado, mas o próximo registro confere a ref do remoto da branch, e a recusa se repetia. Agora ela dá as duas saídas: buscar no remoto novo, para registrar com ele, ou voltar o `branch.<atual>.remote` ao consultado e buscar nele.
+  - **Remoto sem URL.** A busca só é sugerida para remoto com `remote.<r>.url`. Sem URL, a mensagem pede para configurá-lo, porque o `git remote get-url` devolve o próprio nome e sai 0.
+  - **Remoto com `/` no nome.** O diagnóstico do B1 fora da ponta remota cortava o nome na primeira barra: com `time/origin`, sugeria `git fetch time +refs/heads/origin/main:…`. Agora o refspec só sai para `refs/remotes/<remoto>/<base>` exata; nos outros casos, a mensagem manda atualizar a ref remota.
+- **Não exercitado:** as trocas de remoto foram testadas com um `git` falso, não numa corrida real.
+
 ## 0.13.13 — a foto inteira da consulta e a busca da base com refspec, na MergeX
 
 Instale por PR, como a 0.13.12. São os dois Major do CodeAnt na instalação da 0.13.12 no Login (login#65). Só a MergeX muda: o ExpxDev e as outras skills seguem como na 0.13.12.
