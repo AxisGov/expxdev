@@ -93,8 +93,9 @@ function papelDe(raiz, agente) {
   } catch {
     return null;
   }
-  if (texto.includes("\r") || !/^[a-z0-9-]+$/.test(agente ?? "")) return null;
-  const linhas = texto.split("\n");
+  if (!/^[a-z0-9-]+$/.test(agente ?? "")) return null;
+  // o CR do fim sai, como no `read` do shell: o checkout com core.autocrlf entrega CRLF
+  const linhas = texto.split("\n").map((l) => l.replace(/\r$/, ""));
   if (linhas.at(-1) === "") linhas.pop();
   if (linhas[0] !== "# expx-papeis 1") return null;
   const vistos = new Set();

@@ -396,12 +396,14 @@ regras estão em `CONTRATO-expx-orquestracao.md` §11.4.
   conferência. Papel fora do vocabulário recusa o plano antes de escrever, como o
   mesmo `name` com papel publicado por duas skills.
 - **Escrita.** A projeção é gravada antes dos artefatos, de forma atômica, e
-  removida quando nenhum agente instalado declara papel. Não entra em
+  removida quando nenhum agente instalado declara papel. Sem o harness `claude`, o
+  `init` não a toca: os hooks do Claude que ficaram instalados continuam medindo. Não entra em
   `instalacao.arquivos`; o lock guarda o hash dela em `instalacao.papeis`, porque
   não guarda qual skill publica cada agente.
 - **Doctor.** `papeis-projecao-divergente` é **erro** quando a projeção falta com
-  agente de papel instalado, é ilegível, difere do hash de `instalacao.papeis` (a
-  skill ou o papel de um agente trocado), ou diverge das cópias de
+  agente de papel instalado ou com o hash no lock, é ilegível, difere do hash de
+  `instalacao.papeis` (a skill ou o papel de um agente trocado; o CRLF do checkout
+  com `core.autocrlf` não conta), ou diverge das cópias de
   `.claude/agents/` que o lock travou e que ainda batem com o hash dele (papel
   trocado, agente a mais ou a menos, skill fora do lock). A cópia alterada já é `artefato-alterado` e não
   decide nada aqui. A projeção que sobrou sem nenhum agente de papel é **aviso**.

@@ -181,9 +181,11 @@ if [ "$EVENTO" = SubagentStart ]; then
   [ -n "$INSTANCIA" ] || exit 0
   rm -rf "$INSTANCIA" 2>/dev/null
   mkdir -p "$INSTANCIA" 2>/dev/null || exit 0
-  # foto incompleta nao fica: o fim a le como ausente. O papel e a skill do inicio
-  # ficam com ela: o fim vale por eles, mesmo se a projecao mudar no meio
-  { foto "$INSTANCIA" && printf '%s\n' "$SKILL_PAPEL" > "$INSTANCIA/papel"; } || rm -rf "$INSTANCIA" 2>/dev/null
+  # O papel e a skill do inicio ficam com a foto: o fim vale por eles, mesmo se a
+  # projecao mudar no meio. Foto incompleta nao fica, mas o papel sim: o fim grava
+  # `ausente` com ele
+  printf '%s\n' "$SKILL_PAPEL" > "$INSTANCIA/papel" 2>/dev/null || { rm -rf "$INSTANCIA" 2>/dev/null; exit 0; }
+  foto "$INSTANCIA" || rm -rf "$INSTANCIA/head" "$INSTANCIA/status.z" "$INSTANCIA/arvore" "$INSTANCIA/indice" "$INSTANCIA/indice.lock" 2>/dev/null
   exit 0
 fi
 

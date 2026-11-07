@@ -64,7 +64,8 @@ export function verificarPapeis(raiz: string, lock: Lock | undefined, push: (a: 
     push({ id: "papeis-projecao-divergente", severidade: "erro", problema: `${CAMINHO_PAPEIS} ilegivel: ${lida.erro}`, correcao });
     return;
   }
-  if (travado !== undefined && hashDeBytes(texto) !== travado) {
+  // o CRLF do checkout com core.autocrlf não é troca: o lock tem o hash do texto em LF
+  if (travado !== undefined && hashDeBytes(texto.replace(/\r\n/g, "\n")) !== travado) {
     push({
       id: "papeis-projecao-divergente",
       severidade: "erro",
@@ -87,11 +88,11 @@ export function verificarPapeis(raiz: string, lock: Lock | undefined, push: (a: 
   const naProjecao = new Set<string>();
   for (const i of lida.itens) {
     naProjecao.add(i.agente);
+    if (!skills.has(i.skill)) divergencias.push(`${i.agente}: skill ${i.skill} fora do lock`);
     if (incertos.has(i.agente)) continue;
     const quer = esperado.get(i.agente);
     if (quer === undefined) divergencias.push(`${i.agente}: na projecao, sem papel nos agentes instalados`);
     else if (quer !== i.papel) divergencias.push(`${i.agente}: papel ${i.papel} na projecao, ${quer} no agente`);
-    if (!skills.has(i.skill)) divergencias.push(`${i.agente}: skill ${i.skill} fora do lock`);
   }
   for (const agente of [...esperado.keys()].sort()) {
     if (!naProjecao.has(agente)) divergencias.push(`${agente}: papel ${esperado.get(agente) ?? ""} no agente, fora da projecao`);

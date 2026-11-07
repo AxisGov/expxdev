@@ -52,10 +52,13 @@ export function projetarPapeis(itens: readonly PapelProjetado[]): ResultadoPapei
 
 export type LeituraPapeis = { ok: true; itens: PapelProjetado[] } | { ok: false; erro: string };
 
-/** As mesmas regras dos hooks: o arquivo inteiro vale, ou não vale nada. */
+/**
+ * As mesmas regras dos hooks: o arquivo inteiro vale, ou não vale nada. O CR no
+ * fim da linha sai, como no `read` do shell: a projeção é versionada com o `.expx/`,
+ * e o checkout com `core.autocrlf` a entrega em CRLF.
+ */
 export function lerPapeis(texto: string): LeituraPapeis {
-  if (texto.includes("\r")) return { ok: false, erro: "CR no arquivo: a projecao e gravada so com LF" };
-  const linhas = texto.split("\n");
+  const linhas = texto.split("\n").map((l) => l.replace(/\r$/, ""));
   if (linhas.at(-1) === "") linhas.pop();
   if (linhas[0] !== CABECALHO_PAPEIS) return { ok: false, erro: `cabecalho diferente de "${CABECALHO_PAPEIS}"` };
   const itens: PapelProjetado[] = [];

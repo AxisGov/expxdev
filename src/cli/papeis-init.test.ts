@@ -79,6 +79,16 @@ describe("projeção dos papéis (F4)", () => {
     expect(existsSync(join(p, PAPEIS))).toBe(false);
   });
 
+  it("init só com o OpenCode não toca a projeção: os hooks do Claude instalados antes continuam medindo", async () => {
+    const p = produto();
+    const o = origens();
+    expect((await init(p, o)).ok).toBe(true);
+    const antes = lerPapeis(p);
+    const r = await executarInit({ raiz: p, skills: Object.keys(o), harness: ["opencode"], origens: o });
+    expect(r.ok, r.erros.join("\n")).toBe(true);
+    expect(lerPapeis(p)).toBe(antes);
+  });
+
   it.each([false, true])("papel fora do vocabulário é skill inválida, com política %s, e nada é escrito", async (comPolitica) => {
     const p = produto();
     if (comPolitica) gravar(p, ".expx/orquestracao.json", { expx_orquestracao: 1 });

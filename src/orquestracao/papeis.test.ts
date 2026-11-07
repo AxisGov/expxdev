@@ -58,6 +58,11 @@ describe("lerPapeis", () => {
     });
   });
 
+  it("CRLF, do checkout com core.autocrlf, vale como LF, nos três leitores", () => {
+    expect(lerPapeis(ok.replace(/\n/g, "\r\n"))).toEqual(lerPapeis(ok));
+    expect(lerPapeis(`${CABECALHO_PAPEIS}\nqa\trunx\ttestar\r`)).toMatchObject({ ok: true, itens: [{ agente: "qa", papel: "testar" }] });
+  });
+
   it("agente fora do vocabulário do rastro vale na leitura, como nos hooks: só o init o deixa de fora", () => {
     expect(lerPapeis(`${CABECALHO_PAPEIS}\nmeu-agente\trunx\ttestar\n`).ok).toBe(true);
   });
@@ -70,7 +75,6 @@ describe("lerPapeis", () => {
     ["o principal", `${CABECALHO_PAPEIS}\nprincipal\trunx\ttestar\n`],
     ["skill fora do vocabulário do rastro", `${CABECALHO_PAPEIS}\nqa\toutra\ttestar\n`],
     ["agente repetido", `${CABECALHO_PAPEIS}\nqa\trunx\ttestar\nqa\trunx\trevisar\n`],
-    ["CRLF", ok.replace(/\n/g, "\r\n")],
   ])("recusa %s", (_, texto) => {
     expect(lerPapeis(texto).ok).toBe(false);
   });

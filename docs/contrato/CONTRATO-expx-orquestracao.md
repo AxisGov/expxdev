@@ -398,17 +398,20 @@ regimes, e por isso o papel não é uma coluna da projeção do rastro (11.2).
   fora da projeção, com aviso no plano, e não passa pela integridade nem pelo
   primeiro plano. O mesmo `name` com papel em duas skills recusa o plano.
 - Sem nenhum agente com papel, o arquivo não existe, e o `init` remove o anterior.
-- Os hooks aceitam o arquivo inteiro ou nada: cabeçalho diferente, CR, linha sem
+- Os hooks aceitam o arquivo inteiro ou nada: cabeçalho diferente, linha sem
   exatamente dois TABs, campo fora de `[a-z0-9-]`, papel fora do vocabulário ou
   agente repetido deixam todo agente sem papel, e o mesmo vale para o `principal` e
   para skill fora do vocabulário `ferramenta` do rastro. O CLI lê com as mesmas
   regras; o vocabulário de agentes fica só na escrita, e os hooks não guardam lista
-  de nomes de agente. Falha aberta: sem papel, o agente não é de aprovação.
+  de nomes de agente. O CR no fim da linha sai, como no `read` do shell: a projeção
+  é versionada com o `.expx/`, e o checkout com `core.autocrlf` a entrega em CRLF.
+  Falha aberta: sem papel, o agente não é de aprovação.
 - O `init` grava a projeção antes dos hooks e do lock, cada arquivo de forma
   atômica; o conjunto não é uma transação. Na janela entre um e outro, o hook novo
   sem projeção só não mede. A integridade final guarda o papel e a skill junto da
   foto do início, e o fim vale por eles: a projeção trocada ou removida durante o
-  agente não suprime a comparação nem deixa a foto para trás. Para quem não é de
+  agente não suprime a comparação nem deixa a foto para trás. Se a foto do início
+  falha, o papel fica, e o fim grava `ausente` com ele. Para quem não é de
   aprovação, o fim só roda Git se houver alguma foto pendente no git-dir.
 - O `doctor` a confere contra o hash que o `init` gravou no lock e contra os
   agentes instalados (`papeis-projecao-divergente`, `CONTRATO-expx-instalacao.md`

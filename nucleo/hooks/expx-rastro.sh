@@ -396,7 +396,7 @@ EXPX_PROJECAO
 # lidos da projecao que o `expx init` grava com ou sem politica
 # (.expx/papeis.tsv). Imprime "skill<TAB>papel" ou nada. O arquivo inteiro vale
 # ou nao vale nada, pelas mesmas regras do `lerPapeis` do CLI: cabecalho
-# diferente, CR, linha sem exatamente dois TABs, campo fora do alfabeto, o
+# diferente, linha sem exatamente dois TABs, campo fora do alfabeto, o
 # `principal`, skill fora do vocabulario `ferramenta` do rastro, papel fora do
 # vocabulario ou agente repetido deixam todo agente sem papel. Falha
 # aberta: sem papel, o agente nao e de aprovacao. Nunca le o papel do nome.
@@ -405,9 +405,11 @@ expx_papel_de() {
   [ -f "$arq" ] || return 0
   case "$agente" in ""|*[!a-z0-9-]*) return 0 ;; esac
   {
+    # o CR do fim sai: o checkout com core.autocrlf entrega a projecao em CRLF
     IFS= read -r cab || return 0
-    [ "$cab" = "# expx-papeis 1" ] || return 0
+    [ "${cab%$'\r'}" = "# expx-papeis 1" ] || return 0
     while IFS= read -r linha || [ -n "$linha" ]; do
+      linha="${linha%$'\r'}"
       tabs="${linha//[!$'\t']/}"
       [ "${#tabs}" -eq 2 ] || return 0
       IFS=$'\t' read -r ag sk pa <<EXPX_PAPEIS

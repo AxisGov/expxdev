@@ -340,6 +340,27 @@ describe("expx-integridade-final: a foto do início contra o fim, por instância
     expect(arquivosDoEstado(raiz)).toEqual([]);
   });
 
+  it("funcional: a projeção em CRLF (checkout com core.autocrlf) vale como LF", () => {
+    const raiz = repo(PAPEIS.replace(/\n/g, "\r\n"));
+    inicio(raiz, "qa", "ag-1");
+    fim(raiz, "qa", "ag-1");
+    expect(verificacoes(raiz)).toMatchObject([{ agente: "qa", ferramenta: "runx", papel: "testar", integridade_final: { estado: "igual" } }]);
+  });
+
+  it("funcional: a foto do início que falha guarda o papel, e o fim grava ausente mesmo com a projeção trocada", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-integridade-"));
+    criados.push(raiz);
+    git(raiz, "init", "-q", "-b", "main");
+    writeFileSync(join(raiz, ".gitignore"), "docs/eventos/\n");
+    mkdirSync(join(raiz, ".expx"));
+    writeFileSync(join(raiz, ".expx", "papeis.tsv"), PAPEIS);
+    inicio(raiz, "qa", "ag-1");
+    writeFileSync(join(raiz, ".expx", "papeis.tsv"), "# expx-papeis 1\nqa\trunx\tinvestigar\n");
+    fim(raiz, "qa", "ag-1");
+    expect(verificacoes(raiz)).toMatchObject([{ agente: "qa", ferramenta: "runx", papel: "testar", integridade_final: { estado: "ausente" } }]);
+    expect(arquivosDoEstado(raiz)).toEqual([]);
+  });
+
   it("funcional: a ferramenta do evento é a skill da projeção, não uma tabela por nome", () => {
     const raiz = repo("# expx-papeis 1\nqa\tsprintx\ttestar\n");
     inicio(raiz, "qa", "ag-1");
@@ -350,7 +371,6 @@ describe("expx-integridade-final: a foto do início contra o fim, por instância
   it.each([
     ["sem a projeção", null],
     ["cabeçalho de outra versão", PAPEIS.replace("papeis 1", "papeis 2")],
-    ["CRLF", PAPEIS.replace(/\n/g, "\r\n")],
     ["coluna a mais", "# expx-papeis 1\nqa\trunx\ttestar\tx\n"],
     ["papel fora do vocabulário", "# expx-papeis 1\nqa\trunx\taprovar\n"],
     ["agente repetido", "# expx-papeis 1\nqa\trunx\ttestar\nqa\trunx\ttestar\n"],

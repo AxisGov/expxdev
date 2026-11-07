@@ -84,6 +84,24 @@ describe("doctor — projeção dos papéis (F4)", () => {
     expect(ids(achados(raiz))).toEqual([]);
   });
 
+  it("a projeção em CRLF (checkout com core.autocrlf) confere com o hash do lock", async () => {
+    const raiz = await projeto();
+    writeFileSync(join(raiz, PAPEIS), readFileSync(join(raiz, PAPEIS), "utf8").replace(/\n/g, "\r\n"));
+    expect(ids(achados(raiz))).toEqual([]);
+  });
+
+  it("no lock anterior à F4, o agente com a cópia alterada ainda tem a skill conferida", async () => {
+    const raiz = await projeto();
+    const lockArq = join(raiz, ".expx/expx-lock.json");
+    const lock = JSON.parse(readFileSync(lockArq, "utf8")) as { instalacao: Record<string, unknown> };
+    delete lock.instalacao["papeis"];
+    writeFileSync(lockArq, `${JSON.stringify(lock, null, 2)}\n`);
+    const qa = join(raiz, ".claude/agents/qa.md");
+    writeFileSync(qa, `${readFileSync(qa, "utf8")}\nalterado\n`);
+    writeFileSync(join(raiz, PAPEIS), readFileSync(join(raiz, PAPEIS), "utf8").replace("qa\trunx", "qa\tsprintx"));
+    expect(ids(achados(raiz))).toEqual(["papeis-projecao-divergente:erro"]);
+  });
+
   it("projeção que sobrou sem nenhum agente de papel é aviso", async () => {
     const raiz = await projeto();
     gravar(raiz, PAPEIS, readFileSync(join(raiz, PAPEIS), "utf8"));

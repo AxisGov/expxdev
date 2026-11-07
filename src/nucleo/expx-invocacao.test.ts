@@ -20,7 +20,7 @@ const PAPEL: Record<string, string> = {
   "stackx-cartografo": "stackx\tinvestigar",
   "auditor-design": "designx\trevisar",
 };
-const papeis = (agentes: string[]) => ["# expx-papeis 1", ...agentes.filter((a) => a in PAPEL).sort().map((a) => `${a}\t${PAPEL[a]}`)].join("\n") + "\n";
+const papeis = (agentes: string[]) => ["# expx-papeis 1", ...agentes.filter((a) => Object.hasOwn(PAPEL, a)).sort().map((a) => `${a}\t${PAPEL[a]}`)].join("\n") + "\n";
 
 function projeto(agentes = ["qa", "stackx-cartografo"]): string {
   const raiz = mkdtempSync(join(tmpdir(), "expx-invocacao-"));
@@ -139,6 +139,12 @@ describe("expx-invocacao: observa a chamada do agente gerenciado", () => {
     expect(antes(raiz, "stackx-cartografo", "toolu_3").stdout).toBe("");
   });
 
+  it("funcional: a projeção dos papéis em CRLF (checkout com core.autocrlf) vale como LF", () => {
+    const raiz = projeto(["qa"]);
+    writeFileSync(join(raiz, ".expx", "papeis.tsv"), "# expx-papeis 1\r\nqa\trunx\ttestar\r\n");
+    expect(JSON.parse(antes(raiz, "qa").stdout).hookSpecificOutput.updatedInput.run_in_background).toBe(false);
+  });
+
   it("funcional: o evento leva a ferramenta e o papel da projeção dos papéis", () => {
     const raiz = projeto(["qa"]);
     writeFileSync(join(raiz, ".expx", "papeis.tsv"), "# expx-papeis 1\nqa\tsprintx\ttestar\n");
@@ -157,7 +163,6 @@ describe("expx-invocacao: observa a chamada do agente gerenciado", () => {
 
   it.each([
     ["sem a projeção dos papéis", null],
-    ["CRLF", "# expx-papeis 1\r\nqa\trunx\ttestar\r\n"],
     ["agente repetido", "# expx-papeis 1\nqa\trunx\ttestar\nqa\trunx\ttestar\n"],
     ["papel fora do vocabulário", "# expx-papeis 1\nqa\trunx\taprovar\n"],
     ["o principal com papel", "# expx-papeis 1\nprincipal\trunx\ttestar\nqa\trunx\ttestar\n"],
