@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { correspondeClaude, familiaClaude } from "./adaptadores.js";
-import { lerAgenteDaSkill, lerRegistro, reescreverModeloEsforco, serializarRegistro } from "./materializar.js";
+import { lerAgenteDaSkill, lerPapelDoAgente, lerRegistro, reescreverModeloEsforco, serializarRegistro } from "./materializar.js";
 import { conferirResolucaoId, resolucaoId, resolver } from "./resolver.js";
 
 /** CONTRATO-expx-orquestracao §9 e CONTRATO-expx-instalacao §5.3 (F2). */
@@ -32,6 +32,34 @@ describe("lerAgenteDaSkill", () => {
     const r = lerAgenteDaSkill("x/auditor.md", AGENTE("classe: altissima\nmodel: opus"));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.erro).toContain("altissima");
+  });
+
+  // F4: o papel decide a integridade final e o primeiro plano, e fica fora da resolução (§2.2).
+  it("lê o papel à parte do agente que vai ao resolvedor", () => {
+    expect(lerAgenteDaSkill("x/auditor.md", AGENTE("classe: profundo_excepcional\npapel: revisar # nota\nmodel: opus"))).toEqual({
+      ok: true,
+      agente: { nome: "auditor", classe: "profundo_excepcional", frontmatter: { model: "opus" } },
+      papel: "revisar",
+    });
+  });
+
+  it("frontmatter inválido que declara papel é skill inválida, nos dois regimes: o papel não some em silêncio", () => {
+    const dup = "---\nname: qa\npapel: revisar\npapel: investigar\n---\nx\n";
+    const r = lerAgenteDaSkill("x/qa.md", dup);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erro).toContain("papel");
+    const s = lerPapelDoAgente("x/qa.md", dup);
+    expect(s.ok).toBe(false);
+    // a chave indentada também é o papel: o YAML inválido não a esconde
+    expect(lerPapelDoAgente("x/qa.md", "---\n  name: qa\n  papel: revisar\n  papel: testar\n---\nx\n").ok).toBe(false);
+    // sem papel no texto, o frontmatter inválido segue como antes
+    expect(lerPapelDoAgente("x/qa.md", "---\nname: qa\nname: qb\n---\nx\n").ok).toBe(true);
+  });
+
+  it.each(["aprovar", "Revisar", "", "[revisar]"])("papel %j fora do vocabulário é skill inválida", (papel) => {
+    const r = lerAgenteDaSkill("x/auditor.md", AGENTE(`papel: ${papel === "" ? '""' : papel}\nmodel: opus`));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erro).toContain("papel");
   });
 });
 

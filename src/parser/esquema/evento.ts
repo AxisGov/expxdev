@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CLASSES } from "../../orquestracao/tipos.js";
+import { APROVACAO, CLASSES, PAPEIS } from "../../orquestracao/tipos.js";
 import { Ferramenta } from "./enums.js";
 
 /**
@@ -58,6 +58,9 @@ export const EXTRAS_EVENTO = [
   "fora_da_politica",
   // CONTRATO-expx-orquestracao §12.3 (F3c): só em `integridade_final_verificada`.
   "integridade_final",
+  // CONTRATO-expx-orquestracao §11.4 (F4): o papel projetado no início da chamada (o
+  // da foto, na integridade; o do envelope, na invocação). A projeção é o estado presente.
+  "papel",
 ] as const;
 
 /**
@@ -174,17 +177,6 @@ export const TimestampUtc = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/, "ts deve ser AAAA-MM-DDTHH:MM:SSZ");
 
-/**
- * Os agentes de aprovação da lista transitória (CONTRATO-expx-orquestracao
- * §12.2) e a ferramenta com que o hook grava cada um. A F4 troca a lista pelo
- * `papel` da política.
- */
-export const APROVADORES_INTEGRIDADE: Readonly<Record<string, string>> = {
-  "revisor-diff": "mergex",
-  qa: "runx",
-  "runx-revisor-testes": "runx",
-};
-
 /** As partes da foto, na ordem em que `diferencas` as lista. */
 export const PARTES_INTEGRIDADE = ["head", "status", "arvore"] as const;
 
@@ -242,6 +234,7 @@ export const LinhaEvento = z
     // presente só quando o executor saiu da cadeia; ausente nos demais casos
     fora_da_politica: z.literal(true).optional(),
     integridade_final: IntegridadeFinal.optional(),
+    papel: z.enum(PAPEIS).optional(),
   })
   // Extras declaradas passam; o que não é declarado é reportado por
   // `chavesDesconhecidas`, não rejeitado — o rastro nunca trava trabalho.
@@ -275,10 +268,12 @@ export const LinhaEvento = z
     (l) => l.integridade_final === undefined || l.resultado === (l.integridade_final.estado === "igual" ? "ok" : "falha"),
     { message: "resultado de integridade_final_verificada: ok com igual, falha com divergente ou ausente", path: ["resultado"] },
   )
-  // §12.2: só os aprovadores da lista, cada um com a ferramenta dele.
-  .refine((l) => l.evento !== "integridade_final_verificada" || APROVADORES_INTEGRIDADE[l.agente] === l.ferramenta, {
-    message: "integridade_final_verificada só para revisor-diff (mergex), qa e runx-revisor-testes (runx)",
-    path: ["agente"],
+  // §12.2 (F4): quem é de aprovação vem do papel projetado, e não de uma tabela
+  // por nome — o esquema não conhece a projeção do projeto. Com o papel na linha,
+  // ele precisa ser de aprovação; sem ele, é linha de antes da F4.
+  .refine((l) => l.evento !== "integridade_final_verificada" || l.papel === undefined || APROVACAO.includes(l.papel), {
+    message: "integridade_final_verificada só com papel revisar ou testar",
+    path: ["papel"],
   });
 
 export type LinhaEvento = z.infer<typeof LinhaEvento>;

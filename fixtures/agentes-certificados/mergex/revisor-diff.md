@@ -5,6 +5,7 @@ tools: Read, Grep, Glob, Bash
 model: opus
 effort: high
 classe: profundo_excepcional
+papel: revisar
 ---
 
 # revisor-diff — classificação da atenção humana

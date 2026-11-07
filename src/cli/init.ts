@@ -53,6 +53,7 @@ import { VERSAO_RESOLVEDOR, type Resolucao } from "../orquestracao/resolver.js";
 import { VERSAO_TABELA } from "../orquestracao/tabela.js";
 import { VERSAO_MATRIZ_EFFORT_CLAUDE } from "../orquestracao/adaptadores.js";
 import { CAMINHO_PROJECAO, serializarProjecao } from "../orquestracao/projecao.js";
+import { CAMINHO_PAPEIS, projetarPapeis } from "../orquestracao/papeis.js";
 import type { OrquestracaoTravada } from "../nucleo/lock.js";
 import { adquirirBloqueioOperacao } from "../nucleo/bloqueio-operacao.js";
 
@@ -178,6 +179,17 @@ type Plano = {
   resolucoes?: Resolucao[];
   /** A projeção plana das resoluções para o escritor do rastro; sem política, ausente. */
   projecao?: string;
+  /**
+   * A projeção dos papéis, com ou sem política: o texto a gravar, `null` para
+   * remover (nenhum agente com papel). Ausente sem o harness `claude`: aí o plano
+   * não toca os hooks do Claude, e removê-la desligaria os que ficaram instalados.
+   */
+  papeis?: string | null;
+  /**
+   * Sem o harness `claude`, o hash da projeção que o lock anterior travou: ela fica
+   * no disco, e o lock novo precisa continuar provando de onde ela veio.
+   */
+  papeisTravados?: { hash: string };
 };
 
 /** A seção `orquestracao` do lock: as versões e o `resolucao_id` vigente por agente. */
@@ -258,6 +270,8 @@ function instalacaoTravada(plano: Plano): InstalacaoTravada {
   if (plano.modos !== undefined) {
     inst.modos = { hash: hashDeBytes(plano.modos.texto), publicados: plano.modos.publicados };
   }
+  if (typeof plano.papeis === "string") inst.papeis = { hash: hashDeBytes(plano.papeis) };
+  else if (plano.papeis === undefined && plano.papeisTravados !== undefined) inst.papeis = plano.papeisTravados;
   return inst;
 }
 
@@ -288,6 +302,7 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
   const agentesDoPlano: Artefato[] = [];
   let resolucoes: Resolucao[] | undefined;
   let projecao: string | undefined;
+  let papeis: string | null | undefined;
   if (claude) {
     // Política de orquestração: ausente, a camada não existe e nada muda.
     const pol = lerPolitica(op.raiz);
@@ -316,6 +331,11 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
       agentesDoPlano.push(...ag.artefatos);
       avisosDoPlano.push(...ag.avisos);
       erros.push(...ag.erros);
+      const pp = projetarPapeis(ag.papeis);
+      if (pp.ok) {
+        papeis = pp.texto ?? null;
+        avisosDoPlano.push(...pp.avisos);
+      } else erros.push(pp.erro);
       if (politica !== undefined) {
         resolucoes = ag.resolucoes;
         const inseguro = destinoDoRegistroInseguro(op.raiz, resolucoes.map((r) => r.resolucao_id));
@@ -348,7 +368,13 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
     remover: [],
     ...(resolucoes !== undefined ? { resolucoes } : {}),
     ...(projecao !== undefined ? { projecao } : {}),
+    ...(papeis !== undefined ? { papeis } : {}),
   };
+  if (!claude) {
+    const anterior = lerLock(op.raiz);
+    const travados = anterior.ok ? anterior.lock.instalacao?.papeis : undefined;
+    if (travados !== undefined) plano.papeisTravados = travados;
+  }
   if (claude) {
     const lk = lerLock(op.raiz);
     const anteriores = lk.ok ? (lk.lock.instalacao?.arquivos ?? {}) : {};
@@ -366,6 +392,7 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
     ...(claude ? [".claude/settings.json", ".expx/hooks.json"] : []),
     ...(resolucoes !== undefined && resolucoes.length > 0 ? [caminhoDoRegistro("x")] : []),
     ...(projecao !== undefined ? [CAMINHO_PROJECAO] : []),
+    ...(typeof papeis === "string" ? [CAMINHO_PAPEIS] : []),
   ]);
   if (bloqueados.length > 0) erros.push(`destino impossivel de escrever (nada foi escrito):\n  ${bloqueados.join("\n  ")}`);
   if (!claude) return erros.length > 0 ? { ok: false, erros } : { ok: true, plano };
@@ -666,6 +693,10 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
       // a projeção acompanha a política: com ela, regravada; sem ela, some
       if (p.plano.projecao !== undefined) escreverArquivoAtomico(join(op.raiz, ...CAMINHO_PROJECAO.split("/")), p.plano.projecao);
       else rmSync(join(op.raiz, ...CAMINHO_PROJECAO.split("/")), { force: true });
+      // A dos papéis antes dos hooks: o hook novo sem ela só não mede (falha aberta).
+      // Cada arquivo é atômico sozinho; o conjunto não é uma transação.
+      if (typeof p.plano.papeis === "string") escreverArquivoAtomico(join(op.raiz, ...CAMINHO_PAPEIS.split("/")), p.plano.papeis);
+      else if (p.plano.papeis === null) rmSync(join(op.raiz, ...CAMINHO_PAPEIS.split("/")), { force: true });
       aplicarArtefatos(op.raiz, p.plano.projeto);
       for (const rel of p.plano.remover) rmSync(join(op.raiz, ...rel.split("/")), { force: true });
       if (p.plano.settings !== undefined) {

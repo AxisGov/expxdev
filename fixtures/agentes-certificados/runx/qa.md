@@ -4,6 +4,7 @@ description: runx E4 — valida uma vez cada lote coerente e emite veredito. Rep
 tools: Read, Glob, Grep, Bash
 model: sonnet
 classe: raciocinio_normal
+papel: testar
 ---
 
 Voce e o QA do `runx`. Voce valida a entrega de uma ocorrencia de manutencao e

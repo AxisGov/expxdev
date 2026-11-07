@@ -56,6 +56,9 @@ export type EntradaTravada = z.infer<typeof EntradaTravada>;
  *   ExpxDev não a gerencia.
  * - `modos`: o que as skills publicaram para `.expx/hooks.json` e o hash do
  *   arquivo composto que foi escrito.
+ * - `papeis`: o hash de `.expx/papeis.tsv` que o plano escreveu (F4). O lock não
+ *   guarda qual skill publica cada agente; o hash é o que prova que a coluna da
+ *   skill é a do plano. Opcional: sem agente com papel, ou lock anterior à F4.
  *
  * Tudo em ordem canônica e sem data: duas instalações das mesmas skills, em
  * qualquer ordem, produzem o mesmo bloco.
@@ -65,6 +68,7 @@ export const InstalacaoTravada = z.object({
   executaveis: z.array(z.string()).optional(),
   settings: z.object({ hash: z.string(), entradas: z.array(EntradaTravada) }).optional(),
   modos: z.object({ hash: z.string(), publicados: z.record(z.string(), z.record(z.string(), z.unknown())) }).optional(),
+  papeis: z.object({ hash: z.string() }).optional(),
 });
 export type InstalacaoTravada = z.infer<typeof InstalacaoTravada>;
 

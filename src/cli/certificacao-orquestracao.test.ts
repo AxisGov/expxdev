@@ -4,7 +4,9 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { CATALOGO } from "../nucleo/catalogo.js";
 import { planejarAgentes } from "../harness/agentes.js";
+import { projetarPapeis } from "../orquestracao/papeis.js";
 import { validarPolitica } from "../orquestracao/politica.js";
+import { APROVACAO } from "../orquestracao/tipos.js";
 import type { SkillMontavel } from "../plugin/montagem.js";
 import { RAIZ_DO_REPO } from "../teste/candidatos.js";
 
@@ -75,5 +77,24 @@ describe("certificação da orquestração: as nove skills certificadas", () => 
       }
     }
     expect(sem).toEqual([]);
+  });
+
+  // F4: o papel decide a integridade final e o primeiro plano, com ou sem política.
+  it("todo agente certificado declara o papel, e a projeção traz os seis de aprovação com a skill de cada um", () => {
+    const plano = planejarAgentes(montaveis(), {});
+    expect(plano.erros).toEqual([]);
+    const total = CATALOGO.reduce((n, s) => n + agentesDa(s.nome).length, 0);
+    expect(plano.papeis).toHaveLength(total);
+    const projecao = projetarPapeis(plano.papeis);
+    expect(projecao).toMatchObject({ ok: true, avisos: [] });
+    const aprovacao = plano.papeis.filter((p) => APROVACAO.includes(p.papel)).map((p) => `${p.agente}\t${p.skill}\t${p.papel}`).sort();
+    expect(aprovacao).toEqual([
+      "auditor-design\tdesignx\trevisar",
+      "auditor-plano\tsprintx\trevisar",
+      "qa\trunx\ttestar",
+      "revisor-diff\tmergex\trevisar",
+      "runx-revisor-testes\trunx\ttestar",
+      "sprintx-revisor-testes\tsprintx\ttestar",
+    ]);
   });
 });

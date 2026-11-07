@@ -31,13 +31,28 @@ function git(dir: string, ...args: string[]): string {
   return r.stdout;
 }
 
-/** Um repositório com um commit e o rastro ignorado, como o contrato de eventos pede. */
-function repo(): string {
+/** A projeção dos papéis que o `init` grava (CONTRATO-expx-orquestracao §11.4), versionada com o `.expx/`. */
+const PAPEIS = [
+  "# expx-papeis 1",
+  "analista-de-conflito\tmergex\tinvestigar",
+  "auditor-plano\tsprintx\trevisar",
+  "qa\trunx\ttestar",
+  "revisor-diff\tmergex\trevisar",
+  "runx-revisor-testes\trunx\ttestar",
+  "",
+].join("\n");
+
+/** Um repositório com um commit, a projeção dos papéis e o rastro ignorado, como o contrato de eventos pede. */
+function repo(papeis: string | null = PAPEIS): string {
   const d = mkdtempSync(join(tmpdir(), "expx-integridade-"));
   criados.push(d);
   git(d, "init", "-q", "-b", "main");
   writeFileSync(join(d, ".gitignore"), "docs/eventos/\nignorado.txt\n");
   writeFileSync(join(d, "a.txt"), "um\n");
+  if (papeis !== null) {
+    mkdirSync(join(d, ".expx"), { recursive: true });
+    writeFileSync(join(d, ".expx", "papeis.tsv"), papeis);
+  }
   git(d, "add", "-A");
   git(d, "commit", "-q", "-m", "inicio");
   return d;
@@ -70,6 +85,7 @@ type Linha = {
   ferramenta: string;
   agente: string;
   resultado: string;
+  papel?: string;
   integridade_final?: { estado: string; diferencas: string[] };
 };
 
@@ -200,7 +216,8 @@ describe("expx-integridade-final: a foto do início contra o fim, por instância
       git(raiz, "add", "-A");
       git(raiz, "commit", "-q", "-m", "pastas");
       git(raiz, "sparse-checkout", "init", "--cone", indice);
-      git(raiz, "sparse-checkout", "set", "dentro");
+      // o `.expx/` no cone: fora dele, a projeção dos papéis não está no disco e ninguém é de aprovação
+      git(raiz, "sparse-checkout", "set", "dentro", ".expx");
       expect(existsSync(join(raiz, "fora", "f.txt")), indice).toBe(false);
 
       inicio(raiz, "qa", "ag-1");
@@ -237,6 +254,8 @@ describe("expx-integridade-final: a foto do início contra o fim, por instância
     criados.push(raiz);
     git(raiz, "init", "-q", "-b", "main");
     writeFileSync(join(raiz, ".gitignore"), "docs/eventos/\n");
+    mkdirSync(join(raiz, ".expx"));
+    writeFileSync(join(raiz, ".expx", "papeis.tsv"), PAPEIS);
     inicio(raiz, "qa", "ag-1");
     fim(raiz, "qa", "ag-1");
     expect(verificacoes(raiz)[0]?.integridade_final).toEqual({ estado: "ausente", diferencas: [] });
@@ -262,11 +281,11 @@ describe("expx-integridade-final: a foto do início contra o fim, por instância
     expect(verificacoes(raiz).map((v) => v.integridade_final?.estado)).toEqual(["igual", "igual"]);
   });
 
-  it("funcional: `expx:qa` é o qa; agente fora da lista não fotografa nem grava", () => {
+  it("funcional: `expx:qa` é o qa; agente fora da projeção não fotografa nem grava", () => {
     const raiz = repo();
     inicio(raiz, "expx:qa", "ag-1");
     fim(raiz, "expx:qa", "ag-1");
-    expect(verificacoes(raiz)[0]).toMatchObject({ agente: "qa", ferramenta: "runx" });
+    expect(verificacoes(raiz)[0]).toMatchObject({ agente: "qa", ferramenta: "runx", papel: "testar" });
 
     for (const fora of ["Explore", "outro:qa", "qa-extra", "expx:expx:qa", "revisor-diff ", ""]) {
       const r = repo();
@@ -275,6 +294,96 @@ describe("expx-integridade-final: a foto do início contra o fim, por instância
       expect(fim(r, fora, "ag-1").status).toBe(0);
       expect(verificacoes(r), fora).toEqual([]);
     }
+  });
+
+  // F4: o papel projetado decide quem é de aprovação, e a skill da linha é a ferramenta.
+  it("funcional: o papel decide, não o nome — revisar e testar são verificados; investigar, não", () => {
+    const raiz = repo();
+    for (const [agente, id] of [["auditor-plano", "a1"], ["analista-de-conflito", "a2"], ["runx-revisor-testes", "a3"]] as const) {
+      inicio(raiz, agente, id);
+      fim(raiz, agente, id);
+    }
+    expect(verificacoes(raiz).map((l) => [l.agente, l.ferramenta, l.papel, l.resultado])).toEqual([
+      ["auditor-plano", "sprintx", "revisar", "ok"],
+      ["runx-revisor-testes", "runx", "testar", "ok"],
+    ]);
+  });
+
+  it("funcional: a projeção trocada entre o início e o fim não suprime a verificação — vale o papel do início, e o estado sai", () => {
+    const raiz = repo();
+    inicio(raiz, "qa", "ag-1");
+    writeFileSync(join(raiz, ".expx", "papeis.tsv"), "# expx-papeis 1\nqa\tsprintx\tinvestigar\n");
+    git(raiz, "commit", "-q", "-am", "projecao nova");
+    fim(raiz, "qa", "ag-1");
+    expect(verificacoes(raiz)).toMatchObject([{ agente: "qa", ferramenta: "runx", papel: "testar", integridade_final: { estado: "divergente" } }]);
+    expect(arquivosDoEstado(raiz)).toEqual([]);
+  });
+
+  it("funcional: o fim de quem não é de aprovação, com a foto de outro pendente, não grava nada nem mexe nela", () => {
+    const raiz = repo();
+    inicio(raiz, "qa", "ag-1");
+    const antes = arquivosDoEstado(raiz);
+    inicio(raiz, "analista-de-conflito", "ag-2");
+    fim(raiz, "analista-de-conflito", "ag-2");
+    expect(verificacoes(raiz)).toEqual([]);
+    expect(arquivosDoEstado(raiz)).toEqual(antes);
+    fim(raiz, "qa", "ag-1");
+    expect(verificacoes(raiz)).toMatchObject([{ agente: "qa", papel: "testar", integridade_final: { estado: "igual" } }]);
+  });
+
+  it("funcional: a projeção removida entre o início e o fim também não suprime a verificação", () => {
+    const raiz = repo();
+    inicio(raiz, "revisor-diff", "ag-1");
+    rmSync(join(raiz, ".expx", "papeis.tsv"));
+    fim(raiz, "revisor-diff", "ag-1");
+    expect(verificacoes(raiz)).toMatchObject([{ agente: "revisor-diff", ferramenta: "mergex", papel: "revisar" }]);
+    expect(arquivosDoEstado(raiz)).toEqual([]);
+  });
+
+  it("funcional: a projeção em CRLF (checkout com core.autocrlf) vale como LF", () => {
+    const raiz = repo(PAPEIS.replace(/\n/g, "\r\n"));
+    inicio(raiz, "qa", "ag-1");
+    fim(raiz, "qa", "ag-1");
+    expect(verificacoes(raiz)).toMatchObject([{ agente: "qa", ferramenta: "runx", papel: "testar", integridade_final: { estado: "igual" } }]);
+  });
+
+  it("funcional: a foto do início que falha guarda o papel, e o fim grava ausente mesmo com a projeção trocada", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "expx-integridade-"));
+    criados.push(raiz);
+    git(raiz, "init", "-q", "-b", "main");
+    writeFileSync(join(raiz, ".gitignore"), "docs/eventos/\n");
+    mkdirSync(join(raiz, ".expx"));
+    writeFileSync(join(raiz, ".expx", "papeis.tsv"), PAPEIS);
+    inicio(raiz, "qa", "ag-1");
+    writeFileSync(join(raiz, ".expx", "papeis.tsv"), "# expx-papeis 1\nqa\trunx\tinvestigar\n");
+    fim(raiz, "qa", "ag-1");
+    expect(verificacoes(raiz)).toMatchObject([{ agente: "qa", ferramenta: "runx", papel: "testar", integridade_final: { estado: "ausente" } }]);
+    expect(arquivosDoEstado(raiz)).toEqual([]);
+  });
+
+  it("funcional: a ferramenta do evento é a skill da projeção, não uma tabela por nome", () => {
+    const raiz = repo("# expx-papeis 1\nqa\tsprintx\ttestar\n");
+    inicio(raiz, "qa", "ag-1");
+    fim(raiz, "qa", "ag-1");
+    expect(verificacoes(raiz)[0]).toMatchObject({ agente: "qa", ferramenta: "sprintx", papel: "testar" });
+  });
+
+  it.each([
+    ["sem a projeção", null],
+    ["cabeçalho de outra versão", PAPEIS.replace("papeis 1", "papeis 2")],
+    ["coluna a mais", "# expx-papeis 1\nqa\trunx\ttestar\tx\n"],
+    ["papel fora do vocabulário", "# expx-papeis 1\nqa\trunx\taprovar\n"],
+    ["agente repetido", "# expx-papeis 1\nqa\trunx\ttestar\nqa\trunx\ttestar\n"],
+    ["campo fora do alfabeto", "# expx-papeis 1\nqa\tru nx\ttestar\n"],
+    ["o principal com papel", "# expx-papeis 1\nprincipal\trunx\ttestar\nqa\trunx\ttestar\n"],
+    ["skill fora do vocabulário do rastro", "# expx-papeis 1\nqa\toutra\ttestar\n"],
+    ["outra linha inválida no arquivo", "# expx-papeis 1\nqa\trunx\ttestar\nrevisor-diff\tmergex\n"],
+  ])("funcional: %s — nenhum agente é de aprovação (falha aberta, sem git)", (_, papeis) => {
+    const raiz = repo(papeis);
+    expect(inicio(raiz, "qa", "ag-1").status).toBe(0);
+    expect(arquivosDoEstado(raiz)).toEqual([]);
+    expect(fim(raiz, "qa", "ag-1").status).toBe(0);
+    expect(verificacoes(raiz)).toEqual([]);
   });
 
   it("funcional: agent_id e session_id hostis não escapam do estado nem viram caminho", () => {

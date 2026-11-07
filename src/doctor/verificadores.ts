@@ -32,6 +32,7 @@ import { verificarModificacaoLocal, pastaDaSkill } from "../update/modificacao.j
 import { MarketplaceJson, PluginJson, ORIGEM_DO_PLUGIN, NOME_DO_PLUGIN, NOME_DO_MARKETPLACE } from "../plugin/manifestos.js";
 import { lerPluginsHabilitados, caminhoDoSettings } from "../harness/settings.js";
 import { verificarOrquestracao } from "./orquestracao.js";
+import { verificarPapeis } from "./papeis.js";
 
 /**
  * Diagnóstico de instalação quebrada.
@@ -233,6 +234,7 @@ export function diagnosticar(raiz: string, env: NodeJS.ProcessEnv = process.env)
     verificarModoExecutavel(raiz, executaveisDoLock(l.lock.instalacao), push);
   }
   verificarOrquestracao(raiz, l.lock, env, push);
+  verificarPapeis(raiz, l.lock, push);
   verificarHooks(raiz, push);
   verificarRastro(raiz, push);
   verificarRastroIgnorado(raiz, push);

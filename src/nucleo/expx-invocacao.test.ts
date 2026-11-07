@@ -14,12 +14,21 @@ afterEach(() => {
 
 const git = (raiz: string, ...a: string[]) => spawnSync("git", ["-C", raiz, ...a], { encoding: "utf8" }).stdout.trim();
 
+/** Skill e papel de cada agente, como o `init` os projeta em `.expx/papeis.tsv` (F4). */
+const PAPEL: Record<string, string> = {
+  qa: "runx\ttestar",
+  "stackx-cartografo": "stackx\tinvestigar",
+  "auditor-design": "designx\trevisar",
+};
+const papeis = (agentes: string[]) => ["# expx-papeis 1", ...agentes.filter((a) => Object.hasOwn(PAPEL, a)).sort().map((a) => `${a}\t${PAPEL[a]}`)].join("\n") + "\n";
+
 function projeto(agentes = ["qa", "stackx-cartografo"]): string {
   const raiz = mkdtempSync(join(tmpdir(), "expx-invocacao-"));
   criados.push(raiz);
   spawnSync("git", ["init", "-q", "-b", "main", raiz]);
   mkdirSync(join(raiz, ".expx", "resolucoes"), { recursive: true });
   writeFileSync(join(raiz, ".expx", "orquestracao-rastro.tsv"), ["# expx-orquestracao-rastro 1", ...agentes.map((a) => `${a}\t${RES}\tsenior\tdeclarada\tsenior\tclaude-sonnet\tembutida\t-\t-`)].join("\n") + "\n");
+  writeFileSync(join(raiz, ".expx", "papeis.tsv"), papeis(agentes));
   writeFileSync(join(raiz, ".expx", "resolucoes", `${RES}.json`), JSON.stringify(CADEIA));
   return raiz;
 }
@@ -82,6 +91,7 @@ describe("expx-invocacao: observa a chamada do agente gerenciado", () => {
   it("funcional: projeção CRLF com o CR final sem quebra de linha vale como no rastro", () => {
     const raiz = projeto([]);
     writeFileSync(join(raiz, ".expx", "orquestracao-rastro.tsv"), `# expx-orquestracao-rastro 1\r\nqa\t${RES}\tsenior\tdeclarada\tsenior\tclaude-sonnet\tembutida\t-\t-\r`);
+    writeFileSync(join(raiz, ".expx", "papeis.tsv"), papeis(["qa"]));
     expect(antes(raiz, "qa").stdout).not.toBe("");
     expect(envelopes(raiz)).toHaveLength(1);
     depois(raiz, "qa", { status: "completed", resolvedModel: "claude-sonnet-5-5" });
@@ -119,6 +129,53 @@ describe("expx-invocacao: observa a chamada do agente gerenciado", () => {
     expect(antes(raiz, "stackx-cartografo", "toolu_3").stdout).toBe("");
     expect(antes(raiz, "qa", "toolu_4", { run_in_background: false }).stdout).toBe("");
     expect(envelopes(raiz)).toHaveLength(4);
+  });
+
+  // F4: o papel projetado decide o primeiro plano, e a skill da linha é a ferramenta do evento.
+  it("funcional: o papel decide o primeiro plano, não o nome — revisar e testar vão; investigar, não", () => {
+    const raiz = projeto(["qa", "stackx-cartografo", "auditor-design"]);
+    expect(JSON.parse(antes(raiz, "auditor-design").stdout).hookSpecificOutput.updatedInput.run_in_background).toBe(false);
+    expect(JSON.parse(antes(raiz, "qa", "toolu_2").stdout).hookSpecificOutput.updatedInput.run_in_background).toBe(false);
+    expect(antes(raiz, "stackx-cartografo", "toolu_3").stdout).toBe("");
+  });
+
+  it("funcional: a projeção dos papéis em CRLF (checkout com core.autocrlf) vale como LF", () => {
+    const raiz = projeto(["qa"]);
+    writeFileSync(join(raiz, ".expx", "papeis.tsv"), "# expx-papeis 1\r\nqa\trunx\ttestar\r\n");
+    expect(JSON.parse(antes(raiz, "qa").stdout).hookSpecificOutput.updatedInput.run_in_background).toBe(false);
+  });
+
+  it("funcional: o evento leva a ferramenta e o papel da projeção dos papéis", () => {
+    const raiz = projeto(["qa"]);
+    writeFileSync(join(raiz, ".expx", "papeis.tsv"), "# expx-papeis 1\nqa\tsprintx\ttestar\n");
+    antes(raiz, "qa");
+    depois(raiz, "qa", { status: "completed", resolvedModel: "claude-sonnet-5-5" });
+    expect(eventos(raiz)[0]).toMatchObject({ evento: "invocacao_fechada", agente: "qa", ferramenta: "sprintx", papel: "testar" });
+  });
+
+  it("funcional: a skill e o papel da chamada valem no fechamento, mesmo se a projeção mudou no meio", () => {
+    const raiz = projeto(["qa"]);
+    antes(raiz, "qa");
+    writeFileSync(join(raiz, ".expx", "papeis.tsv"), "# expx-papeis 1\nqa\tsprintx\trevisar\n");
+    depois(raiz, "qa", { status: "completed" });
+    expect(eventos(raiz)[0]).toMatchObject({ ferramenta: "runx", papel: "testar" });
+  });
+
+  it.each([
+    ["sem a projeção dos papéis", null],
+    ["agente repetido", "# expx-papeis 1\nqa\trunx\ttestar\nqa\trunx\ttestar\n"],
+    ["papel fora do vocabulário", "# expx-papeis 1\nqa\trunx\taprovar\n"],
+    ["o principal com papel", "# expx-papeis 1\nprincipal\trunx\ttestar\nqa\trunx\ttestar\n"],
+    ["skill fora do vocabulário do rastro", "# expx-papeis 1\nqa\toutra\ttestar\n"],
+    ["outra linha inválida", "# expx-papeis 1\nqa\trunx\ttestar\nx\n"],
+  ])("funcional: %s — o agente não é gerenciado nem vai ao primeiro plano", (_, conteudo) => {
+    const raiz = projeto(["qa"]);
+    if (conteudo === null) rmSync(join(raiz, ".expx", "papeis.tsv"));
+    else writeFileSync(join(raiz, ".expx", "papeis.tsv"), conteudo);
+    expect(antes(raiz, "qa")).toMatchObject({ status: 0, stdout: "" });
+    expect(envelopes(raiz)).toEqual([]);
+    depois(raiz, "qa", { status: "completed" });
+    expect(eventos(raiz)).toEqual([]);
   });
 
   it("funcional: dois prefixos não são o agente, e nome parecido não vira aprovador", () => {
@@ -240,7 +297,7 @@ describe("expx-invocacao: observa a chamada do agente gerenciado", () => {
     expect(JSON.parse(r.stdout).hookSpecificOutput.updatedInput.run_in_background).toBe(false);
   });
 
-  it("funcional: agente na projeção, mas fora do vocabulário do rastro, não é observado", () => {
+  it("funcional: agente na projeção do rastro, mas fora da projeção dos papéis, não é observado", () => {
     const raiz = projeto(["constructor"]);
     expect(antes(raiz, "constructor")).toMatchObject({ status: 0, stdout: "" });
     expect(envelopes(raiz)).toEqual([]);

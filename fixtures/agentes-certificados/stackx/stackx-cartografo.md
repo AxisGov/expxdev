@@ -4,6 +4,7 @@ description: Varre um repositório em busca de evidência real e devolve o inven
 tools: Read, Grep, Glob, Bash
 model: inherit
 classe: raciocinio_normal
+papel: investigar
 ---
 
 # cartógrafo — extração de convenção

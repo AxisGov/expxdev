@@ -392,6 +392,41 @@ EXPX_PROJECAO
   return 0
 }
 
+# O papel do agente e a skill que o publica (CONTRATO-expx-orquestracao §11.4),
+# lidos da projecao que o `expx init` grava com ou sem politica
+# (.expx/papeis.tsv). Imprime "skill<TAB>papel" ou nada. O arquivo inteiro vale
+# ou nao vale nada, pelas mesmas regras do `lerPapeis` do CLI: cabecalho
+# diferente, linha sem exatamente dois TABs, campo fora do alfabeto, o
+# `principal`, skill fora do vocabulario `ferramenta` do rastro, papel fora do
+# vocabulario ou agente repetido deixam todo agente sem papel. Falha
+# aberta: sem papel, o agente nao e de aprovacao. Nunca le o papel do nome.
+expx_papel_de() {
+  local arq="$1/.expx/papeis.tsv" agente="$2" cab="" linha tabs ag sk pa achado="" vistos=$'\n'
+  [ -f "$arq" ] || return 0
+  case "$agente" in ""|*[!a-z0-9-]*) return 0 ;; esac
+  {
+    # o CR do fim sai: o checkout com core.autocrlf entrega a projecao em CRLF
+    IFS= read -r cab || return 0
+    [ "${cab%$'\r'}" = "# expx-papeis 1" ] || return 0
+    while IFS= read -r linha || [ -n "$linha" ]; do
+      linha="${linha%$'\r'}"
+      tabs="${linha//[!$'\t']/}"
+      [ "${#tabs}" -eq 2 ] || return 0
+      IFS=$'\t' read -r ag sk pa <<EXPX_PAPEIS
+$linha
+EXPX_PAPEIS
+      case "$ag" in ""|*[!a-z0-9-]*|principal) return 0 ;; esac
+      case "$sk" in sprintx|runx|mergex|legadox|stackx|memox|prodx|buildx|designx) ;; *) return 0 ;; esac
+      case "$pa" in planejar|implementar|investigar|testar|revisar) ;; *) return 0 ;; esac
+      case "$vistos" in *$'\n'"$ag"$'\n'*) return 0 ;; esac
+      vistos="$vistos$ag"$'\n'
+      [ "$ag" = "$agente" ] && achado="$sk"$'\t'"$pa"
+    done
+  } < "$arq"
+  [ -n "$achado" ] && printf '%s' "$achado"
+  return 0
+}
+
 # ---------------------------------------------------------------- gravacao
 
 # expx_rastro_grava <raiz> <evento> <origem> <resultado> <detalhe> [arquivos_json] [extras_json]
