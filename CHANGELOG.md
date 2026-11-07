@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.13.15 — o papel decide quem é de aprovação (F4 da orquestração)
+
+Instale por PR, como a 0.13.14. É a F4 da orquestração: a integridade final e o primeiro plano do aprovador deixam de escolher o agente por uma lista de nomes e passam a decidir pelo `papel:` que a skill declara. Mudam o ExpxDev e as seis skills com agentes.
+
+- **As skills declaram o papel** (sprintx#70, runx#17, mergex#89, legadox#7, stackx#9, designx#12):
+  - **`revisar`:** `auditor-plano`, `revisor-diff` e `auditor-design`;
+  - **`testar`:** `qa`, `sprintx-revisor-testes` e `runx-revisor-testes`;
+  - **`investigar`:** os outros sete.
+
+  Cada skill tem um teste que exige o papel decidido de cada agente.
+- **A projeção dos papéis.** O `init` lê o `papel:` com ou sem política e grava `.expx/papeis.tsv` (agente, skill e papel). Papel fora do vocabulário, ou frontmatter inválido que declara papel, recusa o plano antes de escrever, nos dois regimes. Sem política, `classe` e `model` continuam sem conferência.
+- **A integridade final e o envelope decidem pelo papel.** É de aprovação quem tem `revisar` ou `testar` na projeção, e a `ferramenta` do evento é a skill da linha. Saem as três listas por nome: a dos aprovadores da integridade, a do primeiro plano e a de ferramenta por agente. O hook da integridade continua saindo sem rodar Git para quem não é de aprovação.
+- **O que muda no comportamento:**
+  - o `auditor-plano`, o `sprintx-revisor-testes` e o `auditor-design` passam também pela integridade final;
+  - o `auditor-design` passa a rodar em primeiro plano;
+  - sem a projeção, nenhum agente é de aprovação: ela sai junto com o hook, no mesmo `init`.
+- **Os eventos levam o papel.** `integridade_final_verificada`, `invocacao_fechada` e `invocacao_abandonada` gravam o `papel` da hora, que é a coorte da F5. O esquema deixa de amarrar o agente à ferramenta e exige `revisar` ou `testar` na verificação com papel; as linhas antigas, sem papel, continuam válidas.
+- **Doctor:** `papeis-projecao-divergente` confere a projeção contra as cópias dos agentes que o lock travou.
+- **Não exercitado:** a F4 foi provada com hooks reais, fixtures e o `init`, mas não numa sessão do Claude Code com subagentes de verdade.
+
 ## 0.13.14 — a busca sugerida nas recusas da reconciliação vai ao remoto certo, na MergeX
 
 Instale por PR, como a 0.13.13. São os três nitpicks do CodeAnt na instalação da 0.13.13 no Conselhos (conselhos#271), mais um que o CodeAnt achou no próprio PR da correção (mergex#90), o do remoto sem URL. Só a MergeX muda: o ExpxDev e as outras skills seguem como na 0.13.13. A recusa já estava certa, e nada passa a ser aceito: muda só o comando sugerido.

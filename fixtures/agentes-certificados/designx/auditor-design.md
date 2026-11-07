@@ -3,6 +3,7 @@ name: auditor-design
 description: Audita conformidade contra o design system e boas praticas de UI. Emite veredito sem corrigir nada.
 tools: Read, Glob, Grep
 classe: raciocinio_normal
+papel: revisar
 ---
 
 # auditor-design

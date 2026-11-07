@@ -1,5 +1,5 @@
-fbadbd764de1f2fbd56efd609e8bc4c8ea44436fdf2e6f6b0dc244348373ea3f  .claude/agents/analista-de-conflito.md
-62d4ea6a238b40e243f5f25db228381cd22d620ce285884531ba332e1e597424  .claude/agents/revisor-diff.md
+fc2c6d142f1b869410714aed5c27f6c0a8d059850abe17c368225745440bbba0  .claude/agents/analista-de-conflito.md
+d44b158ed474fec8e6d05f461fde02e5510c8fd31d15f16cd0a8a817b5a09559  .claude/agents/revisor-diff.md
 37c9e1f20cab46fa2a396920332ec1f2a0ce965dd5031e540182c64832073419  .claude/commands/mergex-abrir.md
 af654a75dd2a0e26eb9093ed28cf4da140031ef908bbf6a2cd373e32b64432fe  .claude/commands/mergex-atencao.md
 b43d4cee2d4ef3298168a4567f28398a12a491869971626548878638588f83ae  .claude/commands/mergex-check.md
@@ -30,7 +30,7 @@ d0b219ee94132d44c0c968e1737c6aba044721d0e8a1701ff4f6a920f2ab5a18  .claude/skills
 8a78434435e46c72e7fadf995e1c6299c1776c5659dc03ece97e6d68165210e9  .claude/skills/mergex/assets/ci/mergex-portao.yml
 69ffdc28ccc180b34a5bef2a3cc2252263628f5989589e0f076f3cfbd6af4b95  .claude/skills/mergex/assets/pre-push-gerenciado.sh
 d5af359692ed5da01c566d5cf37b25e221bf66b9fb69a7b154fe454b9876ac2c  .claude/skills/mergex/decisoes/anteriores-ao-p02.md
-f0a3d42da9a5b515f8ba0369842cde7408aa4a44e3e7677b6cbea7e2e91ca320  .claude/skills/mergex/decisoes/endurecimento-conselhos-208-210.md
+890bd6db182512f04444623c12c2123b61cf248c23472a703cd40f3d6c1e6c6d  .claude/skills/mergex/decisoes/endurecimento-conselhos-208-210.md
 7e047167485cae65e521815148225f0880c7e0f71c79c7851311937bf5b6a7b1  .claude/skills/mergex/decisoes/revisao-por-task-e-entrega-por-sprint.md
 df32a7a924ae8e4168f262444ad8e024b23157dd95b057f305e97824f2d79707  .claude/skills/mergex/references/00-abertura.md
 860b926d351e7694d0d6707552bfb59553b01d88cf3ecbd7463d35a9ddfacec6  .claude/skills/mergex/references/00-schema.md

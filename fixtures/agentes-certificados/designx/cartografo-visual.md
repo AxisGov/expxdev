@@ -3,6 +3,7 @@ name: cartografo-visual
 description: Analisa um projeto existente e extrai o vocabulario visual em uso. Gera o DESIGN-SYSTEM.md candidato a partir do codigo real, sem inventar nada.
 tools: Read, Glob, Grep
 classe: raciocinio_normal
+papel: investigar
 ---
 
 # cartografo-visual

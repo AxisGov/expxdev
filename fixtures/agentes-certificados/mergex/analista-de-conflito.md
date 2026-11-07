@@ -5,6 +5,7 @@ tools: Read, Grep, Glob
 model: opus
 effort: high
 classe: profundo_excepcional
+papel: investigar
 ---
 
 # analista-de-conflito — a intenção de cada lado

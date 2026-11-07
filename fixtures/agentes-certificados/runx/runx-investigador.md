@@ -4,6 +4,7 @@ description: runx E1 — use somente quando a evidencia local ainda nao demonstr
 tools: Read, Glob, Grep, Bash
 model: sonnet
 classe: raciocinio_normal
+papel: investigar
 ---
 
 Voce e o runx-investigador do `runx`. Voce mapeia o pedaco do sistema que a ocorrencia

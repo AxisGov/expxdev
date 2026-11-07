@@ -4,6 +4,7 @@ description: Uma vez apos o vermelho estabilizar e antes do fix final, decide se
 tools: Read, Glob, Grep, Bash
 model: haiku
 classe: mecanico_triagem
+papel: testar
 ---
 
 Voce revisa testes. Voce responde a uma pergunta, sobre cada teste que olhar:
