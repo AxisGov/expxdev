@@ -145,6 +145,19 @@ describe("expx-invocacao: observa a chamada do agente gerenciado", () => {
     expect(JSON.parse(antes(raiz, "qa").stdout).hookSpecificOutput.updatedInput.run_in_background).toBe(false);
   });
 
+  it("funcional: NUL em qualquer ponto de uma projeção a invalida inteira, como no rastro", () => {
+    // NUL na linha de outro agente da projeção do rastro: o agente deixa de ser gerenciado
+    const r1 = projeto(["stackx-cartografo"]);
+    writeFileSync(join(r1, ".expx", "orquestracao-rastro.tsv"), `# expx-orquestracao-rastro 1\nstackx-cartografo\t${RES}\tsenior\tdeclarada\tsenior\tclaude-sonnet\tembutida\t-\t-\nqa\0\t${RES}\tsenior\tdeclarada\tsenior\tclaude-sonnet\tembutida\t-\t-\n`);
+    expect(antes(r1, "stackx-cartografo").stdout).toBe("");
+    expect(envelopes(r1)).toEqual([]);
+    // NUL depois da última quebra de linha da projeção dos papéis: o qa fica sem papel
+    const r2 = projeto(["qa"]);
+    writeFileSync(join(r2, ".expx", "papeis.tsv"), "# expx-papeis 1\nqa\trunx\ttestar\n\0");
+    expect(antes(r2, "qa").stdout).toBe("");
+    expect(envelopes(r2)).toEqual([]);
+  });
+
   it("funcional: o evento leva a ferramenta e o papel da projeção dos papéis", () => {
     const raiz = projeto(["qa"]);
     writeFileSync(join(raiz, ".expx", "papeis.tsv"), "# expx-papeis 1\nqa\tsprintx\ttestar\n");

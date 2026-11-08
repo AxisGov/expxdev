@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.17 — NUL numa projeção a invalida inteira, nos hooks em shell e no do envelope
+
+Instale por PR, como a 0.13.15. Mudam só os hooks `expx-rastro.sh` e `expx-invocacao.mjs`; eventos, `init`, `doctor`, painel e skills seguem como na 0.13.16. Corrige o achado do CodeAnt na instalação da 0.13.16 (conselhos#274).
+
+- **O problema.** O `read` do shell descarta o byte NUL em silêncio, e o leitor Node da mesma projeção não. Com um NUL no nome do agente, num campo, no cabeçalho ou depois da última quebra de linha, os dois hooks discordavam sobre o mesmo arquivo:
+  - **`.expx/papeis.tsv`:** o `expx_papel_de` dava papel ao agente, e o `papelDe` do envelope deixava todos sem papel. A integridade final rodava a mais.
+  - **`.expx/orquestracao-rastro.tsv`:** o `expx_resolucao_extras` gravava `resolucao_id` e a classe sem o NUL, que não é o valor do arquivo, e o `resolucaoDe` recusava a linha.
+- **A correção.** Os dois leitores em shell recusam o arquivo que tiver NUL, antes de qualquer outra leitura, sem processo extra (`read -d ''`). O `resolucaoDe` passa a recusar o arquivo inteiro também quando o NUL está na linha de outro agente, que antes ignorava. Os quatro leitores concordam, e a falha continua aberta, como para qualquer linha inválida (`CONTRATO-expx-orquestracao.md` §11.2 e §11.4).
+- **Nada passa a ser aprovado.** Antes e depois, nenhum caso com NUL fazia o hook aprovar o que devia recusar. O `doctor` já acusava as duas projeções adulteradas, e não muda.
+- **Não exercitado:** o bash 3.2 do macOS. O `read -d ''` existe nele, mas a prova foi no bash 5 do Linux e no Git Bash do CI do Windows.
+
 ## 0.13.16 — o painel mostra declarada, resolvida e observada por invocação (F5 da orquestração)
 
 Só o painel muda: hooks, eventos, `init`, `doctor` e skills seguem como na 0.13.15, e o consumidor não precisa reinstalar nada para continuar como está. É a F5 da orquestração (`CONTRATO-expx-orquestracao.md` §11.5).

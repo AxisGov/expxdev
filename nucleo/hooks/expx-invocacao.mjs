@@ -54,17 +54,20 @@ function pastaDe(raiz) {
  * A linha vale pelas mesmas regras do leitor do rastro (`expx_resolucao_extras`,
  * em expx-rastro.sh): o hook e o rastro tem de concordar sobre ela. Se o hook
  * aceitasse uma linha que o rastro recusa, suprimiria o id explicito da chamada
- * (iguais) e o evento sairia sem `resolucao_id`.
+ * (iguais) e o evento sairia sem `resolucao_id`. Um NUL em qualquer ponto
+ * invalida o arquivo inteiro, mesmo na linha de outro agente, como no rastro.
  */
 function resolucaoDe(raiz, agente) {
-  let linhas;
+  let texto;
   try {
-    // como o `read` do shell: uma linha por \n, sem o \r do fim (CRLF, e o CR
-    // final sem quebra de linha)
-    linhas = readFileSync(join(raiz, ".expx", "orquestracao-rastro.tsv"), "utf8").split("\n").map((l) => l.replace(/\r$/, ""));
+    texto = readFileSync(join(raiz, ".expx", "orquestracao-rastro.tsv"), "utf8");
   } catch {
     return "";
   }
+  if (texto.includes("\0")) return "";
+  // como o `read` do shell: uma linha por \n, sem o \r do fim (CRLF, e o CR
+  // final sem quebra de linha)
+  const linhas = texto.split("\n").map((l) => l.replace(/\r$/, ""));
   if (linhas[0] !== "# expx-orquestracao-rastro 1") return "";
   if (!/^[A-Za-z0-9._-]+$/.test(agente)) return "";
   const dele = linhas.slice(1).filter((l) => l.startsWith(`${agente}\t`));
@@ -84,7 +87,8 @@ function resolucaoDe(raiz, agente) {
  * A skill e o papel do agente, da projecao dos papeis (`.expx/papeis.tsv`); `null` se
  * ele nao tem papel. O arquivo inteiro vale ou nao vale nada, pelas mesmas regras do
  * `expx_papel_de` (expx-rastro.sh) e do `lerPapeis` do CLI: a integridade final e o
- * envelope tem de concordar sobre quem e de aprovacao.
+ * envelope tem de concordar sobre quem e de aprovacao. Um NUL em qualquer ponto ja
+ * reprova o arquivo aqui, pelo alfabeto dos campos; o shell o confere a parte.
  */
 function papelDe(raiz, agente) {
   let texto;

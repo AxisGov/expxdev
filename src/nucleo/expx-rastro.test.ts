@@ -286,6 +286,31 @@ describe("fase e task", () => {
     expect(ev).not.toHaveProperty("resolucao_id");
   });
 
+  it("integração: projeção com NUL em qualquer ponto não acrescenta nada — o `read` do shell o descartaria em silêncio", () => {
+    const linha = (campos: string[]) => campos.join("\t");
+    const ok = ["auditor", "c".repeat(64), "raciocinio_normal", "declarada", "raciocinio_normal", "skill", "skill", "-", "-"];
+    const casos = [
+      `# expx-orquestracao-\0rastro 1\n${linha(ok)}\n`,
+      `# expx-orquestracao-rastro 1\n${linha([...ok.slice(0, 2), "raciocinio_\0normal", ...ok.slice(3)])}\n`,
+      `# expx-orquestracao-rastro 1\n${linha(["audi\0tor", ...ok.slice(1)])}\n`,
+      // NUL na linha de outro agente: o arquivo inteiro deixa de valer, como no hook
+      `# expx-orquestracao-rastro 1\n${linha(ok)}\n${linha(["qa\0", ...ok.slice(1)])}\n`,
+      // depois da última quebra de linha
+      `# expx-orquestracao-rastro 1\n${linha(ok)}\n\0`,
+    ];
+    for (const conteudo of [`# expx-orquestracao-rastro 1\n${linha(ok)}\n`, ...casos]) {
+      const raiz = temp();
+      mkdirSync(join(raiz, ".git"));
+      mkdirSync(join(raiz, ".expx"));
+      writeFileSync(join(raiz, ".expx", "orquestracao-rastro.tsv"), conteudo);
+      roda(raiz, 'expx_rastro_grava "$PWD" veredito_emitido agente ok x', { EXPX_TRABALHO_ID: "t", CLAUDECODE: "1", EXPX_AGENTE: "auditor" });
+      const [ev] = (eventos(raiz)["t.jsonl"] ?? []).map((l) => JSON.parse(l) as Record<string, unknown>);
+      // o controle, sem NUL, leva a resolução; todo caso com NUL, não
+      if (conteudo.includes("\0")) expect(ev, JSON.stringify(conteudo)).not.toHaveProperty("resolucao_id");
+      else expect(ev).toHaveProperty("resolucao_id", "c".repeat(64));
+    }
+  });
+
   it("integração: o harness detectado vai na linha, sem duplicar o que o chamador já mandou nas extras", () => {
     const raiz = temp();
     mkdirSync(join(raiz, ".git"));
