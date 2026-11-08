@@ -18,7 +18,8 @@ export type ExecucaoDoEvento = {
 export function execucaoDoEvento(
   evento: Evento,
   agentes: readonly ConfiguracaoAgente[],
-  resolucoes: Readonly<Record<string, ResolucaoNoPainel | null>> = {},
+  // só o recorte da linha do tempo: a resolução completa é da visão da invocação (§11.5)
+  resolucoes: Readonly<Record<string, Pick<ResolucaoNoPainel, "agente" | "model" | "effort"> | null>> = {},
 ): ExecucaoDoEvento {
   const model = evento.model ?? null;
   const effort = evento.effort ?? null;

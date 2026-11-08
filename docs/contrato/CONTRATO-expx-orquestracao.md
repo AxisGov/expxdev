@@ -17,7 +17,9 @@ projeção `.expx/orquestracao-rastro.tsv`; o painel mostra a resolução como
 configuração não observada (seção 11 e `CONTRATO-expx-eventos.md`). **Desde a
 F3c**, o hook do núcleo registra a `integridade_final` dos agentes de aprovação
 (seção 12). **Desde a 0.13.0**, o envelope da invocação observa a chamada de cada
-agente gerenciado (seção 13). A recusa operacional do veredito e o nível `isolado`
+agente gerenciado (seção 13). **Desde a F5**, o painel mostra, por invocação, a
+classe declarada, a resolução e o executor observado lado a lado, com a
+divergência destacada (11.5). A recusa operacional do veredito e o nível `isolado`
 ainda não existem.
 
 ## 1. Três coisas separadas
@@ -368,9 +370,10 @@ sai. Ela não é fonte de nada.
 - O `doctor` confere a projeção contra o lock e o registro
   (`orquestracao-projecao-divergente`, `CONTRATO-expx-instalacao.md` §5.3).
 
-### 11.3 O leitor
+### 11.3 O leitor da linha avulsa
 
-O painel mostra a configuração quando não há observação, e só ele:
+Na linha do tempo, cada evento mostra **uma** fonte para o executor. O painel
+mostra a configuração quando não há observação, e só ele:
 
 1. `model` ou `effort` observados (não `null`): histórico, sem completar o
    que falta;
@@ -420,6 +423,61 @@ regimes, e por isso o papel não é uma coluna da projeção do rastro (11.2).
   integridade final, e o do envelope, no fechamento e no abandono da chamada. A
   projeção é o estado presente, e só o evento diz qual papel valia quando o agente
   rodou.
+
+### 11.5 A visão da invocação (F5)
+
+O Detalhe de um trabalho ganha a seção **Orquestração**, que junta as três camadas
+da seção 1 numa linha por chamada. Ela só aparece quando o rastro do trabalho tem
+`invocacao_fechada`, `invocacao_abandonada` ou `integridade_final_verificada`, e
+abre sozinha quando há destaque vermelho. O formato dos eventos não muda: a visão
+só lê.
+
+- **A unidade é a `invocacao`.** Cada `invocacao_fechada` ou `invocacao_abandonada`
+  é uma linha. A linha avulsa do subagente, sem `invocacao`, continua com o leitor
+  da 11.3, na linha do tempo, e não entra aqui.
+- **Declarada e resolvida vêm do registro**, pelo `resolucao_id` da linha, com a
+  mesma leitura da 11.3 (formato, arquivo regular, `lerRegistro`). Os campos de
+  classe e de alternativa da própria linha não substituem o registro: o escritor
+  comum os tira da projeção vigente quando grava, e entre a comparação do hook e
+  essa releitura a projeção pode ter mudado. Sem `resolucao_id`, registro ilegível
+  ou registro de outro agente: as duas colunas ficam vazias, e a linha leva
+  **Inconsistência no rastro**.
+- **Observada** é a lista `modelos_observados`, como o hook a gravou.
+- **A integridade final se anexa só pela `instancia` idêntica**, comparada como
+  texto inteiro: 40 e 64 caracteres não se normalizam. Nada se correlaciona por
+  agente, horário, tarefa ou sessão. Integridade da mesma instância com outro agente
+  ou outro papel não se anexa e é inconsistência.
+- **Duplicata não se escolhe.** Duas linhas terminais para a mesma `invocacao`, duas
+  integridades para a mesma instância, ou uma instância citada por duas invocações
+  viram **Inconsistência no rastro**, sem mostrar nenhuma das versões.
+- **Integridade sem invocação** aparece à parte, como "sem invocação na janela".
+  Sem política, é só isso que a seção mostra, e nenhuma invocação é inventada. A
+  linha antiga, sem `papel` nem `instancia`, entra aqui também.
+
+Os destaques, e só eles:
+
+| O que está gravado | Rótulo | Cor |
+|---|---|---|
+| `fora_da_politica: true` | Fora da política | vermelho |
+| integridade anexada `divergente` ou `ausente` | Integridade final inválida | vermelho |
+| `estado_invocacao: falha` | Invocação falhou | vermelho |
+| resolução ausente, ilegível ou de outro agente; duplicata; par de outro agente ou papel | Inconsistência no rastro | vermelho |
+| `estado_invocacao: lancada` | Só lançamento; execução não julgável | âmbar |
+| `invocacao_abandonada` | Invocação abandonada | âmbar |
+| aprovador (`revisar`/`testar`) concluído ou com falha, sem integridade anexada | Par não visto na janela | âmbar |
+| concluída, sem `fora_da_politica`, com modelo observado que não corresponde à alternativa (ou ao `materializado`, na exceção 7.4) | Observado difere da alternativa materializada | âmbar |
+
+**O painel não rejulga a política.** `fora_da_politica` e a integridade final são os
+julgamentos dos hooks. A ausência de `fora_da_politica` não quer dizer "dentro da
+política": o hook não julga sem modelo observado nem registro legível (13.2). A
+única comparação da visão é a do último destaque, com a regra de correspondência da
+13.2, e ela não diz se o modelo está na cadeia nem a direção de um fallback.
+
+**A janela.** O painel lê só a cauda do rastro: no máximo 200 eventos, e os últimos
+64 KiB de cada arquivo (`<id>.1.jsonl` e `<id>.jsonl`). Por isso a falta do par é
+"não visto na janela", nunca "rastro incompleto". A contagem do critério da 13.5
+(20 vereditos, PRs, configurações, falso positivo) não é desta visão: o
+`veredito_emitido` não carrega `invocacao`, e o painel não lê o rastro inteiro.
 
 ## 12. Separação de papéis: a integridade final (F3c)
 

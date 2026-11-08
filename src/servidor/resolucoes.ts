@@ -1,14 +1,24 @@
 import { lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { caminhoDoRegistro, lerRegistro } from "../orquestracao/materializar.js";
+import type { OrigemAlternativa, OrigemClasse } from "../orquestracao/resolver.js";
+import type { Alternativa, Classe } from "../orquestracao/tipos.js";
 import type { LinhaEvento } from "../parser/esquema/evento.js";
 
-/** O que o painel mostra de uma resolução citada por um evento sem observação. */
+/** O que o painel mostra de uma resolução citada por um evento. */
 export type ResolucaoNoPainel = {
   agente: string;
   /** O que foi materializado: o `materializado` na exceção do v1, senão a alternativa. */
   model: string;
   effort: string | null;
+  /** A resolução validada, para a visão da invocação (CONTRATO-expx-orquestracao §11.5). */
+  classe_declarada: Classe;
+  origem_classe: OrigemClasse;
+  classe_resolvida: Classe;
+  cadeia: Alternativa[];
+  alternativa: Alternativa;
+  origem_alternativa: OrigemAlternativa;
+  materializado?: { model: string; effort?: string };
 };
 
 const ID = /^[0-9a-f]{64}$/;
@@ -41,10 +51,20 @@ function lerUma(raiz: string, id: string): ResolucaoNoPainel | null {
     if (!lstatSync(caminho).isFile()) return null;
     const r = lerRegistro(id, readFileSync(caminho, "utf8"));
     if (!r.ok) return null;
-    const m = r.resolucao.materializado;
-    return m !== undefined
-      ? { agente: r.resolucao.agente, model: m.model, effort: m.effort ?? null }
-      : { agente: r.resolucao.agente, model: r.resolucao.alternativa.model, effort: r.resolucao.alternativa.effort ?? null };
+    const { agente, classe_declarada, origem_classe, classe_resolvida, cadeia, alternativa, origem_alternativa, materializado } = r.resolucao;
+    const efetivo = materializado ?? alternativa;
+    return {
+      agente,
+      model: efetivo.model,
+      effort: efetivo.effort ?? null,
+      classe_declarada,
+      origem_classe,
+      classe_resolvida,
+      cadeia,
+      alternativa,
+      origem_alternativa,
+      ...(materializado !== undefined ? { materializado } : {}),
+    };
   } catch {
     return null;
   }

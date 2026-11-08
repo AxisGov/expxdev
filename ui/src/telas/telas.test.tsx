@@ -217,6 +217,74 @@ describe("detalhe do trabalho", () => {
     expect(titulos.some((item) => item.includes("T-01.03") && item.includes("histórico indisponível"))).toBe(true);
   });
 
+  it("integração: a seção Orquestração mostra declarada, resolvida e observada lado a lado, com a divergência destacada (F5)", () => {
+    const rid = "a".repeat(64);
+    const inst = "1".repeat(40);
+    const linha = {
+      expx_eventos: 1 as const,
+      trabalho_id: "exportacao-csv",
+      ferramenta: "mergex",
+      origem: "hook" as const,
+      fase: null,
+      task: null,
+      agente: "revisor-diff",
+      detalhe: "",
+      arquivos: [],
+    };
+    const comOrquestracao: Estado = {
+      ...ok,
+      eventos: {
+        "exportacao-csv": [
+          { ...linha, ts: "2026-11-08T12:00:02Z", evento: "invocacao_fechada", resultado: "ok", invocacao: "toolu_1", estado_invocacao: "concluida", instancia: inst, papel: "revisar", resolucao_id: rid, modelos_observados: ["claude-haiku-5-5"], fora_da_politica: true },
+          { ...linha, ts: "2026-11-08T12:00:01Z", evento: "integridade_final_verificada", resultado: "falha", instancia: inst, papel: "revisar", integridade_final: { estado: "divergente", diferencas: ["arvore"] } },
+          { ...linha, ts: "2026-11-08T11:00:00Z", agente: "qa", papel: "testar", evento: "integridade_final_verificada", resultado: "ok", instancia: "2".repeat(40), integridade_final: { estado: "igual", diferencas: [] } },
+          { ...linha, ts: "2026-11-08T10:00:00Z", ferramenta: "sprintx", origem: "agente", evento: "agente_concluido", resultado: "ok", resolucao_id: rid },
+        ],
+      },
+      resolucoes: {
+        [rid]: {
+          agente: "revisor-diff",
+          model: "sonnet",
+          effort: "high",
+          classe_declarada: "raciocinio_normal",
+          origem_classe: "declarada",
+          classe_resolvida: "raciocinio_normal",
+          cadeia: [{ id: "sonnet-high", model: "sonnet", effort: "high" }],
+          alternativa: { id: "sonnet-high", model: "sonnet", effort: "high" },
+          origem_alternativa: "projeto",
+        },
+      },
+    };
+    const { container } = render(<Detalhe estado={comOrquestracao} id="exportacao-csv" aoVoltar={() => undefined} />);
+    const secao = [...container.querySelectorAll("details")].find((d) => d.querySelector("summary")?.textContent?.startsWith("Orquestração"));
+    expect(secao).toBeDefined();
+    // com destaque vermelho, a seção já abre
+    expect(secao?.open).toBe(true);
+    const cabecalhos = [...(secao?.querySelectorAll("th") ?? [])].map((th) => th.textContent);
+    expect(cabecalhos).toEqual(expect.arrayContaining(["Declarada", "Resolvida", "Observada", "Integridade final"]));
+    const texto = secao?.textContent ?? "";
+    expect(texto).toContain("raciocinio_normal");
+    // o id distingue chamadas simultâneas do mesmo agente (CodeAnt no #152)
+    expect(texto).toContain("toolu_1");
+    expect(texto).toContain("sonnet-high · sonnet · high");
+    expect(texto).toContain("claude-haiku-5-5");
+    expect(texto).toContain("Fora da política");
+    expect(texto).toContain("Integridade final inválida");
+    expect(texto).toContain("divergente: arvore");
+    // a integridade do qa não tem invocação: aparece como órfã
+    expect(texto).toContain("qa");
+    expect(texto).toMatch(/sem invocação/i);
+    expect(texto).toMatch(/janela/i);
+    // a linha avulsa continua com o leitor da §11.3, na linha do tempo
+    expect(screen.getAllByText("revisor-diff · sonnet · high · configuração (não observada)").length).toBeGreaterThan(0);
+  });
+
+  it("funcional: sem invocação nem integridade no rastro, a seção Orquestração não aparece", () => {
+    const { container } = render(<Detalhe estado={ok} id="exportacao-csv" aoVoltar={() => undefined} />);
+    const resumos = [...container.querySelectorAll("summary")].map((s) => s.textContent ?? "");
+    expect(resumos.some((s) => s.startsWith("Orquestração"))).toBe(false);
+  });
+
   it("funcional: a barra de uma fase 1 de 2 mostra 50 por cento", () => {
     const { container } = render(<Detalhe estado={ok} id="exportacao-csv" aoVoltar={() => undefined} />);
     const barras = [...container.querySelectorAll('[role="progressbar"]')];

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.13.16 — o painel mostra declarada, resolvida e observada por invocação (F5 da orquestração)
+
+Só o painel muda: hooks, eventos, `init`, `doctor` e skills seguem como na 0.13.15, e o consumidor não precisa reinstalar nada para continuar como está. É a F5 da orquestração (`CONTRATO-expx-orquestracao.md` §11.5).
+
+- **A seção Orquestração no Detalhe.** Uma linha por invocação (`invocacao_fechada` ou `invocacao_abandonada`), com a classe declarada e a resolução lidas do registro `.expx/resolucoes/`, os modelos observados e a integridade final. Ela só aparece quando o rastro do trabalho tem invocação ou integridade, e abre sozinha quando há destaque vermelho.
+- **A integridade se anexa só pela `instancia` idêntica.** Nada se correlaciona por agente, horário, tarefa ou sessão. Integridade sem invocação aparece à parte, e sem política é só isso que a seção mostra.
+- **Destaques.** Em vermelho: fora da política, integridade final inválida, invocação que falhou e inconsistência no rastro (resolução ilegível ou de outro agente, duplicata, par de outro agente ou papel). Em âmbar: só lançamento, invocação abandonada, par não visto na janela e observado diferente da alternativa materializada.
+- **O painel não rejulga a política.** Ele mostra o que os hooks gravaram, e a ausência de `fora_da_politica` não é lida como "dentro da política". O painel lê só a cauda do rastro, então a falta do par é "não visto na janela", nunca "rastro incompleto".
+- **Fora da F5:** a contagem dos 20 vereditos do critério da recusa (§13.5). O `veredito_emitido` não carrega `invocacao`, e o painel não lê o rastro inteiro.
+- **Linha do tempo:** continua com o leitor da §11.3. O servidor passa a servir a resolução validada completa, e a linha do tempo usa só o recorte de antes.
+- **Não exercitado:** a seção foi provada com fixtures e testes de tela, não com o rastro de uma sessão real com subagentes.
+
 ## 0.13.15 — o papel decide quem é de aprovação (F4 da orquestração), e a DM-327 na MergeX
 
 Instale por PR, como a 0.13.14. É a F4 da orquestração: a integridade final e o primeiro plano do aprovador deixam de escolher o agente por uma lista de nomes e passam a decidir pelo `papel:` que a skill declara. Mudam o ExpxDev e as seis skills com agentes. Vem junto a DM-327 da MergeX, os dois nitpicks do CodeAnt na instalação da 0.13.14 (conselhos#271).
