@@ -549,16 +549,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.13.15 -R AxisGov/expxdev -D ~/expx-cli/v0.13.15 &&
+gh release download v0.13.16 -R AxisGov/expxdev -D ~/expx-cli/v0.13.16 &&
 (
-  cd ~/expx-cli/v0.13.15
+  cd ~/expx-cli/v0.13.16
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.13.15.tgz.sha256
+    sha256sum -c expxdev-0.13.16.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.13.15.tgz.sha256
+    shasum -a 256 -c expxdev-0.13.16.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.13.15/expxdev-0.13.15.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.13.16/expxdev-0.13.16.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -572,7 +572,7 @@ npx --yes --package ~/expx-cli/v0.13.15/expxdev-0.13.15.tgz expx init --skills b
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.13.15 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.13.16 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -686,6 +686,9 @@ npx --yes --package ~/expx-cli/v0.13.15/expxdev-0.13.15.tgz expx init --skills b
 - `0.13.15` fecha a F4 da orquestração: as skills declaram o `papel:` dos agentes, o `init` o projeta
   em `.expx/papeis.tsv`, e a integridade final e o primeiro plano decidem por ele, não pelo nome. Traz
   também a DM-327 da MergeX: nenhum braço da recusa da reconciliação sugere busca em remoto sem URL.
+- `0.13.16` é a F5 da orquestração: o Detalhe do painel mostra, por invocação, a classe declarada, a
+  resolução e o executor observado lado a lado, com a integridade final e a divergência destacada.
+  Só o painel muda.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
