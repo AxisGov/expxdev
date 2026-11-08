@@ -6,6 +6,7 @@ import { GrafoVivo } from "./GrafoVivo.js";
 import { motivosDoAlerta, rotuloDoMotivo } from "./alerta-grafo.js";
 import { rotuloEvento } from "../../../src/watch/logica/atividade.js";
 import { execucaoDoEvento } from "../modelos.js";
+import { SecaoOrquestracao } from "./Orquestracao.js";
 
 const ROTULO_STATUS: Record<string, string> = {
   pendente: "pendente", em_andamento: "em andamento", concluida: "concluída", bloqueada: "bloqueada",
@@ -264,6 +265,8 @@ export function Detalhe({
       </div>
 
       <LinhaDoTempo eventos={eventos} agentes={estado.agentes} resolucoes={estado.resolucoes ?? {}} branch={t.branch} />
+
+      <SecaoOrquestracao eventos={eventos} resolucoes={estado.resolucoes ?? {}} />
 
       <GrafoDoPlano trabalho={t} eventos={eventos} agentes={estado.agentes} resolucoes={estado.resolucoes ?? {}} />
 

@@ -50,9 +50,39 @@ describe("lerResolucoesCitadas", () => {
     const raiz = projeto([a, v1, fora]);
     const m = lerResolucoesCitadas(raiz, { t: [evento(a.resolucao_id), evento(v1.resolucao_id), evento(undefined)] });
     expect(m).toEqual({
-      [a.resolucao_id]: { agente: "auditor", model: "sonnet", effort: "high" },
-      [v1.resolucao_id]: { agente: "triagem", model: "haiku", effort: null },
+      [a.resolucao_id]: {
+        agente: "auditor",
+        model: "sonnet",
+        effort: "high",
+        classe_declarada: "raciocinio_normal",
+        origem_classe: "declarada",
+        classe_resolvida: "raciocinio_normal",
+        cadeia: [{ id: "skill", model: "sonnet", effort: "high" }],
+        alternativa: { id: "skill", model: "sonnet", effort: "high" },
+        origem_alternativa: "skill",
+      },
+      [v1.resolucao_id]: {
+        agente: "triagem",
+        model: "haiku",
+        effort: null,
+        classe_declarada: "raciocinio_normal",
+        origem_classe: "declarada",
+        classe_resolvida: "raciocinio_normal",
+        cadeia: [{ id: "skill", model: "sonnet", effort: "high" }],
+        alternativa: { id: "skill", model: "sonnet", effort: "high" },
+        origem_alternativa: "agentes-json-v1",
+        materializado: { model: "haiku" },
+      },
     });
+  });
+
+  it("funcional: a resolução completa (F5) não leva campo fora do que o painel mostra", () => {
+    const a = resolucao("auditor", { classe_resolvida: "profundo_excepcional", origem_classe: "agente" });
+    const r = lerResolucoesCitadas(projeto([a]), { t: [evento(a.resolucao_id)] })[a.resolucao_id];
+    expect(r?.classe_resolvida).toBe("profundo_excepcional");
+    expect(r?.origem_classe).toBe("agente");
+    expect(Object.keys(r ?? {})).not.toContain("resolucao_id");
+    expect(Object.keys(r ?? {})).not.toContain("versao_resolvedor");
   });
 
   it("funcional: id fora do formato não vira caminho; ausente, adulterado ou link é null", () => {

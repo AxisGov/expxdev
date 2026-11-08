@@ -214,13 +214,40 @@ export type Evento = {
   effort?: string | null;
   /** A resolução em vigor para o agente (CONTRATO-expx-orquestracao §11.1). */
   resolucao_id?: string;
+  classe_declarada?: string;
+  classe_resolvida?: string;
+  origem_classe?: string;
+  alternativa?: string;
+  origem_alternativa?: string;
+  materializado?: { model: string; effort?: string };
+  /** O envelope da invocação (§13.2) e a integridade final (§12.3). */
+  invocacao?: string;
+  instancia?: string;
+  estado_invocacao?: "concluida" | "lancada" | "falha";
+  modelos_observados?: string[];
+  fora_da_politica?: true;
+  integridade_final?: { estado: "igual" | "divergente" | "ausente"; diferencas: string[] };
+  papel?: string;
 };
 
-/** Uma resolução citada por evento, como o servidor a serve (`src/servidor/resolucoes.ts`). */
+export type AlternativaNoPainel = { id: string; model: string; effort?: string };
+
+/**
+ * Uma resolução citada por evento, como o servidor a serve (`src/servidor/resolucoes.ts`).
+ * `agente`, `model` e `effort` são o que a linha do tempo mostra (§11.3); o resto é a
+ * resolução validada do registro, para a visão da invocação (§11.5).
+ */
 export type ResolucaoNoPainel = {
   agente: string;
   model: string;
   effort: string | null;
+  classe_declarada: string;
+  origem_classe: string;
+  classe_resolvida: string;
+  cadeia: AlternativaNoPainel[];
+  alternativa: AlternativaNoPainel;
+  origem_alternativa: string;
+  materializado?: { model: string; effort?: string };
 };
 
 /** Configuração efetiva lida do agente instalado pelo `init`. */
