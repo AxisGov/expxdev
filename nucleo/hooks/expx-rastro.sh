@@ -339,15 +339,26 @@ expx_modo() {
   esac
 }
 
+# Verdadeiro se o arquivo tem um byte NUL. O `read` do shell descarta o NUL em
+# silencio, e o leitor Node da mesma projecao nao: sem esta conferencia, os dois
+# discordariam sobre o mesmo arquivo. O `read -d ''` so termina com sucesso ao
+# achar um NUL; sem nenhum, chega ao fim do arquivo e falha. Sem processo extra.
+expx_tem_nul() {
+  local _nul
+  IFS= read -r -d '' _nul < "$1"
+}
+
 # As chaves da resolucao do agente (CONTRATO-expx-orquestracao §11.1), lidas da
 # projecao plana que o `expx init` grava com a politica ativa
 # (.expx/orquestracao-rastro.tsv). Imprime o fragmento JSON ou nada: sem
-# projecao, com cabecalho, id ou campo fora do formato, ou com o agente fora
-# dela. Falha aberta — a linha sai sem as chaves, nunca com evidencia parcial.
+# projecao, com NUL em qualquer ponto, com cabecalho, id ou campo fora do
+# formato, ou com o agente fora dela. Falha aberta — a linha sai sem as chaves,
+# nunca com evidencia parcial.
 # Os campos so aceitam o que dispensa escape em JSON, entao entram literais.
 expx_resolucao_extras() {
   local arq="$1/.expx/orquestracao-rastro.tsv" agente="$2" cab=""
   [ -f "$arq" ] || return 0
+  expx_tem_nul "$arq" && return 0
   IFS= read -r cab < "$arq" || true
   [ "${cab%$'\r'}" = "# expx-orquestracao-rastro 1" ] || return 0
   # o nome do agente no alfabeto de nome: fora dele, nem consigo mesmo casa
@@ -395,14 +406,15 @@ EXPX_PROJECAO
 # O papel do agente e a skill que o publica (CONTRATO-expx-orquestracao §11.4),
 # lidos da projecao que o `expx init` grava com ou sem politica
 # (.expx/papeis.tsv). Imprime "skill<TAB>papel" ou nada. O arquivo inteiro vale
-# ou nao vale nada, pelas mesmas regras do `lerPapeis` do CLI: cabecalho
-# diferente, linha sem exatamente dois TABs, campo fora do alfabeto, o
+# ou nao vale nada, pelas mesmas regras do `lerPapeis` do CLI: NUL em qualquer
+# ponto, cabecalho diferente, linha sem exatamente dois TABs, campo fora do alfabeto, o
 # `principal`, skill fora do vocabulario `ferramenta` do rastro, papel fora do
 # vocabulario ou agente repetido deixam todo agente sem papel. Falha
 # aberta: sem papel, o agente nao e de aprovacao. Nunca le o papel do nome.
 expx_papel_de() {
   local arq="$1/.expx/papeis.tsv" agente="$2" cab="" linha tabs ag sk pa achado="" vistos=$'\n'
   [ -f "$arq" ] || return 0
+  expx_tem_nul "$arq" && return 0
   case "$agente" in ""|*[!a-z0-9-]*) return 0 ;; esac
   {
     # o CR do fim sai: o checkout com core.autocrlf entrega a projecao em CRLF

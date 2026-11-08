@@ -347,6 +347,23 @@ describe("expx-integridade-final: a foto do início contra o fim, por instância
     expect(verificacoes(raiz)).toMatchObject([{ agente: "qa", ferramenta: "runx", papel: "testar", integridade_final: { estado: "igual" } }]);
   });
 
+  it("funcional: a projeção dos papéis com NUL em qualquer ponto não vale nada, como no hook da invocação", () => {
+    const casos = [
+      PAPEIS.replace("qa\t", "q\0a\t"),
+      PAPEIS.replace("runx\ttestar", "runx\ttes\0tar"),
+      PAPEIS.replace("auditor-plano\t", "auditor-\0plano\t"),
+      PAPEIS.replace("# expx-papeis 1", "# expx-\0papeis 1"),
+      `${PAPEIS}\0`,
+    ];
+    for (const papeis of casos) {
+      const raiz = repo(papeis);
+      inicio(raiz, "qa", "ag-1");
+      fim(raiz, "qa", "ag-1");
+      expect(verificacoes(raiz), JSON.stringify(papeis)).toEqual([]);
+      expect(arquivosDoEstado(raiz), JSON.stringify(papeis)).toEqual([]);
+    }
+  });
+
   it("funcional: a foto do início que falha guarda o papel, e o fim grava ausente mesmo com a projeção trocada", () => {
     const raiz = mkdtempSync(join(tmpdir(), "expx-integridade-"));
     criados.push(raiz);

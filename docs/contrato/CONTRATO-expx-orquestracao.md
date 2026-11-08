@@ -367,6 +367,9 @@ sai. Ela não é fonte de nada.
   TABs, campo vazio ou fora do alfabeto, `resolucao_id` fora do formato ou
   agente fora do alfabeto de nome deixam a linha **sem** as chaves, nunca com
   parte delas.
+- Um NUL em qualquer ponto do arquivo, mesmo na linha de outro agente, invalida a
+  projeção inteira, no escritor e no hook do envelope (§13): o `read` do shell o
+  descartaria em silêncio, e os dois leitores discordariam sobre a mesma linha.
 - O `doctor` confere a projeção contra o lock e o registro
   (`orquestracao-projecao-divergente`, `CONTRATO-expx-instalacao.md` §5.3).
 
@@ -401,7 +404,8 @@ regimes, e por isso o papel não é uma coluna da projeção do rastro (11.2).
   fora da projeção, com aviso no plano, e não passa pela integridade nem pelo
   primeiro plano. O mesmo `name` com papel em duas skills recusa o plano.
 - Sem nenhum agente com papel, o arquivo não existe, e o `init` remove o anterior.
-- Os hooks aceitam o arquivo inteiro ou nada: cabeçalho diferente, linha sem
+- Os hooks aceitam o arquivo inteiro ou nada: NUL em qualquer ponto (o `read` do
+  shell o descartaria em silêncio), cabeçalho diferente, linha sem
   exatamente dois TABs, campo fora de `[a-z0-9-]`, papel fora do vocabulário ou
   agente repetido deixam todo agente sem papel, e o mesmo vale para o `principal` e
   para skill fora do vocabulário `ferramenta` do rastro. O CLI lê com as mesmas
