@@ -217,6 +217,18 @@ describe("visaoDaOrquestracao", () => {
     expect(JSON.stringify(orfa)).not.toMatch(/incomplet/i);
   });
 
+  it("funcional: órfãs com a mesma instância são inconsistência, sem mostrar nenhuma das versões (CodeAnt no #152)", () => {
+    const v = visaoDaOrquestracao(
+      [integridade(), integridade({ ts: "2026-11-08T12:00:04Z", resultado: "falha", integridade_final: { estado: "divergente", diferencas: ["arvore"] } })],
+      resolucoes,
+    );
+    expect(v.orfas).toHaveLength(2);
+    for (const o of v.orfas) {
+      expect(o.integridade).toBeNull();
+      expect(o.destaques).toEqual([{ nivel: "bug", texto: `${ROTULO.inconsistencia}: instância repetida em mais de uma integridade` }]);
+    }
+  });
+
   it("funcional: sem política só existem integridades, e nenhuma invocação é inventada; linha antiga sem papel nem instância também é órfã", () => {
     const v = visaoDaOrquestracao(
       [

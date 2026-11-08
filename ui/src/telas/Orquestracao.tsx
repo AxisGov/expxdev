@@ -107,6 +107,8 @@ export function SecaoOrquestracao({
                 <td>
                   <div><strong style={{ fontWeight: 560 }}>{l.agente}</strong>{l.papel !== null ? <span className="dep"> · {l.papel}</span> : null}</div>
                   <div className="dep">{ROTULO_ESTADO[l.estado]} · <time dateTime={l.ts}>{instante(l.ts)}</time></div>
+                  {/* o id distingue chamadas simultâneas do mesmo agente: o horário tem precisão de segundo */}
+                  <div className="dep mono">{l.invocacao}</div>
                   <Destaques destaques={l.destaques} />
                 </td>
                 <td><Declarada l={l} /></td>

@@ -205,12 +205,16 @@ export function visaoDaOrquestracao(
   for (const e of integridades) {
     const instancia = typeof e.instancia === "string" ? e.instancia : null;
     if (instancia !== null && instanciasDasInvocacoes.has(instancia)) continue;
-    const integridade = integridadeDe(e);
-    const destaques = destaquesDaIntegridade(integridade);
+    // duplicata não se escolhe: nenhuma das versões aparece
     if (instancia !== null && (integridadesPorInstancia.get(instancia)?.length ?? 0) > 1) {
-      destaques.push(inconsistencia("instância repetida em mais de uma integridade"));
+      orfas.push({
+        ts: e.ts, agente: e.agente, papel: e.papel ?? null, instancia, integridade: null,
+        destaques: [inconsistencia("instância repetida em mais de uma integridade")],
+      });
+      continue;
     }
-    orfas.push({ ts: e.ts, agente: e.agente, papel: e.papel ?? null, instancia, integridade, destaques });
+    const integridade = integridadeDe(e);
+    orfas.push({ ts: e.ts, agente: e.agente, papel: e.papel ?? null, instancia, integridade, destaques: destaquesDaIntegridade(integridade) });
   }
 
   return { invocacoes, orfas };

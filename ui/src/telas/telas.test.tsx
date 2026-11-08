@@ -264,6 +264,8 @@ describe("detalhe do trabalho", () => {
     expect(cabecalhos).toEqual(expect.arrayContaining(["Declarada", "Resolvida", "Observada", "Integridade final"]));
     const texto = secao?.textContent ?? "";
     expect(texto).toContain("raciocinio_normal");
+    // o id distingue chamadas simultâneas do mesmo agente (CodeAnt no #152)
+    expect(texto).toContain("toolu_1");
     expect(texto).toContain("sonnet-high · sonnet · high");
     expect(texto).toContain("claude-haiku-5-5");
     expect(texto).toContain("Fora da política");
