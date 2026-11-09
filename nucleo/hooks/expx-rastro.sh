@@ -339,7 +339,7 @@ expx_id_da_pasta() {
 # o `printf -v` avaliaria o indice de `v[$(comando)]`.
 expx_id_do_frontmatter() {
   case "$1" in ""|[!A-Za-z_]*|*[!A-Za-z0-9_]*) return 0 ;; esac
-  local _c="" _l _v="" _n=0 _aberto="" _visto="" _q="" _r _t
+  local _c="" _l _v="" _n=0 _aberto="" _visto="" _q="" _r _t _escapa=""
   # sem aspas, o YAML do painel le estes como booleano, nulo ou numero, nunca string
   local _nao_string='^(true|True|TRUE|false|False|FALSE|null|Null|NULL|[0-9]+|0o[0-7]+|0x[0-9A-Fa-f]+|[0-9]+[.][0-9]*([eE][-+]?[0-9]+)?|[0-9]+[eE][-+]?[0-9]+)$'
   printf -v "$1" '%s' ""
@@ -356,9 +356,16 @@ expx_id_do_frontmatter() {
       continue
     fi
     # fecha em qualquer linha que comece com `---`, como o painel (`\n---`)
-    case "$_l" in ---*) printf -v "$1" '%s' "$_v"; return 0 ;; esac
+    case "$_l" in
+      ---*) [ -z "$_escapa" ] || _v=""; printf -v "$1" '%s' "$_v"; return 0 ;;
+    esac
     _n=$((_n + 1))
     [ "$_n" -le 50 ] || return 0
+    # chave entre aspas duplas com escape, antes ou depois da nossa: o YAML do painel a
+    # decodifica, e ela pode ser `trabalho_id` repetida (o painel recusa o arquivo)
+    case "$_l" in
+      \"*) _t="${_l%%\":*}"; [ "$_t" = "$_l" ] || case "$_t" in *\\*) _escapa=1 ;; esac ;;
+    esac
     # a linha indentada logo depois da chave continua o valor no YAML do painel
     # (`OC-2026-` + `  0007` e `OC-2026- 0007`): o valor de uma linha nao vale
     # mesmo depois de linhas vazias, que o escalar atravessa. A linha indentada que so tem

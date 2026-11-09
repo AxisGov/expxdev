@@ -618,6 +618,9 @@ describe("expx_trabalho_id antes do ORQUESTRADOR.md e pelo frontmatter", () => {
     // chave repetida: o YAML do painel recusa o arquivo (Map keys must be unique)
     "---\ntrabalho_id: OC-2026-0007\ntrabalho_id: OC-B\n---\n",
     "---\ntrabalho_id: OC-2026-0007\nkind: x\n\"trabalho_id\": OC-B\n---\n",
+    // chave com escape, que o YAML do painel decodifica: pode ser a mesma, e o painel recusa
+    '---\ntrabalho_id: OC-2026-0007\n"trabalho\\u005fid": OC-B\n---\n',
+    '---\n"trabalho\\u005fid": OC-A\ntrabalho_id: OC-2026-0007\n---\n',
     "---\nkind: x\n---\ntrabalho_id: OC-2026-0007\n",
     "---\n  trabalho_id: OC-2026-0007\n---\n",
     `---\n${linhas50}\ntrabalho_id: OC-2026-0007\n---\n`,
