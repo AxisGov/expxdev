@@ -68,6 +68,20 @@ docs/eventos/<trabalho_id>.jsonl
 
 Escrito por hooks e pelas próprias skills nas transições de fase. Lido pelo painel. Ninguém edita à mão.
 
+### De onde sai o `trabalho_id` dos hooks do núcleo
+
+Os hooks do núcleo (o rastro, a integridade final e o envelope da invocação) escolhem o trabalho por `expx_trabalho_id`, em `nucleo/hooks/expx-rastro.sh`, nesta ordem:
+
+1. `EXPX_TRABALHO_ID`, quando a skill já sabe qual é;
+2. o `trabalho_id` de `.expx/expx-lock.json`;
+3. a pasta cujo nome é o último segmento da branch (`feature/<slug>`, `fix/<OC-ID>-<slug>`), quando ela tem `ORQUESTRADOR.md`, ou ainda só o `00-PLANEJAMENTO.md` (sprintx, F1 a F3) ou o `00-OCORRENCIA.md` (runx, E1);
+4. o único trabalho com `ORQUESTRADOR.md`; os marcadores do planejamento não contam aqui;
+5. `sem-trabalho`. O mtime nunca escolhe.
+
+Nos passos 3 e 4, o id é o `trabalho_id` do frontmatter da pasta, o mesmo que o painel usa: o primeiro válido entre `ORQUESTRADOR.md`, `00-OCORRENCIA.md` e `00-PLANEJAMENTO.md`. Só sem nenhum o id é o nome da pasta. Vale o bloco que abre na primeira linha com `---` (um BOM UTF-8 no início sai antes) e fecha na próxima linha que começa com `---`, os dois como no painel, em até 50 linhas, com a chave na coluna 0, o valor numa linha só (a linha indentada logo depois da chave o invalida, porque o YAML do painel a leria como continuação) e no alfabeto `[A-Za-z0-9][A-Za-z0-9._-]*`, até 64 caracteres. NUL ou arquivo ilegível invalidam o arquivo, e o seguinte é consultado. Os passos 1 e 2 mantêm a sanitização de sempre.
+
+Até a 0.13.18, o passo 3 devolvia o nome da pasta e só via `ORQUESTRADOR.md`. Os eventos do núcleo de uma ocorrência da runx iam para `OC-AAAA-NNNN-<slug>.jsonl`, fora do painel, e os do planejamento da sprintx iam para `sem-trabalho.jsonl`. Esses arquivos não são migrados nem unidos.
+
 ### Formato da linha
 
 ```json

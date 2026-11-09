@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { bashDosHooks, RAIZ_DO_REPO } from "../teste/candidatos.js";
 import { suportaNomeComCaractereReservado, suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
+import { lerFrontmatter } from "../parser/leitura/frontmatter.js";
 
 /**
  * `nucleo/hooks/expx-rastro.sh`, a biblioteca de rastro que o plugin distribui
@@ -449,6 +450,266 @@ describe("expx_trabalho_id", () => {
   it("funcional: EXPX_TRABALHO_ID continua vencendo a branch", () => {
     const raiz = duasFeatures("feature/b");
     expect(roda(raiz, 'expx_trabalho_id "$PWD"', { EXPX_TRABALHO_ID: "outro" }).trimEnd()).toBe("outro");
+  });
+});
+
+describe("expx_trabalho_id antes do ORQUESTRADOR.md e pelo frontmatter", () => {
+  const fm = (id: string): string => `---\nkind: x\ntrabalho_id: ${id}\n---\n# t\n`;
+
+  /** Repositório na `branch`, com os arquivos dados (caminho relativo a `docs/` → conteúdo). */
+  function repo(branch: string, arquivos: Record<string, string | Buffer>): string {
+    const raiz = temp();
+    git(raiz, "init", "-q", "-b", branch);
+    for (const [rel, conteudo] of Object.entries(arquivos)) {
+      const f = join(raiz, "docs", rel);
+      mkdirSync(join(f, ".."), { recursive: true });
+      writeFileSync(f, conteudo);
+    }
+    return raiz;
+  }
+
+  const id = (raiz: string): string => roda(raiz, 'expx_trabalho_id "$PWD"').trimEnd();
+
+  /** Duas ocorrências fechadas da runx, que não podem decidir pela nova. */
+  const OCS_ANTIGAS = {
+    "manutencao/OC-2026-0005-z/ORQUESTRADOR.md": fm("OC-2026-0005"),
+    "manutencao/OC-2026-0006-y/ORQUESTRADOR.md": fm("OC-2026-0006"),
+  };
+
+  it("funcional: na F1 da sprintx, só com 00-PLANEJAMENTO.md na pasta da branch, o trabalho é o dela", () => {
+    const raiz = repo("feature/nova", {
+      "sprintx/features/a/ORQUESTRADOR.md": fm("a"),
+      "sprintx/features/b/ORQUESTRADOR.md": fm("b"),
+      "sprintx/features/nova/00-PLANEJAMENTO.md": fm("nova"),
+    });
+    expect(id(raiz)).toBe("nova");
+  });
+
+  it("funcional: no E1 da runx, só com 00-OCORRENCIA.md, o trabalho é o id do frontmatter, sem o slug", () => {
+    const raiz = repo("fix/OC-2026-0007-x", {
+      ...OCS_ANTIGAS,
+      "manutencao/OC-2026-0007-x/00-OCORRENCIA.md": fm("OC-2026-0007"),
+    });
+    expect(id(raiz)).toBe("OC-2026-0007");
+  });
+
+  it("funcional: depois do E2 da runx, com ORQUESTRADOR.md e 00-OCORRENCIA.md, o id é o do frontmatter", () => {
+    const raiz = repo("fix/OC-2026-0007-x", {
+      ...OCS_ANTIGAS,
+      "manutencao/OC-2026-0007-x/ORQUESTRADOR.md": fm("OC-2026-0007"),
+      "manutencao/OC-2026-0007-x/00-OCORRENCIA.md": fm("OC-2026-0007"),
+    });
+    expect(id(raiz)).toBe("OC-2026-0007");
+  });
+
+  it("funcional: a pasta com dois marcadores conta uma vez, e o único trabalho sai pelo frontmatter", () => {
+    const raiz = repo("main", {
+      "manutencao/OC-2026-0007-x/ORQUESTRADOR.md": fm("OC-2026-0007"),
+      "manutencao/OC-2026-0007-x/00-OCORRENCIA.md": fm("OC-2026-0007"),
+    });
+    expect(id(raiz)).toBe("OC-2026-0007");
+  });
+
+  it("funcional: os marcadores do planejamento não contam sem a branch — o único ORQUESTRADOR.md continua decidindo", () => {
+    expect(
+      id(
+        repo("main", {
+          "sprintx/features/unico/ORQUESTRADOR.md": fm("unico"),
+          "sprintx/features/abandonada/00-PLANEJAMENTO.md": fm("abandonada"),
+          "manutencao/OC-2026-0009-w/00-OCORRENCIA.md": fm("OC-2026-0009"),
+        }),
+      ),
+    ).toBe("unico");
+    expect(id(repo("main", { "sprintx/features/so-planejada/00-PLANEJAMENTO.md": fm("so-planejada") }))).toBe(
+      "sem-trabalho",
+    );
+  });
+
+  it("funcional: a sprintx grava trabalho_id igual ao slug, e a pasta da branch devolve o slug", () => {
+    const raiz = repo("feature/nova", {
+      "sprintx/features/a/ORQUESTRADOR.md": fm("a"),
+      "sprintx/features/nova/ORQUESTRADOR.md": fm("nova"),
+      "sprintx/features/nova/00-PLANEJAMENTO.md": fm("nova"),
+    });
+    expect(id(raiz)).toBe("nova");
+  });
+
+  const BOM = String.fromCharCode(0xfeff);
+  const linhas50 = Array.from({ length: 50 }, (_, i) => `k${String(i)}: v`).join("\n");
+
+  /** Frontmatter com id seguro: o hook devolve OC-2026-0007. */
+  const VALIDOS: string[] = [
+    "---\r\nkind: x\r\ntrabalho_id: OC-2026-0007\r\n---\r\n",
+    '---\ntrabalho_id: "OC-2026-0007"\n---\n',
+    "---\ntrabalho_id: 'OC-2026-0007'\n---\n",
+    "---\ntrabalho_id:    OC-2026-0007   \n---\n",
+    "---\ntrabalho_id: OC-2026-0007\n\nkind: x\n---\n",
+    "---\ntrabalho_id: OC-2026-0007\n# comentario\nkind: x\n---\n",
+    // o BOM do início sai antes do `---`, como no painel (D-25)
+    `${BOM}---\ntrabalho_id: OC-2026-0007\n---\n`,
+    `${BOM}---\r\ntrabalho_id: OC-2026-0007\r\n---\r\n`,
+  ];
+
+  /** Frontmatter sem id seguro: o hook cai para o nome da pasta. */
+  const INVALIDOS: (string | Buffer)[] = [
+    fm("../x"),
+    fm(""),
+    fm("a b"),
+    fm("-comeca-com-hifen"),
+    fm("x".repeat(65)),
+    fm("OC-2026-0007 # comentario"),
+    "kind: x\ntrabalho_id: OC-2026-0007\n",
+    "# titulo\n---\ntrabalho_id: OC-2026-0007\n---\n",
+    // só o BOM do início sai: em dobro, ou no meio do arquivo, ele é preâmbulo
+    `${BOM}${BOM}---\ntrabalho_id: OC-2026-0007\n---\n`,
+    `---\n${BOM}trabalho_id: OC-2026-0007\n---\n`,
+    // a linha indentada depois da chave continua o valor no YAML do painel
+    "---\ntrabalho_id: OC-2026-\n  0007\n---\n",
+    "---\ntrabalho_id: OC-2026-0007\n\tx\n---\n",
+    "---\ntrabalho_id: OC-2026-\n\n\n  0007\n---\n",
+    "---\nkind: x\n---\ntrabalho_id: OC-2026-0007\n",
+    "---\n  trabalho_id: OC-2026-0007\n---\n",
+    `---\n${linhas50}\ntrabalho_id: OC-2026-0007\n---\n`,
+    Buffer.from("---\ntrabalho_id: OC-2026-\u00000007\n---\n"),
+    Buffer.from("---\nkind: x\u0000\ntrabalho_id: OC-2026-0007\n---\n"),
+  ];
+
+  const naPasta = (conteudo: string | Buffer): string =>
+    repo("fix/OC-2026-0007-x", { ...OCS_ANTIGAS, "manutencao/OC-2026-0007-x/ORQUESTRADOR.md": conteudo });
+
+  it("funcional: o valor válido sai com CRLF, aspas e espaços das pontas", () => {
+    for (const conteudo of VALIDOS) {
+      const raiz = naPasta(conteudo);
+      expect(id(raiz), JSON.stringify(conteudo)).toBe("OC-2026-0007");
+      // o BOM sai por bytes: vale também fora de um locale UTF-8
+      expect(roda(raiz, 'expx_trabalho_id "$PWD"', { LC_ALL: "C" }).trimEnd(), JSON.stringify(conteudo)).toBe("OC-2026-0007");
+    }
+  });
+
+  it("funcional: frontmatter sem id seguro cai para o nome da pasta", () => {
+    for (const conteudo of INVALIDOS) {
+      expect(id(naPasta(conteudo)), JSON.stringify(conteudo.toString())).toBe("OC-2026-0007-x");
+    }
+  });
+
+  it("funcional: quando o hook e o painel aceitam o id, é o mesmo id", () => {
+    // Além dos casos acima, formas que o YAML lê de outro jeito que o olho. Hook que
+    // recusa cai no nome da pasta, como antes da 0.13.19; painel que recusa (número,
+    // booleano, chave repetida) não mostra o trabalho, e o id do arquivo não importa.
+    const sondas = [
+      "---\ntrabalho_id: 0123\n---\n",
+      "---\ntrabalho_id: true\n---\n",
+      "---\ntrabalho_id: 0x1F\n---\n",
+      "---\ntrabalho_id:\tOC-2026-0007\n---\n",
+      "---\ntrabalho_id: OC-2026-0007\ntrabalho_id: OC-B\n---\n",
+      "---\ntrabalho_id: OC-2026-0007\n  # comentario indentado\n---\n",
+      // o painel fecha o bloco em qualquer linha que comece com `---`
+      "---\n trabalho_id: OC-A\n--- texto\ntrabalho_id: OC-B\n---\n",
+      "---\nkind: x\n----\ntrabalho_id: OC-B\n---\n",
+    ];
+    for (const conteudo of [...VALIDOS, ...INVALIDOS, ...sondas]) {
+      const doHook = id(naPasta(conteudo));
+      if (doHook === "OC-2026-0007-x") continue;
+      const lido = lerFrontmatter(conteudo.toString());
+      const dados = lido.ok ? (lido.dados as Record<string, unknown> | null) : null;
+      const doPainel = typeof dados?.["trabalho_id"] === "string" ? dados["trabalho_id"].trim() : null;
+      if (doPainel === null) continue;
+      expect(doHook, JSON.stringify(conteudo.toString())).toBe(doPainel);
+    }
+  });
+
+  it("funcional: frontmatters gerados de peças soltas também concordam com o painel", () => {
+    const pecas = [
+      "---", "--- x", "----", "trabalho_id: OC-A", " trabalho_id: OC-B", "trabalho_id: 'OC-C'", 'trabalho_id: "OC-D"',
+      "trabalho_id: OC-E # c", "trabalho_id:", "trabalho_id:\tOC-F", "  cont", "\tcont", "", "# c", "  # c", "kind: x",
+      "lista:", "  - item", "texto: |", "  trabalho_id: OC-G",
+    ];
+    let semente = 20261109;
+    // LCG em 32 bits (Math.imul não perde precisão), sorteado pelos bits altos
+    const sorteia = (n: number): number => {
+      semente = (Math.imul(semente, 1103515245) + 12345) >>> 0;
+      return (semente >>> 16) % n;
+    };
+    const raiz = naPasta("");
+    const orq = join(raiz, "docs", "manutencao", "OC-2026-0007-x", "ORQUESTRADOR.md");
+    let comparados = 0;
+    for (let i = 0; i < 150; i++) {
+      const linhas = ["---", ...Array.from({ length: 1 + sorteia(6) }, () => pecas[sorteia(pecas.length)] ?? "")];
+      if (sorteia(3) > 0) linhas.push("---");
+      const fim = sorteia(4) === 0 ? "\r\n" : "\n";
+      const conteudo = (sorteia(5) === 0 ? BOM : "") + linhas.join(fim) + fim;
+      writeFileSync(orq, conteudo);
+      const doHook = id(raiz);
+      if (doHook === "OC-2026-0007-x") continue;
+      const lido = lerFrontmatter(conteudo);
+      const dados = lido.ok ? (lido.dados as Record<string, unknown> | null) : null;
+      const doPainel = typeof dados?.["trabalho_id"] === "string" ? dados["trabalho_id"].trim() : null;
+      if (doPainel === null) continue;
+      expect(doHook, JSON.stringify(conteudo)).toBe(doPainel);
+      comparados++;
+    }
+    // a semente fixa tem de chegar a casos em que os dois aceitam, senão o teste não prova nada
+    expect(comparados).toBeGreaterThanOrEqual(10);
+  });
+
+  it("funcional: arquivo ilegível cai para o próximo marcador e, sem ele, para o nome da pasta", () => {
+    if (process.platform === "win32" || process.getuid?.() === 0) return;
+    const raiz = repo("fix/OC-2026-0007-x", { ...OCS_ANTIGAS, "manutencao/OC-2026-0007-x/ORQUESTRADOR.md": fm("OC-2026-0007") });
+    const orq = join(raiz, "docs", "manutencao", "OC-2026-0007-x", "ORQUESTRADOR.md");
+    spawnSync("chmod", ["000", orq]);
+    try {
+      expect(id(raiz)).toBe("OC-2026-0007-x");
+      // o arquivo ilegível não suja o stderr de cada chamada de hook
+      const r = spawnSync(BASH, ["-c", '. "$1"; expx_trabalho_id "$PWD"', "rastro", RASTRO], { cwd: raiz, encoding: "utf8" });
+      expect(r.stderr).toBe("");
+      writeFileSync(join(raiz, "docs", "manutencao", "OC-2026-0007-x", "00-OCORRENCIA.md"), fm("OC-2026-0007"));
+      expect(id(raiz)).toBe("OC-2026-0007");
+    } finally {
+      spawnSync("chmod", ["644", orq]);
+    }
+  });
+
+  it("funcional: precedência ORQUESTRADOR > 00-OCORRENCIA > 00-PLANEJAMENTO, e o inválido não barra o seguinte", () => {
+    const pasta = "manutencao/OC-2026-0007-x";
+    const caso = (arquivos: Record<string, string>): string =>
+      id(
+        repo("fix/OC-2026-0007-x", {
+          ...OCS_ANTIGAS,
+          ...Object.fromEntries(Object.entries(arquivos).map(([f, c]) => [`${pasta}/${f}`, c])),
+        }),
+      );
+    expect(caso({ "ORQUESTRADOR.md": fm("OC-A"), "00-OCORRENCIA.md": fm("OC-B"), "00-PLANEJAMENTO.md": fm("OC-C") })).toBe("OC-A");
+    expect(caso({ "00-OCORRENCIA.md": fm("OC-B"), "00-PLANEJAMENTO.md": fm("OC-C") })).toBe("OC-B");
+    expect(caso({ "ORQUESTRADOR.md": fm("../x"), "00-OCORRENCIA.md": fm("OC-B") })).toBe("OC-B");
+    expect(caso({ "ORQUESTRADOR.md": "# sem frontmatter\n", "00-OCORRENCIA.md": "---\n---\n", "00-PLANEJAMENTO.md": fm("OC-C") })).toBe("OC-C");
+    // a primeira chave decide: a segunda não conserta a primeira inválida
+    const duasChaves = "---\ntrabalho_id: ../x\ntrabalho_id: OC-A\n---\n";
+    expect(caso({ "ORQUESTRADOR.md": duasChaves, "00-OCORRENCIA.md": fm("OC-B") })).toBe("OC-B");
+    expect(caso({ "ORQUESTRADOR.md": duasChaves })).toBe("OC-2026-0007-x");
+  });
+
+  it("funcional: expx_id_do_frontmatter só escreve num nome de variável do shell", () => {
+    const raiz = repo("main", { "x/ORQUESTRADOR.md": fm("OC-A") });
+    const arq = join(raiz, "docs", "x", "ORQUESTRADOR.md").replace(/\\/g, "/");
+    const marca = join(raiz, "marca").replace(/\\/g, "/");
+    const saida = roda(raiz, `expx_id_do_frontmatter 'v[$(: > "${marca}")]' "${arq}"; ok=$?; expx_id_do_frontmatter id "${arq}"; printf '%s|%s' "$ok" "$id"`);
+    expect(saida).toBe("0|OC-A");
+    expect(readdirSync(raiz)).not.toContain("marca");
+  });
+
+  it("integração: numa worktree da runx o evento do núcleo cai no rastro do id da ocorrência", () => {
+    const raiz = repo("main", {
+      ...OCS_ANTIGAS,
+      "manutencao/OC-2026-0007-x/ORQUESTRADOR.md": fm("OC-2026-0007"),
+    });
+    git(raiz, "add", "-A");
+    git(raiz, "commit", "-q", "-m", "base");
+    const wt = join(temp(), "wt");
+    git(raiz, "worktree", "add", "-q", "-b", "fix/OC-2026-0007-x", wt);
+    roda(wt, 'expx_rastro_grava "$PWD" acao_permitida hook permitido x');
+    const ev = eventos(wt);
+    expect(Object.keys(ev)).toEqual(["OC-2026-0007.jsonl"]);
+    expect(JSON.parse(ev["OC-2026-0007.jsonl"]?.[0] ?? "{}")).toMatchObject({ trabalho_id: "OC-2026-0007" });
   });
 });
 

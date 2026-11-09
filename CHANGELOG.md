@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.13.19 — o trabalho dos hooks do núcleo no planejamento e na ocorrência
+
+Instale por PR, como a 0.13.18. Muda só o `expx_trabalho_id` do hook `expx-rastro.sh`, que o rastro, a integridade final e o envelope da invocação usam. Os eventos, o `init`, o `doctor`, o painel e as skills seguem como na 0.13.18. A regra nova está em `CONTRATO-expx-eventos.md`, na seção "De onde sai o `trabalho_id` dos hooks do núcleo".
+
+- **Planejamento da sprintx.** O `ORQUESTRADOR.md` só nasce na F4. Até lá, num repositório com mais de um trabalho, os eventos do núcleo iam para `sem-trabalho.jsonl`; no Login, foram as duas invocações do `sprintx-investigador` na F1 da `ui-react-045`. Agora a pasta da branch também vale quando só tem o `00-PLANEJAMENTO.md`.
+- **Ocorrência da runx.** O id dos eventos do núcleo era o nome da pasta (`OC-2026-0007-<slug>`). A runx e o painel usam o `trabalho_id` do frontmatter (`OC-2026-0007`), então os eventos da mesma ocorrência ficavam em dois arquivos, e a orquestração do painel nunca mostrava as invocações e as integridades (conselhos, OC-2026-0003 a 0009). Agora o id é o do frontmatter: o primeiro válido entre `ORQUESTRADOR.md`, `00-OCORRENCIA.md` e `00-PLANEJAMENTO.md`, e o nome da pasta só quando nenhum tem. A pasta da branch também vale quando só tem o `00-OCORRENCIA.md` (E1).
+- **O que não muda.** Os marcadores do planejamento só valem pela branch. O "único trabalho" continua contando só `ORQUESTRADOR.md`, e o mtime continua sem escolher. `EXPX_TRABALHO_ID` e o lock seguem com a sanitização de antes.
+- **Sem migração.** Os arquivos já gravados (`OC-…-<slug>.jsonl` e as linhas em `sem-trabalho.jsonl`) ficam como estão. Nada os une ao rastro do trabalho.
+- **Não exercitado:** o bash 3.2 do macOS.
+
 ## 0.13.18 — cada leitor de projeção em shell abre o arquivo uma vez
 
 Instale por PR, como a 0.13.17. Muda só o hook `expx-rastro.sh`; o `expx-invocacao.mjs`, os eventos, o `init`, o `doctor`, o painel e as skills seguem como na 0.13.17. Corrige o Major de condição de corrida do CodeAnt na instalação da 0.13.17 no Login (login#69, r4508677024).
