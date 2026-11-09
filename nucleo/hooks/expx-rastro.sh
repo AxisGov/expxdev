@@ -328,16 +328,19 @@ expx_id_da_pasta() {
 
 # expx_id_do_frontmatter <var> <arquivo> — poe em <var> o `trabalho_id` do
 # frontmatter, ou vazio. So vale o bloco que abre na primeira linha com `---`
-# (depois de um BOM UTF-8, se houver) e
-# fecha na proxima linha que comeca com `---`, em ate 50 linhas, com a chave na coluna 0; a primeira
-# chave decide, e a linha indentada logo depois dela a invalida. O valor perde espacos e aspas das pontas e so vale com o
-# alfabeto de um nome de arquivo em docs/eventos/, ate 64 caracteres (o
-# `trabalho_seguro` da runx). NUL em qualquer ponto ou arquivo ilegivel: vazio.
-# Uma leitura, sem fork. <var> so vale como nome de variavel: o `printf -v`
-# avaliaria o indice de `v[$(comando)]`.
+# (depois de um BOM UTF-8, se houver) e fecha na proxima linha que comeca com
+# `---`, em ate 50 linhas, com a chave na coluna 0 (nua ou entre aspas); a
+# primeira chave decide, e a linha indentada logo depois dela a invalida. O valor perde o comentario YAML
+# (o # depois de espaco ou tab, fora das aspas), as aspas e os espacos das
+# pontas, e so vale com o alfabeto de um nome de arquivo em docs/eventos/, ate
+# 64 caracteres (o `trabalho_seguro` da runx). NUL em qualquer ponto ou arquivo
+# ilegivel: vazio. Uma leitura, sem fork. <var> so vale como nome de variavel:
+# o `printf -v` avaliaria o indice de `v[$(comando)]`.
 expx_id_do_frontmatter() {
   case "$1" in ""|[!A-Za-z_]*|*[!A-Za-z0-9_]*) return 0 ;; esac
-  local _c="" _l _v="" _n=0 _aberto="" _visto=""
+  local _c="" _l _v="" _n=0 _aberto="" _visto="" _q="" _r _t
+  # sem aspas, o YAML do painel le estes como booleano, nulo ou numero, nunca string
+  local _nao_string='^(true|True|TRUE|false|False|FALSE|null|Null|NULL|[0-9]+|0o[0-7]+|0x[0-9A-Fa-f]+|[0-9]+[.][0-9]*([eE][-+]?[0-9]+)?|[0-9]+[eE][-+]?[0-9]+)$'
   printf -v "$1" '%s' ""
   # `read -d ''` so sai 0 quando acha um NUL; no fim do arquivo sai 1 com tudo
   # lido. O 2>/dev/null vem antes do <: a falha de abrir tambem fica muda.
@@ -364,14 +367,40 @@ expx_id_do_frontmatter() {
       _visto=2
     fi
     [ -z "$_visto" ] || continue
-    case "$_l" in trabalho_id:*) _visto=1 ;; *) continue ;; esac
-    _v="${_l#trabalho_id:}"
+    # a chave, nua ou entre aspas, com espacos antes dos dois-pontos e espaco
+    # depois deles, como o YAML do painel a le; `trabalho_id:x` nao e chave
+    case "$_l" in
+      \"trabalho_id\"*) _v="${_l#\"trabalho_id\"}" ;;
+      \'trabalho_id\'*) _v="${_l#\'trabalho_id\'}" ;;
+      trabalho_id*) _v="${_l#trabalho_id}" ;;
+      *) continue ;;
+    esac
+    _v="${_v#"${_v%%[![:blank:]]*}"}"
+    case "$_v" in :*) _visto=1; _v="${_v#:}" ;; *) _v=""; continue ;; esac
+    case "$_v" in ""|[[:blank:]]*) ;; *) _v="" ;; esac
+    _v="${_v#"${_v%%[![:space:]]*}"}"
+    case "$_v" in
+      \"*|\'*)
+        # entre aspas o # e texto; depois do fecho, so espacos e o comentario,
+        # que pede espaco antes (conselhos#283, r4514531691)
+        _q="${_v%"${_v#?}"}"; _r="${_v#?}"
+        case "$_r" in
+          *"$_q"*) _v="${_r%%"$_q"*}"; _r="${_r#*"$_q"}" ;;
+          *) _v=""; _r="" ;;
+        esac
+        _t="${_r#"${_r%%[![:blank:]]*}"}"
+        case "$_t" in
+          "") ;;
+          \#*) [ "$_t" != "$_r" ] || _v="" ;;
+          *) _v="" ;;
+        esac
+        ;;
+      *) _v="${_v%%[[:blank:]]#*}" ;;
+    esac
+    # o painel apara o valor (z.string().trim()), inclusive o de dentro das aspas
     _v="${_v#"${_v%%[![:space:]]*}"}"
     _v="${_v%"${_v##*[![:space:]]}"}"
-    case "$_v" in
-      \"*\") _v="${_v#\"}"; _v="${_v%\"}" ;;
-      \'*\') _v="${_v#\'}"; _v="${_v%\'}" ;;
-    esac
+    if [ -z "$_q" ] && [[ $_v =~ $_nao_string ]]; then _v=""; fi
     case "$_v" in ""|[!A-Za-z0-9]*|*[!A-Za-z0-9._-]*) _v="" ;; esac
     [ "${#_v}" -le 64 ] || _v=""
   done <<EXPX_FRONTMATTER

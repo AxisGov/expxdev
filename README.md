@@ -549,16 +549,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.13.19 -R AxisGov/expxdev -D ~/expx-cli/v0.13.19 &&
+gh release download v0.13.20 -R AxisGov/expxdev -D ~/expx-cli/v0.13.20 &&
 (
-  cd ~/expx-cli/v0.13.19
+  cd ~/expx-cli/v0.13.20
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.13.19.tgz.sha256
+    sha256sum -c expxdev-0.13.20.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.13.19.tgz.sha256
+    shasum -a 256 -c expxdev-0.13.20.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.13.19/expxdev-0.13.19.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.13.20/expxdev-0.13.20.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -572,7 +572,7 @@ npx --yes --package ~/expx-cli/v0.13.19/expxdev-0.13.19.tgz expx init --skills b
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.13.19 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.13.20 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -696,6 +696,8 @@ npx --yes --package ~/expx-cli/v0.13.19/expxdev-0.13.19.tgz expx init --skills b
   NUL e o parse leem os mesmos bytes, e a troca concorrente no meio da leitura não entra (login#69).
 - `0.13.19` faz os hooks do núcleo acharem o trabalho já no planejamento da sprintx e no E1 da runx,
   e gravarem a ocorrência da runx pelo id do frontmatter, o mesmo do painel.
+- `0.13.20` põe a revisão por task no E3 da runx e na F6 da sprintx, antes do commit da task, e
+  faz o hook ler o `trabalho_id` com comentário YAML como o painel (conselhos, OC-2026-0009 e #283).
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
