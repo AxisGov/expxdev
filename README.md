@@ -549,16 +549,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.13.18 -R AxisGov/expxdev -D ~/expx-cli/v0.13.18 &&
+gh release download v0.13.19 -R AxisGov/expxdev -D ~/expx-cli/v0.13.19 &&
 (
-  cd ~/expx-cli/v0.13.18
+  cd ~/expx-cli/v0.13.19
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.13.18.tgz.sha256
+    sha256sum -c expxdev-0.13.19.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.13.18.tgz.sha256
+    shasum -a 256 -c expxdev-0.13.19.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.13.18/expxdev-0.13.18.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.13.19/expxdev-0.13.19.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -572,7 +572,7 @@ npx --yes --package ~/expx-cli/v0.13.18/expxdev-0.13.18.tgz expx init --skills b
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.13.18 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.13.19 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -694,6 +694,8 @@ npx --yes --package ~/expx-cli/v0.13.18/expxdev-0.13.18.tgz expx init --skills b
   antes discordavam (conselhos#274).
 - `0.13.18` faz cada leitor em shell dessas projeções abrir o arquivo uma vez só: a conferência do
   NUL e o parse leem os mesmos bytes, e a troca concorrente no meio da leitura não entra (login#69).
+- `0.13.19` faz os hooks do núcleo acharem o trabalho já no planejamento da sprintx e no E1 da runx,
+  e gravarem a ocorrência da runx pelo id do frontmatter, o mesmo do painel.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

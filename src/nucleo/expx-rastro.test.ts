@@ -452,6 +452,181 @@ describe("expx_trabalho_id", () => {
   });
 });
 
+describe("expx_trabalho_id antes do ORQUESTRADOR.md e pelo frontmatter", () => {
+  const fm = (id: string): string => `---\nkind: x\ntrabalho_id: ${id}\n---\n# t\n`;
+
+  /** Repositório na `branch`, com os arquivos dados (caminho relativo a `docs/` → conteúdo). */
+  function repo(branch: string, arquivos: Record<string, string | Buffer>): string {
+    const raiz = temp();
+    git(raiz, "init", "-q", "-b", branch);
+    for (const [rel, conteudo] of Object.entries(arquivos)) {
+      const f = join(raiz, "docs", rel);
+      mkdirSync(join(f, ".."), { recursive: true });
+      writeFileSync(f, conteudo);
+    }
+    return raiz;
+  }
+
+  const id = (raiz: string): string => roda(raiz, 'expx_trabalho_id "$PWD"').trimEnd();
+
+  /** Duas ocorrências fechadas da runx, que não podem decidir pela nova. */
+  const OCS_ANTIGAS = {
+    "manutencao/OC-2026-0005-z/ORQUESTRADOR.md": fm("OC-2026-0005"),
+    "manutencao/OC-2026-0006-y/ORQUESTRADOR.md": fm("OC-2026-0006"),
+  };
+
+  it("funcional: na F1 da sprintx, só com 00-PLANEJAMENTO.md na pasta da branch, o trabalho é o dela", () => {
+    const raiz = repo("feature/nova", {
+      "sprintx/features/a/ORQUESTRADOR.md": fm("a"),
+      "sprintx/features/b/ORQUESTRADOR.md": fm("b"),
+      "sprintx/features/nova/00-PLANEJAMENTO.md": fm("nova"),
+    });
+    expect(id(raiz)).toBe("nova");
+  });
+
+  it("funcional: no E1 da runx, só com 00-OCORRENCIA.md, o trabalho é o id do frontmatter, sem o slug", () => {
+    const raiz = repo("fix/OC-2026-0007-x", {
+      ...OCS_ANTIGAS,
+      "manutencao/OC-2026-0007-x/00-OCORRENCIA.md": fm("OC-2026-0007"),
+    });
+    expect(id(raiz)).toBe("OC-2026-0007");
+  });
+
+  it("funcional: depois do E2 da runx, com ORQUESTRADOR.md e 00-OCORRENCIA.md, o id é o do frontmatter", () => {
+    const raiz = repo("fix/OC-2026-0007-x", {
+      ...OCS_ANTIGAS,
+      "manutencao/OC-2026-0007-x/ORQUESTRADOR.md": fm("OC-2026-0007"),
+      "manutencao/OC-2026-0007-x/00-OCORRENCIA.md": fm("OC-2026-0007"),
+    });
+    expect(id(raiz)).toBe("OC-2026-0007");
+  });
+
+  it("funcional: a pasta com dois marcadores conta uma vez, e o único trabalho sai pelo frontmatter", () => {
+    const raiz = repo("main", {
+      "manutencao/OC-2026-0007-x/ORQUESTRADOR.md": fm("OC-2026-0007"),
+      "manutencao/OC-2026-0007-x/00-OCORRENCIA.md": fm("OC-2026-0007"),
+    });
+    expect(id(raiz)).toBe("OC-2026-0007");
+  });
+
+  it("funcional: os marcadores do planejamento não contam sem a branch — o único ORQUESTRADOR.md continua decidindo", () => {
+    expect(
+      id(
+        repo("main", {
+          "sprintx/features/unico/ORQUESTRADOR.md": fm("unico"),
+          "sprintx/features/abandonada/00-PLANEJAMENTO.md": fm("abandonada"),
+          "manutencao/OC-2026-0009-w/00-OCORRENCIA.md": fm("OC-2026-0009"),
+        }),
+      ),
+    ).toBe("unico");
+    expect(id(repo("main", { "sprintx/features/so-planejada/00-PLANEJAMENTO.md": fm("so-planejada") }))).toBe(
+      "sem-trabalho",
+    );
+  });
+
+  it("funcional: a sprintx grava trabalho_id igual ao slug, e a pasta da branch devolve o slug", () => {
+    const raiz = repo("feature/nova", {
+      "sprintx/features/a/ORQUESTRADOR.md": fm("a"),
+      "sprintx/features/nova/ORQUESTRADOR.md": fm("nova"),
+      "sprintx/features/nova/00-PLANEJAMENTO.md": fm("nova"),
+    });
+    expect(id(raiz)).toBe("nova");
+  });
+
+  it("funcional: o valor válido sai com CRLF, aspas e espaços das pontas", () => {
+    for (const conteudo of [
+      "---\r\nkind: x\r\ntrabalho_id: OC-2026-0007\r\n---\r\n",
+      '---\ntrabalho_id: "OC-2026-0007"\n---\n',
+      "---\ntrabalho_id: 'OC-2026-0007'\n---\n",
+      "---\ntrabalho_id:    OC-2026-0007   \n---\n",
+    ]) {
+      const raiz = repo("fix/OC-2026-0007-x", { ...OCS_ANTIGAS, "manutencao/OC-2026-0007-x/ORQUESTRADOR.md": conteudo });
+      expect(id(raiz), JSON.stringify(conteudo)).toBe("OC-2026-0007");
+    }
+  });
+
+  it("funcional: frontmatter sem id seguro cai para o nome da pasta", () => {
+    const linhas = Array.from({ length: 50 }, (_, i) => `k${String(i)}: v`).join("\n");
+    for (const conteudo of [
+      fm("../x"),
+      fm(""),
+      fm("a b"),
+      fm("-comeca-com-hifen"),
+      fm("x".repeat(65)),
+      "kind: x\ntrabalho_id: OC-2026-0007\n",
+      "# titulo\n---\ntrabalho_id: OC-2026-0007\n---\n",
+      "---\nkind: x\n---\ntrabalho_id: OC-2026-0007\n",
+      "---\n  trabalho_id: OC-2026-0007\n---\n",
+      `---\n${linhas}\ntrabalho_id: OC-2026-0007\n---\n`,
+      Buffer.from("---\ntrabalho_id: OC-2026-\u00000007\n---\n"),
+      Buffer.from("---\nkind: x\u0000\ntrabalho_id: OC-2026-0007\n---\n"),
+    ]) {
+      const raiz = repo("fix/OC-2026-0007-x", { ...OCS_ANTIGAS, "manutencao/OC-2026-0007-x/ORQUESTRADOR.md": conteudo });
+      expect(id(raiz), JSON.stringify(conteudo.toString())).toBe("OC-2026-0007-x");
+    }
+  });
+
+  it("funcional: arquivo ilegível cai para o próximo marcador e, sem ele, para o nome da pasta", () => {
+    if (process.platform === "win32" || process.getuid?.() === 0) return;
+    const raiz = repo("fix/OC-2026-0007-x", { ...OCS_ANTIGAS, "manutencao/OC-2026-0007-x/ORQUESTRADOR.md": fm("OC-2026-0007") });
+    const orq = join(raiz, "docs", "manutencao", "OC-2026-0007-x", "ORQUESTRADOR.md");
+    spawnSync("chmod", ["000", orq]);
+    try {
+      expect(id(raiz)).toBe("OC-2026-0007-x");
+      // o arquivo ilegível não suja o stderr de cada chamada de hook
+      const r = spawnSync(BASH, ["-c", '. "$1"; expx_trabalho_id "$PWD"', "rastro", RASTRO], { cwd: raiz, encoding: "utf8" });
+      expect(r.stderr).toBe("");
+      writeFileSync(join(raiz, "docs", "manutencao", "OC-2026-0007-x", "00-OCORRENCIA.md"), fm("OC-2026-0007"));
+      expect(id(raiz)).toBe("OC-2026-0007");
+    } finally {
+      spawnSync("chmod", ["644", orq]);
+    }
+  });
+
+  it("funcional: precedência ORQUESTRADOR > 00-OCORRENCIA > 00-PLANEJAMENTO, e o inválido não barra o seguinte", () => {
+    const pasta = "manutencao/OC-2026-0007-x";
+    const caso = (arquivos: Record<string, string>): string =>
+      id(
+        repo("fix/OC-2026-0007-x", {
+          ...OCS_ANTIGAS,
+          ...Object.fromEntries(Object.entries(arquivos).map(([f, c]) => [`${pasta}/${f}`, c])),
+        }),
+      );
+    expect(caso({ "ORQUESTRADOR.md": fm("OC-A"), "00-OCORRENCIA.md": fm("OC-B"), "00-PLANEJAMENTO.md": fm("OC-C") })).toBe("OC-A");
+    expect(caso({ "00-OCORRENCIA.md": fm("OC-B"), "00-PLANEJAMENTO.md": fm("OC-C") })).toBe("OC-B");
+    expect(caso({ "ORQUESTRADOR.md": fm("../x"), "00-OCORRENCIA.md": fm("OC-B") })).toBe("OC-B");
+    expect(caso({ "ORQUESTRADOR.md": "# sem frontmatter\n", "00-OCORRENCIA.md": "---\n---\n", "00-PLANEJAMENTO.md": fm("OC-C") })).toBe("OC-C");
+    // a primeira chave decide: a segunda não conserta a primeira inválida
+    const duasChaves = "---\ntrabalho_id: ../x\ntrabalho_id: OC-A\n---\n";
+    expect(caso({ "ORQUESTRADOR.md": duasChaves, "00-OCORRENCIA.md": fm("OC-B") })).toBe("OC-B");
+    expect(caso({ "ORQUESTRADOR.md": duasChaves })).toBe("OC-2026-0007-x");
+  });
+
+  it("funcional: expx_id_do_frontmatter só escreve num nome de variável do shell", () => {
+    const raiz = repo("main", { "x/ORQUESTRADOR.md": fm("OC-A") });
+    const arq = join(raiz, "docs", "x", "ORQUESTRADOR.md").replace(/\\/g, "/");
+    const marca = join(raiz, "marca").replace(/\\/g, "/");
+    const saida = roda(raiz, `expx_id_do_frontmatter 'v[$(: > "${marca}")]' "${arq}"; ok=$?; expx_id_do_frontmatter id "${arq}"; printf '%s|%s' "$ok" "$id"`);
+    expect(saida).toBe("0|OC-A");
+    expect(readdirSync(raiz)).not.toContain("marca");
+  });
+
+  it("integração: numa worktree da runx o evento do núcleo cai no rastro do id da ocorrência", () => {
+    const raiz = repo("main", {
+      ...OCS_ANTIGAS,
+      "manutencao/OC-2026-0007-x/ORQUESTRADOR.md": fm("OC-2026-0007"),
+    });
+    git(raiz, "add", "-A");
+    git(raiz, "commit", "-q", "-m", "base");
+    const wt = join(temp(), "wt");
+    git(raiz, "worktree", "add", "-q", "-b", "fix/OC-2026-0007-x", wt);
+    roda(wt, 'expx_rastro_grava "$PWD" acao_permitida hook permitido x');
+    const ev = eventos(wt);
+    expect(Object.keys(ev)).toEqual(["OC-2026-0007.jsonl"]);
+    expect(JSON.parse(ev["OC-2026-0007.jsonl"]?.[0] ?? "{}")).toMatchObject({ trabalho_id: "OC-2026-0007" });
+  });
+});
+
 describe("expx_modo sem jq", () => {
   // sem jq o hook cai no parser de grep; `command -v jq` falhando simula a ausência
   const SEM_JQ = 'command() { [ "$1 $2" = "-v jq" ] && return 1; builtin command "$@"; }\n';

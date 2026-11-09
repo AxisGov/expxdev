@@ -210,11 +210,21 @@ expx_tool_input_get() {
 #
 #   1. EXPX_TRABALHO_ID, quando a skill ja sabe qual e
 #   2. .expx/expx-lock.json, que o CLI mantem
-#   3. a branch do checkout (`feature/<slug>`), quando existe ORQUESTRADOR.md
-#      numa pasta com esse slug
-#   4. o UNICO trabalho com ORQUESTRADOR.md, nos dois layouts de pasta
+#   3. a branch do checkout (`feature/<slug>`, `fix/<OC-ID>-<slug>`), quando a
+#      pasta com esse nome tem ORQUESTRADOR.md, ou ainda so o 00-PLANEJAMENTO.md
+#      (sprintx, F1 a F3) ou o 00-OCORRENCIA.md (runx, E1)
+#   4. o UNICO trabalho com ORQUESTRADOR.md, nos dois layouts de pasta; os dois
+#      marcadores do planejamento nao contam aqui, para planejamento abandonado
+#      nao tornar ambiguo o repositorio de um trabalho so
 #   5. "sem-trabalho" — inclusive com dois ou mais trabalhos e nada acima
 #      decidindo: o mtime NAO escolhe (decisao do usuario, AxisGov/login#2)
+#
+# Nos passos 3 e 4 o id e o `trabalho_id` do frontmatter da pasta
+# (`expx_id_da_pasta`), e so sem ele o nome da pasta; os passos 1 e 2 mantem a
+# sanitizacao de sempre. A runx grava `OC-AAAA-NNNN` numa pasta
+# `OC-AAAA-NNNN-<slug>`, e o rastro dela e o painel usam o id: com o nome da
+# pasta, os eventos do nucleo de uma ocorrencia iam para outro arquivo, fora do
+# painel.
 #
 # O nome do lock e `expx-lock.json` (src/nucleo/lock.ts). Ler `lock.json` sem
 # o prefixo devolve "sem-trabalho" para sempre, em silencio — a falha aqui e
@@ -273,31 +283,92 @@ expx_trabalho_id() {
   # `find` em vez de glob: no zsh um padrao sem match ABORTA a funcao (nomatch),
   # e o hook perderia o trabalho_id no shell de metade dos usuarios. O -maxdepth
   # 4 cobre os dois layouts sem varrer o repositorio inteiro.
-  local f d unico="" ambiguo="" br slug="" da_branch=""
+  local f p d unico="" unico_p="" ambiguo="" br slug="" da_branch=""
   expx_branch_atual_em br "$raiz"
   [ -n "$br" ] && slug="${br##*/}"
   while IFS= read -r f; do
     [ -f "$f" ] || continue
-    d="${f%/ORQUESTRADOR.md}"; d="${d##*/}"
-    [ -n "$slug" ] && [ "$d" = "$slug" ] && da_branch="$slug"
+    p="${f%/*}"; d="${p##*/}"
+    # a pasta com dois marcadores aparece duas vezes: vale a primeira
+    [ -n "$slug" ] && [ "$d" = "$slug" ] && [ -z "$da_branch" ] && da_branch="$p"
+    case "$f" in */ORQUESTRADOR.md) ;; *) continue ;; esac
     # o mesmo slug nos dois layouts e o MESMO trabalho (mesmo arquivo de eventos)
-    if [ -z "$unico" ]; then unico="$d"; elif [ "$d" != "$unico" ]; then ambiguo=1; fi
+    if [ -z "$unico" ]; then unico="$d"; unico_p="$p"; elif [ "$d" != "$unico" ]; then ambiguo=1; fi
   done <<EOF
-$(find "$raiz/docs" -maxdepth 4 -name ORQUESTRADOR.md -type f 2>/dev/null)
+$(find "$raiz/docs" -maxdepth 4 \( -name ORQUESTRADOR.md -o -name 00-PLANEJAMENTO.md -o -name 00-OCORRENCIA.md \) -type f 2>/dev/null)
 EOF
   if [ -n "$da_branch" ]; then
-    printf '%s' "$da_branch"
+    expx_id_da_pasta "$da_branch"
     return 0
   fi
   # Mais de um trabalho e nada que decida entre eles: sem-trabalho, nunca o
   # mtime. O ORQUESTRADOR.md mexido por ultimo pode ser o da OUTRA feature, e
   # evento atribuido ao trabalho errado e pior que evento sem trabalho.
   if [ -n "$unico" ] && [ -z "$ambiguo" ]; then
-    printf '%s' "$unico"
+    expx_id_da_pasta "$unico_p"
     return 0
   fi
 
   printf 'sem-trabalho'
+}
+
+# expx_id_da_pasta <pasta> — o id do trabalho da pasta: o `trabalho_id` seguro
+# do primeiro de ORQUESTRADOR.md, 00-OCORRENCIA.md e 00-PLANEJAMENTO.md que o
+# tiver, e o nome da pasta quando nenhum tem. Marcador sem id seguro nao barra
+# o seguinte. A ordem e a de autoridade do painel: o plano vence a ocorrencia.
+expx_id_da_pasta() {
+  local _a _id=""
+  for _a in ORQUESTRADOR.md 00-OCORRENCIA.md 00-PLANEJAMENTO.md; do
+    [ -f "$1/$_a" ] || continue
+    expx_id_do_frontmatter _id "$1/$_a"
+    if [ -n "$_id" ]; then printf '%s' "$_id"; return 0; fi
+  done
+  printf '%s' "${1##*/}"
+}
+
+# expx_id_do_frontmatter <var> <arquivo> — poe em <var> o `trabalho_id` do
+# frontmatter, ou vazio. So vale o bloco que abre na primeira linha com `---` e
+# fecha no proximo `---`, em ate 50 linhas, com a chave na coluna 0; a primeira
+# chave decide. O valor perde espacos e aspas das pontas e so vale com o
+# alfabeto de um nome de arquivo em docs/eventos/, ate 64 caracteres (o
+# `trabalho_seguro` da runx). NUL em qualquer ponto ou arquivo ilegivel: vazio.
+# Uma leitura, sem fork. <var> so vale como nome de variavel: o `printf -v`
+# avaliaria o indice de `v[$(comando)]`.
+expx_id_do_frontmatter() {
+  case "$1" in ""|[!A-Za-z_]*|*[!A-Za-z0-9_]*) return 0 ;; esac
+  local _c="" _l _v="" _n=0 _aberto="" _visto=""
+  printf -v "$1" '%s' ""
+  # `read -d ''` so sai 0 quando acha um NUL; no fim do arquivo sai 1 com tudo
+  # lido. O 2>/dev/null vem antes do <: a falha de abrir tambem fica muda.
+  IFS= read -r -d '' _c 2>/dev/null < "$2" && return 0
+  while IFS= read -r _l || [ -n "$_l" ]; do
+    _l="${_l%$'\r'}"
+    if [ -z "$_aberto" ]; then
+      [ "$_l" = "---" ] || return 0
+      _aberto=1
+      continue
+    fi
+    if [ "$_l" = "---" ]; then
+      printf -v "$1" '%s' "$_v"
+      return 0
+    fi
+    _n=$((_n + 1))
+    [ "$_n" -le 50 ] || return 0
+    [ -z "$_visto" ] || continue
+    case "$_l" in trabalho_id:*) _visto=1 ;; *) continue ;; esac
+    _v="${_l#trabalho_id:}"
+    _v="${_v#"${_v%%[![:space:]]*}"}"
+    _v="${_v%"${_v##*[![:space:]]}"}"
+    case "$_v" in
+      \"*\") _v="${_v#\"}"; _v="${_v%\"}" ;;
+      \'*\') _v="${_v#\'}"; _v="${_v%\'}" ;;
+    esac
+    case "$_v" in ""|[!A-Za-z0-9]*|*[!A-Za-z0-9._-]*) _v="" ;; esac
+    [ "${#_v}" -le 64 ] || _v=""
+  done <<EXPX_FRONTMATTER
+$_c
+EXPX_FRONTMATTER
+  return 0
 }
 
 # ------------------------------------------------------------------ modo
