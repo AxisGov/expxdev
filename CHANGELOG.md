@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.13.20 — a revisão por task na runx e na sprintx, e o `trabalho_id` com comentário
+
+Instale por PR, como a 0.13.19. Muda a runx (AxisGov/runx#18, merge b6acc15), a sprintx (AxisGov/sprintx#71, merge 432bd9c) e o hook `expx-rastro.sh`. Os eventos, o `init`, o `doctor` e o painel seguem como na 0.13.19.
+
+- **A revisão por task, nas duas skills.** O contrato `expx-revisao` dizia que a sprintx chamava o `revisar` do núcleo na F6, mas nenhuma versão da sprintx nem da runx teve esse passo. Com `revisao_por_task.modo: obrigatoria`, a task saía sem a evidência, e o commit seguinte, só com ela, era recusado pela mergex (conselhos, OC-2026-0009).
+  - **Onde entra:** no passo 8 do E3 da runx (DR-100) e no passo 4 da F6 da sprintx (DS-206), depois do aceite e antes de `status: concluida`.
+  - **O modo:** o leitor do núcleo só roda quando existe `.expx/fatiamento.json`; sem o arquivo, vale `se_disponivel`.
+  - **As saídas:** cada uma tem sua rota, inclusive uma saída sem rota, como `127` sem `node`. Só o desenvolvedor rejeita um achado. Depois de um achado, uma revisão indisponível não fecha a task.
+  - **Classes novas:** a sprintx ganha três, `revisao_defeito`, `revisao_contestada` e `revisao_incompleta`. Na runx, a classe vai no começo da descrição do bloqueio.
+  - **O resultado** vai no detalhe do `task_concluida`, sem evento novo.
+- **runx, os derivados fora do commit (DR-101).** O `.expx/handoff.md` não rastreado barrava o commit da task e o persistir-método como desvio. O `estado.py` passa a pôr o `estado.json` e o `handoff.md` no exclude local do Git, o do diretório comum, que vale para toda worktree. O que o time versiona fica como está.
+- **runx, a ocorrência pela branch (DR-102).** Numa worktree nova, antes do `00-OCORRENCIA.md`, os primeiros eventos iam para a ocorrência fechada mais recente (`OC-2026-0006.jsonl`). Na branch `fix|chore/OC-…`, vale a pasta dela quando aberta; senão a aberta mais recente; senão a fechada dela. A fechada de outra ocorrência nunca é escolhida.
+- **O `trabalho_id` com comentário (conselhos#283).** Com `trabalho_id: OC-2026-0098 # nota`, o hook caía no nome da pasta, e o painel descarta o comentário. Agora o hook tira o comentário fora das aspas. Também aceita a chave com espaço antes dos dois-pontos ou entre aspas, e não aceita sem aspas o que o YAML lê como booleano, nulo ou número. O contrato `expx-eventos` declara o subconjunto do YAML que o hook lê: âncora, tag, mapa em fluxo, escalar em bloco e escape valem como sem id.
+- **Não entra:** o hook que barraria a task concluída sem a evidência no modo `obrigatoria` (desenho de 2026-10-18, item 4.2).
+- **Não exercitado:** o bash 3.2 do macOS, e o passo novo com o binário real numa feature ou numa ocorrência.
+
 ## 0.13.19 — o trabalho dos hooks do núcleo no planejamento e na ocorrência
 
 Instale por PR, como a 0.13.18. Muda só o `expx_trabalho_id` do hook `expx-rastro.sh`, que o rastro, a integridade final e o envelope da invocação usam. Os eventos, o `init`, o `doctor`, o painel e as skills seguem como na 0.13.18. A regra nova está em `CONTRATO-expx-eventos.md`, na seção "De onde sai o `trabalho_id` dos hooks do núcleo".
