@@ -207,6 +207,10 @@ export const Ocorrencia = z.object({
   modulo_afetado: z.array(z.string()).default([]),
   /** O contrato não lista a chave neste kind; a runx lista (decisão D-32). */
   atualizado_em: DataIso.optional(),
+  /** A classe da sessão principal (CONTRATO-expx-orquestracao §14): preservada, nunca julgada aqui. */
+  classe_sessao: nulavel(z.string()).optional(),
+  classe_sessao_por: nulavel(z.string()).optional(),
+  classe_sessao_justificativa: nulavel(z.string()).optional(),
 });
 
 export const CausaRaiz = z.object({
