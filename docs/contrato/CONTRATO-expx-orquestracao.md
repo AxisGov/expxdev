@@ -51,7 +51,10 @@ o modelo, e o `resolucao_id` não muda com ele. A skill declara o papel junto co
 classe, no frontmatter do agente (`papel:`, F4). Valor fora do vocabulário é skill
 inválida, com ou sem política. Sem `papel:`, o agente não é de aprovação: o papel
 nunca é inferido do nome. `revisar` e `testar` são os papéis de aprovação: só eles
-passam pela integridade final (§12) e rodam em primeiro plano (§13.1).
+passam pela integridade final (§12), com ou sem política. O primeiro plano (§13.1)
+exige, além do papel legível na projeção dos papéis (11.4), a linha válida do
+agente na projeção do rastro (11.2): sem ela não há envelope, e o agente passa
+sem nada.
 
 ### 2.3 Adaptadores
 
@@ -369,7 +372,9 @@ sai. Ela não é fonte de nada.
   parte delas.
 - Um NUL em qualquer ponto do arquivo, mesmo na linha de outro agente, invalida a
   projeção inteira, no escritor e no hook do envelope (§13): o `read` do shell o
-  descartaria em silêncio, e os dois leitores discordariam sobre a mesma linha.
+  descartaria em silêncio, e os dois leitores discordariam sobre a mesma linha. Cada
+  leitor abre o arquivo uma vez: a conferência do NUL e o parse leem os mesmos
+  bytes, e uma troca concorrente no meio da leitura não entra.
 - O `doctor` confere a projeção contra o lock e o registro
   (`orquestracao-projecao-divergente`, `CONTRATO-expx-instalacao.md` §5.3).
 
@@ -404,8 +409,8 @@ regimes, e por isso o papel não é uma coluna da projeção do rastro (11.2).
   fora da projeção, com aviso no plano, e não passa pela integridade nem pelo
   primeiro plano. O mesmo `name` com papel em duas skills recusa o plano.
 - Sem nenhum agente com papel, o arquivo não existe, e o `init` remove o anterior.
-- Os hooks aceitam o arquivo inteiro ou nada: NUL em qualquer ponto (o `read` do
-  shell o descartaria em silêncio), cabeçalho diferente, linha sem
+- Os hooks aceitam o arquivo inteiro ou nada, lido de uma abertura só: NUL em
+  qualquer ponto (o `read` do shell o descartaria em silêncio), cabeçalho diferente, linha sem
   exatamente dois TABs, campo fora de `[a-z0-9-]`, papel fora do vocabulário ou
   agente repetido deixam todo agente sem papel, e o mesmo vale para o `principal` e
   para skill fora do vocabulário `ferramenta` do rastro. O CLI lê com as mesmas

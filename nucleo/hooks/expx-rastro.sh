@@ -339,14 +339,13 @@ expx_modo() {
   esac
 }
 
-# Verdadeiro se o arquivo tem um byte NUL. O `read` do shell descarta o NUL em
-# silencio, e o leitor Node da mesma projecao nao: sem esta conferencia, os dois
-# discordariam sobre o mesmo arquivo. O `read -d ''` so termina com sucesso ao
-# achar um NUL; sem nenhum, chega ao fim do arquivo e falha. Sem processo extra.
-expx_tem_nul() {
-  local _nul
-  IFS= read -r -d '' _nul < "$1"
-}
+# Os dois leitores de projecao abaixo abrem o arquivo UMA vez: o
+# `IFS= read -r -d '' conteudo` o le inteiro para a memoria, e o parse sai da
+# variavel. Reabrir deixaria uma troca concorrente entrar entre a conferencia e o
+# parse (login#69). O `read -d ''` so termina com sucesso ao achar um NUL, que o
+# `read` linha a linha descartaria em silencio e o leitor Node da mesma projecao
+# nao: com NUL, o arquivo nao vale nada. Sem NUL, chega ao fim e falha, com o
+# conteudo inteiro. Tira-se uma quebra final porque o heredoc a devolve.
 
 # As chaves da resolucao do agente (CONTRATO-expx-orquestracao §11.1), lidas da
 # projecao plana que o `expx init` grava com a politica ativa
@@ -356,47 +355,52 @@ expx_tem_nul() {
 # nunca com evidencia parcial.
 # Os campos so aceitam o que dispensa escape em JSON, entao entram literais.
 expx_resolucao_extras() {
-  local arq="$1/.expx/orquestracao-rastro.tsv" agente="$2" cab=""
+  local arq="$1/.expx/orquestracao-rastro.tsv" agente="$2" cab="" conteudo=""
   [ -f "$arq" ] || return 0
-  expx_tem_nul "$arq" && return 0
-  IFS= read -r cab < "$arq" || true
-  [ "${cab%$'\r'}" = "# expx-orquestracao-rastro 1" ] || return 0
+  IFS= read -r -d '' conteudo < "$arq" && return 0
+  conteudo="${conteudo%$'\n'}"
   # o nome do agente no alfabeto de nome: fora dele, nem consigo mesmo casa
   case "$agente" in ""|*[!A-Za-z0-9._-]*) return 0 ;; esac
   local linha tabs ag id cd oc cr alt oa mm me v out="" achadas=0
-  while IFS= read -r linha || [ -n "$linha" ]; do
-    linha="${linha%$'\r'}"
-    case "$linha" in "$agente"$'\t'*) ;; *) continue ;; esac
-    # agente repetido: a projecao nao vale para ele (o plano a recusaria). So se
-    # sabe no fim do arquivo: conta e segue lendo; a decisao vem depois do laco.
-    achadas=$((achadas + 1))
-    [ "$achadas" -eq 1 ] || continue
-    # Exatamente oito TABs, contados na linha crua: o `read` com IFS de TAB
-    # trata TAB como espaco em branco e juntaria coluna vazia ou TAB no fim.
-    tabs="${linha//[!$'\t']/}"
-    [ "${#tabs}" -eq 8 ] || return 0
-    IFS=$'\t' read -r ag id cd oc cr alt oa mm me <<EXPX_PROJECAO
+  {
+    IFS= read -r cab || true
+    [ "${cab%$'\r'}" = "# expx-orquestracao-rastro 1" ] || return 0
+    while IFS= read -r linha || [ -n "$linha" ]; do
+      linha="${linha%$'\r'}"
+      case "$linha" in "$agente"$'\t'*) ;; *) continue ;; esac
+      # agente repetido: a projecao nao vale para ele (o plano a recusaria). So se
+      # sabe no fim do arquivo: conta e segue lendo; a decisao vem depois do laco.
+      achadas=$((achadas + 1))
+      [ "$achadas" -eq 1 ] || continue
+      # Exatamente oito TABs, contados na linha crua: o `read` com IFS de TAB
+      # trata TAB como espaco em branco e juntaria coluna vazia ou TAB no fim.
+      tabs="${linha//[!$'\t']/}"
+      [ "${#tabs}" -eq 8 ] || return 0
+      IFS=$'\t' read -r ag id cd oc cr alt oa mm me <<EXPX_PROJECAO
 $linha
 EXPX_PROJECAO
-    case "$id" in ""|*[!0-9a-f]*) return 0 ;; esac
-    [ "${#id}" -eq 64 ] || return 0
-    # nove campos cheios: um vazio teria deslocado os demais e deixado o ultimo vazio
-    for v in "$ag" "$cd" "$oc" "$cr" "$alt" "$oa" "$mm" "$me"; do
-      case "$v" in ""|*[!A-Za-z0-9._:/-]*) return 0 ;; esac
-    done
-    # `-` so e ausencia nas duas colunas do materializado, e o materializado so
-    # existe na excecao do agentes.json v1, sempre com model
-    for v in "$cd" "$oc" "$cr" "$alt" "$oa"; do [ "$v" != - ] || return 0; done
-    [ "$mm" != - ] || [ "$me" = - ] || return 0
-    [ "$mm" = - ] || [ "$oa" = agentes-json-v1 ] || return 0
-    out="\"resolucao_id\":\"$id\",\"classe_declarada\":\"$cd\",\"classe_resolvida\":\"$cr\""
-    out="$out,\"origem_classe\":\"$oc\",\"alternativa\":\"$alt\",\"origem_alternativa\":\"$oa\""
-    if [ "$mm" != - ]; then
-      if [ "$me" != - ]; then out="$out,\"materializado\":{\"model\":\"$mm\",\"effort\":\"$me\"}"
-      else out="$out,\"materializado\":{\"model\":\"$mm\"}"
+      case "$id" in ""|*[!0-9a-f]*) return 0 ;; esac
+      [ "${#id}" -eq 64 ] || return 0
+      # nove campos cheios: um vazio teria deslocado os demais e deixado o ultimo vazio
+      for v in "$ag" "$cd" "$oc" "$cr" "$alt" "$oa" "$mm" "$me"; do
+        case "$v" in ""|*[!A-Za-z0-9._:/-]*) return 0 ;; esac
+      done
+      # `-` so e ausencia nas duas colunas do materializado, e o materializado so
+      # existe na excecao do agentes.json v1, sempre com model
+      for v in "$cd" "$oc" "$cr" "$alt" "$oa"; do [ "$v" != - ] || return 0; done
+      [ "$mm" != - ] || [ "$me" = - ] || return 0
+      [ "$mm" = - ] || [ "$oa" = agentes-json-v1 ] || return 0
+      out="\"resolucao_id\":\"$id\",\"classe_declarada\":\"$cd\",\"classe_resolvida\":\"$cr\""
+      out="$out,\"origem_classe\":\"$oc\",\"alternativa\":\"$alt\",\"origem_alternativa\":\"$oa\""
+      if [ "$mm" != - ]; then
+        if [ "$me" != - ]; then out="$out,\"materializado\":{\"model\":\"$mm\",\"effort\":\"$me\"}"
+        else out="$out,\"materializado\":{\"model\":\"$mm\"}"
+        fi
       fi
-    fi
-  done < "$arq"
+    done
+  } <<EXPX_CONTEUDO
+$conteudo
+EXPX_CONTEUDO
   # o arquivo inteiro lido: so entao se sabe que o agente nao se repete
   [ "$achadas" -eq 1 ] || return 0
   printf '%s' "$out"
@@ -412,9 +416,10 @@ EXPX_PROJECAO
 # vocabulario ou agente repetido deixam todo agente sem papel. Falha
 # aberta: sem papel, o agente nao e de aprovacao. Nunca le o papel do nome.
 expx_papel_de() {
-  local arq="$1/.expx/papeis.tsv" agente="$2" cab="" linha tabs ag sk pa achado="" vistos=$'\n'
+  local arq="$1/.expx/papeis.tsv" agente="$2" cab="" conteudo="" linha tabs ag sk pa achado="" vistos=$'\n'
   [ -f "$arq" ] || return 0
-  expx_tem_nul "$arq" && return 0
+  IFS= read -r -d '' conteudo < "$arq" && return 0
+  conteudo="${conteudo%$'\n'}"
   case "$agente" in ""|*[!a-z0-9-]*) return 0 ;; esac
   {
     # o CR do fim sai: o checkout com core.autocrlf entrega a projecao em CRLF
@@ -434,7 +439,9 @@ EXPX_PAPEIS
       vistos="$vistos$ag"$'\n'
       [ "$ag" = "$agente" ] && achado="$sk"$'\t'"$pa"
     done
-  } < "$arq"
+  } <<EXPX_CONTEUDO
+$conteudo
+EXPX_CONTEUDO
   [ -n "$achado" ] && printf '%s' "$achado"
   return 0
 }
