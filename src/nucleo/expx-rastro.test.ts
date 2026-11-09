@@ -311,6 +311,66 @@ describe("fase e task", () => {
     }
   });
 
+  // A projeção trocada no meio da leitura (login#69): o `read` sobrescrito troca o
+  // arquivo logo depois da primeira abertura. Quem abre uma vez só fica com o
+  // arquivo de antes; quem reabre lê o novo, e o Bash descartaria o NUL dele.
+  it("funcional: cada leitor de projeção abre o arquivo uma vez — a troca no meio da leitura não entra", () => {
+    const linha = (campos: string[]) => campos.join("\t");
+    const ok = ["auditor", "c".repeat(64), "raciocinio_normal", "declarada", "raciocinio_normal", "skill", "skill", "-", "-"];
+    const casos = [
+      {
+        arquivo: "papeis.tsv",
+        antes: "# expx-papeis 1\nrevisor-diff\tmergex\trevisar\n",
+        depois: ["# expx-papeis 1\nq\0a\trunx\ttestar\n", "# expx-papeis 1\nqa\trunx\ttestar\n"],
+        le: "expx_papel_de \"$PWD\" qa",
+      },
+      {
+        arquivo: "orquestracao-rastro.tsv",
+        antes: `# expx-orquestracao-rastro 1\n${linha(["qa", ...ok.slice(1)])}\n`,
+        depois: [
+          `# expx-orquestracao-rastro 1\n${linha([...ok.slice(0, 2), "raciocinio_\0normal", ...ok.slice(3)])}\n`,
+          `# expx-orquestracao-rastro 1\n${linha(ok)}\n`,
+        ],
+        le: "expx_resolucao_extras \"$PWD\" auditor",
+      },
+    ];
+    for (const c of casos) {
+      for (const depois of c.depois) {
+        const raiz = temp();
+        mkdirSync(join(raiz, ".expx"));
+        writeFileSync(join(raiz, ".expx", c.arquivo), c.antes);
+        writeFileSync(join(raiz, "troca.tsv"), depois);
+        const corpo = [
+          'read() { if [ -z "${TROCOU:-}" ]; then TROCOU=1; mv troca.tsv ".expx/$ARQ"; fi; builtin read "$@"; }',
+          `printf '[%s]' "$(${c.le})"`,
+        ].join("\n");
+        // o agente lido não está no arquivo de antes: nada sai, com ou sem NUL no novo
+        expect(roda(raiz, corpo, { ARQ: c.arquivo }), JSON.stringify(depois)).toBe("[]");
+      }
+    }
+  });
+
+  it("funcional: a leitura única vale como a linha a linha — sem quebra final, quebra dupla no fim e CRLF", () => {
+    const linha = ["auditor", "c".repeat(64), "raciocinio_normal", "declarada", "raciocinio_normal", "skill", "skill", "-", "-"].join("\t");
+    const casos: [string, string, string, boolean][] = [
+      ["papeis.tsv", 'expx_papel_de "$PWD" qa', "# expx-papeis 1\nqa\trunx\ttestar", true],
+      ["papeis.tsv", 'expx_papel_de "$PWD" qa', "# expx-papeis 1\nqa\trunx\ttestar\n\n", false],
+      ["papeis.tsv", 'expx_papel_de "$PWD" qa', "# expx-papeis 1\r\nqa\trunx\ttestar\r", true],
+      ["orquestracao-rastro.tsv", 'expx_resolucao_extras "$PWD" auditor', `# expx-orquestracao-rastro 1\n${linha}`, true],
+      ["orquestracao-rastro.tsv", 'expx_resolucao_extras "$PWD" auditor', `# expx-orquestracao-rastro 1\n${linha}\n\n`, true],
+      ["orquestracao-rastro.tsv", 'expx_resolucao_extras "$PWD" auditor', `# expx-orquestracao-rastro 1\r\n${linha}\r`, true],
+    ];
+    for (const [arquivo, le, conteudo, vale] of casos) {
+      const raiz = temp();
+      mkdirSync(join(raiz, ".expx"));
+      writeFileSync(join(raiz, ".expx", arquivo), conteudo);
+      const saida = roda(raiz, le);
+      // a linha vazia invalida a dos papéis inteira; na do rastro, só não casa com o agente
+      if (vale) expect(saida, JSON.stringify(conteudo)).toMatch(arquivo === "papeis.tsv" ? /^runx\ttestar$/ : /"resolucao_id":"c{64}"/);
+      else expect(saida, JSON.stringify(conteudo)).toBe("");
+    }
+  });
+
   it("integração: o harness detectado vai na linha, sem duplicar o que o chamador já mandou nas extras", () => {
     const raiz = temp();
     mkdirSync(join(raiz, ".git"));

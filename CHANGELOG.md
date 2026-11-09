@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.18 — cada leitor de projeção em shell abre o arquivo uma vez
+
+Instale por PR, como a 0.13.17. Muda só o hook `expx-rastro.sh`; o `expx-invocacao.mjs`, os eventos, o `init`, o `doctor`, o painel e as skills seguem como na 0.13.17. Corrige o Major de condição de corrida do CodeAnt na instalação da 0.13.17 no Login (login#69, r4508677024).
+
+- **O problema.** Na 0.13.17, o `expx_papel_de` e o `expx_resolucao_extras` abriam a projeção para procurar NUL e a reabriam para o parse. Se o arquivo fosse trocado por um com NUL entre as duas aberturas, o Bash lia a versão nova sem o NUL e aceitava o que o leitor Node recusa. No `expx_resolucao_extras` a janela é anterior à 0.13.17: o cabeçalho e as linhas já eram lidos em duas aberturas.
+- **A correção.** Cada leitor lê o arquivo inteiro para a memória numa abertura só (`IFS= read -r -d '' conteudo`), e o parse sai da variável. A conferência do NUL e o parse leem os mesmos bytes. A regra de cada linha não muda: arquivo sem quebra final, com quebra dupla no fim e em CRLF dão o mesmo resultado de antes (`CONTRATO-expx-orquestracao.md` §11.2 e §11.4).
+- **Gravidade baixa.** Para acontecer, era preciso trocar a projeção por um arquivo com NUL no meio da chamada do hook. Só o `expx init` escreve esses arquivos, de forma atômica e sem NUL. O efeito era o do achado da 0.13.17, e nada aprovava o que devia recusar.
+- **O que não fecha.** Os hooks em shell e o do envelope são processos diferentes, que leem em momentos diferentes. Uma troca entre eles faz os dois discordarem mesmo com duas projeções válidas, e por isso o papel e a skill da chamada ficam guardados desde o início (§11.4 e §13.1).
+- **Contrato §2.2.** Passa a dizer que o primeiro plano do aprovador exige o papel na projeção dos papéis e a linha válida do agente na projeção do rastro: sem ela, não há envelope. Era o que o §13.1 já dizia. Os outros dois Major do login#69 apontavam essa ausência e ficaram como desenho.
+- **Não exercitado:** o bash 3.2 do macOS.
+
 ## 0.13.17 — NUL numa projeção a invalida inteira, nos hooks em shell e no do envelope
 
 Instale por PR, como a 0.13.15. Mudam só os hooks `expx-rastro.sh` e `expx-invocacao.mjs`; eventos, `init`, `doctor`, painel e skills seguem como na 0.13.16. Corrige o achado do CodeAnt na instalação da 0.13.16 (conselhos#274).
