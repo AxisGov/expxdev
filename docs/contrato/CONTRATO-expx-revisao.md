@@ -133,7 +133,11 @@ Sai **0** (`ok`), **1** (`achados`, algum aberto), **2** (`indisponivel`) ou
 ou com caminho absoluto ou que sai da raiz por `..`,
 `--base-commit` que não é commit ou fora do `revisar`, e qualquer `FATIA_*` definida
 no ambiente, nos três subcomandos, com a mensagem da emenda e sem evidência);
-evidência travada, **75**. Imprime `<task> <resultado>[:<motivo>]`.
+evidência travada, **75**; erro interno (exceção não tratada), **70**, em qualquer
+subcomando, sem a linha de resultado. Imprime `<task> <resultado>[:<motivo>]`. Quem chama
+só lê `achados` na saída 1 **com** a última linha `<T-NN.MM> achados`: um erro antes do
+despacho (módulo que não carrega) ainda sai 1 pelo Node, e a saída 1 sem a linha é outra
+saída (para a sprintx e a runx, como a 2).
 
 - **Exclusões:** as do núcleo (`^docs/sprintx/`, `^docs/entregas/`, `^docs/eventos/`)
   mais os `padrao` de `excluir_da_revisao` do projeto, lidos pelo leitor irmão
@@ -367,3 +371,4 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-11-01 | A revisão seguinte remove o snapshot de um `revisar` morto antes de limpar (SIGKILL, queda da máquina): o worktree ficava registrado e segurava o commit. Rota do HTTP 403 e regra de mudança de modo no contrato. |
 | 2026-11-01 | Só snapshot com `dono` válido é removido: sem ele o worktree não é deste script, e o `--force` levava arquivo de quem usou o mesmo nome (conselhos#230, regressão da 0.12.17). |
 | 2026-11-02 | A variação da CLI entre rodadas passa de relato a medição, com os números no texto de `ok`. |
+| 2026-11-09 | Exceção não tratada sai **70** (erro interno), não 1 (achado do CodeAnt no katosmv/login#73, r4518931241): a F6 e o E3 a liam como `achados` e bloqueavam com `revisao_defeito` ou `revisao_contestada`. A saída 1 só vale como `achados` com a linha `<T-NN.MM> achados`. |

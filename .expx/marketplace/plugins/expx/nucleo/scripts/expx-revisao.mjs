@@ -7,7 +7,7 @@
 // 2 (indisponivel), 3 (incompleta). conferir: 0 (ok), 1 (FALHA), 3 (só AVISO). listar (só leitura): uma linha de JSON
 // `expx_revisao_listar: 1` com os rejeitados, as rejeições e os removidos da evidência que o `conferir` aceita; 0
 // (todas listadas), 1 (alguma inválida), 3 (alguma ausente). Uso errado, inclusive
-// `FATIA_*` no ambiente: 64. Uma chamada só da CLI (sem lotes), pelo arquivo do pacote conferido; a
+// `FATIA_*` no ambiente: 64. Evidência travada: 75. Erro interno (exceção não tratada), em qualquer subcomando: 70. Uma chamada só da CLI (sem lotes), pelo arquivo do pacote conferido; a
 // resposta é reconciliada com a task (contrato expx-revisao v2); a evidência guarda as `issues` cruas, e o
 // `conferir` deriva delas os achados. Nunca lê credencial da CLI.
 // EXPX_REVISAO_TESTE_PAUSA é só para teste: um diretório em que o `revisar` cria `pronto` e espera
@@ -781,4 +781,10 @@ function rejeitar() {
   }
 }
 
-({ revisar, conferir, rejeitar, listar })[cmd]();
+// Exceção não tratada sairia 1, o código de `achados` no `revisar` e de FALHA no `conferir` (CodeAnt no katosmv/login#73):
+// sai 70 (EX_SOFTWARE). `process.exit` (64, 75) não é exceção e não passa por aqui. Limite aceito: erro antes do despacho
+// (import que falha) continua 1 do Node; quem chama só lê `achados` com a linha `<T-NN.MM> achados`.
+try { ({ revisar, conferir, rejeitar, listar })[cmd](); } catch (e) {
+  process.stderr.write(`expx-revisao: erro interno: ${e?.stack ?? e}\n`);
+  process.exitCode = 70;
+}
