@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.13.21 — os achados da instalação da 0.13.20 no conselhos
+
+Instale por PR, como a 0.13.20. Muda a runx (AxisGov/runx#19, merge a4127f7) e o hook `expx-rastro.sh`; a sprintx, os eventos, o `init`, o `doctor` e o painel seguem como na 0.13.20. Todos os achados vêm do conselhos-municipais#292, e nenhum tinha efeito lá no dia.
+
+- **runx, a aberta que veio da `main`.** O Conselhos tem a OC-0008 e a OC-0011 com `em_andamento` na `main`. Numa worktree nova de outra OC, antes do `00-OCORRENCIA.md`, os primeiros eventos iam para `OC-2026-0011.jsonl`.
+  - Agora, na branch `fix|chore/OC-…` sem a pasta dela aberta, só vale a aberta criada nesta árvore, fora do `HEAD`: é o caso da ocorrência aberta sem worktree. Senão vale a fechada da branch; senão, nenhuma.
+  - Quando não dá para saber de onde a pasta veio (Git falhando, branch órfã), nenhuma é escolhida (DR-103).
+- **runx, o marco pela metade** (CodeAnt r4517966249). A gravação do derivado que falha vira aviso no stderr, e o marco segue até o evento.
+- **runx, o prefixo aparado** (CodeAnt r4517966257). O `--show-prefix` não corta mais o espaço do começo de uma pasta.
+- **O comentário depois do `trabalho_id`.** A linha só com comentário logo depois da chave, indentada ou não, é comentário, e o valor fica, como no painel. A continuação indentada depois dela ainda invalida. A chave repetida passa a invalidar o arquivo, como no painel.
+- **O que já estava tratado.** A vírgula num caminho do `--arquivos` (CodeAnt no #292): o `revisar` já sai `indisponivel:caminho-com-virgula` (`CONTRATO-expx-revisao`), porque o `--include` da CLI do CodeAnt também separa por vírgula.
+- **Não exercitado:** o bash 3.2 do macOS, e o binário real numa ocorrência.
+
 ## 0.13.20 — a revisão por task na runx e na sprintx, e o `trabalho_id` com comentário
 
 Instale por PR, como a 0.13.19. Muda a runx (AxisGov/runx#18, merge b6acc15), a sprintx (AxisGov/sprintx#71, merge 432bd9c) e o hook `expx-rastro.sh`. Os eventos, o `init`, o `doctor` e o painel seguem como na 0.13.19.

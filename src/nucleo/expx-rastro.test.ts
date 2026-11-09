@@ -551,6 +551,10 @@ describe("expx_trabalho_id antes do ORQUESTRADOR.md e pelo frontmatter", () => {
     // o comentário YAML (espaço ou tab antes do #) sai, como no painel (conselhos#283)
     fm("OC-2026-0007 # comentario"),
     "---\ntrabalho_id: OC-2026-0007\t# comentario\n---\n",
+    // a linha indentada só com comentário, logo depois da chave, é comentário, não continuação
+    "---\ntrabalho_id: OC-2026-0007\n  # nota\n---\n",
+    "---\ntrabalho_id: OC-2026-0007\n\t# nota\nkind: x\n---\n",
+    "---\ntrabalho_id: OC-2026-0007\n\n  # nota\n---\n",
     // entre aspas, o mesmo texto é string
     '---\ntrabalho_id: "OC-2026-0007"\nkind: "0123"\n---\n',
     // parece número, mas o YAML lê string
@@ -608,6 +612,15 @@ describe("expx_trabalho_id antes do ORQUESTRADOR.md e pelo frontmatter", () => {
     "---\ntrabalho_id: OC-2026-\n  0007\n---\n",
     "---\ntrabalho_id: OC-2026-0007\n\tx\n---\n",
     "---\ntrabalho_id: OC-2026-\n\n\n  0007\n---\n",
+    // depois do comentário indentado, a continuação ainda invalida (o painel recusa o arquivo)
+    "---\ntrabalho_id: OC-2026-\n  # nota\n  0007\n---\n",
+    "---\ntrabalho_id: OC-2026-\n# nota\n  0007\n---\n",
+    // chave repetida: o YAML do painel recusa o arquivo (Map keys must be unique)
+    "---\ntrabalho_id: OC-2026-0007\ntrabalho_id: OC-B\n---\n",
+    "---\ntrabalho_id: OC-2026-0007\nkind: x\n\"trabalho_id\": OC-B\n---\n",
+    // chave com escape, que o YAML do painel decodifica: pode ser a mesma, e o painel recusa
+    '---\ntrabalho_id: OC-2026-0007\n"trabalho\\u005fid": OC-B\n---\n',
+    '---\n"trabalho\\u005fid": OC-A\ntrabalho_id: OC-2026-0007\n---\n',
     "---\nkind: x\n---\ntrabalho_id: OC-2026-0007\n",
     "---\n  trabalho_id: OC-2026-0007\n---\n",
     `---\n${linhas50}\ntrabalho_id: OC-2026-0007\n---\n`,
