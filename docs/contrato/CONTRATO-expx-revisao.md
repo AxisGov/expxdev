@@ -5,8 +5,9 @@ Este contrato define a CLI aceita, a evidência que a revisão grava, a identida
 um achado, e o que `revisar`, `conferir`, `rejeitar` e `listar` fazem. Quem o implementa é
 `nucleo/scripts/expx-revisao.mjs`, com as regras fixas de `nucleo/scripts/expx-limites.mjs`
 e os perfis de `nucleo/scripts/perfis/`, instalados em
-`.expx/marketplace/plugins/expx/nucleo/scripts/`; quem o chama são a sprintx (passo
-de revisão da F6) e a mergex (V12 no E2), nos planos delas. O modo vem de
+`.expx/marketplace/plugins/expx/nucleo/scripts/`; quem o chama são a sprintx (no passo 4
+da F6, depois do aceite, DS-206), a runx (no passo 8 do E3, DR-100) e a mergex (V12 no E2).
+Até a 0.13.19, as duas skills não tinham o passo, e a task saía sem a evidência. O modo vem de
 `revisao_por_task.modo` em `.expx/fatiamento.json` (§5.2 de
 `CONTRATO-expx-instalacao.md`). Desenho: seção 4.2 de
 `docs/superpowers/specs/2026-10-18-revisao-por-task-pr-por-sprint-design.md`, com a
@@ -305,8 +306,9 @@ portão continua sendo o `conferir`: o `listar` não dá veredito.
 
 ## Orientação ao consumidor
 
-Na sprintx (F6), `incompleta` vira o bloqueio da classe **`revisao_incompleta`**
-(emenda, 8), nunca contestação, com a rota pelo motivo:
+Na sprintx (F6) e na runx (E3), `incompleta` vira o bloqueio da classe **`revisao_incompleta`**
+(emenda, 8), nunca contestação, com a rota pelo motivo. O achado aberto que não sai em duas
+tentativas vira `revisao_defeito` (real) ou `revisao_contestada` (falso positivo, com o argumento):
 
 | Motivo | Rota |
 |---|---|

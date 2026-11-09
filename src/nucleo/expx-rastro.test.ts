@@ -548,6 +548,21 @@ describe("expx_trabalho_id antes do ORQUESTRADOR.md e pelo frontmatter", () => {
     // o BOM do início sai antes do `---`, como no painel (D-25)
     `${BOM}---\ntrabalho_id: OC-2026-0007\n---\n`,
     `${BOM}---\r\ntrabalho_id: OC-2026-0007\r\n---\r\n`,
+    // o comentário YAML (espaço ou tab antes do #) sai, como no painel (conselhos#283)
+    fm("OC-2026-0007 # comentario"),
+    "---\ntrabalho_id: OC-2026-0007\t# comentario\n---\n",
+    // entre aspas, o mesmo texto é string
+    '---\ntrabalho_id: "OC-2026-0007"\nkind: "0123"\n---\n',
+    // parece número, mas o YAML lê string
+    "---\ntrabalho_id: OC-2026-0007\n---\n",
+    '---\ntrabalho_id: "OC-2026-0007" # comentario\n---\n',
+    "---\ntrabalho_id: 'OC-2026-0007'\t# comentario\n---\n",
+    // dentro das aspas, # é texto, e o painel apara os espaços (z.string().trim())
+    '---\ntrabalho_id: " OC-2026-0007 "\n---\n',
+    // a chave com espaço antes dos dois-pontos, ou entre aspas, é a mesma para o YAML
+    "---\ntrabalho_id : OC-2026-0007\n---\n",
+    '---\n"trabalho_id": OC-2026-0007\n---\n',
+    "---\n'trabalho_id': OC-2026-0007\n---\n",
   ];
 
   /** Frontmatter sem id seguro: o hook cai para o nome da pasta. */
@@ -557,7 +572,33 @@ describe("expx_trabalho_id antes do ORQUESTRADOR.md e pelo frontmatter", () => {
     fm("a b"),
     fm("-comeca-com-hifen"),
     fm("x".repeat(65)),
-    fm("OC-2026-0007 # comentario"),
+    // limite declarado no contrato: o hook lê o subconjunto que as skills escrevem, não um
+    // YAML inteiro; âncora, tag, mapa em fluxo e escalar em bloco valem como sem id
+    "---\nid_comum: &id OC-2026-0007\ntrabalho_id: *id\n---\n",
+    "---\ntrabalho_id: !!str OC-2026-0007\n---\n",
+    "---\n{trabalho_id: OC-2026-0007}\n---\n",
+    "---\ntrabalho_id: >\n  OC-2026-0007\n---\n",
+    '---\ntrabalho_id: "OC-2026-\\x30\\x30\\x30\\x37"\n---\n',
+    "---\ntrabalho_id: 'OC-2026-''0007'\n---\n",
+    // outra chave que começa igual, e dois-pontos sem espaço depois (não é chave para o YAML)
+    "---\ntrabalho_idx: OC-2026-0007\n---\n",
+    "---\ntrabalho_id:OC-2026-0007\n---\n",
+    // sem aspas, o YAML do painel lê booleano, nulo e número, e o painel recusa o arquivo
+    fm("true"),
+    fm("False"),
+    fm("null"),
+    fm("0123"),
+    fm("1.5"),
+    fm("1e3"),
+    fm("0x1F"),
+    fm("0o17"),
+    fm(".5"),
+    // sem espaço antes, o # é parte do valor
+    fm("OC-2026-0007#comentario"),
+    '---\ntrabalho_id: "OC-2026-0007 # dentro das aspas"\n---\n',
+    // aspas sem fecho, ou texto colado depois delas
+    '---\ntrabalho_id: "OC-2026-0007\n---\n',
+    '---\ntrabalho_id: "OC-2026-0007"x\n---\n',
     "kind: x\ntrabalho_id: OC-2026-0007\n",
     "# titulo\n---\ntrabalho_id: OC-2026-0007\n---\n",
     // só o BOM do início sai: em dobro, ou no meio do arquivo, ele é preâmbulo
@@ -581,6 +622,12 @@ describe("expx_trabalho_id antes do ORQUESTRADOR.md e pelo frontmatter", () => {
     for (const conteudo of VALIDOS) {
       const raiz = naPasta(conteudo);
       expect(id(raiz), JSON.stringify(conteudo)).toBe("OC-2026-0007");
+      // e é o id que o leitor do painel lê no mesmo arquivo
+      const lido = lerFrontmatter(conteudo);
+      const dados = lido.ok ? (lido.dados as Record<string, unknown> | null) : null;
+      expect(typeof dados?.["trabalho_id"] === "string" ? dados["trabalho_id"].trim() : null, JSON.stringify(conteudo)).toBe(
+        "OC-2026-0007",
+      );
       // o BOM sai por bytes: vale também fora de um locale UTF-8
       expect(roda(raiz, 'expx_trabalho_id "$PWD"', { LC_ALL: "C" }).trimEnd(), JSON.stringify(conteudo)).toBe("OC-2026-0007");
     }
