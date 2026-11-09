@@ -327,9 +327,10 @@ expx_id_da_pasta() {
 }
 
 # expx_id_do_frontmatter <var> <arquivo> — poe em <var> o `trabalho_id` do
-# frontmatter, ou vazio. So vale o bloco que abre na primeira linha com `---` e
-# fecha no proximo `---`, em ate 50 linhas, com a chave na coluna 0; a primeira
-# chave decide. O valor perde espacos e aspas das pontas e so vale com o
+# frontmatter, ou vazio. So vale o bloco que abre na primeira linha com `---`
+# (depois de um BOM UTF-8, se houver) e
+# fecha na proxima linha que comeca com `---`, em ate 50 linhas, com a chave na coluna 0; a primeira
+# chave decide, e a linha indentada logo depois dela a invalida. O valor perde espacos e aspas das pontas e so vale com o
 # alfabeto de um nome de arquivo em docs/eventos/, ate 64 caracteres (o
 # `trabalho_seguro` da runx). NUL em qualquer ponto ou arquivo ilegivel: vazio.
 # Uma leitura, sem fork. <var> so vale como nome de variavel: o `printf -v`
@@ -341,6 +342,8 @@ expx_id_do_frontmatter() {
   # `read -d ''` so sai 0 quando acha um NUL; no fim do arquivo sai 1 com tudo
   # lido. O 2>/dev/null vem antes do <: a falha de abrir tambem fica muda.
   IFS= read -r -d '' _c 2>/dev/null < "$2" && return 0
+  # um BOM UTF-8 no inicio sai antes do `---`, como no painel (D-25)
+  _c="${_c#$'\357\273\277'}"
   while IFS= read -r _l || [ -n "$_l" ]; do
     _l="${_l%$'\r'}"
     if [ -z "$_aberto" ]; then
@@ -348,12 +351,18 @@ expx_id_do_frontmatter() {
       _aberto=1
       continue
     fi
-    if [ "$_l" = "---" ]; then
-      printf -v "$1" '%s' "$_v"
-      return 0
-    fi
+    # fecha em qualquer linha que comece com `---`, como o painel (`\n---`)
+    case "$_l" in ---*) printf -v "$1" '%s' "$_v"; return 0 ;; esac
     _n=$((_n + 1))
     [ "$_n" -le 50 ] || return 0
+    # a linha indentada logo depois da chave continua o valor no YAML do painel
+    # (`OC-2026-` + `  0007` e `OC-2026- 0007`): o valor de uma linha nao vale
+    # mesmo depois de linhas vazias, que o escalar atravessa
+    if [ "$_visto" = 1 ]; then
+      [ -n "$_l" ] || continue
+      case "$_l" in [[:blank:]]*) _v="" ;; esac
+      _visto=2
+    fi
     [ -z "$_visto" ] || continue
     case "$_l" in trabalho_id:*) _visto=1 ;; *) continue ;; esac
     _v="${_l#trabalho_id:}"

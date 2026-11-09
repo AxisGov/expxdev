@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { bashDosHooks, RAIZ_DO_REPO } from "../teste/candidatos.js";
 import { suportaNomeComCaractereReservado, suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
+import { lerFrontmatter } from "../parser/leitura/frontmatter.js";
 
 /**
  * `nucleo/hooks/expx-rastro.sh`, a biblioteca de rastro que o plugin distribui
@@ -533,37 +534,122 @@ describe("expx_trabalho_id antes do ORQUESTRADOR.md e pelo frontmatter", () => {
     expect(id(raiz)).toBe("nova");
   });
 
+  const BOM = String.fromCharCode(0xfeff);
+  const linhas50 = Array.from({ length: 50 }, (_, i) => `k${String(i)}: v`).join("\n");
+
+  /** Frontmatter com id seguro: o hook devolve OC-2026-0007. */
+  const VALIDOS: string[] = [
+    "---\r\nkind: x\r\ntrabalho_id: OC-2026-0007\r\n---\r\n",
+    '---\ntrabalho_id: "OC-2026-0007"\n---\n',
+    "---\ntrabalho_id: 'OC-2026-0007'\n---\n",
+    "---\ntrabalho_id:    OC-2026-0007   \n---\n",
+    "---\ntrabalho_id: OC-2026-0007\n\nkind: x\n---\n",
+    "---\ntrabalho_id: OC-2026-0007\n# comentario\nkind: x\n---\n",
+    // o BOM do início sai antes do `---`, como no painel (D-25)
+    `${BOM}---\ntrabalho_id: OC-2026-0007\n---\n`,
+    `${BOM}---\r\ntrabalho_id: OC-2026-0007\r\n---\r\n`,
+  ];
+
+  /** Frontmatter sem id seguro: o hook cai para o nome da pasta. */
+  const INVALIDOS: (string | Buffer)[] = [
+    fm("../x"),
+    fm(""),
+    fm("a b"),
+    fm("-comeca-com-hifen"),
+    fm("x".repeat(65)),
+    fm("OC-2026-0007 # comentario"),
+    "kind: x\ntrabalho_id: OC-2026-0007\n",
+    "# titulo\n---\ntrabalho_id: OC-2026-0007\n---\n",
+    // só o BOM do início sai: em dobro, ou no meio do arquivo, ele é preâmbulo
+    `${BOM}${BOM}---\ntrabalho_id: OC-2026-0007\n---\n`,
+    `---\n${BOM}trabalho_id: OC-2026-0007\n---\n`,
+    // a linha indentada depois da chave continua o valor no YAML do painel
+    "---\ntrabalho_id: OC-2026-\n  0007\n---\n",
+    "---\ntrabalho_id: OC-2026-0007\n\tx\n---\n",
+    "---\ntrabalho_id: OC-2026-\n\n\n  0007\n---\n",
+    "---\nkind: x\n---\ntrabalho_id: OC-2026-0007\n",
+    "---\n  trabalho_id: OC-2026-0007\n---\n",
+    `---\n${linhas50}\ntrabalho_id: OC-2026-0007\n---\n`,
+    Buffer.from("---\ntrabalho_id: OC-2026-\u00000007\n---\n"),
+    Buffer.from("---\nkind: x\u0000\ntrabalho_id: OC-2026-0007\n---\n"),
+  ];
+
+  const naPasta = (conteudo: string | Buffer): string =>
+    repo("fix/OC-2026-0007-x", { ...OCS_ANTIGAS, "manutencao/OC-2026-0007-x/ORQUESTRADOR.md": conteudo });
+
   it("funcional: o valor válido sai com CRLF, aspas e espaços das pontas", () => {
-    for (const conteudo of [
-      "---\r\nkind: x\r\ntrabalho_id: OC-2026-0007\r\n---\r\n",
-      '---\ntrabalho_id: "OC-2026-0007"\n---\n',
-      "---\ntrabalho_id: 'OC-2026-0007'\n---\n",
-      "---\ntrabalho_id:    OC-2026-0007   \n---\n",
-    ]) {
-      const raiz = repo("fix/OC-2026-0007-x", { ...OCS_ANTIGAS, "manutencao/OC-2026-0007-x/ORQUESTRADOR.md": conteudo });
+    for (const conteudo of VALIDOS) {
+      const raiz = naPasta(conteudo);
       expect(id(raiz), JSON.stringify(conteudo)).toBe("OC-2026-0007");
+      // o BOM sai por bytes: vale também fora de um locale UTF-8
+      expect(roda(raiz, 'expx_trabalho_id "$PWD"', { LC_ALL: "C" }).trimEnd(), JSON.stringify(conteudo)).toBe("OC-2026-0007");
     }
   });
 
   it("funcional: frontmatter sem id seguro cai para o nome da pasta", () => {
-    const linhas = Array.from({ length: 50 }, (_, i) => `k${String(i)}: v`).join("\n");
-    for (const conteudo of [
-      fm("../x"),
-      fm(""),
-      fm("a b"),
-      fm("-comeca-com-hifen"),
-      fm("x".repeat(65)),
-      "kind: x\ntrabalho_id: OC-2026-0007\n",
-      "# titulo\n---\ntrabalho_id: OC-2026-0007\n---\n",
-      "---\nkind: x\n---\ntrabalho_id: OC-2026-0007\n",
-      "---\n  trabalho_id: OC-2026-0007\n---\n",
-      `---\n${linhas}\ntrabalho_id: OC-2026-0007\n---\n`,
-      Buffer.from("---\ntrabalho_id: OC-2026-\u00000007\n---\n"),
-      Buffer.from("---\nkind: x\u0000\ntrabalho_id: OC-2026-0007\n---\n"),
-    ]) {
-      const raiz = repo("fix/OC-2026-0007-x", { ...OCS_ANTIGAS, "manutencao/OC-2026-0007-x/ORQUESTRADOR.md": conteudo });
-      expect(id(raiz), JSON.stringify(conteudo.toString())).toBe("OC-2026-0007-x");
+    for (const conteudo of INVALIDOS) {
+      expect(id(naPasta(conteudo)), JSON.stringify(conteudo.toString())).toBe("OC-2026-0007-x");
     }
+  });
+
+  it("funcional: quando o hook e o painel aceitam o id, é o mesmo id", () => {
+    // Além dos casos acima, formas que o YAML lê de outro jeito que o olho. Hook que
+    // recusa cai no nome da pasta, como antes da 0.13.19; painel que recusa (número,
+    // booleano, chave repetida) não mostra o trabalho, e o id do arquivo não importa.
+    const sondas = [
+      "---\ntrabalho_id: 0123\n---\n",
+      "---\ntrabalho_id: true\n---\n",
+      "---\ntrabalho_id: 0x1F\n---\n",
+      "---\ntrabalho_id:\tOC-2026-0007\n---\n",
+      "---\ntrabalho_id: OC-2026-0007\ntrabalho_id: OC-B\n---\n",
+      "---\ntrabalho_id: OC-2026-0007\n  # comentario indentado\n---\n",
+      // o painel fecha o bloco em qualquer linha que comece com `---`
+      "---\n trabalho_id: OC-A\n--- texto\ntrabalho_id: OC-B\n---\n",
+      "---\nkind: x\n----\ntrabalho_id: OC-B\n---\n",
+    ];
+    for (const conteudo of [...VALIDOS, ...INVALIDOS, ...sondas]) {
+      const doHook = id(naPasta(conteudo));
+      if (doHook === "OC-2026-0007-x") continue;
+      const lido = lerFrontmatter(conteudo.toString());
+      const dados = lido.ok ? (lido.dados as Record<string, unknown> | null) : null;
+      const doPainel = typeof dados?.["trabalho_id"] === "string" ? dados["trabalho_id"].trim() : null;
+      if (doPainel === null) continue;
+      expect(doHook, JSON.stringify(conteudo.toString())).toBe(doPainel);
+    }
+  });
+
+  it("funcional: frontmatters gerados de peças soltas também concordam com o painel", () => {
+    const pecas = [
+      "---", "--- x", "----", "trabalho_id: OC-A", " trabalho_id: OC-B", "trabalho_id: 'OC-C'", 'trabalho_id: "OC-D"',
+      "trabalho_id: OC-E # c", "trabalho_id:", "trabalho_id:\tOC-F", "  cont", "\tcont", "", "# c", "  # c", "kind: x",
+      "lista:", "  - item", "texto: |", "  trabalho_id: OC-G",
+    ];
+    let semente = 20261109;
+    // LCG em 32 bits (Math.imul não perde precisão), sorteado pelos bits altos
+    const sorteia = (n: number): number => {
+      semente = (Math.imul(semente, 1103515245) + 12345) >>> 0;
+      return (semente >>> 16) % n;
+    };
+    const raiz = naPasta("");
+    const orq = join(raiz, "docs", "manutencao", "OC-2026-0007-x", "ORQUESTRADOR.md");
+    let comparados = 0;
+    for (let i = 0; i < 150; i++) {
+      const linhas = ["---", ...Array.from({ length: 1 + sorteia(6) }, () => pecas[sorteia(pecas.length)] ?? "")];
+      if (sorteia(3) > 0) linhas.push("---");
+      const fim = sorteia(4) === 0 ? "\r\n" : "\n";
+      const conteudo = (sorteia(5) === 0 ? BOM : "") + linhas.join(fim) + fim;
+      writeFileSync(orq, conteudo);
+      const doHook = id(raiz);
+      if (doHook === "OC-2026-0007-x") continue;
+      const lido = lerFrontmatter(conteudo);
+      const dados = lido.ok ? (lido.dados as Record<string, unknown> | null) : null;
+      const doPainel = typeof dados?.["trabalho_id"] === "string" ? dados["trabalho_id"].trim() : null;
+      if (doPainel === null) continue;
+      expect(doHook, JSON.stringify(conteudo)).toBe(doPainel);
+      comparados++;
+    }
+    // a semente fixa tem de chegar a casos em que os dois aceitam, senão o teste não prova nada
+    expect(comparados).toBeGreaterThanOrEqual(10);
   });
 
   it("funcional: arquivo ilegível cai para o próximo marcador e, sem ele, para o nome da pasta", () => {
