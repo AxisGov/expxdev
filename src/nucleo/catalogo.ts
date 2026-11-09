@@ -43,7 +43,7 @@ export const CATALOGO: readonly Skill[] = [
     nome: "runx",
     repositorio: "https://github.com/AxisGov/runx",
     origensLegadas: ["https://github.com/bittencourtthulio/runx"],
-    certificado: "b6acc15d220aed42c29b5afbc7c20ee4fb596b25",
+    certificado: "a4127f7141442b49bee7ba39a35d3f3db3a13980",
     papel: "ocorrencias de manutencao do dia a dia",
     camada: false,
   },

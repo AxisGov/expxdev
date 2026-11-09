@@ -549,16 +549,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.13.20 -R AxisGov/expxdev -D ~/expx-cli/v0.13.20 &&
+gh release download v0.13.21 -R AxisGov/expxdev -D ~/expx-cli/v0.13.21 &&
 (
-  cd ~/expx-cli/v0.13.20
+  cd ~/expx-cli/v0.13.21
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.13.20.tgz.sha256
+    sha256sum -c expxdev-0.13.21.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.13.20.tgz.sha256
+    shasum -a 256 -c expxdev-0.13.21.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.13.20/expxdev-0.13.20.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.13.21/expxdev-0.13.21.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -572,7 +572,7 @@ npx --yes --package ~/expx-cli/v0.13.20/expxdev-0.13.20.tgz expx init --skills b
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.13.20 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.13.21 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -698,6 +698,8 @@ npx --yes --package ~/expx-cli/v0.13.20/expxdev-0.13.20.tgz expx init --skills b
   e gravarem a ocorrência da runx pelo id do frontmatter, o mesmo do painel.
 - `0.13.20` põe a revisão por task no E3 da runx e na F6 da sprintx, antes do commit da task, e
   faz o hook ler o `trabalho_id` com comentário YAML como o painel (conselhos, OC-2026-0009 e #283).
+- `0.13.21` corrige o que a instalação da 0.13.20 achou no conselhos (#292): a OC nova não recebe mais
+  os eventos de uma aberta que veio da `main`, e o comentário depois do `trabalho_id` é lido como no painel.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
