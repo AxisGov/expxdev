@@ -330,7 +330,8 @@ expx_id_da_pasta() {
 # frontmatter, ou vazio. So vale o bloco que abre na primeira linha com `---`
 # (depois de um BOM UTF-8, se houver) e fecha na proxima linha que comeca com
 # `---`, em ate 50 linhas, com a chave na coluna 0 (nua ou entre aspas); a
-# primeira chave decide, e a linha indentada logo depois dela a invalida. O valor perde o comentario YAML
+# chave repetida invalida, e a linha indentada logo depois dela, que nao seja so
+# comentario, tambem. O valor perde o comentario YAML
 # (o # depois de espaco ou tab, fora das aspas), as aspas e os espacos das
 # pontas, e so vale com o alfabeto de um nome de arquivo em docs/eventos/, ate
 # 64 caracteres (o `trabalho_seguro` da runx). NUL em qualquer ponto ou arquivo
@@ -360,13 +361,28 @@ expx_id_do_frontmatter() {
     [ "$_n" -le 50 ] || return 0
     # a linha indentada logo depois da chave continua o valor no YAML do painel
     # (`OC-2026-` + `  0007` e `OC-2026- 0007`): o valor de uma linha nao vale
-    # mesmo depois de linhas vazias, que o escalar atravessa
+    # mesmo depois de linhas vazias, que o escalar atravessa. A linha indentada que so tem
+    # comentario e comentario, e o valor fica (conselhos#292)
     if [ "$_visto" = 1 ]; then
       [ -n "$_l" ] || continue
+      # so comentario, indentado ou na coluna 0: a proxima linha ainda pode continuar o valor
+      case "${_l#"${_l%%[![:blank:]]*}"}" in \#*) continue ;; esac
       case "$_l" in [[:blank:]]*) _v="" ;; esac
       _visto=2
     fi
-    [ -z "$_visto" ] || continue
+    # depois da chave, so interessa se ela se repete: o YAML do painel recusa o arquivo
+    # com chave repetida (Map keys must be unique), e o hook tambem
+    if [ -n "$_visto" ]; then
+      case "$_l" in
+        \"trabalho_id\"*) _t="${_l#\"trabalho_id\"}" ;;
+        \'trabalho_id\'*) _t="${_l#\'trabalho_id\'}" ;;
+        trabalho_id*) _t="${_l#trabalho_id}" ;;
+        *) continue ;;
+      esac
+      _t="${_t#"${_t%%[![:blank:]]*}"}"
+      case "$_t" in :*) _v="" ;; esac
+      continue
+    fi
     # a chave, nua ou entre aspas, com espacos antes dos dois-pontos e espaco
     # depois deles, como o YAML do painel a le; `trabalho_id:x` nao e chave
     case "$_l" in
