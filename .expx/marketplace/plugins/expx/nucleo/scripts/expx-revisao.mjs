@@ -906,6 +906,11 @@ function rejeitar() {
     const ev = le(caminhoEv(op.task));
     const alvo = (ev?.achados ?? []).filter((a) => a.identidade === op.identidade);
     if (alvo.length === 0) return ev ? "achado nao encontrado" : "evidencia ausente";
+    // o arquivo da task que mudou depois do `revisar` (ou o removido que voltou): a rejeição valeria para um conteúdo que
+    // não vai ao commit, e o `conferir` reprovaria (`evidencia-nao-bate`). O `revisar` gravou o blob igual ao do checkout
+    const mudou = Object.entries(ehMapa(ev.arquivos) ? ev.arquivos : {})
+      .find(([f, m]) => (m === null ? existsSync(join(op.raiz, f)) : ehMapa(m) && m.blob !== idDe("hash-object", "--", f)))?.[0];
+    if (mudou !== undefined) return `evidencia desatualizada: ${mudou} mudou depois do revisar; rode o revisar de novo`;
     for (const a of alvo) a.estado = "rejeitado";
     ev.rejeicoes = [...(Array.isArray(ev.rejeicoes) ? ev.rejeicoes : []), { identidade: op.identidade, motivo: op.motivo, em: new Date().toISOString() }];
     // rejeitar um achado não muda o que a revisão não pôde fazer (indisponivel) nem o que ela não cobriu (incompleta)

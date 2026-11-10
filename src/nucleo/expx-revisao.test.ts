@@ -1218,6 +1218,36 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
   });
 
+  it("funcional: arquivo da task que mudou depois do revisar → rejeitar recusa (sai 1), nomeia o arquivo e não grava", () => {
+    for (const mais of [[], ["--base-commit"]]) {
+      const c = cenario({ issues: [achado("src/a.js", 3)] });
+      const base = git(c.raiz, "rev-parse", "HEAD");
+      altera3(c.raiz);
+      if (mais.length) { git(c.raiz, "add", "-A"); git(c.raiz, "commit", "-q", "-m", "task"); }
+      const id = revisar(c, "src/a.js", "T-01", undefined, {}, c.script, mais.length ? ["--base-commit", base] : []).ev.achados[0]?.identidade ?? "";
+      expect(id).not.toBe("");
+      const antes = evidencia(c.raiz);
+      escreve(c.raiz, "src/a.js", "l1\nl2\nnovo3 editado\nl4\nl5\n");
+      const r = roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp");
+      expect([r.rc, r.err.includes("evidencia desatualizada: src/a.js")]).toEqual([1, true]);
+      expect(evidencia(c.raiz)).toEqual(antes);
+    }
+  });
+
+  it("funcional: arquivo dado por removido na revisão e que voltou → rejeitar recusa", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    escreve(c.raiz, "src/b.js", "b1\n");
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "b");
+    rmSync(join(c.raiz, "src/b.js"));
+    altera3(c.raiz);
+    const id = revisar(c, "src/a.js,src/b.js").ev.achados[0]?.identidade ?? "";
+    expect(id).not.toBe("");
+    escreve(c.raiz, "src/b.js", "b1\n");
+    const r = roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp");
+    expect([r.rc, r.err.includes("evidencia desatualizada: src/b.js")]).toEqual([1, true]);
+  });
+
   it("funcional: rejeitar entre a releitura e a gravação do revisar não se perde (trava por evidência)", async () => {
     const c = cenario({ issues: [achado("src/a.js", 3)] });
     altera3(c.raiz);
