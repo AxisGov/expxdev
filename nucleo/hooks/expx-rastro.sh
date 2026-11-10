@@ -326,6 +326,60 @@ expx_id_da_pasta() {
   printf '%s' "${1##*/}"
 }
 
+# expx_chave_escapada_invalida <linha> — a linha abre com uma chave entre aspas
+# duplas que tem escape: sai 0 quando ela, decodificada como o YAML do painel a
+# decodifica, e `trabalho_id` (repetida, o painel recusa o arquivo) ou quando o
+# escape nao e do YAML (o painel tambem recusa); sai 1 para outro nome, chave sem
+# escape ou linha que nao e chave. So `\x`, `\u` e `\U` dao letra, digito ou `_`;
+# os outros escapes validos dao caractere que nao entra no nome. Sem fork.
+# Antes, qualquer chave com escape zerava o id (CodeAnt no conselhos#293).
+expx_chave_escapada_invalida() {
+  local _l="$1" _i=1 _c="" _d="" _h _k _n _x _r _esc=""
+  while [ "$_i" -lt "${#_l}" ]; do
+    _c="${_l:_i:1}"
+    case "$_c" in
+      \") break ;;
+      \\)
+        _esc=1
+        _i=$((_i + 1))
+        _c="${_l:_i:1}"
+        case "$_c" in
+          x) _k=2 ;;
+          u) _k=4 ;;
+          U) _k=8 ;;
+          0|a|b|t|$'\t'|n|v|f|r|e|' '|\"|/|\\|N|_|L|P) _d="$_d?"; _i=$((_i + 1)); _c=""; continue ;;
+          *) return 0 ;;
+        esac
+        _h="${_l:_i+1:_k}"
+        [ "${#_h}" -eq "$_k" ] || return 0
+        case "$_h" in *[!0-9A-Fa-f]*) return 0 ;; esac
+        _n=$((16#$_h))
+        # acima de U+10FFFF nao e caractere: o YAML do painel recusa o arquivo
+        [ "$_n" -le 1114111 ] || return 0
+        if [ "$_n" -ge 48 ] && [ "$_n" -le 57 ] || [ "$_n" -ge 65 ] && [ "$_n" -le 90 ] \
+          || [ "$_n" -eq 95 ] || [ "$_n" -ge 97 ] && [ "$_n" -le 122 ]; then
+          printf -v _x '%02x' "$_n"
+          printf -v _x "\\x$_x"
+          _d="$_d$_x"
+        else
+          _d="$_d?"
+        fi
+        _i=$((_i + _k + 1))
+        _c=""
+        continue
+        ;;
+    esac
+    _d="$_d$_c"
+    _i=$((_i + 1))
+  done
+  # sem o fecho das aspas, ou sem escape, nao e o caso
+  [ "$_c" = \" ] && [ -n "$_esc" ] || return 1
+  _r="${_l:_i+1}"
+  _r="${_r#"${_r%%[![:blank:]]*}"}"
+  case "$_r" in :*) ;; *) return 1 ;; esac
+  [ "$_d" = trabalho_id ]
+}
+
 # expx_id_do_frontmatter <var> <arquivo> — poe em <var> o `trabalho_id` do
 # frontmatter, ou vazio. So vale o bloco que abre na primeira linha com `---`
 # (depois de um BOM UTF-8, se houver) e fecha na proxima linha que comeca com
@@ -364,7 +418,7 @@ expx_id_do_frontmatter() {
     # chave entre aspas duplas com escape, antes ou depois da nossa: o YAML do painel a
     # decodifica, e ela pode ser `trabalho_id` repetida (o painel recusa o arquivo)
     case "$_l" in
-      \"*) _t="${_l%%\":*}"; [ "$_t" = "$_l" ] || case "$_t" in *\\*) _escapa=1 ;; esac ;;
+      \"*\\*) expx_chave_escapada_invalida "$_l" && _escapa=1 ;;
     esac
     # a linha indentada logo depois da chave continua o valor no YAML do painel
     # (`OC-2026-` + `  0007` e `OC-2026- 0007`): o valor de uma linha nao vale

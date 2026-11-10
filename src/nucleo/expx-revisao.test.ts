@@ -111,6 +111,17 @@ describe("expx-revisao.mjs revisar: a CLI conferida", () => {
 });
 
 describe("expx-revisao.mjs revisar", () => {
+  // achado do CodeAnt no katosmv/login#73: a exceção saía 1, o código de `achados`, e a F6 e o E3 a liam como achado
+  it("funcional: exceção não tratada no despacho sai 70 (erro interno), nunca 1, e não imprime a linha de resultado", () => {
+    const arquivo = join(temp("expx-revisao-raiz-"), "nao-e-pasta");
+    writeFileSync(arquivo, "");
+    const r = spawnSync(process.execPath, [SCRIPT, "revisar", "--trabalho", "w", "--task", "T-01.01", "--arquivos", "a.js", "--raiz", arquivo],
+      { encoding: "utf8" });
+    expect(r.status).toBe(70);
+    expect(r.stderr).toContain("expx-revisao: erro interno");
+    expect(r.stdout).toBe("");
+  });
+
   it("funcional: achado em linha alterada bloqueia", () => {
     const c = cenario({ issues: [achado("src/a.js", 3)] });
     altera3(c.raiz);

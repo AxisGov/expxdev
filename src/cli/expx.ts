@@ -7,6 +7,7 @@ import { adicionarSkills, removerSkills } from "./selecionar.js";
 import { interpretarFlagsUpdate, executarUpdate } from "../update/flags.js";
 import { diagnosticar } from "../doctor/verificadores.js";
 import { gerarGrafos } from "../grafo/gerar.js";
+import { sugerirSessao } from "./sessao.js";
 import { avaliarSelecao } from "./selecao.js";
 import { executarWizard } from "./wizard.js";
 import { perguntadorDeTerminal, type Perguntador } from "./perguntar.js";
@@ -261,6 +262,26 @@ const EXECUTORES: Partial<Record<Subcomando, Executor>> = {
     // Só o modo de conferência reprova: gravar o grafo de um plano defeituoso é
     // justamente o que torna o defeito visível, e não deve falhar a geração.
     return conferir && problemas > 0 ? 1 : 0;
+  },
+
+  /**
+   * Imprime o comando que abre a sessão principal na classe declarada no artefato do
+   * trabalho (CONTRATO-expx-orquestracao §14). Não grava e não chama o `claude`.
+   */
+  sessao: async (resto, saida) => {
+    const trabalho = resto[0];
+    if (trabalho === undefined || resto.length > 1 || trabalho.startsWith("-")) {
+      saida.escreverErro("uso: expx sessao <trabalho>\n");
+      return 1;
+    }
+    const s = sugerirSessao(process.cwd(), trabalho);
+    if (!s.ok) {
+      saida.escreverErro(`expx sessao: ${s.erro}\n`);
+      return 1;
+    }
+    for (const a of s.avisos) saida.escreverErro(`expx sessao: aviso: ${a}\n`);
+    saida.escrever(`${s.linha}\n`);
+    return 0;
   },
 
   doctor: async (_resto, saida) => {

@@ -11,6 +11,18 @@ function fm(p: string): unknown {
 }
 
 describe("esquemas dos kinds", () => {
+  // a tripla da classe da sessão principal (expx 0.13.22, CONTRATO-expx-orquestracao §14): o painel
+  // a preserva, nula ou declarada, e não a valida além do tipo (quem recusa a incoerente é o `expx sessao`)
+  it("funcional: o 00-OCORRENCIA preserva classe_sessao, classe_sessao_por e classe_sessao_justificativa", () => {
+    const base = fm(`${OK}/manutencao/OC-2026-0142-frete/00-OCORRENCIA.md`) as Record<string, unknown>;
+    const esquema = esquemaDoKind("ocorrencia" as never);
+    const declarada = esquema.safeParse({ ...base, classe_sessao: "profundo_excepcional", classe_sessao_por: "flavio", classe_sessao_justificativa: "migracao" });
+    expect(declarada.success && declarada.data).toMatchObject({ classe_sessao: "profundo_excepcional", classe_sessao_por: "flavio", classe_sessao_justificativa: "migracao" });
+    const nula = esquema.safeParse({ ...base, classe_sessao: null, classe_sessao_por: null, classe_sessao_justificativa: null });
+    expect(nula.success && nula.data).toMatchObject({ classe_sessao: null, classe_sessao_por: null, classe_sessao_justificativa: null });
+    expect(esquema.safeParse(base).success).toBe(true);
+  });
+
   it("integração: cada arquivo da fixture boa valida contra o esquema do seu kind", () => {
     const arquivos: Array<[string, string]> = [
       [`${OK}/exportacao-csv/ORQUESTRADOR.md`, "orquestrador"],

@@ -17,6 +17,7 @@ export const SUBCOMANDOS = [
   "remove",
   "update",
   "doctor",
+  "sessao",
 ] as const;
 export type Subcomando = (typeof SUBCOMANDOS)[number];
 
@@ -39,6 +40,7 @@ expx — CLI do metodo Expx
   expx remove <skill...>    remove skills da selecao
   expx update [skill...]    atualiza as skills instaladas
   expx doctor               diagnostica uma instalacao quebrada
+  expx sessao <trabalho>    imprime o comando que abre a sessao na classe declarada
 
   --ajuda              mostra esta ajuda
   --version            mostra a versao do CLI

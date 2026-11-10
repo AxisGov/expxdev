@@ -567,6 +567,13 @@ describe("expx_trabalho_id antes do ORQUESTRADOR.md e pelo frontmatter", () => {
     "---\ntrabalho_id : OC-2026-0007\n---\n",
     '---\n"trabalho_id": OC-2026-0007\n---\n',
     "---\n'trabalho_id': OC-2026-0007\n---\n",
+    // chave com escape que decodifica para OUTRO nome não zera o id (CodeAnt no conselhos#293)
+    '---\ntrabalho_id: OC-2026-0007\n"outro\\\\campo": x\n---\n',
+    '---\n"outro\\\\campo": x\ntrabalho_id: OC-2026-0007\n---\n',
+    '---\ntrabalho_id: OC-2026-0007\n"t\\x72abalho": x\n---\n',
+    '---\ntrabalho_id: OC-2026-0007\n"trabalho\\_id": x\n---\n',
+    '---\ntrabalho_id: OC-2026-0007\n"a\\":b": x\n---\n',
+    '---\ntrabalho_id: OC-2026-0007\n"titulo": "a \\"b\\""\n---\n',
   ];
 
   /** Frontmatter sem id seguro: o hook cai para o nome da pasta. */
@@ -621,6 +628,11 @@ describe("expx_trabalho_id antes do ORQUESTRADOR.md e pelo frontmatter", () => {
     // chave com escape, que o YAML do painel decodifica: pode ser a mesma, e o painel recusa
     '---\ntrabalho_id: OC-2026-0007\n"trabalho\\u005fid": OC-B\n---\n',
     '---\n"trabalho\\u005fid": OC-A\ntrabalho_id: OC-2026-0007\n---\n',
+    '---\ntrabalho_id: OC-2026-0007\n"\\x74rabalho_id": OC-B\n---\n',
+    '---\ntrabalho_id: OC-2026-0007\n"trabalho\\U0000005Fid": OC-B\n---\n',
+    // code point acima de U+10FFFF: o YAML do painel recusa o arquivo (Codex no diff da 0.13.22)
+    '---\ntrabalho_id: OC-2026-0007\n"outra\\U00110000": x\n---\n',
+    '---\ntrabalho_id: OC-2026-0007\n"outra\\UFFFFFFFF": x\n---\n',
     "---\nkind: x\n---\ntrabalho_id: OC-2026-0007\n",
     "---\n  trabalho_id: OC-2026-0007\n---\n",
     `---\n${linhas50}\ntrabalho_id: OC-2026-0007\n---\n`,

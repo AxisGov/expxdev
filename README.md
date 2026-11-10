@@ -335,6 +335,7 @@ só.
 | `expx update [skill...]` | Atualiza as skills instaladas |
 | `expx grafo [trabalho]` | Grava o `GRAFO.svg` do plano ao lado do `ORQUESTRADOR.md` |
 | `expx doctor` | Diagnostica uma instalação quebrada |
+| `expx sessao <trabalho>` | Imprime o comando que abre a sessão principal na classe declarada no `00-OCORRENCIA.md` ou no `00-PLANEJAMENTO.md` (`cd '<worktree>' && claude --model … --effort …`); não grava nada |
 
 O painel funciona **sem `init`**: ele não precisa de nada instalado.
 
@@ -549,16 +550,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.13.21 -R AxisGov/expxdev -D ~/expx-cli/v0.13.21 &&
+gh release download v0.13.22 -R AxisGov/expxdev -D ~/expx-cli/v0.13.22 &&
 (
-  cd ~/expx-cli/v0.13.21
+  cd ~/expx-cli/v0.13.22
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.13.21.tgz.sha256
+    sha256sum -c expxdev-0.13.22.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.13.21.tgz.sha256
+    shasum -a 256 -c expxdev-0.13.22.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.13.21/expxdev-0.13.21.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.13.22/expxdev-0.13.22.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -572,7 +573,7 @@ npx --yes --package ~/expx-cli/v0.13.21/expxdev-0.13.21.tgz expx init --skills b
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.13.21 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.13.22 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -700,6 +701,9 @@ npx --yes --package ~/expx-cli/v0.13.21/expxdev-0.13.21.tgz expx init --skills b
   faz o hook ler o `trabalho_id` com comentário YAML como o painel (conselhos, OC-2026-0009 e #283).
 - `0.13.21` corrige o que a instalação da 0.13.20 achou no conselhos (#292): a OC nova não recebe mais
   os eventos de uma aberta que veio da `main`, e o comentário depois do `trabalho_id` é lido como no painel.
+- `0.13.22` junta os achados do login#73 e do conselhos#293, a evidência da revisão no
+  `task-so-fecha-verde`, a regra do modo subagente e o `expx sessao`, que imprime o comando de
+  abertura da sessão principal na classe declarada do trabalho.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

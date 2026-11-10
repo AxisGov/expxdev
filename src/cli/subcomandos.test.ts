@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { interpretarSubcomando, SUBCOMANDOS, ajudaGeral } from "./subcomandos.js";
 
 describe("roteador de subcomando", () => {
-  it("integração: os oito subcomandos são reconhecidos", () => {
+  it("integração: os nove subcomandos são reconhecidos", () => {
     expect([...SUBCOMANDOS]).toEqual([
       "init",
       "panel",
@@ -12,6 +12,7 @@ describe("roteador de subcomando", () => {
       "remove",
       "update",
       "doctor",
+      "sessao",
     ]);
     for (const s of SUBCOMANDOS) {
       const r = interpretarSubcomando([s]);

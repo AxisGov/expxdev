@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.13.22 — tudo junto: os achados do login#73 e do conselhos#293, a evidência no hook, o modo subagente e a classe da sessão
+
+Instale por PR, como a 0.13.21. Muda a runx (AxisGov/runx#20, merge 618dbc6), a sprintx (AxisGov/sprintx#72, merge b4850d0), o núcleo (`expx-revisao.mjs`, `expx-rastro.sh`) e o CLI (`expx sessao`). Os eventos, o `init`, o `doctor` e o painel seguem como na 0.13.21; o painel só preserva as chaves novas do `00-OCORRENCIA.md`.
+
+- **A saída 1 do `revisar`** (CodeAnt no katosmv/login#73, r4518931241). Uma exceção não tratada saía 1, o código de `achados`, e a F6 e o E3 a liam como achado.
+  - O núcleo passa a sair **70** (erro interno).
+  - A runx e a sprintx só leem `achados` com a última linha `<T-NN.MM> achados` (DR-104, DS-208). O 70, e a saída 1 sem a linha, são tratados como a saída 2.
+- **O modo pelo leitor** (r4518931484). O `[ -f .expx/fatiamento.json ]` era falso para pasta e link quebrado, e a skill pulava o leitor e assumia `se_disponivel`.
+  - Com o leitor instalado, ele roda sempre e decide sozinho (DR-107, DS-208).
+  - Sem o leitor, qualquer entrada é modo desconhecido (`prerequisito_ausente`).
+- **Aspas no exemplo do `revisar`** (r4518931754). Um caminho com espaço era dividido pelo shell, e o `revisar` saía 64.
+- **A evidência no `task-so-fecha-verde`** (desenho de 2026-10-18, item 4.2; DR-106, DR-110, DS-207, DS-211).
+  - Em `obrigatoria`, a task que a escrita leva a `concluida` precisa de `docs/entregas/<trabalho>/revisao/<T>.json`, arquivo comum.
+  - O id fora de `T-NN.MM` avisa que a evidência não pode ser conferida.
+  - Com modo desconhecido, não exige. O hook fica no modo dele, aviso por padrão.
+- **O `trabalho_id` com outra chave escapada** (CodeAnt no conselhos#293). Uma chave entre aspas com escape, alheia ao `trabalho_id`, zerava o id. Agora a chave é decodificada como no YAML do painel, e só invalida quando dá `trabalho_id`, quando o escape não é do YAML ou quando o code point passa de `U+10FFFF`.
+- **runx, a fechada da branch com o Git falhando** (conselhos#293, DR-105). Sem nenhuma aberta, o Git também é consultado.
+- **O modo subagente** (Conselhos, OC-2026-0011; DR-108, DS-209; CONTRATO-expx-orquestracao §15). A runx e a sprintx não rodam como subagente comum com a worktree diferente do `cwd` da sessão.
+  - Bancada com o `claude` 2.1.319 real (`scripts/bancada-subagente-cwd.sh`): `git -C` e `cd` não mudam o `cwd` do payload.
+  - Com `isolation: "worktree"`, o `cwd` e o rastro do núcleo seguem a worktree do subagente. É compatibilidade medida, não suporte: o E0 da mergex não adota a branch `worktree-agent-*`.
+- **A classe da sessão principal** (escopo (a); DR-109, DS-210; §14).
+  - `classe_sessao`, `classe_sessao_por` e `classe_sessao_justificativa` no `00-OCORRENCIA.md` e no `00-PLANEJAMENTO.md`. Na sprintx, só o `planejamento.sh criar` as grava, com `--classe-sessao`, `--classe-sessao-por` e `--classe-sessao-justificativa`.
+  - `expx sessao <trabalho>` imprime `cd '<worktree>' && claude --model … --effort …`, pela cadeia da política ou pela embutida.
+  - Fora da v1: a observação, o aviso e o painel.
+- **Não exercitado:** o bash 3.2 do macOS, o passo de revisão e o hook com o binário real numa feature ou numa ocorrência, e o fluxo E0–E5 como subagente com `isolation: "worktree"`.
+
 ## 0.13.21 — os achados da instalação da 0.13.20 no conselhos
 
 Instale por PR, como a 0.13.20. Muda a runx (AxisGov/runx#19, merge a4127f7) e o hook `expx-rastro.sh`; a sprintx, os eventos, o `init`, o `doctor` e o painel seguem como na 0.13.20. Todos os achados vêm do conselhos-municipais#292, e nenhum tinha efeito lá no dia.

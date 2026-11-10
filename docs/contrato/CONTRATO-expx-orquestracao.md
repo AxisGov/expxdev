@@ -690,3 +690,88 @@ fecham com `invocacao` e `instancia` distintas, sem envelope restante; a sessão
 sob fallback real segue não exercitado, porque o fallback só ocorre sob sobrecarga, e o
 payload que ele produz está coberto por teste. O hook no Windows nativo não será provado,
 por decisão do dono: o trabalho é no WSL.
+
+## 14. A sessão principal: a classe declarada (0.13.22, escopo (a))
+
+O Claude Code não troca o modelo nem o esforço de uma sessão que já roda: `--model` e
+`--effort` valem na abertura, e `/model` e `/effort` são do humano. Então a política da
+sessão principal da runx e da sprintx é, na v1, só uma **declaração** no artefato do trabalho
+e um **comando de abertura** derivado dela. Nada observa, avisa nem recusa.
+
+### 14.1 A declaração
+
+Três chaves de topo, sempre presentes no artefato que as tem, `null` sem declaração:
+
+| Chave | Valor |
+|---|---|
+| `classe_sessao` | `mecanico_triagem`, `raciocinio_normal`, `profundo_excepcional` ou `null` |
+| `classe_sessao_por` | quem declarou, identificador minúsculo (`^[a-z][a-z0-9_-]*$`); `null` só com a classe `null` |
+| `classe_sessao_justificativa` | texto de uma linha, não vazio, só e obrigatório em `profundo_excepcional`; `null` nas outras |
+
+- **Onde:** no `00-OCORRENCIA.md` da runx (`docs/manutencao/<pasta>/`), que o E1 grava, e no
+  `00-PLANEJAMENTO.md` da sprintx (`docs/sprintx/features/<slug>/`), que só o
+  `planejamento.sh criar` grava (`--classe-sessao`, `--classe-sessao-por`,
+  `--classe-sessao-justificativa`, depois dos posicionais) e que toda regravação preserva. O nome
+  não é `classe`: na sprintx, `classe` é o enum do bloqueio.
+- **Quem:** quem chama a skill (o pedido, o orquestrador do Conselhos) ou um humano. A skill só
+  grava; nunca infere do tamanho, do tipo ou do nome.
+- **Imutável na v1:** declarada, não muda mais no trabalho; nova classe pede novo trabalho.
+
+### 14.2 `expx sessao <trabalho>`
+
+Procura o trabalho em todas as worktrees do repositório (a atual primeiro) pelos dois artefatos,
+pelo `trabalho_id` do frontmatter, e imprime uma linha:
+
+```
+cd '<raiz da worktree do artefato>' && claude --model <m> [--effort <e>]
+```
+
+A raiz vai entre aspas simples POSIX (o apóstrofo vira `'\''`). A cadeia é a do projeto para a
+classe (`adaptadores.claude.classes.<c>`) quando a política está ativa e a traz; senão, a da
+tabela embutida (§5), como no §7; vale a primeira alternativa, e sem `effort` não há `--effort`.
+Sai 0 com a linha; 1, sem linha e com o motivo no stderr, quando o trabalho não é achado, quando
+há mais de um artefato com o mesmo id (`ambiguo`, com os caminhos), quando a classe é `null`
+("sem classe declarada"), quando a tripla é incoerente (`declaracao invalida`), quando a
+política é inválida ou quando, num repositório, a lista das worktrees falha (procurar só na atual
+daria por único um id repetido noutra árvore). `ANTHROPIC_MODEL` e `CLAUDE_CODE_EFFORT_LEVEL` no ambiente viram aviso no
+stderr: passam por cima do comando. É puro: não grava nada e não chama o `claude`. O painel
+preserva as chaves e não as julga.
+
+Limite da v1: num trabalho novo, a primeira sessão abre antes do artefato, e quem a abre é quem
+declara a classe, com o modelo dela (o `expx sessao` não aceita `--classe`, para que o artefato
+seja a única fonte). O comando serve às sessões seguintes: retomada, `/clear` e a sessão aberta na
+worktree depois do handoff do E1 da runx, que leva a tripla quando ela foi declarada.
+
+### 14.3 Fora da v1
+
+A observação passiva do modelo da sessão, o aviso de sessão fora da classe, a linha no painel, o
+`doctor`, o `PreModelSwitch` e cadeias próprias do principal. O H10 (§11.1) não muda: o `model`
+dos eventos do principal continua sendo só o observado no evento.
+
+## 15. Execução como subagente (0.13.22)
+
+Os hooks do expx escolhem o repositório e o trabalho pelo `cwd` do payload (ou pelo `$PWD` do
+processo do hook): no código do núcleo (`expx_raiz`), da runx, da sprintx e da mergex, pela
+leitura do parecer de 2026-11-09. A bancada (`scripts/bancada-subagente-cwd.sh`; resultado em
+`docs/superpowers/specs/2026-11-09-bancada-subagente-cwd.md`), com o `claude` 2.1.319 real e
+`--setting-sources project`, mediu o payload, o `$PWD` do hook e o destino do escritor real do
+núcleo (`expx_rastro_grava`); os hooks da runx, da sprintx e da mergex não rodaram nela:
+
+- **Subagente comum** (`general-purpose`, sem isolamento): `git -C <worktree>` e
+  `cd <worktree> && …` no Bash **não** mudam o `cwd` do payload nem o `$PWD` do hook, que ficam
+  no checkout da sessão; os eventos do escritor do núcleo caem no JSONL do checkout principal. É o
+  que o Conselhos mediu com os hooks reais na OC-2026-0011 (rastro em `sem-trabalho.jsonl`, push
+  lido como push na `main`).
+- **Subagente com `isolation: "worktree"`**: `SubagentStart`, `PreToolUse`, `PostToolUse` e
+  `SubagentStop` recebem como `cwd` a worktree que o Claude Code cria para ele
+  (`.claude/worktrees/agent-<id>`, branch `worktree-agent-<id>`, a partir do `HEAD`), o `$PWD` do
+  hook é o mesmo, e os eventos do escritor do núcleo caem no JSONL dessa worktree. O `tool_response.agentId` do
+  `PostToolUse` do `Agent` é o `agent_id` do `SubagentStart`.
+
+Regra: **a runx e a sprintx não rodam como subagente comum quando a worktree do trabalho é
+diferente do `cwd` da sessão.** A sessão abre na worktree, com o comando do `expx sessao`
+(§14.2). O modo `isolation: "worktree"` tem só a **compatibilidade de `cwd` medida**; ele não é
+suportado: o E0 da mergex só adota a árvore quando a branch ativa já é a do trabalho, e a
+`worktree-agent-<id>` não é; e o fluxo E0–E5 nesse modo, a integridade e o OpenCode não foram
+provados. Suportá-lo pede mudança no E0 da mergex (criar a branch do trabalho na mesma árvore,
+sem trocar de árvore) e uma prova do fluxo inteiro.
