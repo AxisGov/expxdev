@@ -1248,6 +1248,20 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     expect([r.rc, r.err.includes("evidencia desatualizada: src/b.js")]).toEqual([1, true]);
   });
 
+  it.skipIf(process.platform === "win32")("funcional: fora do Windows, o removido que voltou como link quebrado → rejeitar recusa (Codex)", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    escreve(c.raiz, "src/b.js", "b1\n");
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "b");
+    rmSync(join(c.raiz, "src/b.js"));
+    altera3(c.raiz);
+    const id = revisar(c, "src/a.js,src/b.js").ev.achados[0]?.identidade ?? "";
+    expect(id).not.toBe("");
+    symlinkSync("nao-existe.js", join(c.raiz, "src/b.js"));
+    const r = roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp");
+    expect([r.rc, r.err.includes("evidencia desatualizada: src/b.js")]).toEqual([1, true]);
+  });
+
   it("funcional: rejeitar entre a releitura e a gravação do revisar não se perde (trava por evidência)", async () => {
     const c = cenario({ issues: [achado("src/a.js", 3)] });
     altera3(c.raiz);

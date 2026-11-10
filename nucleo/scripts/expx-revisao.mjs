@@ -901,6 +901,11 @@ function listar() {
   process.exitCode = tasks.some((t) => t.listagem === "invalida") ? 1 : tasks.some((t) => t.listagem === "ausente") ? 3 : 0;
 }
 
+/** `f` está no checkout, link quebrado inclusive (o `existsSync` segue o link e o daria por ausente; o git o commitaria). */
+function presenteSemSeguirLink(f) {
+  try { lstatSync(join(op.raiz, f)); return true; } catch { return false; }
+}
+
 function rejeitar() {
   const erro = comTrava(op.task, () => {
     const ev = le(caminhoEv(op.task));
@@ -909,7 +914,7 @@ function rejeitar() {
     // o arquivo da task que mudou depois do `revisar` (ou o removido que voltou): a rejeição valeria para um conteúdo que
     // não vai ao commit, e o `conferir` reprovaria (`evidencia-nao-bate`). O `revisar` gravou o blob igual ao do checkout
     const mudou = Object.entries(ehMapa(ev.arquivos) ? ev.arquivos : {})
-      .find(([f, m]) => (m === null ? existsSync(join(op.raiz, f)) : ehMapa(m) && m.blob !== idDe("hash-object", "--", f)))?.[0];
+      .find(([f, m]) => (m === null ? presenteSemSeguirLink(f) : ehMapa(m) && m.blob !== idDe("hash-object", "--", f)))?.[0];
     if (mudou !== undefined) return `evidencia desatualizada: ${mudou} mudou depois do revisar; rode o revisar de novo`;
     for (const a of alvo) a.estado = "rejeitado";
     ev.rejeicoes = [...(Array.isArray(ev.rejeicoes) ? ev.rejeicoes : []), { identidade: op.identidade, motivo: op.motivo, em: new Date().toISOString() }];
