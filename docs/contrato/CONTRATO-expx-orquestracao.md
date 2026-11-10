@@ -784,6 +784,9 @@ trabalho, em vez de criar outra, que ficaria longe do `cwd` que os hooks recebem
   `worktree-agent-<id>` e tem a entrada igual no `git worktree list --porcelain -z`; senão sai 1,
   sem imprimir. É detecção operacional, não fronteira de segurança: quem controla o repositório
   reproduz o caminho e a branch. Depois da troca de branch, ele sai 1 (a adoção já aconteceu).
+  A skill o procura na árvore atual, senão no checkout principal (a worktree do agente só tem o que
+  está commitado, e há consumidor que não versiona o `.expx/marketplace`); sem ele nos dois, numa
+  raiz `.claude/worktrees/agent-<id>`, ela para ("atualize o expx") em vez de criar outra worktree.
 - **A adoção** (F1 da sprintx, E1 da runx, antes do `git worktree add`): com `isolada` e a árvore
   limpa, `git switch -c <branch> --no-track <base>`, ou `git switch <branch>` se ela existe e não
   está em worktree nenhuma, na própria worktree do agente; a chave `worktree` do artefato recebe o
