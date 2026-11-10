@@ -11,7 +11,7 @@ próxima release do ExpxDev. `--to <ref>` sai do certificado de propósito, uma
 skill por vez. O portão da release confere que cada certificado é ancestral da
 `main` da skill, e `catalogo.test.ts` confere esta tabela contra o catálogo.
 
-Commits certificados (confirmados na organização AxisGov em 2026-11-09; as trocas mais recentes são a runx e a sprintx da 0.13.25, com os relatos da 1ª prova real da revisão por task no Login, DR-113 e DS-215):
+Commits certificados (confirmados na organização AxisGov em 2026-11-10; as trocas mais recentes são a runx e a sprintx da 0.13.26, com o subagente isolado do Claude Code, o lock contestado e os achados do login#77, DR-114, DR-115 e DS-216 a DS-218):
 
 | Repositório | Commit certificado |
 |---|---|
