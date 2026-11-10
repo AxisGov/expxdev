@@ -31,20 +31,26 @@ const SOBREPOEM = [
   ["CLAUDE_CODE_EFFORT_LEVEL", "--effort"],
 ] as const;
 
-/** As raízes das worktrees do repositório de `raiz`, a atual primeiro; fora do git, só ela. */
-function worktrees(raiz: string): string[] {
-  const r = spawnSync("git", ["-C", raiz, "worktree", "list", "--porcelain", "-z"], { encoding: "utf8" });
+/** As raízes das worktrees do repositório de `raiz`, a atual primeiro; fora do git, só ela. Num
+ *  repositório cuja lista de worktrees falha, undefined: procurar só na atual daria por único um id
+ *  repetido noutra árvore (CodeAnt no expxdev#158). */
+function worktrees(raiz: string): string[] | undefined {
   const top = spawnSync("git", ["-C", raiz, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
-  const atual = top.status === 0 ? top.stdout.trim() : raiz;
-  const todas = r.status !== 0 ? [] : r.stdout.split("\0").filter((l) => l.startsWith("worktree ")).map((l) => l.slice("worktree ".length));
+  if (top.status !== 0) return [raiz];
+  const atual = top.stdout.trim();
+  const r = spawnSync("git", ["-C", raiz, "worktree", "list", "--porcelain", "-z"], { encoding: "utf8" });
+  if (r.status !== 0) return undefined;
+  const todas = r.stdout.split("\0").filter((l) => l.startsWith("worktree ")).map((l) => l.slice("worktree ".length));
   return [atual, ...todas.filter((w) => w !== atual)].filter((w) => existsSync(w));
 }
 
 type Candidato = { raiz: string; caminho: string; dados: Record<string, unknown> };
 
-function candidatos(raiz: string, trabalho: string): Candidato[] {
+function candidatos(raiz: string, trabalho: string): Candidato[] | undefined {
   const achados: Candidato[] = [];
-  for (const wt of worktrees(raiz)) {
+  const arvores = worktrees(raiz);
+  if (arvores === undefined) return undefined;
+  for (const wt of arvores) {
     for (const a of ARTEFATOS) {
       const base = join(wt, ...a.pasta);
       let pastas: string[];
@@ -103,6 +109,7 @@ const argumento = (s: string): string => (/^[A-Za-z0-9._:/@+=-]+$/.test(s) ? s :
 
 export function sugerirSessao(raiz: string, trabalho: string, env: NodeJS.ProcessEnv = process.env): Sugestao {
   const achados = candidatos(raiz, trabalho);
+  if (achados === undefined) return { ok: false, erro: "nao foi possivel listar as worktrees do repositorio (git worktree list falhou)" };
   if (achados.length === 0) return { ok: false, erro: `trabalho nao encontrado: ${trabalho}` };
   if (achados.length > 1) {
     return { ok: false, erro: `trabalho ambiguo: ${trabalho} em ${achados.map((a) => a.caminho).join(", ")}` };

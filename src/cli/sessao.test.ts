@@ -12,7 +12,8 @@ import { SUBCOMANDOS } from "./subcomandos.js";
 // sessão principal. Puro: não grava nada e não chama o `claude`.
 const criados: string[] = [];
 afterEach(() => { for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true }); });
-const temp = (p: string): string => { const d = realpathSync(mkdtempSync(join(tmpdir(), p))); criados.push(d); return d; };
+// `.native`: no Windows o `realpathSync` em JS mantém o nome curto 8.3 (RUNNER~1) e o git devolve o longo
+const temp = (p: string): string => { const d = realpathSync.native(mkdtempSync(join(tmpdir(), p))); criados.push(d); return d; };
 function git(d: string, ...args: string[]): void {
   const r = spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false", ...args], { cwd: d, encoding: "utf8" });
   if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
@@ -108,6 +109,22 @@ describe("expx sessao: o que não sugere nada", () => {
     ocorrencia(r, "dup", NORMAL);
     planejamento(r, "dup", NORMAL);
     recusa(r, "dup", /ambiguo[\s\S]*00-OCORRENCIA[\s\S]*00-PLANEJAMENTO/);
+  });
+
+  // CodeAnt no expxdev#158: sem a lista das worktrees, um id duplicado noutra árvore passaria por único
+  it.skipIf(process.platform === "win32")("funcional: git worktree list falhando num repositório recusa, em vez de procurar só na atual", () => {
+    const r = repo();
+    ocorrencia(r, "OC-2026-0013", NORMAL);
+    const bin = temp("expx-sessao-git-");
+    const real = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+    writeFileSync(join(bin, "git"), `#!/bin/sh\nfor a in "$@"; do [ "$a" = worktree ] && exit 128; done\nexec "${real}" "$@"\n`, { mode: 0o755 });
+    const antes = process.env["PATH"];
+    process.env["PATH"] = `${bin}:${antes ?? ""}`;
+    try {
+      recusa(r, "OC-2026-0013", /worktrees/);
+    } finally {
+      process.env["PATH"] = antes;
+    }
   });
 
   it("funcional: política inválida", () => {

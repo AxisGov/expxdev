@@ -731,8 +731,9 @@ classe (`adaptadores.claude.classes.<c>`) quando a política está ativa e a tra
 tabela embutida (§5), como no §7; vale a primeira alternativa, e sem `effort` não há `--effort`.
 Sai 0 com a linha; 1, sem linha e com o motivo no stderr, quando o trabalho não é achado, quando
 há mais de um artefato com o mesmo id (`ambiguo`, com os caminhos), quando a classe é `null`
-("sem classe declarada"), quando a tripla é incoerente (`declaracao invalida`) ou quando a
-política é inválida. `ANTHROPIC_MODEL` e `CLAUDE_CODE_EFFORT_LEVEL` no ambiente viram aviso no
+("sem classe declarada"), quando a tripla é incoerente (`declaracao invalida`), quando a
+política é inválida ou quando, num repositório, a lista das worktrees falha (procurar só na atual
+daria por único um id repetido noutra árvore). `ANTHROPIC_MODEL` e `CLAUDE_CODE_EFFORT_LEVEL` no ambiente viram aviso no
 stderr: passam por cima do comando. É puro: não grava nada e não chama o `claude`. O painel
 preserva as chaves e não as julga.
 
