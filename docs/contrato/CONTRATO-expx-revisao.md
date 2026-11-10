@@ -342,8 +342,9 @@ excluídos do perfil) não vai à CLI nem ao snapshot, e a CLI não tem canal pa
 ele mudou: com o `package.json` de versão ou dependência nova, ela acusa "o lock não foi
 atualizado" (três falsos positivos no Login, ui-react-046). Só esse diagnóstico, com o lock
 declarado na task e alterado no blob que vai ao commit, é falso positivo conhecido: o
-agente registra `revisao_contestada` com o diff do lock que acompanha a mudança do
-`package.json`, e o desenvolvedor rejeita. "O lock mudou em algum lugar" sozinho não prova.
+agente registra `revisao_contestada` com o diff do lock que traz a mesma mudança do
+`package.json` (a versão ou a dependência nova), e o desenvolvedor rejeita. "O lock mudou em
+algum lugar" sozinho não prova: sem essa mudança no lock, o achado é real, e o lock se corrige na task.
 
 **Mudar o modo:** a evidência precisa estar no commit da task, porque o `conferir` lê `<sha>:docs/entregas/.../revisao/<task>.json`. Rodar `revisar` depois não cria essa evidência para o commit antigo. Por isso, religue `obrigatoria` entre trabalhos, regra de operação que nada aqui impõe: a task concluída com o modo desligado dá `evidencia-ausente` se o E2 for reexecutado, e o trabalho já integrado não reexecuta o E2. Trabalho aberto termina no modo em que começou.
 
