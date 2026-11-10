@@ -630,6 +630,9 @@ describe("expx_trabalho_id antes do ORQUESTRADOR.md e pelo frontmatter", () => {
     '---\n"trabalho\\u005fid": OC-A\ntrabalho_id: OC-2026-0007\n---\n',
     '---\ntrabalho_id: OC-2026-0007\n"\\x74rabalho_id": OC-B\n---\n',
     '---\ntrabalho_id: OC-2026-0007\n"trabalho\\U0000005Fid": OC-B\n---\n',
+    // code point acima de U+10FFFF: o YAML do painel recusa o arquivo (Codex no diff da 0.13.22)
+    '---\ntrabalho_id: OC-2026-0007\n"outra\\U00110000": x\n---\n',
+    '---\ntrabalho_id: OC-2026-0007\n"outra\\UFFFFFFFF": x\n---\n',
     "---\nkind: x\n---\ntrabalho_id: OC-2026-0007\n",
     "---\n  trabalho_id: OC-2026-0007\n---\n",
     `---\n${linhas50}\ntrabalho_id: OC-2026-0007\n---\n`,

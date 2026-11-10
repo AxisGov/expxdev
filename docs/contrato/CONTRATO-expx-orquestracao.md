@@ -744,19 +744,22 @@ dos eventos do principal continua sendo só o observado no evento.
 
 ## 15. Execução como subagente (0.13.22)
 
-Os hooks do expx (núcleo, runx, sprintx e mergex) escolhem o repositório e o trabalho pelo `cwd`
-do payload. Medido com o `claude` 2.1.319 real, `--setting-sources project`, numa bancada com o
-escritor real do núcleo (`scripts/bancada-subagente-cwd.sh`; resultado em
-`docs/superpowers/specs/2026-11-09-bancada-subagente-cwd.md`):
+Os hooks do expx escolhem o repositório e o trabalho pelo `cwd` do payload (ou pelo `$PWD` do
+processo do hook): no código do núcleo (`expx_raiz`), da runx, da sprintx e da mergex, pela
+leitura do parecer de 2026-11-09. A bancada (`scripts/bancada-subagente-cwd.sh`; resultado em
+`docs/superpowers/specs/2026-11-09-bancada-subagente-cwd.md`), com o `claude` 2.1.319 real e
+`--setting-sources project`, mediu o payload, o `$PWD` do hook e o destino do escritor real do
+núcleo (`expx_rastro_grava`); os hooks da runx, da sprintx e da mergex não rodaram nela:
 
 - **Subagente comum** (`general-purpose`, sem isolamento): `git -C <worktree>` e
   `cd <worktree> && …` no Bash **não** mudam o `cwd` do payload nem o `$PWD` do hook, que ficam
-  no checkout da sessão; os eventos do subagente caem no JSONL do checkout principal. É o que o
-  Conselhos mediu na OC-2026-0011 (rastro em `sem-trabalho.jsonl`, push lido como push na `main`).
+  no checkout da sessão; os eventos do escritor do núcleo caem no JSONL do checkout principal. É o
+  que o Conselhos mediu com os hooks reais na OC-2026-0011 (rastro em `sem-trabalho.jsonl`, push
+  lido como push na `main`).
 - **Subagente com `isolation: "worktree"`**: `SubagentStart`, `PreToolUse`, `PostToolUse` e
   `SubagentStop` recebem como `cwd` a worktree que o Claude Code cria para ele
   (`.claude/worktrees/agent-<id>`, branch `worktree-agent-<id>`, a partir do `HEAD`), o `$PWD` do
-  hook é o mesmo, e os eventos caem no JSONL dessa worktree. O `tool_response.agentId` do
+  hook é o mesmo, e os eventos do escritor do núcleo caem no JSONL dessa worktree. O `tool_response.agentId` do
   `PostToolUse` do `Agent` é o `agent_id` do `SubagentStart`.
 
 Regra: **a runx e a sprintx não rodam como subagente comum quando a worktree do trabalho é

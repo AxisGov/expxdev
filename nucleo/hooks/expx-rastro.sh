@@ -354,6 +354,8 @@ expx_chave_escapada_invalida() {
         [ "${#_h}" -eq "$_k" ] || return 0
         case "$_h" in *[!0-9A-Fa-f]*) return 0 ;; esac
         _n=$((16#$_h))
+        # acima de U+10FFFF nao e caractere: o YAML do painel recusa o arquivo
+        [ "$_n" -le 1114111 ] || return 0
         if [ "$_n" -ge 48 ] && [ "$_n" -le 57 ] || [ "$_n" -ge 65 ] && [ "$_n" -le 90 ] \
           || [ "$_n" -eq 95 ] || [ "$_n" -ge 97 ] && [ "$_n" -le 122 ]; then
           printf -v _x '%02x' "$_n"
