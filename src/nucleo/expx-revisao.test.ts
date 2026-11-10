@@ -947,7 +947,154 @@ describe("expx-revisao.mjs: arquivo declarado e não alterado (sem-alteracao)", 
   });
 });
 
-const roda = (raiz: string, ...a: string[]) => {
+// Código só movido (Login, ui-react-046: um teste dividido em dois arquivos): o trecho que a task removeu de um arquivo
+// seu e pôs noutro, igual byte a byte, não é linha alterada (`derivacao: 2`). O achado nele vira `anterior`.
+describe("expx-revisao.mjs: código só movido (derivacao 2)", () => {
+  const TESTE = 'const a = require("a");\ndescribe("x", () => {\n  it("um", () => {\n    expect(soma(1, 2)).toBe(3);\n  });\n'
+    + '  it("dois", () => {\n    expect(soma(2, 2)).toBe(4);\n  });\n});\n';
+  const SEM_DOIS = 'const a = require("a");\ndescribe("x", () => {\n  it("um", () => {\n    expect(soma(1, 2)).toBe(3);\n  });\n});\n';
+  const PARTE2 = 'import { soma } from "./soma";\ndescribe("y", () => {\n  it("dois", () => {\n    expect(soma(2, 2)).toBe(4);\n  });\n});\n';
+  /** Commita `antes`, aplica `depois` (`null` apaga) e revisa os caminhos de `depois` com as `issues` dadas. */
+  function movido(antes: Record<string, string>, depois: Record<string, string | null>, issues: object[], mais: string[] = []) {
+    const c = cenario({ issues });
+    for (const [f, t] of Object.entries(antes)) escreve(c.raiz, f, t);
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "antes");
+    const base = git(c.raiz, "rev-parse", "HEAD");
+    for (const [f, t] of Object.entries(depois)) if (t === null) rmSync(join(c.raiz, f)); else escreve(c.raiz, f, t);
+    if (mais.includes("--base-commit")) { git(c.raiz, "add", "-A"); git(c.raiz, "commit", "-q", "-m", "task"); }
+    const r = revisar(c, Object.keys(depois).join(","), "T-01", undefined, {}, c.script, mais.includes("--base-commit") ? ["--base-commit", base] : []);
+    return { c, r, estados: r.ev.achados.map((a) => `${a.arquivo}:${a.linha}=${a.estado}`) };
+  }
+
+  it("funcional: teste dividido em dois arquivos → o trecho movido é anterior, a linha nova é aberta; o conferir refaz igual", () => {
+    const { c, r, estados } = movido({ "src/t.js": TESTE }, { "src/t.js": SEM_DOIS, "src/t2.js": PARTE2 },
+      [achado("src/t2.js", 4), achado("src/t2.js", 1)]);
+    expect(estados).toEqual(["src/t2.js:4=anterior", "src/t2.js:1=aberto"]);
+    expect(r).toMatchObject({ rc: 1, ev: { resultado: "achados", derivacao: 2 } });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
+  });
+
+  it("funcional: só o achado no trecho movido → ok, e o conferir aceita (com --base-commit também)", () => {
+    for (const mais of [[], ["--base-commit"]]) {
+      const { c, r, estados } = movido({ "src/t.js": TESTE }, { "src/t.js": SEM_DOIS, "src/t2.js": PARTE2 }, [achado("src/t2.js", 4)], mais);
+      expect(estados).toEqual(["src/t2.js:4=anterior"]);
+      expect(r.rc).toBe(0);
+      expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+    }
+  });
+
+  it("funcional: arquivo de origem apagado pela task também paga o movimento", () => {
+    const { estados } = movido({ "src/t.js": TESTE }, { "src/t.js": null, "src/t2.js": TESTE }, [achado("src/t2.js", 7)]);
+    expect(estados).toEqual(["src/t2.js:7=anterior"]);
+  });
+
+  it("funcional: cópia (o trecho continua na origem) não recebe crédito", () => {
+    const { estados } = movido({ "src/t.js": TESTE }, { "src/t.js": TESTE.replace("um", "um!"), "src/t2.js": PARTE2 }, [achado("src/t2.js", 4)]);
+    expect(estados).toEqual(["src/t2.js:4=aberto"]);
+  });
+
+  it("funcional: uma linha removida paga uma adição só; uma linha substantiva basta", () => {
+    const { estados } = movido({ "src/m.js": "l1\nl2\nl3\nl4\nl5\n" }, { "src/m.js": "l1\nl2\nl4\nl5\n", "src/b.js": "x9\nl3\nl3\n" },
+      [achado("src/b.js", 3), achado("src/b.js", 2), achado("src/b.js", 1)]);
+    expect(estados).toEqual(["src/b.js:3=aberto", "src/b.js:2=anterior", "src/b.js:1=aberto"]);
+  });
+
+  it("funcional: linha movida com espaço no fim, só pontuação ou só import não recebe crédito", () => {
+    const { estados } = movido({ "src/a.js": 'l1\nl2\nl3\n});\nimport { z } from "z";\nl6\n' },
+      { "src/a.js": "l1\nl2\nl6\n", "src/b.js": 'l3 \n});\nimport { z } from "z";\n' },
+      [achado("src/b.js", 1), achado("src/b.js", 2), achado("src/b.js", 3)]);
+    expect(estados).toEqual(["src/b.js:1=aberto", "src/b.js:2=aberto", "src/b.js:3=aberto"]);
+  });
+
+  it("funcional: o fim de linha conta: `foo` sem \\n no fim não paga `foo\\n`", () => {
+    const sem = movido({ "src/d.js": "foo" }, { "src/d.js": null, "src/e.js": "foo\n" }, [achado("src/e.js", 1)]);
+    const com = movido({ "src/d.js": "foo\n" }, { "src/d.js": null, "src/e.js": "foo\n" }, [achado("src/e.js", 1)]);
+    expect([sem.estados, com.estados]).toEqual([["src/e.js:1=aberto"], ["src/e.js:1=anterior"]]);
+  });
+
+  it("funcional: o maior trecho primeiro (A B }); X A B → destinos A B e A B });): os cinco recebem crédito", () => {
+    const { estados } = movido({ "src/f.js": "A1\nB1\n});\nX1\nA1\nB1\n" }, { "src/f.js": null, "src/g.js": "A1\nB1\nY9\nA1\nB1\n});\n" },
+      [1, 2, 3, 4, 5, 6].map((l) => achado("src/g.js", l)));
+    expect(estados).toEqual(["src/g.js:1=anterior", "src/g.js:2=anterior", "src/g.js:3=aberto", "src/g.js:4=anterior", "src/g.js:5=anterior", "src/g.js:6=anterior"]);
+  });
+
+  it("funcional: com os dois lados no git, o `\\ No newline` e o conteúdo que começa com --- e +++ são lidos certo", () => {
+    const { estados } = movido({ "src/p.js": "keep\n--- separador\n+++ mais\nfim", "src/q.js": "x\n" },
+      { "src/p.js": "keep\n", "src/q.js": "x\n--- separador\n+++ mais\nfim\n" }, [2, 3, 4].map((l) => achado("src/q.js", l)));
+    expect(estados).toEqual(["src/q.js:2=anterior", "src/q.js:3=anterior", "src/q.js:4=aberto"]);
+  });
+
+  it("funcional: a origem não revisável declarada na task paga o movimento", () => {
+    const { estados } = movido({ "package-lock.json": "{}\nsegredo1 = calcula(1);\n" },
+      { "package-lock.json": "{}\n", "src/b.js": "segredo1 = calcula(1);\n" }, [achado("src/b.js", 1)]);
+    expect(estados).toEqual(["src/b.js:1=anterior"]);
+  });
+
+  it("funcional: a origem acima de 1 MiB, com os dois lados no git, não paga nada", () => {
+    const enchimento = "y\n".repeat(600_000);
+    const { estados } = movido({ "package-lock.json": `${enchimento}segredo1 = calcula(1);\n` },
+      { "package-lock.json": enchimento, "src/b.js": "segredo1 = calcula(1);\n" }, [achado("src/b.js", 1)]);
+    expect(estados).toEqual(["src/b.js:1=aberto"]);
+  });
+
+  it("funcional: `objeto = require(...)` sozinho não prova movimento", () => {
+    const { estados } = movido({ "src/m.js": 'l1\nobjeto = require("x");\nl3\n' },
+      { "src/m.js": "l1\nl3\n", "src/b.js": 'objeto = require("x");\n' }, [achado("src/b.js", 1)]);
+    expect(estados).toEqual(["src/b.js:1=aberto"]);
+  });
+
+  it("funcional: repositório sem commit → nada a pagar, o arquivo novo inteiro alterado", () => {
+    const c = cenario({ issues: [achado("src/n.js", 1)] });
+    const raiz = temp("expx-revisao-sem-commit-");
+    git(raiz, "init", "-q", "-b", "main");
+    escreve(raiz, "src/n.js", "n = 1;\n");
+    expect(revisar({ ...c, raiz }, "src/n.js")).toMatchObject({ rc: 1, ev: { derivacao: 2, achados: [{ estado: "aberto" }] } });
+  });
+
+  it("funcional: evidência sem derivacao, que a regra 1 deriva igual, é aceita pelo conferir", () => {
+    const c = cenario({ issues: [achado("src/a.js", 1)] });
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    const ev = evidencia(c.raiz) as Record<string, unknown>;
+    delete ev["derivacao"];
+    escreve(c.raiz, EV, JSON.stringify(ev));
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it("funcional: a ordem das issues não muda o estado de nenhuma", () => {
+    const issues = [1, 2, 3, 4, 5, 6].map((l) => achado("src/t2.js", l));
+    const ida = movido({ "src/t.js": TESTE }, { "src/t.js": SEM_DOIS, "src/t2.js": PARTE2 }, issues).estados;
+    const volta = movido({ "src/t.js": TESTE }, { "src/t.js": SEM_DOIS, "src/t2.js": PARTE2 }, [...issues].reverse()).estados;
+    expect([...volta].reverse()).toEqual(ida);
+  });
+
+  it.each([
+    ["3", 3],
+    ["o texto \"2\"", "2"],
+  ])("funcional: derivacao %s → FALHA evidencia-invalida:derivacao", (_nome, valor) => {
+    const { c } = movido({ "src/t.js": TESTE }, { "src/t.js": SEM_DOIS, "src/t2.js": PARTE2 }, [achado("src/t2.js", 4)]);
+    escreve(c.raiz, EV, JSON.stringify({ ...(evidencia(c.raiz) as object), derivacao: valor }));
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:derivacao" });
+  });
+
+  it("funcional: evidência sem derivacao é a regra 1 (o arquivo novo inteiro alterado): o anterior gravado diverge", () => {
+    const { c } = movido({ "src/t.js": TESTE }, { "src/t.js": SEM_DOIS, "src/t2.js": PARTE2 }, [achado("src/t2.js", 4)]);
+    const ev = evidencia(c.raiz) as Record<string, unknown>;
+    delete ev["derivacao"];
+    escreve(c.raiz, EV, JSON.stringify(ev));
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:achados" });
+  });
+
+  it("funcional: evidência com derivacao 1 e o achado aberto (regra antiga) continua conferível", () => {
+    const { c } = movido({ "src/t.js": TESTE }, { "src/t.js": SEM_DOIS, "src/t2.js": PARTE2 }, [achado("src/t2.js", 4)]);
+    const ev = evidencia(c.raiz) as Ev;
+    escreve(c.raiz, EV, JSON.stringify({ ...ev, derivacao: 1, resultado: "achados", achados: ev.achados.map((a) => ({ ...a, estado: "aberto" })) }));
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
+  });
+});
+
+const roda =(raiz: string, ...a: string[]) => {
   const r = spawnSync(process.execPath, [SCRIPT, ...a, "--trabalho", "w", "--raiz", raiz], { encoding: "utf8" });
   return { rc: r.status, out: r.stdout.trim(), err: r.stderr };
 };

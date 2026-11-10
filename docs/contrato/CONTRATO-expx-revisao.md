@@ -88,6 +88,7 @@ exceto `motivo`:
 | Chave | O que é |
 |---|---|
 | `expx_revisao` | `2` |
+| `derivacao` | `2`: a regra das linhas alteradas com o trecho movido (abaixo). Ausente na evidência de antes da 0.13.26, que vale como `1`, a regra de antes; o `conferir` usa a da evidência |
 | `trabalho`, `task` | o slug e o id da task |
 | `modo` | `uncommitted` ou `base-commit` |
 | `base_commit` | o SHA completo de `--base-commit`, ou `null` |
@@ -159,10 +160,27 @@ saída (para a sprintx e a runx, como a 2).
   (precedência 3).
 - **Com `--base-commit`**, cada arquivo da task tem de estar commitado: o
   `hash-object` do checkout igual a `HEAD:<arquivo>`, e o apagado ausente do `HEAD`.
-- Linha alterada é a dos hunks de `git diff -U0 <head>` (o checkout desde o `HEAD`; com
-  `--base-commit`, `git diff -U0 <sha> <head>`); arquivo novo (ausente em `<head>`, ou em
-  `<sha>`), repositório sem commit ou `git diff` que falha tem todas as linhas alteradas. Achado em linha alterada é
+- Linha alterada (`derivacao: 2`, a que o `revisar` grava) é a linha `+` do diff de cada caminho de
+  `arquivos` entre o blob da partida (`<head>`; com `--base-commit`, `<sha>`) e o blob que vai ao commit
+  (`git diff -U0 --diff-algorithm=myers --indent-heuristic <blob> <blob>`, sem a configuração do usuário;
+  ausente de um lado, o arquivo inteiro é um hunk), **fora a do trecho movido**. Trecho movido: uma
+  sequência contígua de `+` de um hunk igual, byte a byte e com o fim de linha (`foo` sem `\n` no fim
+  não é `foo\n`), a uma sequência contígua de `-` de um hunk de qualquer caminho da task, com ao menos
+  uma linha substantiva (com letra, dígito ou byte ≥ 0x80 depois de aparada, e que não é import:
+  `import`, `from … import`, `export … from`, `using`, `#include`, `require(` ou `… = require(`).
+  Cada `-` paga uma `+` só. Os trechos se escolhem do maior para o menor: a cada rodada, os de
+  comprimento máximo, na ordem (posição da `+`, posição da `-`), sem sobrepor, com as posições na ordem
+  de bytes dos caminhos. Só a `-` da própria task paga: a cópia (o trecho que continua na origem) é
+  alterada. Diff que falha, binário (NUL) ou blob acima de 1 MiB: o caminho inteiro alterado, e as
+  remoções dele não pagam nada. A busca tem teto (5.000.000 comparações); passou, nenhum trecho movido.
+  `derivacao: 1` (a evidência de antes): os hunks de `git diff -U0 <head>` do checkout, ou
+  `git diff -U0 <sha> <head>`, sem trecho movido. Nas duas, arquivo novo sem trecho movido, repositório
+  sem commit ou `git diff` que falha tem todas as linhas alteradas. Achado em linha alterada é
   `aberto` e bloqueia; nas demais é `anterior`, não bloqueia e vai para PR própria (F1).
+- **Limite aceito do trecho movido:** é prova de proveniência textual, não de equivalência de
+  comportamento. O trecho movido para outro escopo (outro `describe`, outra função) conta como movido, e
+  o achado nele vira `anterior`; a revisão humana do PR continua sendo a defesa. Remover e repor texto
+  antigo de propósito também ganha o crédito, e fica visível no diff.
 - Achado cuja identidade está em `rejeicoes` de qualquer evidência do trabalho é
   `rejeitado` (relidas também sob a trava, antes de gravar). Revisar de novo preserva
   as rejeições da própria task.
@@ -227,6 +245,7 @@ linhas valem na ordem em que aparecem.
 | `expx_revisao` ≠ 2 (a v1 inclusive: a task se revisa de novo) | FALHA `evidencia-invalida:versao` | FALHA |
 | JSON ilegível; outra task ou trabalho; `arquivos` que não é mapa, vazio ou com valor que não é mapa nem `null`; `achados` fora da forma; `resultado` fora dos quatro | FALHA `evidencia-invalida` | FALHA |
 | `rejeicoes` que não é lista de `{identidade, motivo, em}` (hex de 64, texto, texto) (`rejeicoes`); `removidos_sem_revisao` que não é lista de textos sem repetição igual aos arquivos `null` de `arquivos` (`removidos_sem_revisao`) | FALHA `evidencia-invalida:<campo>` | FALHA |
+| `derivacao` presente e diferente do inteiro `1` ou `2` | FALHA `evidencia-invalida:derivacao` | FALHA |
 | `ok`/`achados` com `executada_em` fora de ISO 8601 ou data impossível | FALHA `evidencia-invalida:executada_em` | FALHA |
 | `blob` ≠ `git rev-parse <sha>:<arquivo>` (ou `null` e o arquivo existe no commit) | FALHA `evidencia-nao-bate:<arquivo>` | FALHA |
 | arquivo que a task altera fora das chaves de `arquivos`, em qualquer `resultado` (abaixo, "Cobertura do commit"); o primeiro, na ordem do `git diff`; sem o nome, se o diff falha | FALHA `evidencia-invalida:cobertura:<arquivo>` | FALHA |
@@ -235,7 +254,7 @@ linhas valem na ordem em que aparecem.
 | `ok`/`achados` com a `revisao` de algum arquivo diferente da refeita no `conferir` (`excluido` só nas exclusões do núcleo, que em `ok`/`achados` são as únicas; senão o predicado do perfil; `sem-alteracao` só com `<sha>:<arquivo>` igual a `<de>:<arquivo>`, `<de>` o `base_commit` com `--base-commit`, senão o `head`; o igual também pode estar `enviado`) (`revisao`) | FALHA `evidencia-invalida:revisao` | FALHA |
 | `ok`/`achados` com algum `enviado` e: `cli.versao` sem perfil (`cli.versao`); `cli.integridade` ≠ `conferida` (`integridade`); `chamada` nula, com `error` não nulo, sem `issues` lista de objetos ou sem `stdout_sha256` de 64 hex (`chamada`), o que reprova a v2 gravada antes de 2026-10-20; `meta` que não é mapa, `max_files` ≠ perfil ou motivo de pulo fora do perfil (`perfil`); `falhas_de_lote` não vazia (`lote-falhou`); mais de 40 `enviado` (`L1`); `enviado` acima de 5.000 linhas ou 204.800 bytes, ou com `bytes`/`linhas` menores que os do blob `<sha>:<arquivo>` medido de novo (`L2`); `include` diferente dos enviados, ou a reconciliação do `revisar` (repetido, sobra, pulado, faltante) que não fecha (`cobertura`) | FALHA `evidencia-invalida:<campo>` | FALHA |
 | `ok`/`achados` com algum `enviado` e `head` que não é `null` nem o SHA completo de um commit (`head`), ou `modo` `base-commit` com `base_commit` que não é o SHA completo de um commit, ou `modo` `uncommitted` com `base_commit` não nulo, ou outro `modo` (`base_commit`) | FALHA `evidencia-invalida:<campo>` | FALHA |
-| `ok`/`achados` com `achados` diferente dos derivados de `chamada.issues` (de nenhuma, sem `enviado`), com as linhas alteradas de `git diff -U0 <de> <sha>` (`<de>`: `base_commit` com `--base-commit`, senão `head`) e as vizinhas do blob do commit: outra quantidade, ordem, `identidade`, `arquivo`, `linha`, `label` ou `texto`, ou `estado` diferente do derivado, exceto `rejeitado` com a identidade em `rejeicoes` da evidência ou de outra evidência do trabalho no commit; ou `resultado` que não é `achados` com algum `aberto` e `ok` sem nenhum | FALHA `evidencia-invalida:achados` | FALHA |
+| `ok`/`achados` com `achados` diferente dos derivados de `chamada.issues` (de nenhuma, sem `enviado`), com as linhas alteradas pela `derivacao` da evidência, entre `<de>` e `<sha>` (`<de>`: `base_commit` com `--base-commit`, senão `head`; na 2, os blobs de `<de>:<arquivo>` e `<sha>:<arquivo>`; na 1, `git diff -U0 <de> <sha>`) e as vizinhas do blob do commit: outra quantidade, ordem, `identidade`, `arquivo`, `linha`, `label` ou `texto`, ou `estado` diferente do derivado, exceto `rejeitado` com a identidade em `rejeicoes` da evidência ou de outra evidência do trabalho no commit; ou `resultado` que não é `achados` com algum `aberto` e `ok` sem nenhum | FALHA `evidencia-invalida:achados` | FALHA |
 | achado `aberto` | FALHA `achados-abertos:<n>` | FALHA |
 
 **Cobertura do commit.** A evidência tem de cobrir o que a task muda: cada arquivo
@@ -398,3 +417,4 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-11-02 | A variação da CLI entre rodadas passa de relato a medição, com os números no texto de `ok`. |
 | 2026-11-09 | Exceção não tratada sai **70** (erro interno), não 1 (achado do CodeAnt no katosmv/login#73, r4518931241): a F6 e o E3 a liam como `achados` e bloqueavam com `revisao_defeito` ou `revisao_contestada`. A saída 1 só vale como `achados` com a linha `<T-NN.MM> achados`. |
 | 2026-11-10 | Relatos do Login (ui-react-046, a 1ª prova real da F6): o revisável da task igual ao da partida fica `revisao: "sem-alteracao"`, fora do `--include` e da reconciliação (antes, `incompleta:faltante`), e o `conferir` refaz a igualdade; na orientação ao consumidor, não se revisa de novo depois de um `rejeitar` que sai `ok`, e o "lock não atualizado" de um lock não revisável é limite conhecido. |
+| 2026-11-10 | **`derivacao: 2`** (Login, ui-react-046: um teste dividido em dois arquivos fez o achado sobre código antigo ficar `aberto`): o trecho que a task só moveu, igual byte a byte, não é linha alterada, e o achado nele vira `anterior`. Diff por blob da partida ao commit, com algoritmo fixo; trecho com linha substantiva; cada remoção paga uma adição; do maior para o menor; teto de comparações. A evidência sem `derivacao` continua conferida pela regra 1. Desenho com o Codex (2 rodadas). |

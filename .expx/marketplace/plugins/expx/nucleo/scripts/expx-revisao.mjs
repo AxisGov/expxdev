@@ -311,6 +311,119 @@ function alteradas(f, de, ate) {
   return s;
 }
 
+// Derivação 2: o trecho que a task removeu de um arquivo seu e pôs noutro lugar, igual byte a byte (com o fim de linha),
+// não é linha alterada. Prova de proveniência textual, não de equivalência: o trecho movido para outro escopo também conta.
+/** As linhas de um blob, cada uma com o `\n` que tiver (bytes como latin1), ou undefined: blob que o git não dá, acima de
+ *  LEITURA_MAXIMA ou com NUL (binário, como o git o vê). */
+function linhasDoBlob(id) {
+  const b = blobGit(id);
+  if (!b || b.includes(0)) return undefined;
+  return b.toString("latin1").match(/[^\n]*\n|[^\n]+$/g) ?? [];
+}
+/** Os hunks de `git diff -U0` entre dois blobs (`{inicio, menos, mais}`, as linhas com o `\n` que tiverem), ou undefined
+ *  se o diff falha ou é binário. Algoritmo e heurística fixos: a configuração do usuário não muda os hunks. */
+function hunksEntre(a, b) {
+  const r = spawnSync("git", ["diff", "--no-ext-diff", "--no-textconv", "--no-color", "--diff-algorithm=myers", "--indent-heuristic", "-U0", a, b],
+    { cwd: op.raiz, env: GIT_ENV, maxBuffer: 256 << 20 });
+  if (r.error || r.status !== 0) return undefined;
+  const hunks = [];
+  let ultima;
+  for (const l of r.stdout.toString("latin1").split("\n")) {
+    const h = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(l);
+    if (h) hunks.push({ inicio: Number(h[1]), menos: [], mais: [] });
+    else if (/^Binary files /.test(l)) return undefined;
+    else if (hunks.length && (l[0] === "-" || l[0] === "+")) (ultima = l[0] === "-" ? hunks.at(-1).menos : hunks.at(-1).mais).push(`${l.slice(1)}\n`);
+    else if (hunks.length && l[0] === "\\" && ultima?.length) ultima[ultima.length - 1] = ultima.at(-1).slice(0, -1);
+  }
+  return hunks;
+}
+// Linha que sozinha não prova movimento: sem letra nem dígito (vazia, só pontuação) ou import. Pode estar num trecho movido
+// que tenha outra, substantiva.
+const IMPORTACAO = /^(?:import\b|from\s+\S+\s+import\b|export\s.*\sfrom\s|using\s|#include\b|require\s*\(|.*=\s*require\s*\()/;
+const substantiva = (l) => { const t = l.replace(/^[ \t\r\n\f\v]+|[ \t\r\n\f\v]+$/g, ""); return /[A-Za-z0-9\x80-\xff]/.test(t) && !IMPORTACAO.test(t); };
+/** O `alt` do `derivar` na derivação 2: as linhas alteradas de todos os caminhos, calculadas uma vez, na primeira consulta. */
+function movidasPor(caminhos, de, pos) {
+  let mapa;
+  return (f) => (mapa ??= alteradasMovidas(caminhos, de, pos)).get(f) ?? new Set();
+}
+// teto de comparações da busca dos trechos: passou, nenhum crédito (nunca menos linha alterada)
+const TETO_MOVIDAS = 5_000_000;
+/** As linhas alteradas de cada caminho na derivação 2 (Map: Set, ou `true` se o diff do caminho falha): as `+` do diff entre
+ *  `de(f)` e `pos(f)` (blob, ou undefined se ausente), menos as dos trechos movidos. Trecho movido: uma sequência de `+`
+ *  contígua num hunk, igual a uma sequência de `-` contígua num hunk de qualquer caminho, com ao menos uma linha
+ *  substantiva; cada `-` paga uma `+` só. Os trechos se escolhem do maior para o menor (Greedy String Tiling): a cada
+ *  rodada, os de comprimento máximo, por (posição da `+`, posição da `-`), sem sobrepor; as posições seguem os caminhos
+ *  em ordem de bytes. A ordem das `issues` não entra. */
+function alteradasMovidas(caminhos, de, pos) {
+  const res = new Map();
+  const mais = [];
+  const menos = [];
+  let trecho = 0;
+  for (const f of [...caminhos].sort((x, y) => (Buffer.compare(Buffer.from(x), Buffer.from(y))))) {
+    const a = de(f);
+    const b = pos(f);
+    if (a === b) { res.set(f, new Set()); continue; }
+    // os dois lados lidos, mesmo com o diff do git: acima de LEITURA_MAXIMA ou binário, o caminho inteiro alterado e nenhuma
+    // remoção dele paga. Ausente de um lado: o arquivo inteiro é um hunk, como o git o mostraria
+    const la = a === undefined ? [] : linhasDoBlob(a);
+    const lb = b === undefined ? [] : linhasDoBlob(b);
+    const hunks = !la || !lb ? undefined : a === undefined || b === undefined ? [{ inicio: 1, menos: la, mais: lb }] : hunksEntre(a, b);
+    if (!hunks) { res.set(f, true); continue; }
+    const s = new Set();
+    for (const h of hunks) {
+      trecho++;
+      for (const l of h.menos) menos.push({ chave: l, trecho });
+      trecho++;
+      h.mais.forEach((l, k) => { s.add(h.inicio + k); mais.push({ f, linha: h.inicio + k, chave: l, trecho }); });
+    }
+    res.set(f, s);
+  }
+  const semCredito = new Map([...res].map(([f, s]) => [f, s === true ? true : new Set(s)]));
+  // todo trecho válido tem uma linha substantiva: a busca parte só delas (a âncora), e o par de linhas iguais só pontuação,
+  // que se repete aos milhares, nunca é visitado
+  const ancora = mais.map((m) => substantiva(m.chave));
+  const indice = new Map();
+  menos.forEach((m, p) => { if (substantiva(m.chave)) { if (!indice.has(m.chave)) indice.set(m.chave, []); indice.get(m.chave).push(p); } });
+  const usadaMais = new Uint8Array(mais.length);
+  const usadaMenos = new Uint8Array(menos.length);
+  // (x, y) livre, no trecho de (i, p) e igual
+  const segue = (x, y, i, p) => x >= 0 && y >= 0 && x < mais.length && y < menos.length && !usadaMais[x] && !usadaMenos[y]
+    && mais[x].trecho === mais[i].trecho && menos[y].trecho === menos[p].trecho && mais[x].chave === menos[y].chave;
+  let comparacoes = 0;
+  for (;;) {
+    let maior = 0;
+    let trechos = [];
+    // a diagonal de um trecho já achado nesta rodada não se percorre de novo a partir de outra âncora dele
+    const vistos = new Set();
+    for (let i = 0; i < mais.length; i++) {
+      if (usadaMais[i] || !ancora[i]) continue;
+      for (const p of indice.get(mais[i].chave) ?? []) {
+        // toda visita conta, inclusive a que se descarta: o teto limita o trabalho inteiro, não só as extensões
+        if (++comparacoes > TETO_MOVIDAS) return semCredito;
+        if (usadaMenos[p] || vistos.has(i * menos.length + p)) continue;
+        let a = 0;
+        while (segue(i - a - 1, p - a - 1, i, p)) a++;
+        let n = 1;
+        while (segue(i + n, p + n, i, p)) n++;
+        const [i0, p0, total] = [i - a, p - a, a + n];
+        comparacoes += total;
+        if (comparacoes > TETO_MOVIDAS) return semCredito;
+        for (let k = 0; k < total; k++) vistos.add((i0 + k) * menos.length + p0 + k);
+        if (total < maior) continue;
+        if (total > maior) { maior = total; trechos = []; }
+        trechos.push([i0, p0]);
+      }
+    }
+    if (maior === 0) break;
+    trechos.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+    for (const [i, p] of trechos) {
+      if (![...Array(maior).keys()].every((k) => !usadaMais[i + k] && !usadaMenos[p + k])) continue;
+      for (let k = 0; k < maior; k++) { usadaMais[i + k] = 1; usadaMenos[p + k] = 1; res.get(mais[i + k].f).delete(mais[i + k].linha); }
+    }
+  }
+  return res;
+}
+
 const AQUI = dirname(fileURLToPath(import.meta.url));
 /** Uma pasta temporária com o `.expx/fatiamento.json` do commit `rev` (o `HEAD` revisado, com `--base-commit`; o da task,
  *  no `conferir`), para o leitor: ausente no commit, a pasta fica sem ele (os padrões, como o ausente no disco); entrada que
@@ -413,7 +526,7 @@ function revisar() {
   const anterior = le(caminhoEv(op.task));
   // o HEAD da revisão: sem `--base-commit`, as linhas alteradas são as do checkout desde ele (o `conferir` as refaz até o commit)
   const headDaRevisao = idDe("rev-parse", "--verify", "-q", "HEAD^{commit}") ?? null;
-  const ev = { expx_revisao: 2, trabalho: op.trabalho, task: op.task, modo: base ? "base-commit" : "uncommitted", base_commit: base, head: headDaRevisao, cli: null,
+  const ev = { expx_revisao: 2, derivacao: 2, trabalho: op.trabalho, task: op.task, modo: base ? "base-commit" : "uncommitted", base_commit: base, head: headDaRevisao, cli: null,
     executada_em: new Date().toISOString(), arquivos: {}, chamada: null, resultado: "ok", achados: [],
     rejeicoes: Array.isArray(anterior?.rejeicoes) ? anterior.rejeicoes : [], removidos_sem_revisao: [] };
   const fim = (resultado, motivo) => Object.assign(ev, { resultado, motivo });
@@ -512,7 +625,10 @@ function revisar() {
     }
     const rejeitadas = new Set([...ev.rejeicoes.map((r) => r?.identidade), ...rejeitadasDoTrabalho()]);
     const lido = (f) => { try { return readFileSync(join(raizRevisao, f), "utf8"); } catch { return ""; } };
-    ev.achados = derivar(j.issues, ev.arquivos, ev.cli.versao, (f) => alteradas(f, base ?? headDaRevisao, base ? headDaRevisao : undefined), lido)
+    // derivação 2: do blob da partida ao blob que vai ao commit, os mesmos do `conferir`, que não dependem do checkout
+    const partida = base ?? headDaRevisao;
+    ev.achados = derivar(j.issues, ev.arquivos, ev.cli.versao,
+      movidasPor(Object.keys(ev.arquivos), (f) => (partida ? blobEm(partida, f) : undefined), (f) => ev.arquivos[f]?.blob ?? undefined), lido)
       .map((a) => ({ ...a, estado: rejeitadas.has(a.identidade) ? "rejeitado" : a.estado }));
     if (ev.achados.some((a) => a.estado === "aberto")) ev.resultado = "achados";
     return undefined;
@@ -668,6 +784,8 @@ function avaliar(task, sha) {
     || !["ok", "achados", "indisponivel", "incompleta"].includes(ev.resultado)) return falha("evidencia-invalida");
   const lista = semListas(ev);
   if (lista) return falha(`evidencia-invalida:${lista}`);
+  // ausente é a 1 (a evidência de antes da 0.13.26); só o inteiro 1 ou 2
+  if (Object.hasOwn(ev, "derivacao") && ev.derivacao !== 1 && ev.derivacao !== 2) return falha("evidencia-invalida:derivacao");
   const concluida = ["ok", "achados"].includes(ev.resultado);
   if (concluida && semData(ev)) return falha("evidencia-invalida:executada_em");
   for (const [f, a] of Object.entries(ev.arquivos)) {
@@ -730,8 +848,10 @@ function achadosDivergem(ev, sha) {
     if (ev.modo === "base-commit" ? !ehCommit(ev.base_commit) : ev.modo !== "uncommitted" || ev.base_commit !== null) return "base_commit";
     const de = ev.modo === "base-commit" ? ev.base_commit : ev.head;
     const texto = (f) => (blobGit(`${sha}:./${f}`) ?? Buffer.alloc(0)).toString("utf8");
+    // a regra da evidência, não a deste script: sem `derivacao`, a 1 (o diff por arquivo, sem trecho movido)
+    const alt = ev.derivacao === 2 ? movidasPor(Object.keys(ev.arquivos), (f) => blobEm(de, f), (f) => blobEm(sha, f)) : (f) => alteradas(f, de, sha);
     // pelo JSON, como foi gravado (`NaN` vira `null`)
-    derivados = JSON.parse(JSON.stringify(derivar(ev.chamada.issues, ev.arquivos, ev.cli.versao, (f) => alteradas(f, de, sha), texto)));
+    derivados = JSON.parse(JSON.stringify(derivar(ev.chamada.issues, ev.arquivos, ev.cli.versao, alt, texto)));
   }
   const rejeitadas = rejeicoesNoCommit(ev, sha);
   if (ev.achados.length !== derivados.length || derivados.some((d, k) => {
