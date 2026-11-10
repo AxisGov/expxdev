@@ -4,10 +4,20 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 - **O arquivo declarado e não alterado não dá mais `incompleta:faltante`.** O arquivo de `arquivos.cria`/`altera` que a task não tocou ia ao `--include`, e a CLI, que só revisa o que mudou, não o devolvia. Agora o revisável igual ao da partida (o `HEAD`, ou a base com `--base-commit`) fica `revisao: "sem-alteracao"`, fora de L1, L2, do `--include` e da reconciliação. O `conferir` refaz a igualdade contra o `base_commit` ou o `head`, que tem de ser commit.
 - **Não se revisa de novo depois de um `rejeitar` que sai `ok`.** A CLI varia entre chamadas e redescrevia o mesmo ponto com outra identidade, o que reabria o achado. A F6, o passo 8 do 03-fix e o contrato dizem que a revisão da task está feita e que só se revisa de novo se um arquivo da task mudou depois.
-- **O "lock não atualizado" é falso positivo conhecido.** O `package-lock.json` não vai à CLI, e ela acusa o lock sempre que o `package.json` muda. A rota é `revisao_contestada` com duas provas: o diff do lock com a mesma mudança do `package.json` e a instalação congelada (`npm ci` e equivalentes) passando. Sem elas, o achado é real (revisão do runx#22, do sprintx#75 e do expxdev#161). O texto da runx e da sprintx ganha a instalação congelada na 0.13.27.
+- **O "lock não atualizado" é falso positivo conhecido.** O `package-lock.json` não vai à CLI, e ela acusa o lock sempre que o `package.json` muda. A rota é `revisao_contestada` com duas provas: o diff do lock com a mesma mudança do `package.json` e a instalação congelada (`npm ci` e equivalentes) passando. Sem elas, o achado é real (revisão do runx#22, do sprintx#75 e do expxdev#161). O texto da runx e da sprintx ganha a instalação congelada na 0.13.26.
 - **Não exercitado:** a CLI real com o `sem-alteracao` (a suíte usa a CLI falsa).
 
 # Changelog
+
+## 0.13.26 — código movido, o subagente isolado e os achados do Login na 0.13.24
+
+Instale por PR, como a 0.13.25. Muda o núcleo (`expx-revisao.mjs`, o novo `expx-worktree-isolada.sh` e os contratos `expx-revisao` e `expx-orquestracao`), a runx (AxisGov/runx#23, merge 473db26, DR-114 e DR-115) e a sprintx (AxisGov/sprintx#76, merge 0c3c8ef, DS-216 a DS-218). Os eventos, o `init`, o `doctor`, o painel e o `expx sessao` seguem como na 0.13.25.
+
+- **Código só movido não é linha alterada (`derivacao: 2`).** No Login (ui-react-046), um teste dividido em dois arquivos fez o achado sobre código antigo ficar `aberto`. Agora o trecho que a task só moveu, igual byte a byte e com linha substantiva, não conta como alterado, e o achado nele vira `anterior`. O diff é por blob, da partida ao commit, com algoritmo fixo e teto de comparações. A evidência grava `derivacao: 2`, e a evidência sem o campo continua conferida pela regra de antes.
+- **A runx e a sprintx rodam como subagente com `isolation: "worktree"` do Claude Code.** O `expx-worktree-isolada.sh` reconhece a worktree do agente (`.claude/worktrees/agent-<id>`, na branch `worktree-agent-<id>`). Com ela e a árvore limpa, o E1 da runx e a F1 da sprintx criam ou retomam a branch do trabalho ali mesmo, em vez de abrir uma segunda worktree. A branch ativa em outra worktree viva para. A mergex não muda: o E0 adota a branch ativa (contrato `expx-orquestracao` §15.1).
+- **O lock contestado, na runx e na sprintx.** O texto da 0.13.25 chega às skills: o diff do lock e a instalação congelada passando. A instalação que falha por outro motivo não prova nada e vai com a contestação ao desenvolvedor, e o subconjunto de testes afetado roda de novo depois dela. O contrato `expx-revisao` diz o mesmo.
+- **Achados da CodeAnt na instalação da 0.13.24 no Login (katosmv/login#77, DS-218).** Um comentário no fim de uma linha de chave (`tasks: # nota: |`) ou um `|` entre aspas abria um escalar em bloco no `task-so-fecha-verde`, e as tasks abaixo eram puladas. No `criar` da sprintx, o `trap` do temporário só sai depois do `mv`, e o `mv` que falha para com erro de persistência.
+- **Não exercitado:** a CLI real com a `derivacao: 2` (a suíte usa a CLI falsa) e o fluxo inteiro da runx e da sprintx executado pelo modelo como subagente isolado (a bancada real cobriu a abertura da branch).
 
 ## 0.13.24 — os achados da instalação da 0.13.23 no conselhos
 

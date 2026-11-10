@@ -550,16 +550,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.13.25 -R AxisGov/expxdev -D ~/expx-cli/v0.13.25 &&
+gh release download v0.13.26 -R AxisGov/expxdev -D ~/expx-cli/v0.13.26 &&
 (
-  cd ~/expx-cli/v0.13.25
+  cd ~/expx-cli/v0.13.26
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.13.25.tgz.sha256
+    sha256sum -c expxdev-0.13.26.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.13.25.tgz.sha256
+    shasum -a 256 -c expxdev-0.13.26.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.13.25/expxdev-0.13.25.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.13.26/expxdev-0.13.26.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -573,7 +573,7 @@ npx --yes --package ~/expx-cli/v0.13.25/expxdev-0.13.25.tgz expx init --skills b
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.13.25 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.13.26 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -712,6 +712,8 @@ npx --yes --package ~/expx-cli/v0.13.25/expxdev-0.13.25.tgz expx init --skills b
 - `0.13.25` corrige o que a 1ª prova real da revisão por task achou no Login: o arquivo declarado
   e não alterado fica `sem-alteracao` (antes, `incompleta:faltante`), não se revisa de novo depois de
   um `rejeitar` que sai `ok`, e o "lock não atualizado" é falso positivo conhecido.
+- `0.13.26` não conta código só movido como linha alterada, deixa a runx e a sprintx rodarem como
+  subagente isolado do Claude Code e corrige o que a instalação da 0.13.24 achou no Login (#77).
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
