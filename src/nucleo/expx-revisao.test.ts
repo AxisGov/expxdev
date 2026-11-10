@@ -822,6 +822,131 @@ describe("expx-revisao.mjs revisar v2: --base-commit", () => {
   });
 });
 
+// Arquivo declarado na task e igual ao de partida: a CLI só revisa o que mudou e não o devolve, e enviá-lo dava
+// `incompleta:faltante` (Login, frente ui-react-046). Fica `sem-alteracao`, fora do `--include`.
+describe("expx-revisao.mjs: arquivo declarado e não alterado (sem-alteracao)", () => {
+  const comB = (c: Cenario): string => {
+    escreve(c.raiz, "src/b.js", "b\n");
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "b");
+    return git(c.raiz, "rev-parse", "HEAD");
+  };
+
+  it("funcional: sem --base-commit, src/b.js igual ao HEAD e a CLI devolvendo só o alterado → ok, b sem-alteracao, fora do --include", () => {
+    const c = cenario({ resposta: resp() });
+    comB(c);
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js,src/b.js");
+    expect(r).toMatchObject({ rc: 0, out: "T-01 ok\n", ev: { resultado: "ok", arquivos: { "src/a.js": { revisao: "enviado" }, "src/b.js": { revisao: "sem-alteracao" } } } });
+    expect(r.chamadas).toEqual([["review", "--headless", "--uncommitted", "--include", "src/a.js"]]);
+  });
+
+  it("funcional: só o arquivo não alterado → ok sem procurar a CLI, e o conferir aceita", () => {
+    const c = cenario();
+    const r = revisar(c, "src/a.js");
+    expect(r).toMatchObject({ rc: 0, ev: { resultado: "ok", arquivos: { "src/a.js": { revisao: "sem-alteracao" } } } });
+    naoChamou(r);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it("funcional: com --base-commit, src/a.js igual na base e no HEAD → sem-alteracao; o conferir aceita", () => {
+    const c = cenario({ resposta: resp({ reviewed_files: ["src/b.js"] }) });
+    const base = git(c.raiz, "rev-parse", "HEAD");
+    comB(c);
+    const r = revisar(c, "src/a.js,src/b.js", "T-01", undefined, {}, c.script, ["--base-commit", base]);
+    expect(r).toMatchObject({ rc: 0, ev: { resultado: "ok", arquivos: { "src/a.js": { revisao: "sem-alteracao" }, "src/b.js": { revisao: "enviado" } } } });
+    expect(r.chamadas).toEqual([["review", "--headless", "--base-commit", base, "--include", "src/b.js"]]);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it("funcional: arquivo novo vazio não é sem-alteracao (ausente na partida ≠ blob vazio)", () => {
+    const c = cenario({ resposta: resp({ reviewed_files: ["src/vazio.js"] }) });
+    escreve(c.raiz, "src/vazio.js", "");
+    expect(revisar(c, "src/vazio.js")).toMatchObject({ rc: 0, ev: { arquivos: { "src/vazio.js": { revisao: "enviado" } } } });
+  });
+
+  it("funcional: arquivo não revisável igual à partida continua nao-revisavel", () => {
+    const c = cenario();
+    escreve(c.raiz, "package-lock.json", "{}\n");
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "lock");
+    expect(revisar(c, "package-lock.json")).toMatchObject({ rc: 0, ev: { arquivos: { "package-lock.json": { revisao: "nao-revisavel" } } } });
+  });
+
+  it("funcional: evidência que dá sem-alteracao a um arquivo alterado → FALHA evidencia-invalida:revisao", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    const ev = evidencia(c.raiz) as Ev;
+    ev.arquivos["src/a.js"] = { ...(ev.arquivos["src/a.js"] as Arquivo), revisao: "sem-alteracao" };
+    escreve(c.raiz, EV, JSON.stringify(ev));
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:revisao" });
+  });
+
+  it.each([
+    ["o SHA da árvore do HEAD", (raiz: string) => git(raiz, "rev-parse", "HEAD^{tree}")],
+    ["um SHA inexistente", () => "0".repeat(40)],
+  ])("funcional: sem-alteracao com head = %s, sem nenhum enviado → FALHA evidencia-invalida:revisao", (_nome, head) => {
+    const c = cenario();
+    revisar(c, "src/a.js");
+    escreve(c.raiz, EV, JSON.stringify({ ...(evidencia(c.raiz) as object), head: head(c.raiz) }));
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:revisao" });
+  });
+
+  it("funcional: o igual marcado enviado sem a chamada da CLI → FALHA (enviado exige a CLI e a reconciliação)", () => {
+    const c = cenario();
+    revisar(c, "src/a.js");
+    const ev = evidencia(c.raiz) as Ev;
+    ev.arquivos["src/a.js"] = { ...(ev.arquivos["src/a.js"] as Arquivo), revisao: "enviado" };
+    escreve(c.raiz, EV, JSON.stringify(ev));
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:cli.versao" });
+  });
+
+  it("funcional: repositório sem commit → enviado (não há partida)", () => {
+    const c = cenario();
+    const raiz = temp("expx-revisao-sem-commit-");
+    git(raiz, "init", "-q", "-b", "main");
+    escreve(raiz, "src/n.js", "n\n");
+    expect(revisar({ ...c, raiz }, "src/n.js")).toMatchObject({ rc: 0, ev: { arquivos: { "src/n.js": { revisao: "enviado" } } } });
+  });
+
+  it("funcional: com core.autocrlf=true, o checkout em CRLF igual ao HEAD normalizado → sem-alteracao, sem a CLI", () => {
+    const c = cenario({}, "true");
+    escreve(c.raiz, "src/a.js", "l1\r\nl2\r\nl3\r\nl4\r\nl5\r\n");
+    const r = revisar(c, "src/a.js");
+    expect(r).toMatchObject({ rc: 0, ev: { arquivos: { "src/a.js": { revisao: "sem-alteracao" } } } });
+    naoChamou(r);
+  });
+
+  it("funcional: excluído do núcleo e igual à partida continua excluido; L1 conta só os enviados", () => {
+    const c = cenario({ resposta: resp() });
+    escreve(c.raiz, "docs/sprintx/x.md", "x\n");
+    for (let i = 0; i < 40; i++) escreve(c.raiz, `src/f${i}.js`, `${i}\n`);
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "mais");
+    altera3(c.raiz);
+    const lista = ["src/a.js", "docs/sprintx/x.md", ...Array.from({ length: 40 }, (_, i) => `src/f${i}.js`)];
+    const r = revisar(c, lista.join(","));
+    expect(r).toMatchObject({ rc: 0, ev: { resultado: "ok", arquivos: { "docs/sprintx/x.md": { revisao: "excluido" }, "src/f0.js": { revisao: "sem-alteracao" } } } });
+    expect(r.chamadas).toEqual([["review", "--headless", "--uncommitted", "--include", "src/a.js"]]);
+  });
+
+  it("funcional: o listar lê a evidência com sem-alteracao como as outras", () => {
+    const c = cenario();
+    revisar(c, "src/a.js");
+    const r = roda(c.raiz, "listar", "--task", `T-01=${commita(c.raiz, true)}`);
+    expect(r.rc).toBe(0);
+    expect(JSON.parse(r.out)).toMatchObject({ tasks: [{ task: "T-01", listagem: "ok", resultado: "ok" }] });
+  });
+
+  it("funcional: arquivo editado entre o revisar (sem-alteracao) e o commit → FALHA evidencia-nao-bate", () => {
+    const c = cenario();
+    revisar(c, "src/a.js");
+    altera3(c.raiz);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-nao-bate:src/a.js" });
+  });
+});
+
 const roda = (raiz: string, ...a: string[]) => {
   const r = spawnSync(process.execPath, [SCRIPT, ...a, "--trabalho", "w", "--raiz", raiz], { encoding: "utf8" });
   return { rc: r.status, out: r.stdout.trim(), err: r.stderr };

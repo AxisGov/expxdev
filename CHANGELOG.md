@@ -1,3 +1,12 @@
+## 0.13.25 — a 1ª prova real da revisão por task, no Login
+
+Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`), a runx (AxisGov/runx#22, merge 29e6813, DR-113) e a sprintx (AxisGov/sprintx#75, merge b9d411f, DS-215). Os eventos, o `init`, o `doctor`, o painel e o `expx sessao` seguem como na 0.13.24. Os relatos são da `implementa-login`, na frente ui-react-046 (CodeAnt CLI 0.5.14, `se_disponivel`).
+
+- **O arquivo declarado e não alterado não dá mais `incompleta:faltante`.** O arquivo de `arquivos.cria`/`altera` que a task não tocou ia ao `--include`, e a CLI, que só revisa o que mudou, não o devolvia. Agora o revisável igual ao da partida (o `HEAD`, ou a base com `--base-commit`) fica `revisao: "sem-alteracao"`, fora de L1, L2, do `--include` e da reconciliação. O `conferir` refaz a igualdade contra o `base_commit` ou o `head`, que tem de ser commit.
+- **Não se revisa de novo depois de um `rejeitar` que sai `ok`.** A CLI varia entre chamadas e redescrevia o mesmo ponto com outra identidade, o que reabria o achado. A F6, o passo 8 do 03-fix e o contrato dizem que a revisão da task está feita e que só se revisa de novo se um arquivo da task mudou depois.
+- **O "lock não atualizado" é falso positivo conhecido.** O `package-lock.json` não vai à CLI, e ela acusa o lock sempre que o `package.json` muda. A rota é `revisao_contestada` com duas provas: o diff do lock com a mesma mudança do `package.json` e a instalação congelada (`npm ci` e equivalentes) passando. Sem elas, o achado é real (revisão do runx#22, do sprintx#75 e do expxdev#161). O texto da runx e da sprintx ganha a instalação congelada na 0.13.27.
+- **Não exercitado:** a CLI real com o `sem-alteracao` (a suíte usa a CLI falsa).
+
 # Changelog
 
 ## 0.13.24 — os achados da instalação da 0.13.23 no conselhos
