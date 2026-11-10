@@ -4,7 +4,7 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 - **O arquivo declarado e não alterado não dá mais `incompleta:faltante`.** O arquivo de `arquivos.cria`/`altera` que a task não tocou ia ao `--include`, e a CLI, que só revisa o que mudou, não o devolvia. Agora o revisável igual ao da partida (o `HEAD`, ou a base com `--base-commit`) fica `revisao: "sem-alteracao"`, fora de L1, L2, do `--include` e da reconciliação. O `conferir` refaz a igualdade contra o `base_commit` ou o `head`, que tem de ser commit.
 - **Não se revisa de novo depois de um `rejeitar` que sai `ok`.** A CLI varia entre chamadas e redescrevia o mesmo ponto com outra identidade, o que reabria o achado. A F6, o passo 8 do 03-fix e o contrato dizem que a revisão da task está feita e que só se revisa de novo se um arquivo da task mudou depois.
-- **O "lock não atualizado" é falso positivo conhecido.** O `package-lock.json` não vai à CLI, e ela acusa o lock sempre que o `package.json` muda. A rota é `revisao_contestada` com o diff do lock, desde que esse diff traga a mesma mudança do `package.json`. Sem ela, o achado é real (revisão do runx#22 e do sprintx#75).
+- **O "lock não atualizado" é falso positivo conhecido.** O `package-lock.json` não vai à CLI, e ela acusa o lock sempre que o `package.json` muda. A rota é `revisao_contestada` com duas provas: o diff do lock com a mesma mudança do `package.json` e a instalação congelada (`npm ci` e equivalentes) passando. Sem elas, o achado é real (revisão do runx#22, do sprintx#75 e do expxdev#161). O texto da runx e da sprintx ganha a instalação congelada na 0.13.27.
 - **Não exercitado:** a CLI real com o `sem-alteracao` (a suíte usa a CLI falsa).
 
 # Changelog
