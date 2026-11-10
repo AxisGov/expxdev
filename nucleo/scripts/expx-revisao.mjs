@@ -351,6 +351,8 @@ function exclusoesDoProjeto(rev) {
 }
 const arvore = (ref) => new Set(git("ls-tree", "-r", "-z", "--name-only", ref).stdout.split("\0").filter(Boolean));
 const idDe = (...a) => { const r = git(...a); return r.status === 0 ? r.stdout.trim() : undefined; };
+/** O blob de `f` em `rev`, ou undefined (ausente, ou `rev` que não resolve). */
+const blobEm = (rev, f) => idDe("rev-parse", "--verify", "-q", `${rev}:./${f}`);
 /** O blob que vai ao commit (sem `--base-commit`: `hash-object -w`; com: o de `HEAD`) e as medidas da CLI no blob e no
  *  checkout, valendo o maior; `disco` é o `hash-object` do checkout (o que mudaria se o arquivo fosse editado). */
 function medida(f) {
@@ -431,8 +433,11 @@ function revisar() {
   for (const f of presentes) {
     const m = (medidas[f] = medida(f));
     const fora = excluido(f, EXCLUIDOS_DO_NUCLEO) || excluido(f, exclusoes ?? []);
+    // igual ao da partida (a base, ou o HEAD sem `--base-commit`): a CLI só revisa o que mudou e não o devolveria
+    // (`faltante`). Ausente na partida nunca é igual, nem vazio
+    const igual = m !== undefined && m.blob === blobEm(base ?? "HEAD", f);
     ev.arquivos[f] = { blob: m?.blob ?? null, bytes: m?.bytes ?? null, linhas: m?.linhas ?? null,
-      revisao: fora ? "excluido" : revisavel(f, perfil) ? "enviado" : "nao-revisavel" };
+      revisao: fora ? "excluido" : !revisavel(f, perfil) ? "nao-revisavel" : igual ? "sem-alteracao" : "enviado" };
   }
   let raizRevisao = op.raiz;
   let limparSnapshot = () => {};
@@ -574,8 +579,14 @@ function semSinalDaCli(ev, sha) {
   // a classificação é refeita: sem ela, um revisável marcado `excluido` dispensaria todo o resto. Em `ok`/`achados`
   // só há `excluido` do núcleo (o do projeto dá `incompleta:excluido-declarado`)
   const homologado = perfilCli(homologadas().at(-1));
-  const esperada = (f) => (excluido(f, EXCLUIDOS_DO_NUCLEO) ? "excluido" : revisavel(f, homologado) ? "enviado" : "nao-revisavel");
-  if (Object.entries(ev.arquivos).some(([f, a]) => a !== null && a.revisao !== esperada(f))) return "revisao";
+  // `sem-alteracao` só com o blob do commit igual ao da partida (`base_commit`, ou o `head` da revisão), refeito aqui;
+  // `enviado` também vale para o igual (a CLI o revisou, e a reconciliação abaixo o cobra)
+  const de = ev.modo === "base-commit" ? ev.base_commit : ev.head;
+  // `de` tem de ser commit: o SHA de uma árvore também resolve `<de>:<arquivo>`, e sem `enviado` nada mais confere o `head`
+  const igual = (f) => { const p = ehCommit(de) ? blobEm(de, f) : undefined; return p !== undefined && p === blobEm(sha, f); };
+  const esperada = (f) => (excluido(f, EXCLUIDOS_DO_NUCLEO) ? "excluido" : !revisavel(f, homologado) ? "nao-revisavel" : igual(f) ? "sem-alteracao" : "enviado");
+  const aceita = (f, revisao) => revisao === esperada(f) || (revisao === "enviado" && esperada(f) === "sem-alteracao");
+  if (Object.entries(ev.arquivos).some(([f, a]) => a !== null && !aceita(f, a.revisao))) return "revisao";
   const enviados = Object.keys(ev.arquivos).filter((f) => ev.arquivos[f]?.revisao === "enviado");
   if (enviados.length === 0) return undefined;
   const perfil = typeof ev.cli?.versao === "string" ? perfilCli(ev.cli.versao) : undefined;

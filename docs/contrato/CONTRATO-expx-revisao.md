@@ -94,7 +94,7 @@ exceto `motivo`:
 | `head` | o SHA completo do `HEAD` quando o `revisar` rodou, ou `null` sem commit; sem `--base-commit`, é dele que as linhas alteradas são medidas |
 | `cli` | `{versao, integridade}`: a versão do `package.json` do pacote e `conferida`; `integridade` `null` quando a CLI foi achada mas não passou; `cli` `null` quando a CLI não foi procurada (nada a revisar, ou um portão antes dela) ou não foi achada |
 | `executada_em` | timestamp ISO (R4) |
-| `arquivos` | `{<caminho>: {blob, bytes, linhas, revisao} \| null}`. `blob`: o sha1 que vai ao commit (sem `--base-commit`, `git hash-object -w`, com os filtros de fim de linha; com, o de `HEAD:<caminho>`). `bytes` e `linhas`: medidos como a CLI (`Buffer.byteLength` e `split('\n').length`) no blob e no checkout, o maior; conteúdo acima de 1 MiB não é lido (já reprova L2 pelo tamanho, porque a decodificação da CLI nunca encolhe o conteúdo): `bytes` é o tamanho e `linhas` `null`. `revisao`: `enviado`, `nao-revisavel` (fora do predicado da CLI) ou `excluido` (exclusões do núcleo ou do projeto). `null` para arquivo removido |
+| `arquivos` | `{<caminho>: {blob, bytes, linhas, revisao} \| null}`. `blob`: o sha1 que vai ao commit (sem `--base-commit`, `git hash-object -w`, com os filtros de fim de linha; com, o de `HEAD:<caminho>`). `bytes` e `linhas`: medidos como a CLI (`Buffer.byteLength` e `split('\n').length`) no blob e no checkout, o maior; conteúdo acima de 1 MiB não é lido (já reprova L2 pelo tamanho, porque a decodificação da CLI nunca encolhe o conteúdo): `bytes` é o tamanho e `linhas` `null`. `revisao`: `enviado`, `nao-revisavel` (fora do predicado da CLI), `excluido` (exclusões do núcleo ou do projeto) ou `sem-alteracao` (revisável igual ao da partida, abaixo). `null` para arquivo removido |
 | `chamada` | `{include, meta, error, falhas_de_lote, issues, stdout_sha256}` da única chamada, ou `null` sem chamada. `falhas_de_lote`: as linhas do stderr que começam com `[error]` ou `Warning: parsing error in rejector`. `issues`: a lista `issues` do JSON da CLI, crua (cada objeto com todas as chaves que a CLI deu, sem reformatar), ou `null` com JSON ilegível. `stdout_sha256`: sha256, em hex, do stdout da CLI byte a byte (com os avisos do npm), para rastreio |
 | `resultado` | `ok`, `achados` (algum `aberto`), `incompleta` ou `indisponivel` |
 | `motivo` | só com `incompleta` e `indisponivel` (abaixo) |
@@ -151,6 +151,12 @@ saída (para a sprintx e a runx, como a 2).
 - **Revisável** é o predicado da CLI homologada (perfil): fora dos nomes, extensões e
   sufixos excluídos. Markdown é revisável. Os portões antes da CLI usam os números do
   perfil, iguais em todas as homologadas, e não dependem da CLI instalada.
+- **Sem alteração:** o revisável da task cujo `blob` é igual ao da partida (sem
+  `--base-commit`, `HEAD:<arquivo>`; com, `<sha>:<arquivo>`) fica `revisao: "sem-alteracao"`,
+  fora de L1, L2, do `--include` e da reconciliação: a CLI só revisa o que mudou e não o
+  devolveria, e enviá-lo dava `incompleta:faltante` (Login, ui-react-046). Ausente na partida
+  nunca é igual, nem o arquivo novo vazio. Só com arquivos assim, a CLI nem é procurada
+  (precedência 3).
 - **Com `--base-commit`**, cada arquivo da task tem de estar commitado: o
   `hash-object` do checkout igual a `HEAD:<arquivo>`, e o apagado ausente do `HEAD`.
 - Linha alterada é a dos hunks de `git diff -U0 <head>` (o checkout desde o `HEAD`; com
@@ -184,7 +190,7 @@ O primeiro que se aplica decide o resultado:
 | 2 | `incompleta:excluido-declarado:<f>` | arquivo presente da task em `excluir_da_revisao` do projeto |
 | 2 | `incompleta:L1:<n>` | mais de 40 revisáveis |
 | 2 | `incompleta:L2:<f>` | o primeiro revisável, na ordem da task, acima de 5.000 linhas ou de 204.800 bytes |
-| 3 | `ok` | nenhum revisável: a CLI nem é procurada (`cli` e `chamada` `null`) |
+| 3 | `ok` | nenhum `enviado` (nenhum revisável, ou todos `sem-alteracao`): a CLI nem é procurada (`cli` e `chamada` `null`) |
 | 4 | `indisponivel:cli-ausente` | nenhum `codeant` no `PATH` |
 | 4 | `indisponivel:integridade` | `codeant` fora de pacote, `package.json` de outro pacote, `bin` que não é o executável, arquivo do manifesto ausente ou diferente, `package.json` com outro `name`, `version` ou `bin`, ou o que não se consegue conferir. A CLI não roda |
 | 4 | `indisponivel:versao` | versão do pacote sem perfil |
@@ -226,7 +232,7 @@ linhas valem na ordem em que aparecem.
 | arquivo que a task altera fora das chaves de `arquivos`, em qualquer `resultado` (abaixo, "Cobertura do commit"); o primeiro, na ordem do `git diff`; sem o nome, se o diff falha | FALHA `evidencia-invalida:cobertura:<arquivo>` | FALHA |
 | `indisponivel` | FALHA `indisponivel:<motivo>` | AVISO `indisponivel:<motivo>` |
 | `incompleta` (não depende do modo) | FALHA `incompleta:<motivo>` | FALHA `incompleta:<motivo>` |
-| `ok`/`achados` com a `revisao` de algum arquivo diferente da refeita no `conferir` (`excluido` só nas exclusões do núcleo, que em `ok`/`achados` são as únicas; senão o predicado do perfil) (`revisao`) | FALHA `evidencia-invalida:revisao` | FALHA |
+| `ok`/`achados` com a `revisao` de algum arquivo diferente da refeita no `conferir` (`excluido` só nas exclusões do núcleo, que em `ok`/`achados` são as únicas; senão o predicado do perfil; `sem-alteracao` só com `<sha>:<arquivo>` igual a `<de>:<arquivo>`, `<de>` o `base_commit` com `--base-commit`, senão o `head`; o igual também pode estar `enviado`) (`revisao`) | FALHA `evidencia-invalida:revisao` | FALHA |
 | `ok`/`achados` com algum `enviado` e: `cli.versao` sem perfil (`cli.versao`); `cli.integridade` ≠ `conferida` (`integridade`); `chamada` nula, com `error` não nulo, sem `issues` lista de objetos ou sem `stdout_sha256` de 64 hex (`chamada`), o que reprova a v2 gravada antes de 2026-10-20; `meta` que não é mapa, `max_files` ≠ perfil ou motivo de pulo fora do perfil (`perfil`); `falhas_de_lote` não vazia (`lote-falhou`); mais de 40 `enviado` (`L1`); `enviado` acima de 5.000 linhas ou 204.800 bytes, ou com `bytes`/`linhas` menores que os do blob `<sha>:<arquivo>` medido de novo (`L2`); `include` diferente dos enviados, ou a reconciliação do `revisar` (repetido, sobra, pulado, faltante) que não fecha (`cobertura`) | FALHA `evidencia-invalida:<campo>` | FALHA |
 | `ok`/`achados` com algum `enviado` e `head` que não é `null` nem o SHA completo de um commit (`head`), ou `modo` `base-commit` com `base_commit` que não é o SHA completo de um commit, ou `modo` `uncommitted` com `base_commit` não nulo, ou outro `modo` (`base_commit`) | FALHA `evidencia-invalida:<campo>` | FALHA |
 | `ok`/`achados` com `achados` diferente dos derivados de `chamada.issues` (de nenhuma, sem `enviado`), com as linhas alteradas de `git diff -U0 <de> <sha>` (`<de>`: `base_commit` com `--base-commit`, senão `head`) e as vizinhas do blob do commit: outra quantidade, ordem, `identidade`, `arquivo`, `linha`, `label` ou `texto`, ou `estado` diferente do derivado, exceto `rejeitado` com a identidade em `rejeicoes` da evidência ou de outra evidência do trabalho no commit; ou `resultado` que não é `achados` com algum `aberto` e `ok` sem nenhum | FALHA `evidencia-invalida:achados` | FALHA |
@@ -324,6 +330,21 @@ tentativas vira `revisao_defeito` (real) ou `revisao_contestada` (falso positivo
 | `acesso-negado` | o 403 em todo lote: tente `codeant logout` e `codeant login` uma vez, apesar de a mensagem da CLI induzir a repetir; persistindo, é conta ou serviço, e nada aqui resolve. Em `se_disponivel`, é AVISO, e a task fecha sem a revisão; em `obrigatoria`, a task espera a CLI voltar. O 403 em `error` no JSON dá `indisponivel:erro`, com a mesma rota |
 | `pulado`, `faltante`, `sobra`, `repetido` | diagnóstico |
 
+**Depois de um `rejeitar` que sai `<T-NN.MM> ok`, a revisão da task está feita.** Não se
+roda o `revisar` de novo "para conferir": a CLI varia entre chamadas ("O que o `ok`
+atesta") e redescreve o mesmo ponto com outra vizinhança ou outro `label`, o que dá outra
+identidade, reabre o achado e troca a evidência que o desenvolvedor fechou (Login,
+ui-react-046, T-01.01). Só se revisa de novo quando um arquivo da task que vai ao commit
+mudou depois do `rejeitar`: aí a evidência não bate mais com o blob.
+
+**Limite conhecido: o lock não revisável.** `package-lock.json` (e os outros nomes
+excluídos do perfil) não vai à CLI nem ao snapshot, e a CLI não tem canal para saber que
+ele mudou: com o `package.json` de versão ou dependência nova, ela acusa "o lock não foi
+atualizado" (três falsos positivos no Login, ui-react-046). Só esse diagnóstico, com o lock
+declarado na task e alterado no blob que vai ao commit, é falso positivo conhecido: o
+agente registra `revisao_contestada` com o diff do lock que acompanha a mudança do
+`package.json`, e o desenvolvedor rejeita. "O lock mudou em algum lugar" sozinho não prova.
+
 **Mudar o modo:** a evidência precisa estar no commit da task, porque o `conferir` lê `<sha>:docs/entregas/.../revisao/<task>.json`. Rodar `revisar` depois não cria essa evidência para o commit antigo. Por isso, religue `obrigatoria` entre trabalhos, regra de operação que nada aqui impõe: a task concluída com o modo desligado dá `evidencia-ausente` se o E2 for reexecutado, e o trabalho já integrado não reexecuta o E2. Trabalho aberto termina no modo em que começou.
 
 `indisponivel` depende do modo (`obrigatoria`: a task não fecha). Na mergex, a V12
@@ -372,3 +393,4 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-11-01 | Só snapshot com `dono` válido é removido: sem ele o worktree não é deste script, e o `--force` levava arquivo de quem usou o mesmo nome (conselhos#230, regressão da 0.12.17). |
 | 2026-11-02 | A variação da CLI entre rodadas passa de relato a medição, com os números no texto de `ok`. |
 | 2026-11-09 | Exceção não tratada sai **70** (erro interno), não 1 (achado do CodeAnt no katosmv/login#73, r4518931241): a F6 e o E3 a liam como `achados` e bloqueavam com `revisao_defeito` ou `revisao_contestada`. A saída 1 só vale como `achados` com a linha `<T-NN.MM> achados`. |
+| 2026-11-10 | Relatos do Login (ui-react-046, a 1ª prova real da F6): o revisável da task igual ao da partida fica `revisao: "sem-alteracao"`, fora do `--include` e da reconciliação (antes, `incompleta:faltante`), e o `conferir` refaz a igualdade; na orientação ao consumidor, não se revisa de novo depois de um `rejeitar` que sai `ok`, e o "lock não atualizado" de um lock não revisável é limite conhecido. |
