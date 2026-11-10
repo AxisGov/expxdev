@@ -1038,6 +1038,13 @@ describe("expx-revisao.mjs: código só movido (derivacao 2)", () => {
     expect(estados).toEqual(["src/b.js:1=aberto"]);
   });
 
+  it("funcional: mais de 1.000.000 de linhas nos diffs (blobs antigos grandes, cada um abaixo de 1 MiB) → nenhum crédito", () => {
+    const grande = "y\n".repeat(500_001);
+    const { estados } = movido({ "src/g1.txt": grande, "src/g2.txt": grande, "src/m.js": "l1\nsegredo1 = calcula(1);\n" },
+      { "src/g1.txt": null, "src/g2.txt": null, "src/m.js": "l1\n", "src/b.js": "segredo1 = calcula(1);\n" }, [achado("src/b.js", 1)]);
+    expect(estados).toEqual(["src/b.js:1=aberto"]);
+  });
+
   it("funcional: `objeto = require(...)` sozinho não prova movimento", () => {
     const { estados } = movido({ "src/m.js": 'l1\nobjeto = require("x");\nl3\n' },
       { "src/m.js": "l1\nl3\n", "src/b.js": 'objeto = require("x");\n' }, [achado("src/b.js", 1)]);

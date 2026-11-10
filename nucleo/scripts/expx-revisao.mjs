@@ -348,6 +348,9 @@ function movidasPor(caminhos, de, pos) {
 }
 // teto de comparações da busca dos trechos: passou, nenhum crédito (nunca menos linha alterada)
 const TETO_MOVIDAS = 5_000_000;
+// teto das linhas reunidas dos hunks (as `+` e as `-` de todos os caminhos), antes da busca: o blob antigo só tem o limite
+// de LEITURA_MAXIMA, e 40 deles enchiam a memória antes do teto de comparações. Passou, nenhum crédito
+const TETO_LINHAS_MOVIDAS = 1_000_000;
 /** As linhas alteradas de cada caminho na derivação 2 (Map: Set, ou `true` se o diff do caminho falha): as `+` do diff entre
  *  `de(f)` e `pos(f)` (blob, ou undefined se ausente), menos as dos trechos movidos. Trecho movido: uma sequência de `+`
  *  contígua num hunk, igual a uma sequência de `-` contígua num hunk de qualquer caminho, com ao menos uma linha
@@ -359,6 +362,7 @@ function alteradasMovidas(caminhos, de, pos) {
   const mais = [];
   const menos = [];
   let trecho = 0;
+  let linhas = 0;
   for (const f of [...caminhos].sort((x, y) => (Buffer.compare(Buffer.from(x), Buffer.from(y))))) {
     const a = de(f);
     const b = pos(f);
@@ -370,6 +374,9 @@ function alteradasMovidas(caminhos, de, pos) {
     const hunks = !la || !lb ? undefined : a === undefined || b === undefined ? [{ inicio: 1, menos: la, mais: lb }] : hunksEntre(a, b);
     if (!hunks) { res.set(f, true); continue; }
     const s = new Set();
+    for (const h of hunks) linhas += h.menos.length + h.mais.length;
+    // acima do teto, só as `+` do caminho, sem guardar nada para a busca
+    if (linhas > TETO_LINHAS_MOVIDAS) { for (const h of hunks) h.mais.forEach((_, k) => s.add(h.inicio + k)); res.set(f, s); continue; }
     for (const h of hunks) {
       trecho++;
       for (const l of h.menos) menos.push({ chave: l, trecho });
@@ -378,6 +385,7 @@ function alteradasMovidas(caminhos, de, pos) {
     }
     res.set(f, s);
   }
+  if (linhas > TETO_LINHAS_MOVIDAS) return res;
   const semCredito = new Map([...res].map(([f, s]) => [f, s === true ? true : new Set(s)]));
   // todo trecho válido tem uma linha substantiva: a busca parte só delas (a âncora), e o par de linhas iguais só pontuação,
   // que se repete aos milhares, nunca é visitado

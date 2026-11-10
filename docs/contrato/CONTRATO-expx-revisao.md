@@ -172,7 +172,7 @@ saída (para a sprintx e a runx, como a 2).
   comprimento máximo, na ordem (posição da `+`, posição da `-`), sem sobrepor, com as posições na ordem
   de bytes dos caminhos. Só a `-` da própria task paga: a cópia (o trecho que continua na origem) é
   alterada. Diff que falha, binário (NUL) ou blob acima de 1 MiB: o caminho inteiro alterado, e as
-  remoções dele não pagam nada. A busca tem teto (5.000.000 comparações); passou, nenhum trecho movido.
+  remoções dele não pagam nada. A busca tem teto (5.000.000 comparações); passou, nenhum trecho movido. Antes dela, as linhas `+` e `-` de todos os hunks também têm teto (1.000.000); passou, nenhum trecho movido.
   `derivacao: 1` (a evidência de antes): os hunks de `git diff -U0 <head>` do checkout, ou
   `git diff -U0 <sha> <head>`, sem trecho movido. Nas duas, arquivo novo sem trecho movido, repositório
   sem commit ou `git diff` que falha tem todas as linhas alteradas. Achado em linha alterada é
@@ -422,4 +422,5 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-11-09 | Exceção não tratada sai **70** (erro interno), não 1 (achado do CodeAnt no katosmv/login#73, r4518931241): a F6 e o E3 a liam como `achados` e bloqueavam com `revisao_defeito` ou `revisao_contestada`. A saída 1 só vale como `achados` com a linha `<T-NN.MM> achados`. |
 | 2026-11-10 | Relatos do Login (ui-react-046, a 1ª prova real da F6): o revisável da task igual ao da partida fica `revisao: "sem-alteracao"`, fora do `--include` e da reconciliação (antes, `incompleta:faltante`), e o `conferir` refaz a igualdade; na orientação ao consumidor, não se revisa de novo depois de um `rejeitar` que sai `ok`, e o "lock não atualizado" de um lock não revisável é limite conhecido. |
 | 2026-11-10 | **`derivacao: 2`** (Login, ui-react-046: um teste dividido em dois arquivos fez o achado sobre código antigo ficar `aberto`): o trecho que a task só moveu, igual byte a byte, não é linha alterada, e o achado nele vira `anterior`. Diff por blob da partida ao commit, com algoritmo fixo; trecho com linha substantiva; cada remoção paga uma adição; do maior para o menor; teto de comparações. A evidência sem `derivacao` continua conferida pela regra 1. Desenho com o Codex (2 rodadas). |
+| 2026-11-10 | Revisão do expxdev#162 (CodeAnt): a derivação 2 tem também teto de linhas reunidas (1.000.000 `+` e `-`), antes da busca; o blob antigo só tinha o limite de 1 MiB, e 40 deles enchiam a memória antes do teto de comparações. Passou, nenhum crédito. |
 | 2026-11-10 | Lock contestado, alinhado à runx (03-fix) e à sprintx (06-execucao): a instalação congelada que falha por outro motivo não prova nada e vai com a contestação ao desenvolvedor; depois dela, o subconjunto de testes afetado roda de novo. |
