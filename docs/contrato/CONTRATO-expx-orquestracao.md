@@ -736,6 +736,11 @@ política é inválida. `ANTHROPIC_MODEL` e `CLAUDE_CODE_EFFORT_LEVEL` no ambien
 stderr: passam por cima do comando. É puro: não grava nada e não chama o `claude`. O painel
 preserva as chaves e não as julga.
 
+Limite da v1: num trabalho novo, a primeira sessão abre antes do artefato, e quem a abre é quem
+declara a classe, com o modelo dela (o `expx sessao` não aceita `--classe`, para que o artefato
+seja a única fonte). O comando serve às sessões seguintes: retomada, `/clear` e a sessão aberta na
+worktree depois do handoff do E1 da runx, que leva a tripla quando ela foi declarada.
+
 ### 14.3 Fora da v1
 
 A observação passiva do modelo da sessão, o aviso de sessão fora da classe, a linha no painel, o
