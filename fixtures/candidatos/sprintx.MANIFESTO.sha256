@@ -24,7 +24,7 @@ b1323d31872393330339d3f09f46a5f0d7cfa4a880dc54a52be9d2863befb1f3  .claude/hooks/
 c79f5061a97281b6b82f4593df8aded01adb631e356dae9d1594c5c0c6fd5da1  .claude/hooks/testes/agente-real-rastro.sh
 f28582b7834fc475936b536531cfc8d05409f8ab7abd1bc7975a44f3f0781fc3  .claude/hooks/testes/bancada-autorizacao-f6.sh
 9675711736ebae34584c407d2ab781a015e1779f5a0feb05be2598090c15845b  .claude/hooks/testes/bancada-base-encadeada.sh
-c9764178a8c5cef43372f7e5f764319fc9b2e29ccad6090eae63af7a902d3aa5  .claude/hooks/testes/bancada-bloqueio-replanejamento.sh
+6d21950767a5d641ff528f174b8e771c1b56c8cfe059b19659ddc23d746fb807  .claude/hooks/testes/bancada-bloqueio-replanejamento.sh
 1a8b6eb9d3fd8d0b9f35b285a448d5a4356cc5eda4702751b3dbb9cec5b3c9d6  .claude/hooks/testes/bancada-desvio-estimativa.sh
 3d018b4c332fdba5ef28c2a7a6a00ccce084f9017519e80c22b9017f48087309  .claude/hooks/testes/bancada-escopo-e-hooks.sh
 c42a3abff806d5251464d747ec486f5433c7337ed11936286096cb9c04f619d8  .claude/hooks/testes/bancada-escopo-links.sh
@@ -40,7 +40,7 @@ e4b5896caa3898640a4395008272174673f81d609f010164472fcdbc3f035ab0  .claude/hooks/
 d9370952ede36c379751835d4a711550bd37b95c16f127d841883a49e962d2a5  .claude/hooks/testes/fonte.sh
 00dc2c2d5319710f73f5f54616c5b652aa3f99879f8c75444c8002abeeb13483  .claude/hooks/testes/transcrito-agente.sh
 0354c304ed52b1d41becc8df83b36f4a3bf0b3543316bf0e569347ca719fe43d  .claude/settings.json
-7dd63a49a12c66006c62d2a1902686e602d90bc737318b4f741157523265abe4  .claude/skills/sprintx/DECISOES-DA-SKILL.md
+56967c67e5bf2825f2e94be54ea88167e1db516a25f25360e31249bbb1b62971  .claude/skills/sprintx/DECISOES-DA-SKILL.md
 fac5561965487266f43e57cecfde4abe63be527ddd84a9ddc9ae6f773133c4ad  .claude/skills/sprintx/SKILL.md
 296b12dd80970ea12c8ac42de6de82a7f34b98e257587d139c8db8d7a4041343  .claude/skills/sprintx/assets/TEMPLATE-BLOQUEIOS.md
 87e9ed363f1a083e60fc37d2c48cb3315513a3a47950858dd445d8d5bc780de3  .claude/skills/sprintx/assets/TEMPLATE-DECISOES.md
@@ -63,7 +63,7 @@ a4102c98bdd79bd6adb347ae31550e2c3f159a116dfe877650d19953fb6833e0  .claude/skills
 ea4f7911c1c4fdd412313c64566275b80b00f39d97e10ee69efd7c86cdd77642  .claude/skills/sprintx/references/03-plano.md
 81fc160be05bde218ab4e187eba2f84f9c565ff4de1126749ac041bd4ea1ca2e  .claude/skills/sprintx/references/04-orquestrador.md
 dee6609e9cb22c467a775a6a94372e4f3c9ff7ab968ff4d1d4332d195e744f5b  .claude/skills/sprintx/references/05-auditoria.md
-196fd73e66a7de668c97bf5aecc04f94f5ed400c5b85dbe2187665eccfae8d87  .claude/skills/sprintx/references/06-execucao.md
+dd6d0b5e96400d83ecbfe5bd97b109e7abf4abd77ace145e7852045d411de3c9  .claude/skills/sprintx/references/06-execucao.md
 7470ee3c03e137f825555b7f57f79aa529b54e0ecd5663b0bf9d095752fb90cf  .claude/skills/sprintx/references/07-estimativa.md
 8991177f18210ed91348742eb5f5d144962eafff604cd78406f5b9f5bf5c836a  .claude/skills/sprintx/references/08-rastro.md
 c4267a0df409dfc4f06c668640c7e135cdf7237ebbea0c8d88278ac792ec9129  .claude/skills/sprintx/references/09-diagrama.md
