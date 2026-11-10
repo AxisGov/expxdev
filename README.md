@@ -550,16 +550,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.13.22 -R AxisGov/expxdev -D ~/expx-cli/v0.13.22 &&
+gh release download v0.13.23 -R AxisGov/expxdev -D ~/expx-cli/v0.13.23 &&
 (
-  cd ~/expx-cli/v0.13.22
+  cd ~/expx-cli/v0.13.23
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.13.22.tgz.sha256
+    sha256sum -c expxdev-0.13.23.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.13.22.tgz.sha256
+    shasum -a 256 -c expxdev-0.13.23.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.13.22/expxdev-0.13.22.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.13.23/expxdev-0.13.23.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -573,7 +573,7 @@ npx --yes --package ~/expx-cli/v0.13.22/expxdev-0.13.22.tgz expx init --skills b
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.13.22 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.13.23 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -704,6 +704,9 @@ npx --yes --package ~/expx-cli/v0.13.22/expxdev-0.13.22.tgz expx init --skills b
 - `0.13.22` junta os achados do login#73 e do conselhos#293, a evidência da revisão no
   `task-so-fecha-verde`, a regra do modo subagente e o `expx sessao`, que imprime o comando de
   abertura da sessão principal na classe declarada do trabalho.
+- `0.13.23` corrige o que a instalação da 0.13.22 achou no conselhos (#296) e no Login (#75): o
+  `task-so-fecha-verde` lê o `status` e o id como o YAML, e o `criar` da sprintx não perde mais uma
+  corrida.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

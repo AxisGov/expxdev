@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.13.23 — os achados da instalação da 0.13.22 no conselhos e no Login
+
+Instale por PR, como a 0.13.22. Muda a runx (AxisGov/runx#21, merge c958b52) e a sprintx (AxisGov/sprintx#73, merge 49db46a). O núcleo, os eventos, o `init`, o `doctor`, o painel e o `expx sessao` seguem como na 0.13.22. Os achados vêm da CodeAnt no conselhos-municipais#296, reproduzidos pela `expx-atualizacao`, e no katosmv/login#75. Nenhum tinha efeito nos consumidores no dia.
+
+- **O texto da saída 1** (runx DR-111, sprintx DS-212). A saída 1 do `revisar` cobre também o achado sem vínculo a uma linha de um arquivo da task, que o núcleo deixa aberto.
+- **A evidência no `task-so-fecha-verde`** (DR-111, DS-212):
+  - link em qualquer ponto do caminho (uma pasta `revisao` linkada para fora da worktree) não vale;
+  - na sprintx, `- id:` vazio vira `?` e avisa como fora da forma, e o `?` nunca conta como já concluído;
+  - `id: "T-01.01"` é lido sem as aspas e sem o comentário.
+- **O `status` só pela chave** (DS-212, DR-112). Um `status: concluida` dentro de outro campo (uma nota) ou de um escalar em bloco (`objetivo: |`) concluía a task.
+  - Na sprintx, a âncora e o escalar em bloco nos dois awks do hook.
+  - Na runx, o `_parse` do `expx_rastro.py` passa a reconhecer `chave: |` e `>`, o que vale para todo hook que o usa. O conteúdo na mesma coluna da chave continua chave, como no PyYAML.
+- **O `planejamento.sh criar`** (DS-212, DS-213):
+  - `--classe-sessao ""` e as outras duas opções vazias são erro de contrato, em vez de "sem declaração";
+  - a corrida de dois `criar` do mesmo slug (CodeAnt no login#75): o arquivo nasce por `ln` exclusivo, e quem perde cai no `ja_existe`, que compara e recusa;
+  - um `00-PLANEJAMENTO.md` que é link, inclusive pendente, passa a ser erro de contrato, também pelo caminho do legado no `avanca`.
+- **A regra 21 da sprintx** traz a exceção "sem worktree" explícita da F1.
+- **O que não procede:** a chave sem fecho com escape no `expx-rastro.sh` (o painel não lê id nenhum, e o critério é nunca dar um id diferente do que ele lê) e a vírgula no `--arquivos` (já sai `indisponivel:caminho-com-virgula`).
+- **Não exercitado:** o bash 3.2 do macOS e o `ln` no Windows nativo.
+
 ## 0.13.22 — tudo junto: os achados do login#73 e do conselhos#293, a evidência no hook, o modo subagente e a classe da sessão
 
 Instale por PR, como a 0.13.21. Muda a runx (AxisGov/runx#20, merge 618dbc6), a sprintx (AxisGov/sprintx#72, merge b4850d0), o núcleo (`expx-revisao.mjs`, `expx-rastro.sh`) e o CLI (`expx sessao`). Os eventos, o `init`, o `doctor` e o painel seguem como na 0.13.21; o painel só preserva as chaves novas do `00-OCORRENCIA.md`.
