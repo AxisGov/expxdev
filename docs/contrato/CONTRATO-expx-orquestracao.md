@@ -770,8 +770,36 @@ núcleo (`expx_rastro_grava`); os hooks da runx, da sprintx e da mergex não rod
 
 Regra: **a runx e a sprintx não rodam como subagente comum quando a worktree do trabalho é
 diferente do `cwd` da sessão.** A sessão abre na worktree, com o comando do `expx sessao`
-(§14.2). O modo `isolation: "worktree"` tem só a **compatibilidade de `cwd` medida**; ele não é
-suportado: o E0 da mergex só adota a árvore quando a branch ativa já é a do trabalho, e a
-`worktree-agent-<id>` não é; e o fluxo E0–E5 nesse modo, a integridade e o OpenCode não foram
-provados. Suportá-lo pede mudança no E0 da mergex (criar a branch do trabalho na mesma árvore,
-sem trocar de árvore) e uma prova do fluxo inteiro.
+(§14.2).
+
+### 15.1 O subagente com `isolation: "worktree"` (0.13.26)
+
+Suportado **só no Claude Code** (o OpenCode não tem `isolation`) e **só para um trabalho novo ou
+cuja branch está livre** (sem worktree). O subagente isolado adota a própria worktree como a do
+trabalho, em vez de criar outra, que ficaria longe do `cwd` que os hooks recebem:
+
+- **A detecção:** `nucleo/scripts/expx-worktree-isolada.sh` imprime `isolada` e sai 0 quando a
+  raiz da worktree de quem chama é vinculada (`git-dir` ≠ `git-common-dir`), fica em
+  `<raiz do checkout principal>/.claude/worktrees/agent-<id>` (`<id>` alfanumérico), está na branch
+  `worktree-agent-<id>` e tem a entrada igual no `git worktree list --porcelain -z`; senão sai 1,
+  sem imprimir. É detecção operacional, não fronteira de segurança: quem controla o repositório
+  reproduz o caminho e a branch. Depois da troca de branch, ele sai 1 (a adoção já aconteceu).
+  A skill o procura na árvore atual, senão no checkout principal (a worktree do agente só tem o que
+  está commitado, e há consumidor que não versiona o `.expx/marketplace`); sem ele nos dois, numa
+  raiz `.claude/worktrees/agent-<id>`, ela para ("atualize o expx") em vez de criar outra worktree.
+- **A adoção** (F1 da sprintx, E1 da runx, antes do `git worktree add`): com `isolada` e a árvore
+  limpa, `git switch -c <branch> --no-track <base>`, ou `git switch <branch>` se ela existe e não
+  está em worktree nenhuma, na própria worktree do agente; a chave `worktree` do artefato recebe o
+  caminho dela. A branch numa worktree `prunable` (pasta movida ou apagada) segue antes a rota de
+  sempre da F1/E1 (perguntar; reparar a movida, remover só o registro da apagada). A branch em outra
+  worktree viva continua parando (o `git switch` a recusa; a retomada é uma sessão aberta naquela
+  worktree, pelo `expx sessao`).
+- **A mergex não muda:** depois da adoção, a branch ativa é a do trabalho, e o E0 a adota pelo
+  caso A; o caso B fica como está.
+- **O que fica:** o Claude Code mantém a worktree do agente que deixou mudança (commit inclusive) e
+  remove a que ficou sem nenhuma; a `worktree-agent-<id>` sobra como branch sem worktree, e o expx
+  nunca a apaga nem remove worktree. Um agente de aprovação (`revisar`/`testar`) nunca troca de
+  branch: a integridade final (§12) o reprovaria, e é o comportamento certo.
+- **Medido** (`scripts/bancada-subagente-isolado.sh`, `claude` 2.1.319 real, `--setting-sources
+  project`, haiku; resultado em `docs/superpowers/specs/2026-11-10-bancada-subagente-isolado.md`).
+  **Não provado:** o fluxo E0–E5 inteiro executado pelo modelo nesse modo, e o macOS.
