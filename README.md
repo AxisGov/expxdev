@@ -335,6 +335,7 @@ só.
 | `expx update [skill...]` | Atualiza as skills instaladas |
 | `expx grafo [trabalho]` | Grava o `GRAFO.svg` do plano ao lado do `ORQUESTRADOR.md` |
 | `expx doctor` | Diagnostica uma instalação quebrada |
+| `expx sessao <trabalho>` | Imprime o comando que abre a sessão principal na classe declarada no `00-OCORRENCIA.md` ou no `00-PLANEJAMENTO.md` (`cd '<worktree>' && claude --model … --effort …`); não grava nada |
 
 O painel funciona **sem `init`**: ele não precisa de nada instalado.
 
