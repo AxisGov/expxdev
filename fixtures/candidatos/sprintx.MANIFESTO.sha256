@@ -19,14 +19,14 @@ d1a6a0f98e45740d45da25910dd068ebb5f1d2678fc51b79e36cfe1cbfdb439c  .claude/hooks/
 af8642903f504cb832d59576686c23d374a982c27c7c20f119aa4eded7419703  .claude/hooks/sprintx/git-perigoso.sh
 fd6c820d88c191feaf72a5a61658ddcc8d59a064832e148c02d915803267dba6  .claude/hooks/sprintx/sem-placeholder-no-plano.sh
 2e1ca6b14efee0c531fc249815f19814f4777d86d39d5b8fc0d710cdcef8ad4b  .claude/hooks/sprintx/task-reivindicada.sh
-19b5374c900199ac578f4084954249bdd847ad26e9281f9fef0a953c4a70d231  .claude/hooks/sprintx/task-so-fecha-verde.sh
+35eed78b4d02be2c7ccc6f6a3a7b58f470389dc42a397a3b82bc5e99b4bf9bf3  .claude/hooks/sprintx/task-so-fecha-verde.sh
 b1323d31872393330339d3f09f46a5f0d7cfa4a880dc54a52be9d2863befb1f3  .claude/hooks/sprintx/tdd-teste-antes.sh
 c79f5061a97281b6b82f4593df8aded01adb631e356dae9d1594c5c0c6fd5da1  .claude/hooks/testes/agente-real-rastro.sh
 f28582b7834fc475936b536531cfc8d05409f8ab7abd1bc7975a44f3f0781fc3  .claude/hooks/testes/bancada-autorizacao-f6.sh
 9675711736ebae34584c407d2ab781a015e1779f5a0feb05be2598090c15845b  .claude/hooks/testes/bancada-base-encadeada.sh
 c9764178a8c5cef43372f7e5f764319fc9b2e29ccad6090eae63af7a902d3aa5  .claude/hooks/testes/bancada-bloqueio-replanejamento.sh
 1a8b6eb9d3fd8d0b9f35b285a448d5a4356cc5eda4702751b3dbb9cec5b3c9d6  .claude/hooks/testes/bancada-desvio-estimativa.sh
-dbab72063a9292cf74eb40aacf940790ddcfb8553a174270b273dda78013e1fe  .claude/hooks/testes/bancada-escopo-e-hooks.sh
+3d018b4c332fdba5ef28c2a7a6a00ccce084f9017519e80c22b9017f48087309  .claude/hooks/testes/bancada-escopo-e-hooks.sh
 c42a3abff806d5251464d747ec486f5433c7337ed11936286096cb9c04f619d8  .claude/hooks/testes/bancada-escopo-links.sh
 73d1db2b4fb059da8901bb11018764ff295878e776137b6a993d3edb50813e23  .claude/hooks/testes/bancada-historico-calibracao.sh
 b2b9f7b6b8c6349316092989a7babefd495ee6c9ff89bcf2c6dc6ba76d66ac8d  .claude/hooks/testes/bancada-modelo-esforco.sh
@@ -40,7 +40,7 @@ e4b5896caa3898640a4395008272174673f81d609f010164472fcdbc3f035ab0  .claude/hooks/
 d9370952ede36c379751835d4a711550bd37b95c16f127d841883a49e962d2a5  .claude/hooks/testes/fonte.sh
 00dc2c2d5319710f73f5f54616c5b652aa3f99879f8c75444c8002abeeb13483  .claude/hooks/testes/transcrito-agente.sh
 0354c304ed52b1d41becc8df83b36f4a3bf0b3543316bf0e569347ca719fe43d  .claude/settings.json
-6b985aac82aa78f66dec12954f6cf0fb0e20159ddd799a295861db7984eb3977  .claude/skills/sprintx/DECISOES-DA-SKILL.md
+7dd63a49a12c66006c62d2a1902686e602d90bc737318b4f741157523265abe4  .claude/skills/sprintx/DECISOES-DA-SKILL.md
 fac5561965487266f43e57cecfde4abe63be527ddd84a9ddc9ae6f773133c4ad  .claude/skills/sprintx/SKILL.md
 296b12dd80970ea12c8ac42de6de82a7f34b98e257587d139c8db8d7a4041343  .claude/skills/sprintx/assets/TEMPLATE-BLOQUEIOS.md
 87e9ed363f1a083e60fc37d2c48cb3315513a3a47950858dd445d8d5bc780de3  .claude/skills/sprintx/assets/TEMPLATE-DECISOES.md

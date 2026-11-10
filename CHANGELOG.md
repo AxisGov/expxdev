@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.24 — os achados da instalação da 0.13.23 no conselhos
+
+Instale por PR, como a 0.13.23. Muda só a sprintx (AxisGov/sprintx#74, merge e3481da), no `task-so-fecha-verde.sh` (DS-214). A runx, o núcleo, os eventos, o `init`, o `doctor`, o painel e o `expx sessao` seguem como na 0.13.23. Os achados são da CodeAnt no conselhos-municipais#298, reproduzidos pela `expx-atualizacao`. Nenhum tinha efeito no conselhos no dia.
+
+- **O `status` entre aspas.** `status: "concluida"` (ou entre aspas simples), YAML válido, não casava no gate nem nos dois awks, e o hook ficava mudo. Anterior à 0.13.23.
+- **O comentário não abre escalar em bloco.** Um `# nota: |` fazia o hook pular os campos seguintes. Era regressão da 0.13.23 (DS-212).
+- **CRLF.** O `\r` do fim da linha impedia o `status` ancorado; agora sai.
+- **O tab** conta 4 espaços na indentação, como no `_parse` da runx. Antes, os dois liam diferente dentro de um escalar em bloco.
+- **Fora, por decisão do dono:** o texto do `>` dobrado no `_parse` (os hooks só usam o id e o `status`) e o sistema de arquivos sem hard link no `criar` (limite declarado na DS-213).
+- **Não exercitado:** o bash 3.2 do macOS.
+
 ## 0.13.23 — os achados da instalação da 0.13.22 no conselhos e no Login
 
 Instale por PR, como a 0.13.22. Muda a runx (AxisGov/runx#21, merge c958b52) e a sprintx (AxisGov/sprintx#73, merge 49db46a). O núcleo, os eventos, o `init`, o `doctor`, o painel e o `expx sessao` seguem como na 0.13.22. Os achados vêm da CodeAnt no conselhos-municipais#296, reproduzidos pela `expx-atualizacao`, e no katosmv/login#75. Nenhum tinha efeito nos consumidores no dia.
