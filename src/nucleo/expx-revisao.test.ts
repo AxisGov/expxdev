@@ -1957,7 +1957,7 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
     expect(r.rc).toBe(1);
     expect(r.out).toContain("T-01 achados");
     expect(r.ev).toMatchObject({ expx_revisao: 3, resultado: "achados", escala: { de: "codeant", motivo: "cli-ausente" },
-      revisor: { nome: "codex", versao: "0.163.0", formato: 1 }, chamada_codex: { include: ["src/a.js"], arquivos_revisados: ["src/a.js"] } });
+      revisor: { nome: "codex", versao: "0.163.0", formato: 2 }, chamada_codex: { include: ["src/a.js"], arquivos_revisados: ["src/a.js"] } });
     expect(r.ev.achados.map((a) => `${a.linha}=${a.estado}`)).toEqual(["3=aberto", "1=anterior"]);
     expect(chamadasDoCodex(codex)).toHaveLength(1);
     const sha = commita(c.raiz);
@@ -2122,6 +2122,29 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
     expect(rev()).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "cli-ausente+codex-erro" } });
   });
 
+  it("funcional: dois defeitos do Codex na mesma linha têm identidades diferentes, e rejeitar um não cala o outro (CodeAnt no katosmv/login#81)", () => {
+    const { c, rev } = escala({ resposta: resposta([doCodex("src/a.js", 3, "divide por zero"), doCodex("src/a.js", 3, "vaza o token no log")]) });
+    altera3(c.raiz);
+    const r = rev();
+    expect(r.ev).toMatchObject({ revisor: { formato: 2 }, achados: [{ estado: "aberto" }, { estado: "aberto" }] });
+    const [um, dois] = r.ev.achados;
+    expect(um?.identidade).not.toBe(dois?.identidade);
+    expect(roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", um?.identidade ?? "", "--motivo", "fp").out).toBe("T-01 achados");
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
+  });
+
+  it("funcional: a evidência v3 com formato 1 (0.14.1, que já grava o executavel) continua conferida pela regra dela, sem a mensagem na identidade", () => {
+    const { c, rev } = escala({ resposta: resposta([doCodex("src/a.js", 3)]) });
+    altera3(c.raiz);
+    rev();
+    const ev = evidencia(c.raiz) as { revisor: { formato: number; versao: string; modelo: string }; achados: { identidade: string }[] };
+    ev.revisor.formato = 1;
+    const versao = `codex:${ev.revisor.versao}:${ev.revisor.modelo}:1`;
+    ev.achados[0]!.identidade = createHash("sha256").update(["codex", "src/a.js", "l2", "novo3", "l4", versao].join("\0")).digest("hex");
+    escreve(c.raiz, EV, JSON.stringify(ev));
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
+  });
+
   it("funcional: conferir recusa o motivo do Codex fora dos cinco do contrato (Codex)", () => {
     const { c, rev } = escala({ logado: false });
     altera3(c.raiz);
@@ -2145,6 +2168,13 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
 });
 
 describe("expx-revisao.mjs: derivacao 3 (a issue que não se liga a uma linha da task fica aberta, para a CodeAnt e o Codex)", () => {
+  it("funcional: um campo `chave_extra` na issue crua da CodeAnt não muda a identidade (só o Codex de formato 2 põe a mensagem nela; Codex na 0.14.2)", () => {
+    const c = cenario({ resposta: resp({}, { issues: [{ ...achado("src/a.js", 3), chave_extra: "da-cli" }] }) });
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js");
+    expect(r.ev.achados[0]?.identidade).toBe(identidade("security", "src/a.js", ["l2", "novo3", "l4"]));
+  });
+
   it("funcional: issue da CodeAnt numa linha além do fim do arquivo fica aberta; a evidência grava derivacao 3 e o conferir refaz igual", () => {
     const c = cenario({ issues: [achado("src/a.js", 99)] });
     altera3(c.raiz);
