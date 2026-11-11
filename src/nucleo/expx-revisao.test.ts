@@ -1298,6 +1298,23 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     expect(evidencia(c.raiz)).toMatchObject({ resultado: "ok", rejeicoes: [{ identidade: id }], achados: [{ estado: "rejeitado" }] });
   });
 
+  it("funcional: arquivo da task que muda entre a conferência e a gravação do rejeitar → sai 1 e a evidência fica como estava (CodeAnt no katosmv/login#79)", async () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    const id = revisar(c, "src/a.js").ev.achados[0]?.identidade ?? "";
+    const antes = readFileSync(join(c.raiz, EV), "utf8");
+    const dir = temp("expx-pausa-");
+    const espera = async (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+    const rej = new Promise<number | null>((ok) => spawn(process.execPath,
+      [c.script, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp", "--trabalho", "w", "--raiz", c.raiz],
+      { env: { ...process.env, EXPX_REVISAO_TESTE_PAUSA: dir }, stdio: "ignore" }).on("close", ok));
+    for (const ate = Date.now() + 20000; !existsSync(join(dir, "pronto")) && Date.now() < ate;) await espera(50);
+    escreve(c.raiz, "src/a.js", "l1\nl2\nnovo3 editado\nl4\nl5\n");
+    writeFileSync(join(dir, "continuar"), "");
+    expect(await rej).toBe(1);
+    expect(readFileSync(join(c.raiz, EV), "utf8")).toBe(antes);
+  });
+
   it("funcional: trava velha de processo vivo não é removida por idade", async () => {
     const c = cenario({ issues: [achado("src/a.js", 3)] });
     altera3(c.raiz);
@@ -2043,6 +2060,34 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
       escreve(c.raiz, EV, JSON.stringify(ev));
       expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`).out, esperado).toBe(`T-01 FALHA ${esperado}`);
     }
+  });
+
+  it.skipIf(process.platform !== "win32")("funcional: no Windows, o `codex.cmd` do npm (sem `codex.exe`) roda pelo alvo do shim, pelo node (Codex)", () => {
+    const c = cenario();
+    const codex = instalarCodexFalso(temp("expx-codex-"), { resposta: resposta() });
+    const prefixo = temp("expx-codex-npm-");
+    const alvo = join(prefixo, "node_modules", "@openai", "codex", "bin");
+    mkdirSync(alvo, { recursive: true });
+    writeFileSync(join(alvo, "codex.js"), `require(${JSON.stringify(codex.script)});\n`);
+    writeFileSync(join(prefixo, "codex.cmd"), '@ECHO off\r\n"%_prog%"  "%dp0%\\node_modules\\@openai\\codex\\bin\\codex.js" %*\r\n');
+    altera3(c.raiz);
+    // sem EXPX_REVISAO_TESTE_CODEX: o `codex` do PATH, que aqui é só o shim
+    const env: NodeJS.ProcessEnv = {};
+    for (const [k, v] of Object.entries(process.env)) if (k !== "EXPX_REVISAO_TESTE_CODEX" && k.toUpperCase() !== "PATH") env[k] = v;
+    env["PATH"] = `${prefixo}${delimiter}${SEM_CODEANT}`;
+    const r = spawnSync(process.execPath, [c.script, "revisar", "--trabalho", "w", "--task", "T-01", "--arquivos", "src/a.js", "--raiz", c.raiz], { encoding: "utf8", env });
+    expect(r.stdout.trim()).toBe("T-01 ok");
+    expect(chamadasDoCodex(codex)).toHaveLength(1);
+  });
+
+  it("funcional: conferir recusa o motivo do Codex fora dos cinco do contrato (Codex)", () => {
+    const { c, codex } = escala({ logado: false });
+    altera3(c.raiz);
+    revisar(c, "src/a.js", "T-01", SEM_CODEANT, { EXPX_REVISAO_TESTE_CODEX: codex.script });
+    const ev = evidencia(c.raiz) as Record<string, unknown>;
+    expect(ev["motivo"]).toBe("cli-ausente+codex-sem-login");
+    escreve(c.raiz, EV, JSON.stringify({ ...ev, motivo: "cli-ausente+codex-inventado" }));
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:escala" });
   });
 
   it("funcional: com --base-commit, o pedido nomeia o base_commit, e o conferir refaz igual", () => {

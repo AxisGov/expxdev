@@ -62,7 +62,7 @@ Não há parâmetro: vale em `obrigatoria` e em `se_disponivel`. A evidência da
   (`caminho-com-virgula`, `arquivo-inexistente`, `fatiamento-invalido`,
   `arquivo-nao-commitado`), o `snapshot`, o `arquivo-mudou-durante-revisao` e toda
   `incompleta`: cobertura parcial não é indisponibilidade.
-- **O Codex** é o `codex` do `PATH`, numa tentativa só: `codex --version` (a versão),
+- **O Codex** é o `codex` do `PATH` (no Windows, sem `codex.exe`, o alvo do primeiro `codex.cmd` do npm, `node_modules/@openai/codex/...`, pelo `node`, como na CodeAnt), numa tentativa só: `codex --version` (a versão),
   `codex login status` (saída ≠ 0 é `codex-sem-login`; o agente nunca roda `codex login`) e
   `codex exec --ephemeral --ignore-user-config -s read-only -m gpt-5.6-terra -c model_reasoning_effort="high" -C <snapshot> --output-schema <schema> -o <arquivo> -`,
   com o pedido fixo pelo stdin e o prazo da CLI (15 minutos). O modelo é fixo no núcleo,
@@ -336,7 +336,9 @@ não mudam (rejeitar um achado não cobre o que a CLI não revisou). Sai 1 se a 
 ou o achado não existe, e também, sem gravar nada, se um arquivo da evidência mudou depois do
 `revisar`: o `hash-object` do checkout difere do `blob` gravado, ou o arquivo dado por removido
 existe de novo, inclusive como link quebrado, ou não se prova ausente (só `ENOENT`/`ENOTDIR` provam; permissão ou E/S que falha não) (`evidencia desatualizada: <arquivo>`). A rejeição valeria para um conteúdo que
-não vai ao commit; a rota é rodar o `revisar` de novo.
+não vai ao commit; a rota é rodar o `revisar` de novo. A trava só protege a evidência, então a conferência se repete
+depois da gravação: um arquivo que mudou no meio desfaz a gravação, com a mesma saída 1
+(CodeAnt no katosmv/login#79). O que muda depois disso o `conferir` do commit reprova (`evidencia-nao-bate`).
 
 Só o desenvolvedor rejeita. O agente classifica, deduplica e contesta (bloqueio
 `revisao_contestada`), nunca aceita risco. Como o agente pode escrever o arquivo,
@@ -482,3 +484,4 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-11-10 | Lock contestado, alinhado à runx (03-fix) e à sprintx (06-execucao): a instalação congelada que falha por outro motivo não prova nada e vai com a contestação ao desenvolvedor; depois dela, o subconjunto de testes afetado roda de novo. |
 | 2026-11-10 | Achado do CodeAnt no katosmv/login#78 (instalação da 0.13.26): o `rejeitar` recusa, sem gravar, se um arquivo da evidência mudou depois do `revisar` (`evidencia desatualizada: <arquivo>`, saída 1). Antes, gravava `ok` sobre os blobs antigos, e só o `conferir` do commit reprovava. A regra de revisar de novo passa a ser "depois do último `revisar`". |
 | 2026-11-11 | **Escala para o Codex** (0.14.0; pedido da orquestra_conselho depois do 403 de 2026-11-10; decisão do Flávio: "não é parâmetro, é escala"; desenho com o Codex): a CodeAnt fora por motivo escalável, o `revisar` revisa com o Codex sobre o mesmo snapshot, e a evidência é a v3 (`escala`, `revisor`, `chamada_codex`); os dois fora, `indisponivel:<CodeAnt>+codex-<motivo>`. O `conferir` aceita a v2 e a v3, refaz o pedido (`prompt_sha256`) e deriva os achados das `issues` do Codex. Modelo fixo, uma tentativa, 15 minutos; a severidade não decide. |
+| 2026-11-11 | Achados do Codex e do CodeAnt na 0.14.0: o motivo do Codex com os dois fora é um dos cinco do contrato, e o `conferir` recusa outro (`evidencia-invalida:escala`); no Windows, sem `codex.exe`, o alvo do `codex.cmd` do npm roda pelo `node`; o `rejeitar` confere os blobs de novo depois de gravar e desfaz a gravação se algum mudou no meio (katosmv/login#79). |

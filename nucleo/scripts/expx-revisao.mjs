@@ -299,6 +299,8 @@ function cliConferida() {
 // snapshot. Erro de quem chama, snapshot, corrida de arquivo e cobertura parcial (`incompleta`) nunca escalam.
 const ESCALAVEIS = ["cli-ausente", "versao", "integridade", "acesso-negado", "tempo-esgotado", "erro"];
 const MODELO_CODEX = "gpt-5.6-terra";
+// os dois fora: `<motivo da CodeAnt>+<um destes>`, e só estes
+const MOTIVOS_CODEX = ["codex-ausente", "codex-sem-login", "codex-erro", "codex-tempo-esgotado", "codex-saida-invalida"];
 const FORMATO_CODEX = 1;
 // a severidade é só informação: todo achado em linha alterada conta, como na CodeAnt
 const SEVERIDADES = ["critica", "alta", "media", "baixa"];
@@ -337,9 +339,26 @@ const sha256 = (b) => createHash("sha256").update(b).digest("hex");
 // caminho relativo ou que não existe é o Codex ausente. Com ela definida, o `codex` do PATH nunca roda.
 function codexRoda(a, opcoes) {
   const falso = process.env.EXPX_REVISAO_TESTE_CODEX;
-  if (falso === undefined) return spawnSync("codex", a, opcoes);
+  if (falso === undefined) {
+    const r = spawnSync("codex", a, opcoes);
+    const shim = r.error?.code === "ENOENT" ? codexDoShim() : undefined;
+    return shim ? spawnSync(process.execPath, [shim, ...a], opcoes) : r;
+  }
   if (!isAbsolute(falso) || !existsSync(falso)) return { error: { code: "ENOENT" } };
   return spawnSync(process.execPath, [falso, ...a], opcoes);
+}
+/** No Windows, o npm instala o `codex.cmd`, que o `spawnSync` sem shell não roda: o alvo do primeiro shim do `PATH`
+ *  (`node_modules/@openai/codex/...`), que roda pelo `node`, ou undefined. */
+function codexDoShim() {
+  if (process.platform !== "win32") return undefined;
+  const path = Object.entries(process.env).find(([k]) => k.toUpperCase() === "PATH")?.[1] ?? "";
+  for (const d of path.split(";").filter(Boolean)) {
+    let texto;
+    try { texto = readFileSync(join(d, "codex.cmd"), "utf8"); } catch { continue; }
+    const m = /node_modules[\\/]@openai[\\/]codex[\\/]([^"'\s%]+)/.exec(texto);
+    const alvo = m && join(d, "node_modules", "@openai", "codex", ...m[1].split(/[\\/]/));
+    return alvo && existsSync(alvo) ? alvo : undefined;
+  }
 }
 /** O Codex revisa o snapshot: `{motivo}` (`codex-*`, nada revisado) ou `{versao, pedido, bruto, resposta}`, com
  *  `resposta` undefined se a saída não é o JSON do schema. Uma tentativa só, no prazo da CLI. */
@@ -915,7 +934,7 @@ function avaliar(task, sha) {
   if (lista) return falha(`evidencia-invalida:${lista}`);
   // a escala só parte de uma CodeAnt fora por motivo escalável; os dois fora, o motivo junta os dois
   if (ev.expx_revisao === 3 && (!ehMapa(ev.escala) || ev.escala.de !== "codeant" || !ESCALAVEIS.includes(ev.escala.motivo)
-    || (ev.resultado === "indisponivel" && !(["snapshot", "arquivo-mudou-durante-revisao"].includes(ev.motivo) || new RegExp(`^${ev.escala.motivo}\\+codex-[a-z-]+$`).test(String(ev.motivo)))))) {
+    || (ev.resultado === "indisponivel" && !["snapshot", "arquivo-mudou-durante-revisao", ...MOTIVOS_CODEX.map((m) => `${ev.escala.motivo}+${m}`)].includes(ev.motivo)))) {
     return falha("evidencia-invalida:escala");
   }
   // ausente é a 1 (a evidência de antes da 0.13.26); só o inteiro 1 ou 2
@@ -1036,19 +1055,33 @@ function presenteSemSeguirLink(f) {
 
 function rejeitar() {
   const erro = comTrava(op.task, () => {
+    let original;
+    try { original = readFileSync(caminhoEv(op.task)); } catch { /* ausente: o `le` abaixo dá undefined */ }
     const ev = le(caminhoEv(op.task));
     const alvo = (ev?.achados ?? []).filter((a) => a.identidade === op.identidade);
     if (alvo.length === 0) return ev ? "achado nao encontrado" : "evidencia ausente";
     // o arquivo da task que mudou depois do `revisar` (ou o removido que voltou): a rejeição valeria para um conteúdo que
     // não vai ao commit, e o `conferir` reprovaria (`evidencia-nao-bate`). O `revisar` gravou o blob igual ao do checkout
-    const mudou = Object.entries(ehMapa(ev.arquivos) ? ev.arquivos : {})
-      .find(([f, m]) => (m === null ? presenteSemSeguirLink(f) : ehMapa(m) && m.blob !== idDe("hash-object", "--", f)))?.[0];
-    if (mudou !== undefined) return `evidencia desatualizada: ${mudou} mudou depois do revisar; rode o revisar de novo`;
+    const arquivos = Object.entries(ehMapa(ev.arquivos) ? ev.arquivos : {});
+    const desatualizado = () => arquivos.find(([f, m]) => (m === null ? presenteSemSeguirLink(f) : ehMapa(m) && m.blob !== idDe("hash-object", "--", f)))?.[0];
+    const erroDe = (f) => `evidencia desatualizada: ${f} mudou depois do revisar; rode o revisar de novo`;
+    const mudou = desatualizado();
+    if (mudou !== undefined) return erroDe(mudou);
+    pausaDeTeste();
     for (const a of alvo) a.estado = "rejeitado";
     ev.rejeicoes = [...(Array.isArray(ev.rejeicoes) ? ev.rejeicoes : []), { identidade: op.identidade, motivo: op.motivo, em: new Date().toISOString() }];
     // rejeitar um achado não muda o que a revisão não pôde fazer (indisponivel) nem o que ela não cobriu (incompleta)
     if (!["indisponivel", "incompleta"].includes(ev.resultado)) ev.resultado = ev.achados.some((a) => a.estado === "aberto") ? "achados" : "ok";
     grava(op.task, ev);
+    // a trava só protege a evidência: o arquivo que mudou entre a conferência e a gravação (CodeAnt no katosmv/login#79)
+    // desfaz a gravação, e a evidência fica como estava
+    const depois = desatualizado();
+    if (depois !== undefined) {
+      const tmp = `${caminhoEv(op.task)}.${process.pid}.tmp`;
+      writeFileSync(tmp, original);
+      renameSync(tmp, caminhoEv(op.task));
+      return erroDe(depois);
+    }
     process.stdout.write(`${op.task} ${ev.resultado}${["indisponivel", "incompleta"].includes(ev.resultado) ? `:${ev.motivo}` : ""}\n`);
     return undefined;
   });
