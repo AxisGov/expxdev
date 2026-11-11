@@ -16,7 +16,7 @@ Instale por PR, como a 0.13.27. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 - **A revisão por task escala para o Codex.** O pedido veio da orquestra_conselho, depois de horas de 403 da CodeAnt em 2026-11-10: com `obrigatoria`, a V12 travava; com `se_disponivel`, a task sem evidência também passava como aviso. A decisão do Flávio foi "não é parâmetro, é escala".
   - **Quando escala:** com a CodeAnt fora (ausente, sem acesso, com erro, fora do prazo, versão não homologada ou pacote que não confere), o próprio `revisar` revisa com o Codex sobre o mesmo snapshot.
   - **Como o Codex é chamado:** o `codex` do `PATH`, só leitura, sem a configuração do usuário, com modelo fixo, pedido fixo e schema, numa tentativa só de até 15 minutos.
-  - **A evidência:** é a v3, com a escala, o revisor e a resposta crua. O `conferir` refaz o pedido e deriva os achados das `issues` do Codex. A severidade não decide: todo achado em linha alterada conta, como na CodeAnt.
+  - **A evidência:** é a v3, com a escala, o revisor, os campos da resposta na forma do schema e o hash do texto que o Codex devolveu. O `conferir` refaz o pedido e deriva os achados das `issues` do Codex. A severidade não decide: todo achado em linha alterada conta, como na CodeAnt.
   - **Com a CodeAnt funcionando:** nada muda, e a evidência continua v2.
   - **Com os dois fora:** `indisponivel:<CodeAnt>+codex-<motivo>`, FALHA em `obrigatoria` e AVISO em `se_disponivel`.
   - **O que não escala:** erro de quem chama, snapshot e cobertura parcial.

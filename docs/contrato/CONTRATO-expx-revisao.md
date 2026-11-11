@@ -83,7 +83,7 @@ Não há parâmetro: vale em `obrigatoria` e em `se_disponivel`. A evidência da
   `se_disponivel`, AVISO. Achado do Codex, evidência inválida e `incompleta` continuam
   FALHA.
 - **Limite aceito.** O Codex não tem perfil nem manifesto como a CodeAnt: a evidência guarda a
-  versão da CLI, o modelo, a resposta crua, o `stdout_sha256` dela e o `prompt_sha256` do
+  versão da CLI, o modelo, os campos da resposta na forma do schema, o `stdout_sha256` do texto devolvido e o `prompt_sha256` do
   pedido, que o `conferir` refaz. Como na CodeAnt, quem edita a evidência edita as `issues`, e
   só o núcleo grava a escala, com o motivo da CodeAnt nela; a defesa é o diff da evidência no PR.
 - **Recusado no desenho:** a escala nas skills, a escala depois de cobertura parcial, repetir
