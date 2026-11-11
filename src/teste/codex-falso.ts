@@ -2,10 +2,11 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * O Codex falso da escala (contrato expx-revisao, "Escala para o Codex"): um script que o núcleo roda pelo `node`
- * quando `EXPX_REVISAO_TESTE_CODEX` aponta para ele, no lugar do `codex` do `PATH`. Responde a `--version`, a
- * `login status` e a `exec`; no `exec`, grava a resposta configurada no arquivo do `-o`. Cada chamada vai para
- * `<base>/chamadas.jsonl`: os argumentos, o `cwd` e o texto recebido no stdin.
+ * O Codex falso da escala (contrato expx-revisao, "Escala para o Codex"), instalado como o `codex` que o núcleo acha no
+ * `PATH`, sem gancho no núcleo: no POSIX, o executável `codex` com o `node` absoluto no shebang; no Windows, o
+ * `codex.cmd` do npm com o alvo `node_modules/@openai/codex/bin/codex.js`, que o núcleo roda pelo `node`. Responde a
+ * `--version`, a `login status` e a `exec`; no `exec`, grava a resposta configurada no arquivo do `-o`. Cada chamada vai
+ * para `<base>/chamadas.jsonl`: os argumentos, o `cwd` e o texto recebido no stdin.
  */
 export interface CfgCodex {
   versao?: string;
@@ -20,8 +21,10 @@ export interface CfgCodex {
 }
 
 export interface Codex {
-  /** O script, para `EXPX_REVISAO_TESTE_CODEX`. */
-  script: string;
+  /** A pasta que vai no `PATH`. */
+  path: string;
+  /** O arquivo que o núcleo roda e mede (o executável no POSIX, o alvo do shim no Windows). */
+  executavel: string;
   dir: string;
 }
 
@@ -31,9 +34,9 @@ export interface ChamadaCodex {
   stdin: string;
 }
 
-const PROGRAMA = `const fs = require("node:fs");
+const programa = (dir: string): string => `const fs = require("node:fs");
 const path = require("node:path");
-const dir = __dirname;
+const dir = ${JSON.stringify(dir)};
 const cfg = JSON.parse(fs.readFileSync(path.join(dir, "cfg.json"), "utf8"));
 const a = process.argv.slice(2);
 if (a[0] === "--version") { process.stdout.write("codex-cli " + (cfg.versao ?? "0.163.0") + "\\n"); process.exit(0); }
@@ -49,10 +52,20 @@ fs.writeFileSync(o, typeof r === "string" ? r : JSON.stringify(r));
 `;
 
 export function instalarCodexFalso(base: string, cfg: CfgCodex = {}): Codex {
-  mkdirSync(base, { recursive: true });
-  const script = join(base, "codex.cjs");
-  writeFileSync(script, PROGRAMA);
-  const codex = { script, dir: base };
+  const path = join(base, "bin");
+  mkdirSync(path, { recursive: true });
+  let executavel: string;
+  if (process.platform === "win32") {
+    const alvo = join(path, "node_modules", "@openai", "codex", "bin");
+    mkdirSync(alvo, { recursive: true });
+    executavel = join(alvo, "codex.js");
+    writeFileSync(executavel, programa(base));
+    writeFileSync(join(path, "codex.cmd"), '@ECHO off\r\n"%_prog%"  "%dp0%\\node_modules\\@openai\\codex\\bin\\codex.js" %*\r\n');
+  } else {
+    executavel = join(path, "codex");
+    writeFileSync(executavel, `#!${process.execPath}\n${programa(base)}`, { mode: 0o755 });
+  }
+  const codex = { path, executavel, dir: base };
   configurarCodex(codex, cfg);
   return codex;
 }

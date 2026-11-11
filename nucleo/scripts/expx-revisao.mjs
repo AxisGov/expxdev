@@ -337,37 +337,49 @@ const issuesDoCodex = (issues) => issues.map((i) => ({ relevant_file: i.arquivo,
 const versaoDoRevisor = (r) => `codex:${r.versao}:${r.modelo}:${r.formato}`;
 const mesmosArquivos = (a, b) => Array.isArray(a) && a.length === b.length && new Set(a).size === a.length && b.every((f) => a.includes(f));
 const sha256 = (b) => createHash("sha256").update(b).digest("hex");
-// EXPX_REVISAO_TESTE_CODEX é só para teste: o script do Codex falso, rodado pelo `node`, no lugar do `codex` do PATH;
-// caminho relativo ou que não existe é o Codex ausente. Com ela definida, o `codex` do PATH nunca roda.
-function codexRoda(a, opcoes) {
-  const falso = process.env.EXPX_REVISAO_TESTE_CODEX;
-  if (falso === undefined) {
-    const r = spawnSync("codex", a, opcoes);
-    // `codex` sem extensão só acha `.com`/`.exe` (ENOENT); um `.cmd` que o Node chegue a resolver sem shell dá EINVAL
-    const shim = ["ENOENT", "EINVAL"].includes(r.error?.code) ? codexDoShim() : undefined;
-    return shim ? spawnSync(process.execPath, [shim, ...a], opcoes) : r;
-  }
-  if (!isAbsolute(falso) || !existsSync(falso)) return { error: { code: "ENOENT" } };
-  return spawnSync(process.execPath, [falso, ...a], opcoes);
-}
-/** No Windows, o npm instala o `codex.cmd`, que o `spawnSync` sem shell não roda: o alvo do primeiro shim do `PATH`
- *  (`node_modules/@openai/codex/...`), que roda pelo `node`, ou undefined. */
-function codexDoShim() {
-  if (process.platform !== "win32") return undefined;
-  const path = Object.entries(process.env).find(([k]) => k.toUpperCase() === "PATH")?.[1] ?? "";
-  for (const d of path.split(";").filter(Boolean)) {
+/** O `codex` que o shell rodaria, achado aqui para rodar e medir o mesmo arquivo: o primeiro do `PATH` (no POSIX, o
+ *  `codex` executável; no Windows, `codex.com` ou `codex.exe`, senão o alvo do `codex.cmd` do npm,
+ *  `node_modules/@openai/codex/...`, que roda pelo `node`, como a CodeAnt). `{exe, antes, caminho}` (`caminho` real, o
+ *  que se mede) ou undefined. Não há gancho de teste (conselhos#315): o teste põe o falso no `PATH`. */
+function localizarCodex() {
+  const win = process.platform === "win32";
+  const path = Object.entries(process.env).find(([k]) => (win ? k.toUpperCase() === "PATH" : k === "PATH"))?.[1] ?? "";
+  const real = (f) => { try { return realpathSync(f); } catch { return undefined; } };
+  const executavel = (f) => { try { const e = statSync(f); return e.isFile() && (win || (e.mode & 0o111) !== 0); } catch { return false; } };
+  for (const d of path.split(win ? ";" : ":").filter(Boolean)) {
+    for (const nome of win ? ["codex.com", "codex.exe"] : ["codex"]) {
+      const f = join(d, nome);
+      if (executavel(f) && real(f)) return { exe: real(f), antes: [], caminho: real(f) };
+    }
+    if (!win) continue;
     let texto;
     try { texto = readFileSync(join(d, "codex.cmd"), "utf8"); } catch { continue; }
     const m = /node_modules[\\/]@openai[\\/]codex[\\/]([^"'\s%]+)/.exec(texto);
-    const alvo = m && join(d, "node_modules", "@openai", "codex", ...m[1].split(/[\\/]/));
-    return alvo && existsSync(alvo) ? alvo : undefined;
+    const alvo = m && real(join(d, "node_modules", "@openai", "codex", ...m[1].split(/[\\/]/)));
+    return alvo ? { exe: process.execPath, antes: [alvo], caminho: alvo } : undefined;
   }
+}
+/** sha256 do arquivo, lido em blocos (o binário do Codex passa de 100 MB), ou undefined. */
+function sha256DoArquivo(f) {
+  let fd;
+  try {
+    fd = openSync(f, "r");
+    const h = createHash("sha256");
+    const bloco = Buffer.alloc(1 << 20);
+    for (let n; (n = readSync(fd, bloco, 0, bloco.length, null)) > 0;) h.update(bloco.subarray(0, n));
+    return h.digest("hex");
+  } catch { return undefined; } finally { if (fd !== undefined) closeSync(fd); }
 }
 /** O Codex revisa o snapshot: `{motivo}` (`codex-*`, nada revisado) ou `{versao, pedido, bruto, resposta}`, com
  *  `resposta` undefined se a saída não é o JSON do schema. Uma tentativa só, no prazo da CLI. */
 function codexRevisa(raiz, base, enviados) {
+  const loc = localizarCodex();
+  if (!loc) return { motivo: "codex-ausente" };
+  // o arquivo medido é o que roda: o caminho real, achado uma vez
+  const executavel = { caminho: loc.caminho, sha256: sha256DoArquivo(loc.caminho) };
+  if (!executavel.sha256) return { motivo: "codex-erro" };
+  const codexRoda = (a, opcoes) => spawnSync(loc.exe, [...loc.antes, ...a], opcoes);
   const versao = codexRoda(["--version"], { encoding: "utf8", timeout: 60_000, killSignal: "SIGKILL" });
-  if (versao.error?.code === "ENOENT") return { motivo: "codex-ausente" };
   const v = /\d+\.\d+\.\d+\S*/.exec(String(versao.stdout ?? ""))?.[0];
   if (versao.error || versao.status !== 0 || !v) return { motivo: "codex-erro" };
   const login = codexRoda(["login", "status"], { encoding: "utf8", timeout: 60_000, killSignal: "SIGKILL" });
@@ -389,7 +401,7 @@ function codexRevisa(raiz, base, enviados) {
     try { bruto = readFileSync(saida); } catch { return { motivo: "codex-saida-invalida" }; }
     let resposta;
     try { resposta = respostaDoCodex(JSON.parse(bruto.toString("utf8"))); } catch { /* texto livre */ }
-    return { versao: v, pedido, bruto, resposta };
+    return { versao: v, executavel, pedido, bruto, resposta };
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 /** O JSON da CLI: do primeiro `{` que dá JSON até o último `}` (o npm pode avisar antes e depois). */
@@ -632,7 +644,7 @@ function revisar() {
   const anterior = le(caminhoEv(op.task));
   // o HEAD da revisão: sem `--base-commit`, as linhas alteradas são as do checkout desde ele (o `conferir` as refaz até o commit)
   const headDaRevisao = idDe("rev-parse", "--verify", "-q", "HEAD^{commit}") ?? null;
-  const ev = { expx_revisao: 2, derivacao: 2, trabalho: op.trabalho, task: op.task, modo: base ? "base-commit" : "uncommitted", base_commit: base, head: headDaRevisao, cli: null,
+  const ev = { expx_revisao: 2, derivacao: 3, trabalho: op.trabalho, task: op.task, modo: base ? "base-commit" : "uncommitted", base_commit: base, head: headDaRevisao, cli: null,
     executada_em: new Date().toISOString(), arquivos: {}, chamada: null, resultado: "ok", achados: [],
     rejeicoes: Array.isArray(anterior?.rejeicoes) ? anterior.rejeicoes : [], removidos_sem_revisao: [] };
   const fim = (resultado, motivo) => Object.assign(ev, { resultado, motivo });
@@ -672,8 +684,10 @@ function revisar() {
     return true;
   };
   /** 10. O que foi revisado é o que vai ao commit, e os achados das `issues` (na forma da CodeAnt) do revisor `versao`. */
-  const concluir = (issues, versao, estrito = false) => {
-    for (const f of enviados) {
+  const concluir = (issues, versao) => {
+    // todo arquivo presente da task, não só os enviados: o `sem-alteracao` que muda durante a chamada gravaria o blob da
+    // partida (conselhos#312)
+    for (const f of presentes) {
       const m = medida(f);
       if (!m || ["blob", "bytes", "linhas", "disco"].some((k) => m[k] !== medidas[f][k])) return fim("indisponivel", "arquivo-mudou-durante-revisao");
     }
@@ -682,7 +696,7 @@ function revisar() {
     // derivação 2: do blob da partida ao blob que vai ao commit, os mesmos do `conferir`, que não dependem do checkout
     const partida = base ?? headDaRevisao;
     ev.achados = derivar(issues, ev.arquivos, versao,
-      movidasPor(Object.keys(ev.arquivos), (f) => (partida ? blobEm(partida, f) : undefined), (f) => ev.arquivos[f]?.blob ?? undefined), lido, estrito)
+      movidasPor(Object.keys(ev.arquivos), (f) => (partida ? blobEm(partida, f) : undefined), (f) => ev.arquivos[f]?.blob ?? undefined), lido, ev.derivacao)
       .map((a) => ({ ...a, estado: rejeitadas.has(a.identidade) ? "rejeitado" : a.estado }));
     if (ev.achados.some((a) => a.estado === "aberto")) ev.resultado = "achados";
     return undefined;
@@ -695,7 +709,7 @@ function revisar() {
     process.stderr.write(`expx-revisao: CodeAnt fora (${motivo}): a revisao escala para o Codex\n`);
     const cx = codexRevisa(raizRevisao, baseDoPedido(ev), enviados);
     if (cx.motivo) return fim("indisponivel", `${motivo}+${cx.motivo}`);
-    ev.revisor = { nome: "codex", versao: cx.versao, modelo: MODELO_CODEX, formato: FORMATO_CODEX };
+    ev.revisor = { nome: "codex", versao: cx.versao, modelo: MODELO_CODEX, formato: FORMATO_CODEX, executavel: cx.executavel };
     ev.chamada_codex = { include: enviados, arquivos_revisados: cx.resposta?.arquivos_revisados ?? null, issues: cx.resposta?.issues ?? null,
       stdout_sha256: sha256(cx.bruto), prompt_sha256: sha256(cx.pedido) };
     // texto livre, fora do schema, sem a task inteira ou com issue fora dela (nunca se lê um caminho que o modelo inventou,
@@ -703,7 +717,7 @@ function revisar() {
     if (!cx.resposta || !mesmosArquivos(cx.resposta.arquivos_revisados, enviados) || !issuesNaTask(cx.resposta.issues, enviados)) {
       return fim("indisponivel", `${motivo}+codex-saida-invalida`);
     }
-    return concluir(issuesDoCodex(cx.resposta.issues), versaoDoRevisor(ev.revisor), true);
+    return concluir(issuesDoCodex(cx.resposta.issues), versaoDoRevisor(ev.revisor));
   };
   try { (() => {
     // 1. o pedido não se revisa como está
@@ -796,21 +810,23 @@ function rejeitadasDoTrabalho() {
 /** Os achados das `issues` da CLI, sem rejeição: `aberto` (linha alterada) ou `anterior`. `alt(f)` dá as linhas alteradas
  *  de um arquivo da task (Set, ou `true` para todas) e `texto(f)` o conteúdo (ou ""). A mesma regra no `revisar` (checkout)
  *  e no `conferir` (commit da task), para que `achados` seja derivável das `issues` gravadas. */
-function derivar(issues, arquivos, versao, alt, texto, estrito = false) {
+function derivar(issues, arquivos, versao, alt, texto, derivacao = 1) {
   const cache = new Map();
   return issues.map((i) => {
     const arquivo = caminho(String(i.relevant_file ?? ""));
     const linha = Number(i.start_line);
-    if (!cache.has(arquivo)) cache.set(arquivo, { alt: Object.hasOwn(arquivos, arquivo) ? alt(arquivo) : new Set(), linhas: texto(arquivo).split(/\r?\n/) });
+    // na 3, o arquivo fora da task nunca é lido: o caminho vem do revisor (`../../dev/zero` travava a leitura)
+    const daTask = Object.hasOwn(arquivos, arquivo);
+    if (!cache.has(arquivo)) cache.set(arquivo, { alt: daTask ? alt(arquivo) : new Set(), linhas: daTask || derivacao < 3 ? texto(arquivo).split(/\r?\n/) : [] });
     const c = cache.get(arquivo);
     const viz = [linha - 2, linha - 1, linha].map((k) => (c.linhas[k] ?? "").trim());
     const label = String(i.label ?? "");
     const identidade = createHash("sha256").update([label, arquivo, ...viz, versao].join("\0")).digest("hex");
     // Achado que não se liga a uma linha de um arquivo da task não pode ser dado por anterior: fica aberto.
-    // `estrito` (o Codex): a linha além do fim do arquivo também não se liga a nada. A CodeAnt fica como sempre, porque mudar a
-    // regra dela mudaria os achados das evidências v2 já gravadas
+    // na 3, a linha além do fim do arquivo também não se liga a nada. A 1 e a 2 ficam como eram: mudá-las mudaria os achados
+    // das evidências já gravadas
     const ultima = c.linhas.length - (c.linhas.at(-1) === "" ? 1 : 0);
-    const semVinculo = !Object.hasOwn(arquivos, arquivo) || !Number.isSafeInteger(linha) || linha < 1 || (estrito && linha > ultima);
+    const semVinculo = !daTask || !Number.isSafeInteger(linha) || linha < 1 || (derivacao >= 3 && linha > ultima);
     return { identidade, arquivo, linha, label, texto: String(i.issue_content ?? ""), estado: semVinculo || c.alt === true || c.alt.has(linha) ? "aberto" : "anterior" };
   });
 }
@@ -868,7 +884,8 @@ function semSinalDaCli(ev, sha) {
  *  schema), L1, L2 pelo perfil homologado e a cobertura (`include` e `arquivos_revisados` iguais aos enviados). */
 function semSinalDoCodex(ev, sha, enviados, perfil) {
   const r = ev.revisor;
-  if (!ehMapa(r) || r.nome !== "codex" || typeof r.versao !== "string" || r.modelo !== MODELO_CODEX || r.formato !== FORMATO_CODEX) return "revisor";
+  if (!ehMapa(r) || r.nome !== "codex" || typeof r.versao !== "string" || r.modelo !== MODELO_CODEX || r.formato !== FORMATO_CODEX
+    || !ehMapa(r.executavel) || typeof r.executavel.caminho !== "string" || r.executavel.caminho === "" || !/^[0-9a-f]{64}$/.test(r.executavel.sha256)) return "revisor";
   const ch = ev.chamada_codex;
   if (!ehMapa(ch) || !Array.isArray(ch.include) || !ch.include.every((f) => typeof f === "string")
     || !respostaDoCodex({ arquivos_revisados: ch.arquivos_revisados, issues: ch.issues }) || !issuesNaTask(ch.issues, enviados)
@@ -947,8 +964,8 @@ function avaliar(task, sha) {
     || (ev.resultado === "indisponivel" && !["snapshot", "arquivo-mudou-durante-revisao", ...MOTIVOS_CODEX.map((m) => `${ev.escala.motivo}+${m}`)].includes(ev.motivo)))) {
     return falha("evidencia-invalida:escala");
   }
-  // ausente é a 1 (a evidência de antes da 0.13.26); só o inteiro 1 ou 2
-  if (Object.hasOwn(ev, "derivacao") && ev.derivacao !== 1 && ev.derivacao !== 2) return falha("evidencia-invalida:derivacao");
+  // ausente é a 1 (a evidência de antes da 0.13.26); só o inteiro 1, 2 ou 3 (a 3 desde a 0.14.1)
+  if (Object.hasOwn(ev, "derivacao") && ![1, 2, 3].includes(ev.derivacao)) return falha("evidencia-invalida:derivacao");
   const concluida = ["ok", "achados"].includes(ev.resultado);
   if (concluida && semData(ev)) return falha("evidencia-invalida:executada_em");
   for (const [f, a] of Object.entries(ev.arquivos)) {
@@ -1012,10 +1029,10 @@ function achadosDivergem(ev, sha) {
     const de = ev.modo === "base-commit" ? ev.base_commit : ev.head;
     const texto = (f) => (blobGit(`${sha}:./${f}`) ?? Buffer.alloc(0)).toString("utf8");
     // a regra da evidência, não a deste script: sem `derivacao`, a 1 (o diff por arquivo, sem trecho movido)
-    const alt = ev.derivacao === 2 ? movidasPor(Object.keys(ev.arquivos), (f) => blobEm(de, f), (f) => blobEm(sha, f)) : (f) => alteradas(f, de, sha);
+    const alt = ev.derivacao >= 2 ? movidasPor(Object.keys(ev.arquivos), (f) => blobEm(de, f), (f) => blobEm(sha, f)) : (f) => alteradas(f, de, sha);
     // pelo JSON, como foi gravado (`NaN` vira `null`)
     const [issues, versao] = ev.expx_revisao === 3 ? [issuesDoCodex(ev.chamada_codex.issues), versaoDoRevisor(ev.revisor)] : [ev.chamada.issues, ev.cli.versao];
-    derivados = JSON.parse(JSON.stringify(derivar(issues, ev.arquivos, versao, alt, texto, ev.expx_revisao === 3)));
+    derivados = JSON.parse(JSON.stringify(derivar(issues, ev.arquivos, versao, alt, texto, ev.derivacao ?? 1)));
   }
   const rejeitadas = rejeicoesNoCommit(ev, sha);
   if (ev.achados.length !== derivados.length || derivados.some((d, k) => {
