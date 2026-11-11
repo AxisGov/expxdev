@@ -2104,6 +2104,15 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
     expect(chamadasDoCodex(codex)[0]?.nodeOptions).toBeNull();
   });
 
+  it("funcional: o Codex não herda nenhuma LD_* nem DYLD_* (LD_LIBRARY_PATH, DYLD_FRAMEWORK_PATH...), e o resto do ambiente passa (CodeAnt no katosmv/login#83)", () => {
+    const { c, codex, rev } = escala({ resposta: resposta() });
+    altera3(c.raiz);
+    const fora = temp("expx-libs-");
+    const r = rev("src/a.js", [], { LD_LIBRARY_PATH: fora, LD_QUALQUER: fora, DYLD_FRAMEWORK_PATH: fora, DYLD_FALLBACK_LIBRARY_PATH: fora, HTTPS_PROXY: "http://proxy.exemplo.invalid:3128" });
+    expect(r.rc).toBe(0);
+    expect(chamadasDoCodex(codex)[0]?.ambiente).toEqual({ HTTPS_PROXY: "http://proxy.exemplo.invalid:3128" });
+  });
+
   it.skipIf(process.platform === "win32")("funcional: fora do Windows, o `codex` com `#!/usr/bin/env node` roda pelo node do núcleo, nunca pelo `node` do PATH (Codex no #315)", () => {
     const c = cenario();
     const codex = instalarCodexFalso(temp("expx-codex-"), { resposta: resposta() }, "env");

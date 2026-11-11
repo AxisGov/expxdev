@@ -39,6 +39,8 @@ export interface ChamadaCodex {
   stdin: string;
   /** O `NODE_OPTIONS` que o Codex recebeu, ou null. */
   nodeOptions: string | null;
+  /** As variáveis `LD_*`, `DYLD_*`, `NODE_OPTIONS`, `NODE_PATH` e `HTTPS_PROXY` que o Codex recebeu. */
+  ambiente: Record<string, string>;
 }
 
 const programa = (dir: string): string => `const fs = require("node:fs");
@@ -50,7 +52,8 @@ if (a[0] === "--version") { process.stdout.write("codex-cli " + (cfg.versao ?? "
 if (a[0] === "login" && a[1] === "status") process.exit(cfg.logado === false ? 1 : 0);
 if (a[0] !== "exec") process.exit(2);
 const stdin = fs.readFileSync(0, "utf8");
-fs.appendFileSync(path.join(dir, "chamadas.jsonl"), JSON.stringify({ args: a, cwd: process.cwd(), stdin, nodeOptions: process.env.NODE_OPTIONS ?? null }) + "\\n");
+fs.appendFileSync(path.join(dir, "chamadas.jsonl"), JSON.stringify({ args: a, cwd: process.cwd(), stdin, nodeOptions: process.env.NODE_OPTIONS ?? null,
+  ambiente: Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(LD_|DYLD_|NODE_OPTIONS$|NODE_PATH$|HTTPS_PROXY$)/i.test(k))) }) + "\\n");
 if (cfg.alteraSiMesmo) fs.appendFileSync(__filename, "\\n// trocado durante a revisao\\n");
 if (cfg.dorme) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, cfg.dorme);
 if (cfg.saida) process.exit(cfg.saida);
