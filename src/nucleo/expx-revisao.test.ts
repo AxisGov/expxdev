@@ -9,6 +9,7 @@ import { ambienteCom, noPath, RAIZ_DO_REPO } from "../teste/candidatos.js";
 import { arquivosDoCaso, respostaDoCaso, type CasoConformidade } from "../teste/conformidade.js";
 import { chamadasDa, configurarFalsa, instalarCodeantFalsa, nucleoDeTeste, type CfgFalsa, type Falsa } from "../teste/codeant-falsa.js";
 import { suportaNomeComCaractereReservado, suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
+import { chamadasDoCodex, instalarCodexFalso, type CfgCodex } from "../teste/codex-falso.js";
 
 // `nucleo/scripts/expx-revisao.mjs`. A CLI do CodeAnt nunca é chamada de verdade: uma `codeant` falsa, instalada
 // como pacote npm, vem antes no PATH, responde um JSON e registra os argumentos recebidos.
@@ -73,7 +74,7 @@ describe("expx-revisao.mjs revisar: a CLI conferida", () => {
     const c = cenario();
     altera3(c.raiz);
     const r = revisar(c, "src/a.js", "T-01", undefined, {}, SCRIPT);
-    expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "integridade" } });
+    expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "integridade+codex-ausente" } });
     expect(r.chamadas).toEqual([]);
   });
 
@@ -82,7 +83,7 @@ describe("expx-revisao.mjs revisar: a CLI conferida", () => {
     altera3(c.raiz);
     writeFileSync(join(c.falsa.pacote, "README.md"), "trocado\n");
     const r = revisar(c, "src/a.js");
-    expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "integridade" } });
+    expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "integridade+codex-ausente" } });
     expect(r.chamadas).toEqual([]);
   });
 
@@ -90,14 +91,14 @@ describe("expx-revisao.mjs revisar: a CLI conferida", () => {
     const c = cenario({ versao: "0.5.15" });
     altera3(c.raiz);
     const r = revisar(c, "src/a.js");
-    expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "versao" } });
+    expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "versao+codex-ausente" } });
     expect(r.chamadas).toEqual([]);
   });
 
   it("funcional: PATH sem codeant → indisponivel:cli-ausente", () => {
     const c = cenario();
     altera3(c.raiz);
-    expect(revisar(c, "src/a.js", "T-01", dirname(noPath("git") ?? ""))).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "cli-ausente" } });
+    expect(revisar(c, "src/a.js", "T-01", dirname(noPath("git") ?? ""))).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "cli-ausente+codex-ausente" } });
   });
 
   it("funcional: a CLI roda pelo node no arquivo conferido, não pelo shim nem pelo link", () => {
@@ -157,7 +158,8 @@ describe("expx-revisao.mjs revisar", () => {
   ])("funcional: %s → indisponivel (rc 2) com motivo", (nome, cfg, motivo) => {
     const c = cenario(cfg);
     altera3(c.raiz);
-    expect(revisar(c, "src/a.js", "T-01", nome === "CLI ausente" ? dirname(noPath("git") ?? "") : undefined)).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo } });
+    // sem o Codex (o ausente do ambiente de teste), a escala também não revisa: os dois motivos
+    expect(revisar(c, "src/a.js", "T-01", nome === "CLI ausente" ? dirname(noPath("git") ?? "") : undefined)).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: `${motivo}+codex-ausente` } });
   });
 
   it("funcional: --arquivos sem nenhum caminho (`,,`) é uso errado, nunca ok", () => {
@@ -627,7 +629,7 @@ describe("expx-revisao.mjs revisar v2: depois da CLI", () => {
   it("funcional: os 403 cobrem todos os enviados, sem achado → indisponivel:acesso-negado (rc 2), mesmo com o reviewed_files cheio", () => {
     const c = cenario({ stderr: `[progress] Fetching diff...\n${negado("src/a.js, src/a.js, src/b.js")}\n${negado("src/b.js")}\n`, resposta: resp({ reviewed_files: ["src/a.js", "src/b.js"], total_changed: 2 }) });
     doisArquivos(c.raiz);
-    expect(revisar(c, "src/a.js,src/b.js")).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "acesso-negado" } });
+    expect(revisar(c, "src/a.js,src/b.js")).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "acesso-negado+codex-ausente" } });
   });
 
   it("funcional: os 403 não cobrem um dos enviados → continua incompleta:lote-falhou, porque ele pode ter sido revisado", () => {
@@ -655,8 +657,8 @@ describe("expx-revisao.mjs revisar v2: depois da CLI", () => {
     altera3(c.raiz);
     revisar(c, "src/a.js", "T-01");
     const sha = commita(c.raiz);
-    expect(conferir(c.raiz, "se_disponivel", `T-01=${sha}`)).toMatchObject({ rc: 3, out: "T-01 AVISO indisponivel:acesso-negado" });
-    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA indisponivel:acesso-negado" });
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${sha}`)).toMatchObject({ rc: 3, out: "T-01 AVISO indisponivel:acesso-negado+codex-ausente" });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA indisponivel:acesso-negado+codex-ausente" });
   });
 
   it("borda: o Risk planner que falha só degrada a revisão, e ela segue", () => {
@@ -1193,9 +1195,9 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     const c = cenario();
     altera3(c.raiz);
     revisar(c, "src/a.js", "T-01", dirname(noPath("git") ?? ""));
-    expect(evidencia(c.raiz)).toMatchObject({ resultado: "indisponivel", motivo: "cli-ausente", cli: null, chamada: null });
+    expect(evidencia(c.raiz)).toMatchObject({ resultado: "indisponivel", motivo: "cli-ausente+codex-ausente", cli: null, chamada: null });
     escreve(c.raiz, EV, JSON.stringify({ ...(evidencia(c.raiz) as object), executada_em: undefined }));
-    expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 3, out: "T-01 AVISO indisponivel:cli-ausente" });
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 3, out: "T-01 AVISO indisponivel:cli-ausente+codex-ausente" });
   });
 
   it("funcional: indisponivel é FALHA em obrigatoria e AVISO em se_disponivel", () => {
@@ -1203,8 +1205,8 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     altera3(c.raiz);
     revisar(c, "src/a.js");
     const sha = commita(c.raiz);
-    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA indisponivel:erro" });
-    expect(conferir(c.raiz, "se_disponivel", `T-01=${sha}`)).toMatchObject({ rc: 3, out: "T-01 AVISO indisponivel:erro" });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA indisponivel:erro+codex-ausente" });
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${sha}`)).toMatchObject({ rc: 3, out: "T-01 AVISO indisponivel:erro+codex-ausente" });
   });
 
   it("funcional: achado aberto reprova; rejeitar um achado aberto faz conferir passar", () => {
@@ -1868,7 +1870,7 @@ describe("expx-revisao.mjs conferir: evidência que não se lê e base_commit qu
     altera3(c.raiz);
     revisar(c, "src/a.js", "T-01", semCodeant());
     const ev = evidencia(c.raiz) as Record<string, any>;
-    expect(ev).toMatchObject({ resultado: "indisponivel", motivo: "cli-ausente" });
+    expect(ev).toMatchObject({ resultado: "indisponivel", motivo: "cli-ausente+codex-ausente" });
     escreve(c.raiz, EV, JSON.stringify({ ...ev, modo: "base-commit", base_commit: "0".repeat(40) }));
     expect(conferir(c.raiz, "se_disponivel", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:cobertura" });
   });
@@ -1883,7 +1885,7 @@ describe("expx-revisao.mjs: correções P1 do Login (falha fechada)", () => {
     expect(Date.now() - inicio).toBeLessThan(15_000);
     expect(r.rc).toBe(2);
     expect(r.ev.resultado).toBe("indisponivel");
-    expect(r.ev.motivo).toBe("tempo-esgotado");
+    expect(r.ev.motivo).toBe("tempo-esgotado+codex-ausente");
   });
 
   it.each([
@@ -1906,5 +1908,151 @@ describe("expx-revisao.mjs: correções P1 do Login (falha fechada)", () => {
     const fonte = readFileSync(SCRIPT, "utf8");
     const depoisDoVeredito = [...fonte.matchAll(/process\.stdout\.write\(`\$\{(?:op\.task|linhas\.join)[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*(process\.[a-zA-Z]+)/g)].map((m) => m[1]);
     expect(depoisDoVeredito).toEqual(["process.exitCode", "process.exitCode"]);
+  });
+});
+
+describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
+  it("estrutural: o ambiente de teste nunca deixa o núcleo chamar o `codex` do PATH (EXPX_REVISAO_TESTE_CODEX definida e ausente)", () => {
+    const falso = process.env["EXPX_REVISAO_TESTE_CODEX"];
+    expect(falso).toBeTruthy();
+    expect(existsSync(falso ?? "")).toBe(false);
+  });
+
+  const SEM_CODEANT = dirname(noPath("git") ?? "");
+  /** O cenário com o Codex falso (`cfg`); `codeant` dá a falsa da CodeAnt, ou nenhuma no PATH. */
+  function escala(cfg: CfgCodex, codeant: CfgFalsa | null = null) {
+    const c = cenario(codeant ?? {});
+    const codex = instalarCodexFalso(temp("expx-codex-"), cfg);
+    const env = { EXPX_REVISAO_TESTE_CODEX: codex.script };
+    const rev = (arquivos = "src/a.js", mais: string[] = []) => revisar(c, arquivos, "T-01", codeant ? undefined : SEM_CODEANT, env, c.script, mais);
+    return { c, codex, rev };
+  }
+  const resposta = (issues: object[] = [], revisados = ["src/a.js"]) => ({ arquivos_revisados: revisados, issues });
+  const doCodex = (arquivo: string, linha: number, mensagem = "defeito") => ({ arquivo, linha, severidade: "alta", mensagem });
+
+  it("funcional: CodeAnt ausente → o Codex revisa: evidência v3 com a escala, achado em linha alterada aberto; conferir e rejeitar como sempre", () => {
+    const { c, codex, rev } = escala({ resposta: resposta([doCodex("src/a.js", 3), doCodex("src/a.js", 1)]) });
+    altera3(c.raiz);
+    const r = rev();
+    expect(r.rc).toBe(1);
+    expect(r.out).toContain("T-01 achados");
+    expect(r.ev).toMatchObject({ expx_revisao: 3, resultado: "achados", escala: { de: "codeant", motivo: "cli-ausente" },
+      revisor: { nome: "codex", versao: "0.163.0", formato: 1 }, chamada_codex: { include: ["src/a.js"], arquivos_revisados: ["src/a.js"] } });
+    expect(r.ev.achados.map((a) => `${a.linha}=${a.estado}`)).toEqual(["3=aberto", "1=anterior"]);
+    expect(chamadasDoCodex(codex)).toHaveLength(1);
+    const sha = commita(c.raiz);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
+    expect(roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", r.ev.achados[0]?.identidade ?? "", "--motivo", "fp").out).toBe("T-01 ok");
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it("funcional: a chamada do Codex: só leitura, sem configuração do usuário, modelo fixo, schema, sobre o snapshot; o pedido nomeia os arquivos e a base", () => {
+    const { c, codex, rev } = escala({ resposta: resposta() });
+    altera3(c.raiz);
+    expect(rev().rc).toBe(0);
+    const [ch] = chamadasDoCodex(codex);
+    const a = ch?.args ?? [];
+    expect(a.slice(0, 3)).toEqual(["exec", "--ephemeral", "--ignore-user-config"]);
+    expect(a[a.indexOf("-s") + 1]).toBe("read-only");
+    expect(a[a.indexOf("-m") + 1]).toMatch(/\S/);
+    expect(a).toContain("--output-schema");
+    expect(a.at(-1)).toBe("-");
+    expect(a[a.indexOf("-C") + 1]).toContain("expx-revisao-snapshot-");
+    expect(ch?.cwd).toContain("expx-revisao-snapshot-");
+    expect(ch?.stdin).toContain("src/a.js");
+    expect(ch?.stdin).toContain("HEAD");
+  });
+
+  it("funcional: CodeAnt com erro (JSON com error) → o Codex revisa", () => {
+    const { c, rev } = escala({ resposta: resposta() }, { error: "falhou" });
+    altera3(c.raiz);
+    expect(rev()).toMatchObject({ rc: 0, ev: { expx_revisao: 3, resultado: "ok", escala: { de: "codeant", motivo: "erro" } } });
+  });
+
+  it("funcional: CodeAnt com o pacote editado (integridade) → o Codex revisa", () => {
+    const { c, rev } = escala({ resposta: resposta() }, {});
+    writeFileSync(c.falsa.bin, `${readFileSync(c.falsa.bin, "utf8")}\n// editado\n`);
+    altera3(c.raiz);
+    expect(rev()).toMatchObject({ rc: 0, ev: { expx_revisao: 3, resultado: "ok", escala: { de: "codeant", motivo: "integridade" } } });
+  });
+
+  it("funcional: CodeAnt que funciona → o Codex nunca é chamado, e a evidência continua v2", () => {
+    const { c, codex, rev } = escala({ resposta: resposta() }, {});
+    altera3(c.raiz);
+    expect(rev()).toMatchObject({ rc: 0, ev: { expx_revisao: 2, resultado: "ok" } });
+    expect(rev().ev).not.toHaveProperty("escala");
+    expect(chamadasDoCodex(codex)).toHaveLength(0);
+  });
+
+  it("funcional: o que não é indisponibilidade da CodeAnt não escala (incompleta, arquivo não commitado)", () => {
+    const um = escala({ resposta: resposta() }, { stderr: "[error] lote" });
+    altera3(um.c.raiz);
+    expect(um.rev()).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "lote-falhou" } });
+    expect(chamadasDoCodex(um.codex)).toHaveLength(0);
+    const dois = escala({ resposta: resposta() });
+    const base = git(dois.c.raiz, "rev-parse", "HEAD");
+    altera3(dois.c.raiz);
+    expect(dois.rev("src/a.js", ["--base-commit", base])).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "arquivo-nao-commitado:src/a.js" } });
+    expect(chamadasDoCodex(dois.codex)).toHaveLength(0);
+  });
+
+  it.each<[string, CfgCodex | null, string]>([
+    ["ausente", null, "codex-ausente"],
+    ["sem login", { logado: false }, "codex-sem-login"],
+    ["que sai com erro", { saida: 3 }, "codex-erro"],
+    ["com texto livre", { resposta: "Revisei e está tudo certo." }, "codex-saida-invalida"],
+    ["fora do schema", { resposta: { arquivos_revisados: ["src/a.js"], issues: [{ arquivo: "src/a.js", linha: "3", mensagem: "x" }] } }, "codex-saida-invalida"],
+    ["que não revisou a task inteira", { resposta: { arquivos_revisados: [], issues: [] } }, "codex-saida-invalida"],
+  ])("funcional: CodeAnt e Codex %s fora → indisponivel:<CodeAnt>+<Codex> (rc 2), FALHA em obrigatoria e AVISO em se_disponivel", (_n, cfg, codexMotivo) => {
+    const { c, codex } = escala(cfg ?? {});
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js", "T-01", SEM_CODEANT, { EXPX_REVISAO_TESTE_CODEX: cfg === null ? join(codex.dir, "nao-existe.cjs") : codex.script });
+    expect(r.rc).toBe(2);
+    expect(r.out.trim()).toBe(`T-01 indisponivel:cli-ausente+${codexMotivo}`);
+    expect(r.ev).toMatchObject({ expx_revisao: 3, resultado: "indisponivel", motivo: `cli-ausente+${codexMotivo}`, escala: { de: "codeant", motivo: "cli-ausente" }, achados: [] });
+    const sha = commita(c.raiz);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 1, out: `T-01 FALHA indisponivel:cli-ausente+${codexMotivo}` });
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${sha}`)).toMatchObject({ rc: 3, out: `T-01 AVISO indisponivel:cli-ausente+${codexMotivo}` });
+  });
+
+  it("funcional: Codex que não responde no tempo → codex-tempo-esgotado, sem esperar ele terminar", () => {
+    const { c, codex } = escala({ dorme: 20_000, resposta: resposta() });
+    altera3(c.raiz);
+    const inicio = Date.now();
+    const r = revisar(c, "src/a.js", "T-01", SEM_CODEANT, { EXPX_REVISAO_TESTE_CODEX: codex.script, EXPX_REVISAO_TESTE_TEMPO_CLI: "500" });
+    expect(Date.now() - inicio).toBeLessThan(15_000);
+    expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "cli-ausente+codex-tempo-esgotado" } });
+  });
+
+  it("funcional: conferir recusa a evidência v3 adulterada", () => {
+    const { c, rev } = escala({ resposta: resposta([doCodex("src/a.js", 3)]) });
+    altera3(c.raiz);
+    rev();
+    const original = evidencia(c.raiz) as Record<string, Record<string, unknown>>;
+    const casos: [string, (ev: Record<string, Record<string, unknown>>) => void][] = [
+      ["evidencia-invalida:escala", (ev) => { ev["escala"] = { de: "codeant", motivo: "lote-falhou" }; }],
+      ["evidencia-invalida:escala", (ev) => { ev["escala"] = { de: "codeant", motivo: "arquivo-nao-commitado:src/a.js" }; }],
+      ["evidencia-invalida:revisor", (ev) => { ev["revisor"] = { ...ev["revisor"], nome: "outro" }; }],
+      ["evidencia-invalida:chamada", (ev) => { ev["chamada_codex"] = { ...ev["chamada_codex"], prompt_sha256: "0".repeat(64) }; }],
+      ["evidencia-invalida:cobertura", (ev) => { ev["chamada_codex"] = { ...ev["chamada_codex"], arquivos_revisados: [] }; }],
+      ["evidencia-invalida:achados", (ev) => { (ev["achados"] as unknown as { estado: string }[])[0]!.estado = "anterior"; }],
+    ];
+    for (const [esperado, muda] of casos) {
+      const ev = JSON.parse(JSON.stringify(original)) as Record<string, Record<string, unknown>>;
+      muda(ev);
+      escreve(c.raiz, EV, JSON.stringify(ev));
+      expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`).out, esperado).toBe(`T-01 FALHA ${esperado}`);
+    }
+  });
+
+  it("funcional: com --base-commit, o pedido nomeia o base_commit, e o conferir refaz igual", () => {
+    const { c, codex, rev } = escala({ resposta: resposta([doCodex("src/a.js", 3)]) });
+    const base = git(c.raiz, "rev-parse", "HEAD");
+    altera3(c.raiz);
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "task");
+    expect(rev("src/a.js", ["--base-commit", base])).toMatchObject({ rc: 1, ev: { expx_revisao: 3, modo: "base-commit", achados: [{ estado: "aberto" }] } });
+    expect(chamadasDoCodex(codex)[0]?.stdin).toContain(base);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
   });
 });
