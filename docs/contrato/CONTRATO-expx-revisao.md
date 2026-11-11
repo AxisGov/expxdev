@@ -1,6 +1,7 @@
-# Contrato `expx-revisao` v2 — revisão por task pela CLI do CodeAnt
+# Contrato `expx-revisao` v3 — revisão por task pela CLI do CodeAnt, com escala para o Codex
 
-Cada task do método passa pela CLI do CodeAnt, e o portão do PR confere que passou.
+Cada task do método passa pela CLI do CodeAnt, e o portão do PR confere que passou. Com a
+CodeAnt fora, a revisão escala para o Codex ("Escala para o Codex", abaixo).
 Este contrato define a CLI aceita, a evidência que a revisão grava, a identidade de
 um achado, e o que `revisar`, `conferir`, `rejeitar` e `listar` fazem. Quem o implementa é
 `nucleo/scripts/expx-revisao.mjs`, com as regras fixas de `nucleo/scripts/expx-limites.mjs`
@@ -50,6 +51,49 @@ que vale onde os dois divergem. Os limites L1, L2 e L3 estão em
   `set-codeant-api-key`, nunca define `CODEANT_API_TOKEN` e nunca lê nem imprime
   `~/.codeant/config.json`. Sem login, a revisão nunca é aprovação.
 
+## Escala para o Codex
+
+Desde a 0.14.0 (decisão do Flávio, 2026-11-10: "não é parâmetro, é escala"), quando a
+CodeAnt não está funcional, o próprio `revisar` revisa com o Codex, sobre o mesmo snapshot.
+Não há parâmetro: vale em `obrigatoria` e em `se_disponivel`. A evidência da escala é a v3.
+
+- **Escalam** os `indisponivel` da CodeAnt fora: `cli-ausente`, `versao`, `integridade`,
+  `acesso-negado`, `tempo-esgotado` e `erro`. **Não escalam** o erro de quem chama
+  (`caminho-com-virgula`, `arquivo-inexistente`, `fatiamento-invalido`,
+  `arquivo-nao-commitado`), o `snapshot`, o `arquivo-mudou-durante-revisao` e toda
+  `incompleta`: cobertura parcial não é indisponibilidade.
+- **O Codex** é o `codex` do `PATH` (no Windows, sem `codex.exe`, o alvo do primeiro `codex.cmd` do npm, `node_modules/@openai/codex/...`, pelo `node`, como na CodeAnt), numa tentativa só: `codex --version` (a versão),
+  `codex login status` (saída ≠ 0 é `codex-sem-login`; o agente nunca roda `codex login`) e
+  `codex exec --ephemeral --ignore-user-config -s read-only -m gpt-5.6-terra -c model_reasoning_effort="high" -C <snapshot> --output-schema <schema> -o <arquivo> -`,
+  com o pedido fixo pelo stdin e o prazo da CLI (15 minutos). O modelo é fixo no núcleo,
+  igual em todo consumidor. O pedido nomeia a base (`--base-commit`; sem ele, `HEAD`; sem
+  commit, nenhuma) e os enviados, e pede só defeito de correção, de segurança ou regressão,
+  nunca estilo, nome ou preferência: é ele que filtra o que conta.
+- **A resposta** é o JSON do schema e nada mais: `{arquivos_revisados: [texto], issues:
+  [{arquivo, linha, severidade, mensagem}]}`, `linha` inteiro, `severidade` ∈ `critica`,
+  `alta`, `media`, `baixa`, sem campo a mais nem a menos. A severidade é só informação:
+  todo achado em linha alterada conta, como na CodeAnt. Cada issue vira um achado como os da
+  CodeAnt (`relevant_file` = `arquivo`, `start_line` = `linha`, `label` = `codex`,
+  `issue_content` = `mensagem`), com a identidade calculada com `codex:<versão>:<modelo>:<formato>`
+  no lugar da versão da CLI. Toda issue tem de estar num arquivo enviado: a de outro caminho (inclusive
+  um que sai da raiz) faz a resposta inválida, e nada se lê dele. A linha além do fim do arquivo não se
+  liga a nada e fica `aberto`, nunca `anterior` (CodeAnt no expxdev#164). `aberto`/`anterior`, `derivacao` e `rejeitar` valem como sempre.
+- **Os dois fora:** `indisponivel:<motivo da CodeAnt>+<motivo do Codex>`, com `codex-ausente`,
+  `codex-sem-login`, `codex-erro` (saída ≠ 0, ou a versão que não se lê),
+  `codex-tempo-esgotado` ou `codex-saida-invalida` (texto livre, fora do schema, ou
+  `arquivos_revisados` diferente dos enviados, ou issue fora deles). Em `obrigatoria`, FALHA; em
+  `se_disponivel`, AVISO. Achado do Codex, evidência inválida e `incompleta` continuam
+  FALHA.
+- **Limite aceito.** O Codex não tem perfil nem manifesto como a CodeAnt: a evidência guarda a
+  versão da CLI, o modelo, os campos da resposta na forma do schema, o `stdout_sha256` do texto devolvido e o `prompt_sha256` do
+  pedido, que o `conferir` refaz. Como na CodeAnt, quem edita a evidência edita as `issues`, e
+  só o núcleo grava a escala, com o motivo da CodeAnt nela; a defesa é o diff da evidência no PR.
+- **Recusado no desenho:** a escala nas skills, a escala depois de cobertura parcial, repetir
+  até sair "zero achados", texto livre do Codex e falha do Codex virar `ok`.
+- **Teste:** `EXPX_REVISAO_TESTE_CODEX` (só para teste) troca o `codex` do `PATH` pelo script
+  dado, rodado pelo `node`; caminho relativo ou que não existe é o Codex ausente. A suíte a
+  define para todo teste do núcleo, e nenhum teste chama o `codex` de verdade.
+
 ## Os dois portões
 
 Uma task só fecha com os dois (emenda, 3):
@@ -73,7 +117,7 @@ achado, e 15 arquivos deram zero achado, contra quatro nos mesmos arquivos em lo
 A causa não está determinada. Uma rodada é amostra: zero achado é um sinal a mais, e não
 substitui os testes nem a revisão humana.
 
-## A evidência (v2)
+## A evidência (v2, e v3 na escala)
 
 O id da task é o da sprintx e da runx, `T-NN.MM` (sprint.task, dois dígitos em cada
 parte: `^T-[0-9]{2}\.[0-9]{2}$`); o legado sem ponto continua aceito, com qualquer
@@ -87,7 +131,7 @@ exceto `motivo`:
 
 | Chave | O que é |
 |---|---|
-| `expx_revisao` | `2` |
+| `expx_revisao` | `2`; `3` quando houve a escala para o Codex (as chaves só da v3 estão no fim da tabela) |
 | `derivacao` | `2`: a regra das linhas alteradas com o trecho movido (abaixo). Ausente na evidência de antes da 0.13.26, que vale como `1`, a regra de antes; o `conferir` usa a da evidência |
 | `trabalho`, `task` | o slug e o id da task |
 | `modo` | `uncommitted` ou `base-commit` |
@@ -99,9 +143,12 @@ exceto `motivo`:
 | `chamada` | `{include, meta, error, falhas_de_lote, issues, stdout_sha256}` da única chamada, ou `null` sem chamada. `falhas_de_lote`: as linhas do stderr que começam com `[error]` ou `Warning: parsing error in rejector`. `issues`: a lista `issues` do JSON da CLI, crua (cada objeto com todas as chaves que a CLI deu, sem reformatar), ou `null` com JSON ilegível. `stdout_sha256`: sha256, em hex, do stdout da CLI byte a byte (com os avisos do npm), para rastreio |
 | `resultado` | `ok`, `achados` (algum `aberto`), `incompleta` ou `indisponivel` |
 | `motivo` | só com `incompleta` e `indisponivel` (abaixo) |
-| `achados` | `[{identidade, arquivo, linha, label, texto, estado}]`, `estado` ∈ `aberto`, `anterior`, `rejeitado`: um por item de `chamada.issues`, na mesma ordem, derivado dele (abaixo) |
+| `achados` | `[{identidade, arquivo, linha, label, texto, estado}]`, `estado` ∈ `aberto`, `anterior`, `rejeitado`: um por item de `chamada.issues` (na v3, de `chamada_codex.issues`), na mesma ordem, derivado dele (abaixo) |
 | `rejeicoes` | `[{identidade, motivo, em}]` |
 | `removidos_sem_revisao` | caminhos apagados pela task |
+| `escala` | só na v3: `{de: "codeant", motivo}`, o motivo escalável da CodeAnt. `cli` e `chamada` guardam a tentativa dela |
+| `revisor` | só na v3: `{nome: "codex", versao, modelo, formato: 1}`, ou `null` se o Codex não revisou |
+| `chamada_codex` | só na v3: `{include, arquivos_revisados, issues, stdout_sha256, prompt_sha256}`, ou `null` se o Codex não respondeu. `issues` e `arquivos_revisados` crus, na forma do schema (`null` fora dele); `stdout_sha256` da resposta e `prompt_sha256` do pedido |
 
 **Identidade** de um achado: sha256, em hex, de
 `label \0 arquivo \0 linha anterior \0 linha apontada \0 linha seguinte \0 versão da CLI`,
@@ -224,6 +271,10 @@ O primeiro que se aplica decide o resultado:
 | 10 | `indisponivel:arquivo-mudou-durante-revisao` | o blob, o checkout ou a medida de um enviado mudou durante a chamada |
 | 11 | `achados` / `ok` | algum achado aberto / nenhum |
 
+**Escala.** O `indisponivel` das linhas 4, 6 (`acesso-negado`) e 7, e o `tempo-esgotado` da
+chamada (a CLI que não responde no prazo), não termina a revisão: o Codex revisa ("Escala para o
+Codex"), e o resultado é o dele pelas linhas 10 e 11, ou `indisponivel:<CodeAnt>+codex-<motivo>`.
+
 Motivos de pulo do perfil 0.5.14 (texto exato): `binary/generated`, `deleted`,
 `excluded by pattern`, `too large (<n> KB, max 200 KB)`, `too large (<n> lines, max 5000)`,
 `exceeded 40-file limit`. Nunca se tira número do texto do motivo.
@@ -242,7 +293,8 @@ linhas valem na ordem em que aparecem.
 | `desligada` | ok | ok |
 | `<sha>` não é commit | FALHA `commit-inexistente:<sha>` | FALHA |
 | evidência ausente do commit (fora da árvore dele; na árvore e ilegível para o git, como objeto apagado, é `evidencia-invalida`, abaixo) | FALHA `evidencia-ausente` | AVISO `evidencia-ausente` |
-| `expx_revisao` ≠ 2 (a v1 inclusive: a task se revisa de novo) | FALHA `evidencia-invalida:versao` | FALHA |
+| `expx_revisao` fora de 2 e 3 (a v1 inclusive: a task se revisa de novo) | FALHA `evidencia-invalida:versao` | FALHA |
+| v3 com `escala` que não é `{de: "codeant", motivo}` com motivo escalável, ou `indisponivel` cujo `motivo` não é `<motivo da escala>+codex-<motivo>`, `snapshot` nem `arquivo-mudou-durante-revisao` | FALHA `evidencia-invalida:escala` | FALHA |
 | JSON ilegível; outra task ou trabalho; `arquivos` que não é mapa, vazio ou com valor que não é mapa nem `null`; `achados` fora da forma; `resultado` fora dos quatro | FALHA `evidencia-invalida` | FALHA |
 | `rejeicoes` que não é lista de `{identidade, motivo, em}` (hex de 64, texto, texto) (`rejeicoes`); `removidos_sem_revisao` que não é lista de textos sem repetição igual aos arquivos `null` de `arquivos` (`removidos_sem_revisao`) | FALHA `evidencia-invalida:<campo>` | FALHA |
 | `derivacao` presente e diferente do inteiro `1` ou `2` | FALHA `evidencia-invalida:derivacao` | FALHA |
@@ -253,8 +305,9 @@ linhas valem na ordem em que aparecem.
 | `incompleta` (não depende do modo) | FALHA `incompleta:<motivo>` | FALHA `incompleta:<motivo>` |
 | `ok`/`achados` com a `revisao` de algum arquivo diferente da refeita no `conferir` (`excluido` só nas exclusões do núcleo, que em `ok`/`achados` são as únicas; senão o predicado do perfil; `sem-alteracao` só com `<sha>:<arquivo>` igual a `<de>:<arquivo>`, `<de>` o `base_commit` com `--base-commit`, senão o `head`; o igual também pode estar `enviado`) (`revisao`) | FALHA `evidencia-invalida:revisao` | FALHA |
 | `ok`/`achados` com algum `enviado` e: `cli.versao` sem perfil (`cli.versao`); `cli.integridade` ≠ `conferida` (`integridade`); `chamada` nula, com `error` não nulo, sem `issues` lista de objetos ou sem `stdout_sha256` de 64 hex (`chamada`), o que reprova a v2 gravada antes de 2026-10-20; `meta` que não é mapa, `max_files` ≠ perfil ou motivo de pulo fora do perfil (`perfil`); `falhas_de_lote` não vazia (`lote-falhou`); mais de 40 `enviado` (`L1`); `enviado` acima de 5.000 linhas ou 204.800 bytes, ou com `bytes`/`linhas` menores que os do blob `<sha>:<arquivo>` medido de novo (`L2`); `include` diferente dos enviados, ou a reconciliação do `revisar` (repetido, sobra, pulado, faltante) que não fecha (`cobertura`) | FALHA `evidencia-invalida:<campo>` | FALHA |
+| v3 `ok`/`achados` com algum `enviado`, no lugar da linha acima: `revisor` que não é o Codex com o modelo e o formato do núcleo (`revisor`); `chamada_codex` fora da forma, resposta fora do schema, issue fora dos enviados, `stdout_sha256` que não é hex de 64 ou `prompt_sha256` diferente do pedido refeito com a base da evidência e o `include` (`chamada`); mais de 40 `enviado` (`L1`); L2 como acima, pelo perfil homologado (`L2`); `include` ou `arquivos_revisados` diferentes dos enviados (`cobertura`) | FALHA `evidencia-invalida:<campo>` | FALHA |
 | `ok`/`achados` com algum `enviado` e `head` que não é `null` nem o SHA completo de um commit (`head`), ou `modo` `base-commit` com `base_commit` que não é o SHA completo de um commit, ou `modo` `uncommitted` com `base_commit` não nulo, ou outro `modo` (`base_commit`) | FALHA `evidencia-invalida:<campo>` | FALHA |
-| `ok`/`achados` com `achados` diferente dos derivados de `chamada.issues` (de nenhuma, sem `enviado`), com as linhas alteradas pela `derivacao` da evidência, entre `<de>` e `<sha>` (`<de>`: `base_commit` com `--base-commit`, senão `head`; na 2, os blobs de `<de>:<arquivo>` e `<sha>:<arquivo>`; na 1, `git diff -U0 <de> <sha>`) e as vizinhas do blob do commit: outra quantidade, ordem, `identidade`, `arquivo`, `linha`, `label` ou `texto`, ou `estado` diferente do derivado, exceto `rejeitado` com a identidade em `rejeicoes` da evidência ou de outra evidência do trabalho no commit; ou `resultado` que não é `achados` com algum `aberto` e `ok` sem nenhum | FALHA `evidencia-invalida:achados` | FALHA |
+| `ok`/`achados` com `achados` diferente dos derivados de `chamada.issues` (na v3, de `chamada_codex.issues`, com `codex:<versão>:<modelo>:<formato>` na identidade; de nenhuma, sem `enviado`), com as linhas alteradas pela `derivacao` da evidência, entre `<de>` e `<sha>` (`<de>`: `base_commit` com `--base-commit`, senão `head`; na 2, os blobs de `<de>:<arquivo>` e `<sha>:<arquivo>`; na 1, `git diff -U0 <de> <sha>`) e as vizinhas do blob do commit: outra quantidade, ordem, `identidade`, `arquivo`, `linha`, `label` ou `texto`, ou `estado` diferente do derivado, exceto `rejeitado` com a identidade em `rejeicoes` da evidência ou de outra evidência do trabalho no commit; ou `resultado` que não é `achados` com algum `aberto` e `ok` sem nenhum | FALHA `evidencia-invalida:achados` | FALHA |
 | achado `aberto` | FALHA `achados-abertos:<n>` | FALHA |
 
 **Cobertura do commit.** A evidência tem de cobrir o que a task muda: cada arquivo
@@ -285,7 +338,9 @@ não mudam (rejeitar um achado não cobre o que a CLI não revisou). Sai 1 se a 
 ou o achado não existe, e também, sem gravar nada, se um arquivo da evidência mudou depois do
 `revisar`: o `hash-object` do checkout difere do `blob` gravado, ou o arquivo dado por removido
 existe de novo, inclusive como link quebrado, ou não se prova ausente (só `ENOENT`/`ENOTDIR` provam; permissão ou E/S que falha não) (`evidencia desatualizada: <arquivo>`). A rejeição valeria para um conteúdo que
-não vai ao commit; a rota é rodar o `revisar` de novo.
+não vai ao commit; a rota é rodar o `revisar` de novo. A trava só protege a evidência, então a conferência se repete
+depois da gravação: um arquivo que mudou no meio desfaz a gravação, com a mesma saída 1
+(CodeAnt no katosmv/login#79). O que muda depois disso o `conferir` do commit reprova (`evidencia-nao-bate`).
 
 Só o desenvolvedor rejeita. O agente classifica, deduplica e contesta (bloqueio
 `revisao_contestada`), nunca aceita risco. Como o agente pode escrever o arquivo,
@@ -351,6 +406,7 @@ tentativas vira `revisao_defeito` (real) ou `revisao_contestada` (falso positivo
 | `lote-falhou` | revisar de novo a task inteira; repetindo com HTTP 413, reduzir o que vai no lote e repetir. A CLI agrupa os arquivos ordenados, em lotes de até cinco: dividir a task pode manter o mesmo lote, e um arquivo sozinho pode passar do limite do servidor, que não se conhece. Um 403 junto de outro erro, ou com achado de outro lote, continua aqui: a cobertura é parcial |
 | `acesso-negado` | o 403 em todo lote: tente `codeant logout` e `codeant login` uma vez, apesar de a mensagem da CLI induzir a repetir; persistindo, é conta ou serviço, e nada aqui resolve. Em `se_disponivel`, é AVISO, e a task fecha sem a revisão; em `obrigatoria`, a task espera a CLI voltar. O 403 em `error` no JSON dá `indisponivel:erro`, com a mesma rota |
 | `pulado`, `faltante`, `sobra`, `repetido` | diagnóstico |
+| `<CodeAnt>+codex-<motivo>` (desde a 0.14.0, os dois fora) | a rota do motivo da CodeAnt, e a do Codex: `codex-ausente`, instalar o Codex; `codex-sem-login`, o desenvolvedor roda `codex login` (o agente nunca); `codex-erro`, `codex-tempo-esgotado` e `codex-saida-invalida`, revisar de novo uma vez. Em `se_disponivel`, AVISO; em `obrigatoria`, a task espera um dos dois voltar |
 
 **Depois de um `rejeitar` que sai `<T-NN.MM> ok`, a revisão da task está feita.** Não se
 roda o `revisar` de novo "para conferir": a CLI varia entre chamadas ("O que o `ok`
@@ -429,3 +485,6 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-11-10 | Revisão do expxdev#162 (CodeAnt): a derivação 2 tem também teto de linhas reunidas (1.000.000 `+` e `-`), antes da busca; o blob antigo só tinha o limite de 1 MiB, e 40 deles enchiam a memória antes do teto de comparações. Passou, nenhum crédito. |
 | 2026-11-10 | Lock contestado, alinhado à runx (03-fix) e à sprintx (06-execucao): a instalação congelada que falha por outro motivo não prova nada e vai com a contestação ao desenvolvedor; depois dela, o subconjunto de testes afetado roda de novo. |
 | 2026-11-10 | Achado do CodeAnt no katosmv/login#78 (instalação da 0.13.26): o `rejeitar` recusa, sem gravar, se um arquivo da evidência mudou depois do `revisar` (`evidencia desatualizada: <arquivo>`, saída 1). Antes, gravava `ok` sobre os blobs antigos, e só o `conferir` do commit reprovava. A regra de revisar de novo passa a ser "depois do último `revisar`". |
+| 2026-11-11 | **Escala para o Codex** (0.14.0; pedido da orquestra_conselho depois do 403 de 2026-11-10; decisão do Flávio: "não é parâmetro, é escala"; desenho com o Codex): a CodeAnt fora por motivo escalável, o `revisar` revisa com o Codex sobre o mesmo snapshot, e a evidência é a v3 (`escala`, `revisor`, `chamada_codex`); os dois fora, `indisponivel:<CodeAnt>+codex-<motivo>`. O `conferir` aceita a v2 e a v3, refaz o pedido (`prompt_sha256`) e deriva os achados das `issues` do Codex. Modelo fixo, uma tentativa, 15 minutos; a severidade não decide. |
+| 2026-11-11 | Achados do Codex e do CodeAnt na 0.14.0: o motivo do Codex com os dois fora é um dos cinco do contrato, e o `conferir` recusa outro (`evidencia-invalida:escala`); no Windows, sem `codex.exe`, o alvo do `codex.cmd` do npm roda pelo `node`; o `rejeitar` confere os blobs de novo depois de gravar e desfaz a gravação se algum mudou no meio (katosmv/login#79). |
+| 2026-11-11 | Revisão do expxdev#164 (CodeAnt): a issue do Codex fora dos enviados (inclusive o caminho que sai da raiz, que o `revisar` leria) faz a resposta inválida (`codex-saida-invalida`), e o `conferir` a recusa (`chamada`); a linha do Codex além do fim do arquivo fica `aberto`. A regra da CodeAnt não muda: mudaria os achados das evidências v2 já gravadas. |

@@ -9,6 +9,27 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.0 — a escala da CodeAnt para o Codex
+
+Instale por PR, como a 0.13.27. Muda o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`, agora v3), a runx (AxisGov/runx#25, merge e52769e, DR-117 e DR-118) e a sprintx (AxisGov/sprintx#78, merge 2ad1587, DS-220). O `init` passa a instalar esses dois commits. Os eventos, o `doctor`, o painel e o `expx sessao` seguem como na 0.13.27. É versão menor nova porque a evidência ganha a v3: um núcleo 0.13.x a recusa (`evidencia-invalida:versao`), e o núcleo e as skills se atualizam juntos, como sempre pelo `init`.
+
+- **A revisão por task escala para o Codex.** O pedido veio da orquestra_conselho, depois de horas de 403 da CodeAnt em 2026-11-10: com `obrigatoria`, a V12 travava; com `se_disponivel`, a task sem evidência também passava como aviso. A decisão do Flávio foi "não é parâmetro, é escala".
+  - **Quando escala:** com a CodeAnt fora (ausente, sem acesso, com erro, fora do prazo, versão não homologada ou pacote que não confere), o próprio `revisar` revisa com o Codex sobre o mesmo snapshot.
+  - **Como o Codex é chamado:** o `codex` do `PATH`, só leitura, sem a configuração do usuário, com modelo fixo, pedido fixo e schema, numa tentativa só de até 15 minutos.
+  - **A evidência:** é a v3, com a escala, o revisor, os campos da resposta na forma do schema e o hash do texto que o Codex devolveu. O `conferir` refaz o pedido e deriva os achados das `issues` do Codex. A severidade não decide: todo achado em linha alterada conta, como na CodeAnt.
+  - **Com a CodeAnt funcionando:** nada muda, e a evidência continua v2.
+  - **Com os dois fora:** `indisponivel:<CodeAnt>+codex-<motivo>`, FALHA em `obrigatoria` e AVISO em `se_disponivel`.
+  - **O que não escala:** erro de quem chama, snapshot e cobertura parcial.
+- **O que o consumidor precisa:** para a escala funcionar, o `codex` instalado e com login feito pelo desenvolvedor. O agente nunca roda `codex login`. Sem ele, a saída é `<motivo da CodeAnt>+codex-ausente` ou `+codex-sem-login`, com a mesma rota de antes.
+- **A corrida do `rejeitar`** (CodeAnt no katosmv/login#79): a trava só protegia a evidência. Agora o `rejeitar` confere os blobs de novo depois de gravar e desfaz a gravação se um arquivo da task mudou no meio.
+- **A runx e a sprintx:** a saída 2 passa a ser "nem a CodeAnt nem o Codex revisaram" com o núcleo 0.14.0. O agente nunca chama o Codex.
+- **A base informada na runx** (DR-118; CodeAnt no conselhos-municipais#312): a runx não aceita base informada. O pedido que nomeia outra base, ou uma base que não existe, para e diz, sem trocar a base em silêncio.
+- **Não exercitado:**
+  - o shim `codex.cmd` do npm no Windows (o teste só roda no Windows, na CI);
+  - o fluxo inteiro de uma task com a escala, executado pelo modelo.
+
+  A escala com o `codex` real foi provada uma vez, num repositório de teste sem a CodeAnt: o Codex achou o defeito plantado, e o `conferir` reprovou a task.
+
 ## 0.13.27 — os achados da instalação da 0.13.26 no Login
 
 Instale por PR, como a 0.13.26. Muda o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`), a runx (AxisGov/runx#24, merge f8cdc2c, DR-116) e a sprintx (AxisGov/sprintx#77, merge 5921cc4, DS-219). O `init` passa a instalar esses dois commits. Os eventos, o `doctor`, o painel e o `expx sessao` seguem como na 0.13.26. Os achados são da CodeAnt no katosmv/login#78, confirmados no código.

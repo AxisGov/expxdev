@@ -39,6 +39,9 @@ export default defineConfig({
             "src/doctor/**/*.test.ts",
           ],
           environment: "node",
+          // A escala do `expx-revisao` nunca chama o `codex` do PATH num teste: o núcleo usa o Codex falso de
+          // `EXPX_REVISAO_TESTE_CODEX`, e este caminho, que não existe, é o Codex ausente (src/teste/codex-falso.ts).
+          env: { EXPX_REVISAO_TESTE_CODEX: "expx-codex-de-teste-ausente.cjs" },
           // Estes testes clonam repositorios git de verdade em pasta temporaria.
           // Sob a carga da suite completa em paralelo, 30s nao bastam: o teste
           // falhava por timeout, nunca por assercao.
