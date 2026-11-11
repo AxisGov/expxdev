@@ -2133,7 +2133,7 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
     expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
   });
 
-  it("funcional: a evidência v3 com formato 1 (0.14.0 e 0.14.1) continua conferida pela regra dela, sem a mensagem na identidade", () => {
+  it("funcional: a evidência v3 com formato 1 (0.14.1, que já grava o executavel) continua conferida pela regra dela, sem a mensagem na identidade", () => {
     const { c, rev } = escala({ resposta: resposta([doCodex("src/a.js", 3)]) });
     altera3(c.raiz);
     rev();
@@ -2168,6 +2168,13 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
 });
 
 describe("expx-revisao.mjs: derivacao 3 (a issue que não se liga a uma linha da task fica aberta, para a CodeAnt e o Codex)", () => {
+  it("funcional: um campo `chave_extra` na issue crua da CodeAnt não muda a identidade (só o Codex de formato 2 põe a mensagem nela; Codex na 0.14.2)", () => {
+    const c = cenario({ resposta: resp({}, { issues: [{ ...achado("src/a.js", 3), chave_extra: "da-cli" }] }) });
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js");
+    expect(r.ev.achados[0]?.identidade).toBe(identidade("security", "src/a.js", ["l2", "novo3", "l4"]));
+  });
+
   it("funcional: issue da CodeAnt numa linha além do fim do arquivo fica aberta; a evidência grava derivacao 3 e o conferir refaz igual", () => {
     const c = cenario({ issues: [achado("src/a.js", 99)] });
     altera3(c.raiz);

@@ -13,7 +13,7 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 Instale por PR, como a 0.14.1. Muda só o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`). A runx, a sprintx, os eventos, o `init`, o `doctor`, o painel e o `expx sessao` seguem como na 0.14.1. O achado é da CodeAnt no katosmv/login#81 (instalação da 0.14.0).
 
-- **Dois defeitos do Codex na mesma linha deixam de colidir.** Toda issue do Codex tem o `label` `codex`, e a identidade não levava a mensagem. Com isso, dois defeitos diferentes na mesma linha tinham a mesma identidade, e um `rejeitar` calava os dois. No formato 2 do revisor, o sha256 da mensagem entra na identidade. O custo aceito: se o Codex redescreve o mesmo ponto com outro texto numa nova revisão, o achado rejeitado reabre, e isso falha fechado. A evidência de formato 1 (da 0.14.1; a da 0.14.0 já é recusada pela falta do `executavel`) continua conferida pela regra dela.
+- **Dois defeitos do Codex na mesma linha, com mensagens diferentes, deixam de colidir.** Toda issue do Codex tem o `label` `codex`, e a identidade não levava a mensagem. Com isso, dois defeitos diferentes na mesma linha tinham a mesma identidade, e um `rejeitar` calava os dois. No formato 2 do revisor, o sha256 da mensagem entra na identidade. O custo aceito: se o Codex redescreve o mesmo ponto com outro texto numa nova revisão, o achado rejeitado reabre, e isso falha fechado. Com a mesma mensagem, ainda colidem. A CodeAnt não muda: a parte extra nunca vem da issue crua. A evidência de formato 1 (da 0.14.1; a da 0.14.0 já é recusada pela falta do `executavel`) continua conferida pela regra dela.
 
 ## 0.14.1 — a falha de segurança da escala e a derivacao 3
 

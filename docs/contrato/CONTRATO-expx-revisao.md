@@ -77,7 +77,9 @@ Não há parâmetro: vale em `obrigatoria` e em `se_disponivel`. A evidência da
   `issue_content` = `mensagem`), com a identidade calculada com `codex:<versão>:<modelo>:<formato>`
   no lugar da versão da CLI e, no formato 2 (desde a 0.14.2), com o sha256 da `mensagem` no fim: o `label` é sempre `codex`, e
   dois defeitos na mesma linha colidiam (um `rejeitar` calava os dois; katosmv/login#81). O custo aceito é o Codex que
-  redescreve o ponto reabrir o achado, o que falha fechado. A v3 com formato 1 (0.14.0 e 0.14.1) é conferida sem a mensagem. Toda issue tem de estar num arquivo enviado: a de outro caminho (inclusive
+  redescreve o ponto reabrir o achado, o que falha fechado. Dois defeitos com a mesma mensagem na mesma linha ainda
+  colidem. A v3 com formato 1 da 0.14.1 é conferida sem a mensagem; a da 0.14.0, sem `executavel`, é recusada (`revisor`). A
+  parte extra nunca vem da issue crua: a da CodeAnt deriva como sempre. Toda issue tem de estar num arquivo enviado: a de outro caminho (inclusive
   um que sai da raiz) faz a resposta inválida, e nada se lê dele. A linha além do fim do arquivo não se
   liga a nada e fica `aberto`, nunca `anterior` (CodeAnt no expxdev#164; desde a 0.14.1, a `derivacao: 3` vale isso também para a CodeAnt). `aberto`/`anterior`, `derivacao` e `rejeitar` valem como sempre.
 - **Os dois fora:** `indisponivel:<motivo da CodeAnt>+<motivo do Codex>`, com `codex-ausente`,

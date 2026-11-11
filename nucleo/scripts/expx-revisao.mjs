@@ -336,8 +336,9 @@ function respostaDoCodex(r) {
 const issuesNaTask = (issues, enviados) => issues.every((i) => enviados.includes(i.arquivo));
 // no formato 2, o hash da mensagem entra na identidade: o `label` é sempre `codex`, e dois defeitos na mesma linha colidiam
 // (um `rejeitar` calava os dois). O custo, aceito: o Codex que redescreve o ponto reabre o achado, nunca o cala
-const issuesDoCodex = (issues, formato) => issues.map((i) => ({ relevant_file: i.arquivo, start_line: i.linha, label: "codex", issue_content: i.mensagem,
-  ...(formato >= 2 ? { chave_extra: sha256(i.mensagem) } : {}) }));
+const issuesDoCodex = (issues) => issues.map((i) => ({ relevant_file: i.arquivo, start_line: i.linha, label: "codex", issue_content: i.mensagem }));
+/** A parte extra da identidade do Codex no `formato` (o sha256 da mensagem no 2), ou nenhuma: a issue crua nunca a dá. */
+const extraDoCodex = (formato) => (formato >= 2 ? (i) => sha256(String(i.issue_content)) : undefined);
 const versaoDoRevisor = (r) => `codex:${r.versao}:${r.modelo}:${r.formato}`;
 const mesmosArquivos = (a, b) => Array.isArray(a) && a.length === b.length && new Set(a).size === a.length && b.every((f) => a.includes(f));
 const sha256 = (b) => createHash("sha256").update(b).digest("hex");
@@ -711,7 +712,7 @@ function revisar() {
     return true;
   };
   /** 10. O que foi revisado é o que vai ao commit, e os achados das `issues` (na forma da CodeAnt) do revisor `versao`. */
-  const concluir = (issues, versao) => {
+  const concluir = (issues, versao, extra) => {
     // todo arquivo presente da task, não só os enviados: o `sem-alteracao` que muda durante a chamada gravaria o blob da
     // partida (conselhos#312)
     for (const f of presentes) {
@@ -723,7 +724,7 @@ function revisar() {
     // derivação 2: do blob da partida ao blob que vai ao commit, os mesmos do `conferir`, que não dependem do checkout
     const partida = base ?? headDaRevisao;
     ev.achados = derivar(issues, ev.arquivos, versao,
-      movidasPor(Object.keys(ev.arquivos), (f) => (partida ? blobEm(partida, f) : undefined), (f) => ev.arquivos[f]?.blob ?? undefined), lido, ev.derivacao)
+      movidasPor(Object.keys(ev.arquivos), (f) => (partida ? blobEm(partida, f) : undefined), (f) => ev.arquivos[f]?.blob ?? undefined), lido, ev.derivacao, extra)
       .map((a) => ({ ...a, estado: rejeitadas.has(a.identidade) ? "rejeitado" : a.estado }));
     if (ev.achados.some((a) => a.estado === "aberto")) ev.resultado = "achados";
     return undefined;
@@ -744,7 +745,7 @@ function revisar() {
     if (!cx.resposta || !mesmosArquivos(cx.resposta.arquivos_revisados, enviados) || !issuesNaTask(cx.resposta.issues, enviados)) {
       return fim("indisponivel", `${motivo}+codex-saida-invalida`);
     }
-    return concluir(issuesDoCodex(cx.resposta.issues, FORMATO_CODEX), versaoDoRevisor(ev.revisor));
+    return concluir(issuesDoCodex(cx.resposta.issues), versaoDoRevisor(ev.revisor), extraDoCodex(FORMATO_CODEX));
   };
   try { (() => {
     // 1. o pedido não se revisa como está
@@ -837,7 +838,7 @@ function rejeitadasDoTrabalho() {
 /** Os achados das `issues` da CLI, sem rejeição: `aberto` (linha alterada) ou `anterior`. `alt(f)` dá as linhas alteradas
  *  de um arquivo da task (Set, ou `true` para todas) e `texto(f)` o conteúdo (ou ""). A mesma regra no `revisar` (checkout)
  *  e no `conferir` (commit da task), para que `achados` seja derivável das `issues` gravadas. */
-function derivar(issues, arquivos, versao, alt, texto, derivacao = 1) {
+function derivar(issues, arquivos, versao, alt, texto, derivacao = 1, extra = undefined) {
   const cache = new Map();
   return issues.map((i) => {
     const arquivo = caminho(String(i.relevant_file ?? ""));
@@ -848,7 +849,7 @@ function derivar(issues, arquivos, versao, alt, texto, derivacao = 1) {
     const c = cache.get(arquivo);
     const viz = [linha - 2, linha - 1, linha].map((k) => (c.linhas[k] ?? "").trim());
     const label = String(i.label ?? "");
-    const identidade = createHash("sha256").update([label, arquivo, ...viz, versao, ...(i.chave_extra ? [i.chave_extra] : [])].join("\0")).digest("hex");
+    const identidade = createHash("sha256").update([label, arquivo, ...viz, versao, ...(extra ? [extra(i)] : [])].join("\0")).digest("hex");
     // Achado que não se liga a uma linha de um arquivo da task não pode ser dado por anterior: fica aberto.
     // na 3, a linha além do fim do arquivo também não se liga a nada. A 1 e a 2 ficam como eram: mudá-las mudaria os achados
     // das evidências já gravadas
@@ -1058,8 +1059,9 @@ function achadosDivergem(ev, sha) {
     // a regra da evidência, não a deste script: sem `derivacao`, a 1 (o diff por arquivo, sem trecho movido)
     const alt = ev.derivacao >= 2 ? movidasPor(Object.keys(ev.arquivos), (f) => blobEm(de, f), (f) => blobEm(sha, f)) : (f) => alteradas(f, de, sha);
     // pelo JSON, como foi gravado (`NaN` vira `null`)
-    const [issues, versao] = ev.expx_revisao === 3 ? [issuesDoCodex(ev.chamada_codex.issues, ev.revisor.formato), versaoDoRevisor(ev.revisor)] : [ev.chamada.issues, ev.cli.versao];
-    derivados = JSON.parse(JSON.stringify(derivar(issues, ev.arquivos, versao, alt, texto, ev.derivacao ?? 1)));
+    const [issues, versao, extra] = ev.expx_revisao === 3
+      ? [issuesDoCodex(ev.chamada_codex.issues), versaoDoRevisor(ev.revisor), extraDoCodex(ev.revisor.formato)] : [ev.chamada.issues, ev.cli.versao, undefined];
+    derivados = JSON.parse(JSON.stringify(derivar(issues, ev.arquivos, versao, alt, texto, ev.derivacao ?? 1, extra)));
   }
   const rejeitadas = rejeicoesNoCommit(ev, sha);
   if (ev.achados.length !== derivados.length || derivados.some((d, k) => {

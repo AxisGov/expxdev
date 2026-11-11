@@ -720,7 +720,7 @@ npx --yes --package ~/expx-cli/v0.14.2/expxdev-0.14.2.tgz expx init --skills bui
   do `rejeitar` (login#79) e faz a runx parar quando o pedido nomeia uma base (conselhos#312).
 - `0.14.1` tira o gancho de teste que trocava o Codex no núcleo instalado (conselhos#315), grava o executável que
   revisou e passa à `derivacao: 3`, que não lê arquivo fora da task.
-- `0.14.2` põe a mensagem do Codex na identidade do achado: dois defeitos na mesma linha não colidem mais (login#81).
+- `0.14.2` põe a mensagem do Codex na identidade do achado: dois defeitos na mesma linha, com mensagens diferentes, não colidem mais (login#81).
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
