@@ -39,7 +39,7 @@ export interface ChamadaCodex {
   stdin: string;
   /** O `NODE_OPTIONS` que o Codex recebeu, ou null. */
   nodeOptions: string | null;
-  /** As variáveis `LD_*`, `DYLD_*`, `NODE_OPTIONS`, `NODE_PATH` e `HTTPS_PROXY` que o Codex recebeu. */
+  /** As variáveis que injetam código ou mudam o que os comandos veem, e o `HTTPS_PROXY`, que o Codex recebeu. */
   ambiente: Record<string, string>;
 }
 
@@ -53,7 +53,7 @@ if (a[0] === "login" && a[1] === "status") process.exit(cfg.logado === false ? 1
 if (a[0] !== "exec") process.exit(2);
 const stdin = fs.readFileSync(0, "utf8");
 fs.appendFileSync(path.join(dir, "chamadas.jsonl"), JSON.stringify({ args: a, cwd: process.cwd(), stdin, nodeOptions: process.env.NODE_OPTIONS ?? null,
-  ambiente: Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(LD_|DYLD_|NODE_OPTIONS$|NODE_PATH$|HTTPS_PROXY$)/i.test(k))) }) + "\\n");
+  ambiente: Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(LD_|DYLD_|GIT_|NODE_OPTIONS$|NODE_PATH$|GCONV_PATH$|BASH_ENV$|ENV$|PYTHONPATH$|PYTHONSTARTUP$|PERL5OPT$|PERL5LIB$|RUBYOPT$|RUBYLIB$|HTTPS_PROXY$)/i.test(k))) }) + "\\n");
 if (cfg.alteraSiMesmo) fs.appendFileSync(__filename, "\\n// trocado durante a revisao\\n");
 if (cfg.dorme) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, cfg.dorme);
 if (cfg.saida) process.exit(cfg.saida);

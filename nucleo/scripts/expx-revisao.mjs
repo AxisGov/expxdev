@@ -376,10 +376,13 @@ function scriptDeNode(f) {
     return /^#!.*\bnode(js)?\b/.test(linha);
   } catch { return false; } finally { if (fd !== undefined) closeSync(fd); }
 }
-// O que injeta código num processo sem mudar o arquivo que se mede: `NODE_OPTIONS=--require`, `NODE_PATH` e todo o
-// carregador dinâmico por prefixo (`LD_*`, `DYLD_*`: `LD_LIBRARY_PATH` e os primos do macOS, os de hoje e os que vierem;
-// CodeAnt no katosmv/login#83). O Codex nunca o herda; o resto do ambiente (proxy, certificado, `CODEX_*`) passa
-const INJETA = /^(LD_|DYLD_)|^(NODE_OPTIONS|NODE_PATH)$/i;
+// O que injeta código no Codex ou nos comandos que ele roda no sandbox sem mudar o arquivo que se mede, ou muda o que esses
+// comandos veem: o carregador dinâmico por prefixo (`LD_*`, `DYLD_*`: `LD_LIBRARY_PATH` e os primos do macOS; CodeAnt no
+// katosmv/login#83), os módulos do iconv (`GCONV_PATH`), o node (`NODE_OPTIONS`, `NODE_PATH`), o arquivo que o shell roda ao
+// abrir (`BASH_ENV`, `ENV`), os interpretadores (`PYTHONPATH`, `PYTHONSTARTUP`, `PERL5OPT`, `PERL5LIB`, `RUBYOPT`, `RUBYLIB`)
+// e o git por prefixo (`GIT_*`: outro repositório, outra configuração, outro diff). O Codex nunca o herda; o resto do
+// ambiente (proxy, certificado, `CODEX_*`) passa
+const INJETA = /^(LD_|DYLD_|GIT_)|^(GCONV_PATH|NODE_OPTIONS|NODE_PATH|BASH_ENV|ENV|PYTHONPATH|PYTHONSTARTUP|PERL5OPT|PERL5LIB|RUBYOPT|RUBYLIB)$/i;
 const ambienteDoCodex = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !INJETA.test(k)));
 /** sha256 do arquivo, lido em blocos (o binário do Codex passa de 100 MB), ou undefined. */
 function sha256DoArquivo(f) {

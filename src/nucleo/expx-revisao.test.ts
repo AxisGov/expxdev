@@ -2104,11 +2104,14 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
     expect(chamadasDoCodex(codex)[0]?.nodeOptions).toBeNull();
   });
 
-  it("funcional: o Codex não herda nenhuma LD_* nem DYLD_* (LD_LIBRARY_PATH, DYLD_FRAMEWORK_PATH...), e o resto do ambiente passa (CodeAnt no katosmv/login#83)", () => {
+  it("funcional: o Codex não herda o que injeta código ou muda o que os comandos dele veem (LD_*, DYLD_*, GCONV_PATH, BASH_ENV, GIT_*...), e o resto passa (CodeAnt no katosmv/login#83; Codex)", () => {
     const { c, codex, rev } = escala({ resposta: resposta() });
     altera3(c.raiz);
     const fora = temp("expx-libs-");
-    const r = rev("src/a.js", [], { LD_LIBRARY_PATH: fora, LD_QUALQUER: fora, DYLD_FRAMEWORK_PATH: fora, DYLD_FALLBACK_LIBRARY_PATH: fora, HTTPS_PROXY: "http://proxy.exemplo.invalid:3128" });
+    const injeta = Object.fromEntries(["LD_LIBRARY_PATH", "LD_QUALQUER", "DYLD_FRAMEWORK_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "GCONV_PATH", "BASH_ENV", "ENV",
+      "PYTHONPATH", "PYTHONSTARTUP", "PERL5OPT", "PERL5LIB", "RUBYOPT", "RUBYLIB", "GIT_QUALQUER"].map((k) => [k, fora]));
+    // `GIT_*` que não quebram o git do próprio núcleo (um `GIT_DIR` trocaria o repositório dele também): o prefixo é o que se prova
+    const r = rev("src/a.js", [], { ...injeta, GIT_TRACE: "0", HTTPS_PROXY: "http://proxy.exemplo.invalid:3128" });
     expect(r.rc).toBe(0);
     expect(chamadasDoCodex(codex)[0]?.ambiente).toEqual({ HTTPS_PROXY: "http://proxy.exemplo.invalid:3128" });
   });
