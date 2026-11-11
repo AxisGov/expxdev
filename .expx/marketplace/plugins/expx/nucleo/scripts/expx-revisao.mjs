@@ -871,7 +871,7 @@ function semSinalDoCodex(ev, sha, enviados, perfil) {
   if (!ehMapa(r) || r.nome !== "codex" || typeof r.versao !== "string" || r.modelo !== MODELO_CODEX || r.formato !== FORMATO_CODEX) return "revisor";
   const ch = ev.chamada_codex;
   if (!ehMapa(ch) || !Array.isArray(ch.include) || !ch.include.every((f) => typeof f === "string")
-    || !respostaDoCodex({ arquivos_revisados: ch.arquivos_revisados, issues: ch.issues }) || !issuesNaTask(ch.issues, ch.include)
+    || !respostaDoCodex({ arquivos_revisados: ch.arquivos_revisados, issues: ch.issues }) || !issuesNaTask(ch.issues, enviados)
     || !/^[0-9a-f]{64}$/.test(ch.stdout_sha256)
     || ch.prompt_sha256 !== sha256(pedidoAoCodex(baseDoPedido(ev), ch.include))) return "chamada";
   if (enviados.length > perfil.max_files) return "L1";
