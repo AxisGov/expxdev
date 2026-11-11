@@ -348,8 +348,10 @@ function localizarCodex() {
   const executavel = (f) => { try { const e = statSync(f); return e.isFile() && (win || (e.mode & 0o111) !== 0); } catch { return false; } };
   for (const d of path.split(win ? ";" : ":").filter(Boolean)) {
     for (const nome of win ? ["codex.com", "codex.exe"] : ["codex"]) {
-      const f = join(d, nome);
-      if (executavel(f) && real(f)) return { exe: real(f), antes: [], caminho: real(f) };
+      const f = real(join(d, nome));
+      if (!f || !executavel(f)) continue;
+      // o script do npm (`#!/usr/bin/env node`) entregaria o interpretador ao PATH: roda pelo node deste processo
+      return scriptDeNode(f) ? { exe: process.execPath, antes: [f], caminho: f } : { exe: f, antes: [], caminho: f };
     }
     if (!win) continue;
     let texto;
@@ -359,6 +361,20 @@ function localizarCodex() {
     return alvo ? { exe: process.execPath, antes: [alvo], caminho: alvo } : undefined;
   }
 }
+/** O arquivo começa com um shebang que roda o node. */
+function scriptDeNode(f) {
+  let fd;
+  try {
+    fd = openSync(f, "r");
+    const b = Buffer.alloc(200);
+    const linha = b.subarray(0, readSync(fd, b, 0, 200, 0)).toString("latin1").split("\n")[0];
+    return /^#!.*\bnode(js)?\b/.test(linha);
+  } catch { return false; } finally { if (fd !== undefined) closeSync(fd); }
+}
+// O que injeta código num processo sem mudar o arquivo que se mede (`NODE_OPTIONS=--require`, o carregador dinâmico): o
+// Codex nunca o herda
+const INJETA = /^(NODE_OPTIONS|NODE_PATH|LD_PRELOAD|LD_AUDIT|DYLD_INSERT_LIBRARIES|DYLD_LIBRARY_PATH)$/i;
+const ambienteDoCodex = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !INJETA.test(k)));
 /** sha256 do arquivo, lido em blocos (o binário do Codex passa de 100 MB), ou undefined. */
 function sha256DoArquivo(f) {
   let fd;
@@ -378,7 +394,8 @@ function codexRevisa(raiz, base, enviados) {
   // o arquivo medido é o que roda: o caminho real, achado uma vez
   const executavel = { caminho: loc.caminho, sha256: sha256DoArquivo(loc.caminho) };
   if (!executavel.sha256) return { motivo: "codex-erro" };
-  const codexRoda = (a, opcoes) => spawnSync(loc.exe, [...loc.antes, ...a], opcoes);
+  const env = ambienteDoCodex();
+  const codexRoda = (a, opcoes) => spawnSync(loc.exe, [...loc.antes, ...a], { ...opcoes, env });
   const versao = codexRoda(["--version"], { encoding: "utf8", timeout: 60_000, killSignal: "SIGKILL" });
   const v = /\d+\.\d+\.\d+\S*/.exec(String(versao.stdout ?? ""))?.[0];
   if (versao.error || versao.status !== 0 || !v) return { motivo: "codex-erro" };
@@ -395,6 +412,12 @@ function codexRevisa(raiz, base, enviados) {
     if (r.error?.code === "ETIMEDOUT") return { motivo: "codex-tempo-esgotado" };
     if (r.error || r.status !== 0) {
       process.stderr.write(`expx-revisao: codex saiu ${r.status ?? r.error?.code}: ${String(r.stderr ?? "").slice(-2000)}\n`);
+      return { motivo: "codex-erro" };
+    }
+    // medido de novo depois de rodar: o arquivo trocado no meio não deixa a evidência atestar outro binário (a janela de
+    // trocar e destrocar entre as duas medidas é limite declarado no contrato)
+    if (sha256DoArquivo(loc.caminho) !== executavel.sha256) {
+      process.stderr.write(`expx-revisao: o executavel do codex mudou durante a revisao: ${loc.caminho}\n`);
       return { motivo: "codex-erro" };
     }
     let bruto;

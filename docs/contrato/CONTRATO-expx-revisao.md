@@ -62,7 +62,7 @@ Não há parâmetro: vale em `obrigatoria` e em `se_disponivel`. A evidência da
   (`caminho-com-virgula`, `arquivo-inexistente`, `fatiamento-invalido`,
   `arquivo-nao-commitado`), o `snapshot`, o `arquivo-mudou-durante-revisao` e toda
   `incompleta`: cobertura parcial não é indisponibilidade.
-- **O Codex** é o `codex` do `PATH`, achado pelo núcleo, que roda e mede o mesmo arquivo: no POSIX, o primeiro `codex` executável; no Windows, `codex.com` ou `codex.exe`, senão o alvo do primeiro `codex.cmd` do npm (`node_modules/@openai/codex/...`), pelo `node`, como na CodeAnt. Não há gancho que o troque (conselhos#315). Numa tentativa só: `codex --version` (a versão),
+- **O Codex** é o `codex` do `PATH`, achado pelo núcleo, que roda e mede o mesmo arquivo: no POSIX, o primeiro `codex` executável (o script com shebang de `node`, como o do npm, roda pelo `node` do próprio núcleo, nunca pelo `node` do `PATH`); no Windows, `codex.com` ou `codex.exe`, senão o alvo do primeiro `codex.cmd` do npm (`node_modules/@openai/codex/...`), pelo `node`, como na CodeAnt. Não há gancho que o troque (conselhos#315). O Codex roda sem `NODE_OPTIONS`, `NODE_PATH`, `LD_PRELOAD`, `LD_AUDIT`, `DYLD_INSERT_LIBRARIES` e `DYLD_LIBRARY_PATH` do ambiente, que injetariam código sem mudar o arquivo medido, e o arquivo é medido de novo depois de rodar: mudou, `codex-erro`. Numa tentativa só: `codex --version` (a versão),
   `codex login status` (saída ≠ 0 é `codex-sem-login`; o agente nunca roda `codex login`) e
   `codex exec --ephemeral --ignore-user-config -s read-only -m gpt-5.6-terra -c model_reasoning_effort="high" -C <snapshot> --output-schema <schema> -o <arquivo> -`,
   com o pedido fixo pelo stdin e o prazo da CLI (15 minutos). O modelo é fixo no núcleo,
@@ -79,7 +79,7 @@ Não há parâmetro: vale em `obrigatoria` e em `se_disponivel`. A evidência da
   um que sai da raiz) faz a resposta inválida, e nada se lê dele. A linha além do fim do arquivo não se
   liga a nada e fica `aberto`, nunca `anterior` (CodeAnt no expxdev#164; desde a 0.14.1, a `derivacao: 3` vale isso também para a CodeAnt). `aberto`/`anterior`, `derivacao` e `rejeitar` valem como sempre.
 - **Os dois fora:** `indisponivel:<motivo da CodeAnt>+<motivo do Codex>`, com `codex-ausente`,
-  `codex-sem-login`, `codex-erro` (saída ≠ 0, ou a versão que não se lê),
+  `codex-sem-login`, `codex-erro` (saída ≠ 0, a versão que não se lê, ou o executável que muda durante a revisão),
   `codex-tempo-esgotado` ou `codex-saida-invalida` (texto livre, fora do schema, ou
   `arquivos_revisados` diferente dos enviados, ou issue fora deles). Em `obrigatoria`, FALHA; em
   `se_disponivel`, AVISO. Achado do Codex, evidência inválida e `incompleta` continuam
@@ -88,7 +88,8 @@ Não há parâmetro: vale em `obrigatoria` e em `se_disponivel`. A evidência da
   versão da CLI, o modelo, o executável que rodou (`executavel`: o caminho real e o sha256 dele), os
   campos da resposta na forma do schema, o `stdout_sha256` do texto devolvido e o `prompt_sha256` do
   pedido, que o `conferir` refaz. Um `codex` falso posto antes no `PATH` revisa como o verdadeiro:
-  o caminho e o hash gravados são o que o PR mostra dele. Como na CodeAnt, quem edita a evidência edita
+  o caminho e o hash gravados são o que o PR mostra dele. Quem troca o arquivo e o destroca entre as
+  duas medidas também passa: é quem já controla a máquina. Como na CodeAnt, quem edita a evidência edita
   as `issues`, e só o núcleo grava a escala, com o motivo da CodeAnt nela; a defesa é o diff da
   evidência no PR.
 - **Recusado no desenho:** a escala nas skills, a escala depois de cobertura parcial, repetir
@@ -493,4 +494,4 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-11-11 | **Escala para o Codex** (0.14.0; pedido da orquestra_conselho depois do 403 de 2026-11-10; decisão do Flávio: "não é parâmetro, é escala"; desenho com o Codex): a CodeAnt fora por motivo escalável, o `revisar` revisa com o Codex sobre o mesmo snapshot, e a evidência é a v3 (`escala`, `revisor`, `chamada_codex`); os dois fora, `indisponivel:<CodeAnt>+codex-<motivo>`. O `conferir` aceita a v2 e a v3, refaz o pedido (`prompt_sha256`) e deriva os achados das `issues` do Codex. Modelo fixo, uma tentativa, 15 minutos; a severidade não decide. |
 | 2026-11-11 | Achados do Codex e do CodeAnt na 0.14.0: o motivo do Codex com os dois fora é um dos cinco do contrato, e o `conferir` recusa outro (`evidencia-invalida:escala`); no Windows, sem `codex.exe`, o alvo do `codex.cmd` do npm roda pelo `node`; o `rejeitar` confere os blobs de novo depois de gravar e desfaz a gravação se algum mudou no meio (katosmv/login#79). |
 | 2026-11-11 | Revisão do expxdev#164 (CodeAnt): a issue do Codex fora dos enviados (inclusive o caminho que sai da raiz, que o `revisar` leria) faz a resposta inválida (`codex-saida-invalida`), e o `conferir` a recusa (`chamada`); a linha do Codex além do fim do arquivo fica `aberto`. A regra da CodeAnt não muda: mudaria os achados das evidências v2 já gravadas. |
-| 2026-11-11 | 0.14.1: sai o gancho `EXPX_REVISAO_TESTE_CODEX` (CodeAnt no conselhos#315: ele trocava o Codex por qualquer script no núcleo instalado); o núcleo acha o `codex` no `PATH`, roda e mede o mesmo arquivo, e a v3 grava `revisor.executavel` (caminho real e sha256), que o `conferir` exige. **`derivacao: 3`**: a issue fora da task não é lida e, como a linha além do fim do arquivo, fica `aberto`, também para a CodeAnt (a 1 e a 2 continuam conferidas pela regra delas). A releitura depois da revisão cobre todo arquivo presente da task, não só os enviados (conselhos#312). |
+| 2026-11-11 | 0.14.1: sai o gancho `EXPX_REVISAO_TESTE_CODEX` (CodeAnt no conselhos#315: ele trocava o Codex por qualquer script no núcleo instalado); o núcleo acha o `codex` no `PATH`, roda e mede o mesmo arquivo, e a v3 grava `revisor.executavel` (caminho real e sha256), que o `conferir` exige. **`derivacao: 3`**: a issue fora da task não é lida e, como a linha além do fim do arquivo, fica `aberto`, também para a CodeAnt (a 1 e a 2 continuam conferidas pela regra delas). A releitura depois da revisão cobre todo arquivo presente da task, não só os enviados (conselhos#312). O Codex roda sem as variáveis que injetam código (`NODE_OPTIONS` e o carregador dinâmico), o script de `node` roda pelo `node` do núcleo, e o executável é medido antes e depois (Codex na revisão da 0.14.1). |

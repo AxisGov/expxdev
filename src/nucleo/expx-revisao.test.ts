@@ -1931,7 +1931,9 @@ describe("expx-revisao.mjs: correções P1 do Login (falha fechada)", () => {
 describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
   it("estrutural: o núcleo não tem gancho que troque o Codex (conselhos#315), e o PATH da suíte não tem `codex` de verdade", () => {
     expect(readFileSync(SCRIPT, "utf8")).not.toMatch(/EXPX_REVISAO_TESTE_CODEX|process\.env\.[A-Z_]*CODEX/);
-    const comCodex = (process.env["PATH"] ?? "").split(delimiter).filter((d) => ["codex", "codex.exe", "codex.com", "codex.cmd"].some((n) => existsSync(join(d, n))));
+    // a chave do PATH em qualquer caixa (`Path` no Windows)
+    const chave = Object.keys(process.env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+    const comCodex = (process.env[chave] ?? "").split(delimiter).filter((d) => ["codex", "codex.exe", "codex.com", "codex.cmd"].some((n) => existsSync(join(d, n))));
     expect(comCodex).toEqual([]);
   });
 
@@ -2093,6 +2095,31 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
     const ev = evidencia(c.raiz) as Record<string, Record<string, unknown>>;
     escreve(c.raiz, EV, JSON.stringify({ ...ev, revisor: { ...ev["revisor"], executavel: undefined } }));
     expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:revisor" });
+  });
+
+  it("funcional: o Codex roda sem NODE_OPTIONS do ambiente (código injetado não passaria no caminho e no hash gravados; Codex no #315)", () => {
+    const { c, codex, rev } = escala({ resposta: resposta() });
+    altera3(c.raiz);
+    expect(rev("src/a.js", [], { NODE_OPTIONS: "--max-old-space-size=4096" }).rc).toBe(0);
+    expect(chamadasDoCodex(codex)[0]?.nodeOptions).toBeNull();
+  });
+
+  it.skipIf(process.platform === "win32")("funcional: fora do Windows, o `codex` com `#!/usr/bin/env node` roda pelo node do núcleo, nunca pelo `node` do PATH (Codex no #315)", () => {
+    const c = cenario();
+    const codex = instalarCodexFalso(temp("expx-codex-"), { resposta: resposta() }, "env");
+    const falso = temp("expx-node-falso-");
+    const marca = join(falso, "rodou");
+    writeFileSync(join(falso, "node"), `#!/bin/sh\necho rodou > ${JSON.stringify(marca)}\nexit 1\n`, { mode: 0o755 });
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js", "T-01", `${falso}${delimiter}${codex.path}${delimiter}${SEM_CODEANT}`);
+    expect([r.rc, existsSync(marca)]).toEqual([0, false]);
+    expect(chamadasDoCodex(codex)).toHaveLength(1);
+  });
+
+  it("funcional: o executável do Codex que muda durante a revisão → codex-erro, nada revisado (Codex no #315)", () => {
+    const { c, rev } = escala({ resposta: resposta(), alteraSiMesmo: true });
+    altera3(c.raiz);
+    expect(rev()).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "cli-ausente+codex-erro" } });
   });
 
   it("funcional: conferir recusa o motivo do Codex fora dos cinco do contrato (Codex)", () => {

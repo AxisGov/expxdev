@@ -3,8 +3,10 @@ import { delimiter, join } from "node:path";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
-// O PATH de quem roda, sem as pastas que têm um `codex` (o nome que o núcleo procura em cada sistema).
-const PATH_SEM_CODEX = (process.env["PATH"] ?? "")
+// O PATH de quem roda, sem as pastas que têm um `codex` (o nome que o núcleo procura em cada sistema), na mesma chave
+// (`Path` no Windows).
+const CHAVE_DO_PATH = Object.keys(process.env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+const PATH_SEM_CODEX = (process.env[CHAVE_DO_PATH] ?? "")
   .split(delimiter)
   .filter((d) => !["codex", "codex.exe", "codex.com", "codex.cmd"].some((n) => existsSync(join(d, n))))
   .join(delimiter);
@@ -49,7 +51,7 @@ export default defineConfig({
           environment: "node",
           // A escala do `expx-revisao` nunca chama o `codex` de verdade num teste: o PATH da suíte não tem nenhuma pasta
           // com `codex`, e o teste que precisa dele põe o falso na frente (src/teste/codex-falso.ts).
-          env: { PATH: PATH_SEM_CODEX },
+          env: { [CHAVE_DO_PATH]: PATH_SEM_CODEX },
           // Estes testes clonam repositorios git de verdade em pasta temporaria.
           // Sob a carga da suite completa em paralelo, 30s nao bastam: o teste
           // falhava por timeout, nunca por assercao.

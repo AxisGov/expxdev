@@ -18,7 +18,12 @@ export interface CfgCodex {
   saida?: number;
   /** Milissegundos de espera no `exec`, para simular o Codex que trava. */
   dorme?: number;
+  /** No `exec`, acrescenta uma linha ao próprio arquivo (o binário trocado durante a revisão). */
+  alteraSiMesmo?: boolean;
 }
+
+/** No POSIX, o shebang: o `node` absoluto (padrão) ou `#!/usr/bin/env node`, que entrega o interpretador ao PATH. */
+export type Shebang = "absoluto" | "env";
 
 export interface Codex {
   /** A pasta que vai no `PATH`. */
@@ -32,6 +37,8 @@ export interface ChamadaCodex {
   args: string[];
   cwd: string;
   stdin: string;
+  /** O `NODE_OPTIONS` que o Codex recebeu, ou null. */
+  nodeOptions: string | null;
 }
 
 const programa = (dir: string): string => `const fs = require("node:fs");
@@ -43,7 +50,8 @@ if (a[0] === "--version") { process.stdout.write("codex-cli " + (cfg.versao ?? "
 if (a[0] === "login" && a[1] === "status") process.exit(cfg.logado === false ? 1 : 0);
 if (a[0] !== "exec") process.exit(2);
 const stdin = fs.readFileSync(0, "utf8");
-fs.appendFileSync(path.join(dir, "chamadas.jsonl"), JSON.stringify({ args: a, cwd: process.cwd(), stdin }) + "\\n");
+fs.appendFileSync(path.join(dir, "chamadas.jsonl"), JSON.stringify({ args: a, cwd: process.cwd(), stdin, nodeOptions: process.env.NODE_OPTIONS ?? null }) + "\\n");
+if (cfg.alteraSiMesmo) fs.appendFileSync(__filename, "\\n// trocado durante a revisao\\n");
 if (cfg.dorme) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, cfg.dorme);
 if (cfg.saida) process.exit(cfg.saida);
 const o = a[a.indexOf("-o") + 1];
@@ -51,7 +59,7 @@ const r = cfg.resposta ?? { arquivos_revisados: [], issues: [] };
 fs.writeFileSync(o, typeof r === "string" ? r : JSON.stringify(r));
 `;
 
-export function instalarCodexFalso(base: string, cfg: CfgCodex = {}): Codex {
+export function instalarCodexFalso(base: string, cfg: CfgCodex = {}, shebang: Shebang = "absoluto"): Codex {
   const path = join(base, "bin");
   mkdirSync(path, { recursive: true });
   let executavel: string;
@@ -63,7 +71,7 @@ export function instalarCodexFalso(base: string, cfg: CfgCodex = {}): Codex {
     writeFileSync(join(path, "codex.cmd"), '@ECHO off\r\n"%_prog%"  "%dp0%\\node_modules\\@openai\\codex\\bin\\codex.js" %*\r\n');
   } else {
     executavel = join(path, "codex");
-    writeFileSync(executavel, `#!${process.execPath}\n${programa(base)}`, { mode: 0o755 });
+    writeFileSync(executavel, `#!${shebang === "env" ? "/usr/bin/env node" : process.execPath}\n${programa(base)}`, { mode: 0o755 });
   }
   const codex = { path, executavel, dir: base };
   configurarCodex(codex, cfg);
