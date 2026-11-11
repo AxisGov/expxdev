@@ -2109,11 +2109,15 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
     altera3(c.raiz);
     const fora = temp("expx-libs-");
     const injeta = Object.fromEntries(["LD_LIBRARY_PATH", "LD_QUALQUER", "DYLD_FRAMEWORK_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "GCONV_PATH", "BASH_ENV", "ENV",
-      "NODE_PATH", "PYTHONPATH", "PYTHONSTARTUP", "PERL5OPT", "PERL5LIB", "RUBYOPT", "RUBYLIB", "GIT_QUALQUER"].map((k) => [k, fora]));
+      "NODE_PATH", "PYTHONPATH", "PYTHONSTARTUP", "PYTHONHOME", "PERL5OPT", "PERL5LIB", "PERLLIB", "RUBYOPT", "RUBYLIB", "JAVA_TOOL_OPTIONS",
+      "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS", "DOTNET_STARTUP_HOOKS", "CORECLR_PROFILER", "LUA_INIT", "GIT_QUALQUER"].map((k) => [k, fora]));
     // `GIT_*` que não quebram o git do próprio núcleo (um `GIT_DIR` trocaria o repositório dele também): o prefixo é o que se prova
     const r = rev("src/a.js", [], { ...injeta, GIT_TRACE: "0", HTTPS_PROXY: "http://proxy.exemplo.invalid:3128" });
     expect(r.rc).toBe(0);
-    expect(chamadasDoCodex(codex)[0]?.ambiente).toEqual({ HTTPS_PROXY: "http://proxy.exemplo.invalid:3128" });
+    // a ausência das bloqueadas e a presença do proxy, não a igualdade: o ambiente de quem roda a suíte pode ter `https_proxy` (CodeAnt no #167)
+    const recebido = chamadasDoCodex(codex)[0]?.ambiente ?? {};
+    expect(Object.keys(recebido).filter((k) => Object.hasOwn(injeta, k) || /^(GIT_|LD_|DYLD_)/i.test(k))).toEqual([]);
+    expect(recebido["HTTPS_PROXY"]).toBe("http://proxy.exemplo.invalid:3128");
   });
 
   it.skipIf(process.platform === "win32")("funcional: fora do Windows, o `codex` com `#!/usr/bin/env node` roda pelo node do núcleo, nunca pelo `node` do PATH (Codex no #315)", () => {
