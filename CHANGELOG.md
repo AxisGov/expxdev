@@ -9,6 +9,18 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.3 — o ambiente do Codex e o arquivo que muda durante a revisão
+
+Instale por PR, como a 0.14.2. Muda o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`), a runx (AxisGov/runx#27, merge 575677f, DR-120) e a sprintx (AxisGov/sprintx#80, merge 9e4de6d, DS-222). O `init` passa a instalar esses dois commits. Os eventos, o `doctor`, o painel e o `expx sessao` seguem como na 0.14.2. Os achados são da CodeAnt no katosmv/login#83 (instalação da 0.14.2), do CodeRabbit no runx#27 e da revisão do Codex.
+
+- **O Codex não herda o que injeta código** (CodeAnt no katosmv/login#83, segurança). A lista da 0.14.1 esquecia o `LD_LIBRARY_PATH` e os primos do macOS, que carregam biblioteca de uma pasta controlada sem mudar o hash do executável gravado. Agora o Codex não herda:
+  - nenhuma variável `LD_*`, `DYLD_*` ou `GIT_*`, bloqueadas por prefixo;
+  - `GCONV_PATH`, `NODE_OPTIONS`, `NODE_PATH`, `BASH_ENV`, `ENV`, `PYTHONPATH`, `PYTHONSTARTUP`, `PERL5OPT`, `PERL5LIB`, `RUBYOPT` e `RUBYLIB`, que valem também para os comandos que ele roda no sandbox.
+
+  O resto do ambiente passa (proxy, certificado, `CODEX_*`). É bloqueio, não lista de permissão, para não quebrar o Codex num ambiente que a lista não previsse.
+- **O arquivo que muda durante a revisão** (CodeRabbit no runx#27, anterior a esta versão). Na runx e na sprintx, o `arquivo-mudou-durante-revisao` deixa de ser tratado como indisponibilidade: o agente roda de novo o subconjunto afetado, confere o critério de aceite e roda o `revisar` de novo, inclusive depois de uma saída 1. Se mudar outra vez, ele para e diz. Antes, em `se_disponivel`, a task fechava com aviso, usando os testes de antes da mudança.
+- **Textos:** `git worktree repair "<novo caminho>"` ganhou aspas, e a abertura da saída 2 cobre o `arquivo-mudou-durante-revisao`.
+
 ## 0.14.2 — a identidade dos achados do Codex
 
 Instale por PR, como a 0.14.1. Muda só o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`). A runx, a sprintx, os eventos, o `init`, o `doctor`, o painel e o `expx sessao` seguem como na 0.14.1. O achado é da CodeAnt no katosmv/login#81 (instalação da 0.14.0).
