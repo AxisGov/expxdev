@@ -341,7 +341,8 @@ function codexRoda(a, opcoes) {
   const falso = process.env.EXPX_REVISAO_TESTE_CODEX;
   if (falso === undefined) {
     const r = spawnSync("codex", a, opcoes);
-    const shim = r.error?.code === "ENOENT" ? codexDoShim() : undefined;
+    // `codex` sem extensão só acha `.com`/`.exe` (ENOENT); um `.cmd` que o Node chegue a resolver sem shell dá EINVAL
+    const shim = ["ENOENT", "EINVAL"].includes(r.error?.code) ? codexDoShim() : undefined;
     return shim ? spawnSync(process.execPath, [shim, ...a], opcoes) : r;
   }
   if (!isAbsolute(falso) || !existsSync(falso)) return { error: { code: "ENOENT" } };
