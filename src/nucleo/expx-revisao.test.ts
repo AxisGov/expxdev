@@ -2032,6 +2032,22 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
     expect(conferir(c.raiz, "se_disponivel", `T-01=${sha}`)).toMatchObject({ rc: 3, out: `T-01 AVISO indisponivel:cli-ausente+${codexMotivo}` });
   });
 
+  it.each([
+    ["que sai da raiz", "../../../../dev/zero"],
+    ["fora da task", "src/outro.js"],
+  ])("funcional: issue do Codex com arquivo %s → codex-saida-invalida, sem ler o arquivo (CodeAnt no expxdev#164)", (_n, arquivo) => {
+    const { c, rev } = escala({ resposta: resposta([doCodex(arquivo, 1)]) });
+    altera3(c.raiz);
+    expect(rev()).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "cli-ausente+codex-saida-invalida" } });
+  });
+
+  it("funcional: issue do Codex numa linha além do fim do arquivo fica aberta, nunca anterior (CodeAnt no expxdev#164)", () => {
+    const { c, rev } = escala({ resposta: resposta([doCodex("src/a.js", 99)]) });
+    altera3(c.raiz);
+    expect(rev()).toMatchObject({ rc: 1, ev: { resultado: "achados", achados: [{ linha: 99, estado: "aberto" }] } });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
+  });
+
   it("funcional: Codex que não responde no tempo → codex-tempo-esgotado, sem esperar ele terminar", () => {
     const { c, codex } = escala({ dorme: 20_000, resposta: resposta() });
     altera3(c.raiz);
@@ -2052,6 +2068,10 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
       ["evidencia-invalida:revisor", (ev) => { ev["revisor"] = { ...ev["revisor"], nome: "outro" }; }],
       ["evidencia-invalida:chamada", (ev) => { ev["chamada_codex"] = { ...ev["chamada_codex"], prompt_sha256: "0".repeat(64) }; }],
       ["evidencia-invalida:cobertura", (ev) => { ev["chamada_codex"] = { ...ev["chamada_codex"], arquivos_revisados: [] }; }],
+      ["evidencia-invalida:chamada", (ev) => {
+        const ch = ev["chamada_codex"] as { issues: { arquivo: string }[] };
+        ev["chamada_codex"] = { ...ch, issues: ch.issues.map((i) => ({ ...i, arquivo: "src/outro.js" })) };
+      }],
       ["evidencia-invalida:achados", (ev) => { (ev["achados"] as unknown as { estado: string }[])[0]!.estado = "anterior"; }],
     ];
     for (const [esperado, muda] of casos) {

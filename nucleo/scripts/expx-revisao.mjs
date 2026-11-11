@@ -331,6 +331,8 @@ function respostaDoCodex(r) {
       && Number.isSafeInteger(i.linha) && SEVERIDADES.includes(i.severidade) && typeof i.mensagem === "string") ? r : undefined;
 }
 /** As `issues` do Codex na forma da CodeAnt, para o `derivar`: a identidade não depende da severidade. */
+/** Toda issue do Codex num arquivo enviado (o pedido só nomeia esses). */
+const issuesNaTask = (issues, enviados) => issues.every((i) => enviados.includes(i.arquivo));
 const issuesDoCodex = (issues) => issues.map((i) => ({ relevant_file: i.arquivo, start_line: i.linha, label: "codex", issue_content: i.mensagem }));
 const versaoDoRevisor = (r) => `codex:${r.versao}:${r.modelo}:${r.formato}`;
 const mesmosArquivos = (a, b) => Array.isArray(a) && a.length === b.length && new Set(a).size === a.length && b.every((f) => a.includes(f));
@@ -670,7 +672,7 @@ function revisar() {
     return true;
   };
   /** 10. O que foi revisado é o que vai ao commit, e os achados das `issues` (na forma da CodeAnt) do revisor `versao`. */
-  const concluir = (issues, versao) => {
+  const concluir = (issues, versao, estrito = false) => {
     for (const f of enviados) {
       const m = medida(f);
       if (!m || ["blob", "bytes", "linhas", "disco"].some((k) => m[k] !== medidas[f][k])) return fim("indisponivel", "arquivo-mudou-durante-revisao");
@@ -680,7 +682,7 @@ function revisar() {
     // derivação 2: do blob da partida ao blob que vai ao commit, os mesmos do `conferir`, que não dependem do checkout
     const partida = base ?? headDaRevisao;
     ev.achados = derivar(issues, ev.arquivos, versao,
-      movidasPor(Object.keys(ev.arquivos), (f) => (partida ? blobEm(partida, f) : undefined), (f) => ev.arquivos[f]?.blob ?? undefined), lido)
+      movidasPor(Object.keys(ev.arquivos), (f) => (partida ? blobEm(partida, f) : undefined), (f) => ev.arquivos[f]?.blob ?? undefined), lido, estrito)
       .map((a) => ({ ...a, estado: rejeitadas.has(a.identidade) ? "rejeitado" : a.estado }));
     if (ev.achados.some((a) => a.estado === "aberto")) ev.resultado = "achados";
     return undefined;
@@ -696,9 +698,12 @@ function revisar() {
     ev.revisor = { nome: "codex", versao: cx.versao, modelo: MODELO_CODEX, formato: FORMATO_CODEX };
     ev.chamada_codex = { include: enviados, arquivos_revisados: cx.resposta?.arquivos_revisados ?? null, issues: cx.resposta?.issues ?? null,
       stdout_sha256: sha256(cx.bruto), prompt_sha256: sha256(cx.pedido) };
-    // texto livre, fora do schema ou sem a task inteira: nada revisado
-    if (!cx.resposta || !mesmosArquivos(cx.resposta.arquivos_revisados, enviados)) return fim("indisponivel", `${motivo}+codex-saida-invalida`);
-    return concluir(issuesDoCodex(cx.resposta.issues), versaoDoRevisor(ev.revisor));
+    // texto livre, fora do schema, sem a task inteira ou com issue fora dela (nunca se lê um caminho que o modelo inventou,
+    // como `../../dev/zero`): nada revisado
+    if (!cx.resposta || !mesmosArquivos(cx.resposta.arquivos_revisados, enviados) || !issuesNaTask(cx.resposta.issues, enviados)) {
+      return fim("indisponivel", `${motivo}+codex-saida-invalida`);
+    }
+    return concluir(issuesDoCodex(cx.resposta.issues), versaoDoRevisor(ev.revisor), true);
   };
   try { (() => {
     // 1. o pedido não se revisa como está
@@ -791,7 +796,7 @@ function rejeitadasDoTrabalho() {
 /** Os achados das `issues` da CLI, sem rejeição: `aberto` (linha alterada) ou `anterior`. `alt(f)` dá as linhas alteradas
  *  de um arquivo da task (Set, ou `true` para todas) e `texto(f)` o conteúdo (ou ""). A mesma regra no `revisar` (checkout)
  *  e no `conferir` (commit da task), para que `achados` seja derivável das `issues` gravadas. */
-function derivar(issues, arquivos, versao, alt, texto) {
+function derivar(issues, arquivos, versao, alt, texto, estrito = false) {
   const cache = new Map();
   return issues.map((i) => {
     const arquivo = caminho(String(i.relevant_file ?? ""));
@@ -802,7 +807,10 @@ function derivar(issues, arquivos, versao, alt, texto) {
     const label = String(i.label ?? "");
     const identidade = createHash("sha256").update([label, arquivo, ...viz, versao].join("\0")).digest("hex");
     // Achado que não se liga a uma linha de um arquivo da task não pode ser dado por anterior: fica aberto.
-    const semVinculo = !Object.hasOwn(arquivos, arquivo) || !Number.isSafeInteger(linha) || linha < 1;
+    // `estrito` (o Codex): a linha além do fim do arquivo também não se liga a nada. A CodeAnt fica como sempre, porque mudar a
+    // regra dela mudaria os achados das evidências v2 já gravadas
+    const ultima = c.linhas.length - (c.linhas.at(-1) === "" ? 1 : 0);
+    const semVinculo = !Object.hasOwn(arquivos, arquivo) || !Number.isSafeInteger(linha) || linha < 1 || (estrito && linha > ultima);
     return { identidade, arquivo, linha, label, texto: String(i.issue_content ?? ""), estado: semVinculo || c.alt === true || c.alt.has(linha) ? "aberto" : "anterior" };
   });
 }
@@ -863,7 +871,8 @@ function semSinalDoCodex(ev, sha, enviados, perfil) {
   if (!ehMapa(r) || r.nome !== "codex" || typeof r.versao !== "string" || r.modelo !== MODELO_CODEX || r.formato !== FORMATO_CODEX) return "revisor";
   const ch = ev.chamada_codex;
   if (!ehMapa(ch) || !Array.isArray(ch.include) || !ch.include.every((f) => typeof f === "string")
-    || !respostaDoCodex({ arquivos_revisados: ch.arquivos_revisados, issues: ch.issues }) || !/^[0-9a-f]{64}$/.test(ch.stdout_sha256)
+    || !respostaDoCodex({ arquivos_revisados: ch.arquivos_revisados, issues: ch.issues }) || !issuesNaTask(ch.issues, ch.include)
+    || !/^[0-9a-f]{64}$/.test(ch.stdout_sha256)
     || ch.prompt_sha256 !== sha256(pedidoAoCodex(baseDoPedido(ev), ch.include))) return "chamada";
   if (enviados.length > perfil.max_files) return "L1";
   for (const f of enviados) {
@@ -1006,7 +1015,7 @@ function achadosDivergem(ev, sha) {
     const alt = ev.derivacao === 2 ? movidasPor(Object.keys(ev.arquivos), (f) => blobEm(de, f), (f) => blobEm(sha, f)) : (f) => alteradas(f, de, sha);
     // pelo JSON, como foi gravado (`NaN` vira `null`)
     const [issues, versao] = ev.expx_revisao === 3 ? [issuesDoCodex(ev.chamada_codex.issues), versaoDoRevisor(ev.revisor)] : [ev.chamada.issues, ev.cli.versao];
-    derivados = JSON.parse(JSON.stringify(derivar(issues, ev.arquivos, versao, alt, texto)));
+    derivados = JSON.parse(JSON.stringify(derivar(issues, ev.arquivos, versao, alt, texto, ev.expx_revisao === 3)));
   }
   const rejeitadas = rejeicoesNoCommit(ev, sha);
   if (ev.achados.length !== derivados.length || derivados.some((d, k) => {
