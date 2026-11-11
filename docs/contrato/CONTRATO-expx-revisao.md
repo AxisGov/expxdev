@@ -284,7 +284,7 @@ Acrescenta `{identidade, motivo, em}` em `rejeicoes` e muda o achado para
 não mudam (rejeitar um achado não cobre o que a CLI não revisou). Sai 1 se a evidência
 ou o achado não existe, e também, sem gravar nada, se um arquivo da evidência mudou depois do
 `revisar`: o `hash-object` do checkout difere do `blob` gravado, ou o arquivo dado por removido
-existe de novo (`evidencia desatualizada: <arquivo>`). A rejeição valeria para um conteúdo que
+existe de novo, inclusive como link quebrado, ou não se prova ausente (só `ENOENT`/`ENOTDIR` provam; permissão ou E/S que falha não) (`evidencia desatualizada: <arquivo>`). A rejeição valeria para um conteúdo que
 não vai ao commit; a rota é rodar o `revisar` de novo.
 
 Só o desenvolvedor rejeita. O agente classifica, deduplica e contesta (bloqueio

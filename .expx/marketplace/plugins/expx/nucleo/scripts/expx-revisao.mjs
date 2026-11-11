@@ -901,9 +901,10 @@ function listar() {
   process.exitCode = tasks.some((t) => t.listagem === "invalida") ? 1 : tasks.some((t) => t.listagem === "ausente") ? 3 : 0;
 }
 
-/** `f` está no checkout, link quebrado inclusive (o `existsSync` segue o link e o daria por ausente; o git o commitaria). */
+/** `f` está no checkout, link quebrado inclusive (o `existsSync` segue o link e o daria por ausente; o git o commitaria).
+ *  Só a ausência provada (`ENOENT`, `ENOTDIR`) é ausência: permissão ou E/S que falha não prova nada e conta como presente. */
 function presenteSemSeguirLink(f) {
-  try { lstatSync(join(op.raiz, f)); return true; } catch { return false; }
+  try { lstatSync(join(op.raiz, f)); return true; } catch (e) { return !["ENOENT", "ENOTDIR"].includes(e?.code); }
 }
 
 function rejeitar() {

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -1260,6 +1260,23 @@ describe("expx-revisao.mjs conferir e rejeitar", () => {
     symlinkSync("nao-existe.js", join(c.raiz, "src/b.js"));
     const r = roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp");
     expect([r.rc, r.err.includes("evidencia desatualizada: src/b.js")]).toEqual([1, true]);
+  });
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)("funcional: fora do Windows, removido que não se pode ver (pasta sem permissão) não conta como ausente → rejeitar recusa (CodeAnt)", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    escreve(c.raiz, "d/b.js", "b1\n");
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "b");
+    rmSync(join(c.raiz, "d/b.js"));
+    altera3(c.raiz);
+    const id = revisar(c, "src/a.js,d/b.js").ev.achados[0]?.identidade ?? "";
+    expect(id).not.toBe("");
+    escreve(c.raiz, "d/b.js", "b1\n");
+    chmodSync(join(c.raiz, "d"), 0o000);
+    try {
+      const r = roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp");
+      expect([r.rc, r.err.includes("evidencia desatualizada: d/b.js")]).toEqual([1, true]);
+    } finally { chmodSync(join(c.raiz, "d"), 0o755); }
   });
 
   it("funcional: rejeitar entre a releitura e a gravação do revisar não se perde (trava por evidência)", async () => {
