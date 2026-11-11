@@ -15,8 +15,8 @@ Instale por PR, como a 0.14.2. Muda o núcleo (`expx-revisao.mjs` e o contrato `
 
 - **O Codex não herda o que injeta código** (CodeAnt no katosmv/login#83, segurança). A lista da 0.14.1 esquecia o `LD_LIBRARY_PATH` e os primos do macOS, que carregam biblioteca de uma pasta controlada sem mudar o hash do executável gravado. Agora o Codex não herda:
   - nenhuma variável `LD_*`, `DYLD_*` ou `GIT_*`, bloqueadas por prefixo;
-  - as famílias dos runtimes `PYTHON*`, `PERL*`, `RUBY*`, `JAVA*`, `CORECLR_*` e `LUA_INIT*`, também por prefixo;
-  - `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS`, `DOTNET_STARTUP_HOOKS`, `GCONV_PATH`, `NODE_OPTIONS`, `NODE_PATH`, `BASH_ENV` e `ENV`.
+  - `CORECLR_PROFILER*` e `LUA_INIT*`, também por prefixo;
+  - os injetores conhecidos de Node, Python, Perl, Ruby, Java e .NET (`NODE_OPTIONS`, `PYTHONPATH`, `PYTHONHOME`, `PERL5OPT`, `RUBYOPT`, `JAVA_TOOL_OPTIONS`, `DOTNET_STARTUP_HOOKS` e afins), mais `GCONV_PATH`, `BASH_ENV` e `ENV`. A configuração legítima desses runtimes (`JAVA_HOME`, `PYTHONIOENCODING`) passa.
 
   Isso vale também para os comandos que ele roda no sandbox. O resto do ambiente passa (proxy, certificado, `CODEX_*`). É bloqueio, não lista de permissão, para não quebrar o Codex num ambiente que a lista não previsse. A lista é defesa a mais, não fronteira: quem controla o ambiente também põe um `codex` falso no `PATH`, limite que o contrato já declara.
 - **O arquivo que muda durante a revisão** (CodeRabbit no runx#27, anterior a esta versão). Na runx e na sprintx, o `arquivo-mudou-durante-revisao` deixa de ser tratado como indisponibilidade: o agente roda de novo o subconjunto afetado, confere o critério de aceite e roda o `revisar` de novo, inclusive depois de uma saída 1. Se mudar outra vez, ele para e diz. Antes, em `se_disponivel`, a task fechava com aviso, usando os testes de antes da mudança.
