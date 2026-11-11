@@ -24,7 +24,7 @@ b1323d31872393330339d3f09f46a5f0d7cfa4a880dc54a52be9d2863befb1f3  .claude/hooks/
 c79f5061a97281b6b82f4593df8aded01adb631e356dae9d1594c5c0c6fd5da1  .claude/hooks/testes/agente-real-rastro.sh
 f28582b7834fc475936b536531cfc8d05409f8ab7abd1bc7975a44f3f0781fc3  .claude/hooks/testes/bancada-autorizacao-f6.sh
 9675711736ebae34584c407d2ab781a015e1779f5a0feb05be2598090c15845b  .claude/hooks/testes/bancada-base-encadeada.sh
-68a45adf2febc710f8b690cc13b7c43ddf56782ccf27bbb6069e2cf764490302  .claude/hooks/testes/bancada-bloqueio-replanejamento.sh
+2f8a9cf559ad03d55d17d44a246ba17bed27c128099d3f24bd7f4d0972c8ddad  .claude/hooks/testes/bancada-bloqueio-replanejamento.sh
 1a8b6eb9d3fd8d0b9f35b285a448d5a4356cc5eda4702751b3dbb9cec5b3c9d6  .claude/hooks/testes/bancada-desvio-estimativa.sh
 717a4a04cb0a595ba3babe7a95f0a9342b81c80284c442aaa15a65568e67cdff  .claude/hooks/testes/bancada-escopo-e-hooks.sh
 c42a3abff806d5251464d747ec486f5433c7337ed11936286096cb9c04f619d8  .claude/hooks/testes/bancada-escopo-links.sh
@@ -36,11 +36,11 @@ b2b9f7b6b8c6349316092989a7babefd495ee6c9ff89bcf2c6dc6ba76d66ac8d  .claude/hooks/
 14c07b1657547c0a90f15b18d71237f165219a67e21d87331d47fdcd0e99abc1  .claude/hooks/testes/bancada-runx-na-mesma-arvore.sh
 c4585b4985bc6187d61677ddf68430d51183c3b5a4ad4a6c295d76b523b79d85  .claude/hooks/testes/bancada-segredo-limite.sh
 f7174dee86fb586fc35fa09a029ba2438d25095351309c14a64b060961d085f6  .claude/hooks/testes/bancada-segredo-sem-git.sh
-b15910749e0b4a8f33ed6d00625c9b8825b1a77aee823752b3c487aa98a75083  .claude/hooks/testes/bancada.sh
+20ab0ca2e7e1b696a3bfde420825a87e35d28dd36414ed224921ab1e83ec5f73  .claude/hooks/testes/bancada.sh
 d9370952ede36c379751835d4a711550bd37b95c16f127d841883a49e962d2a5  .claude/hooks/testes/fonte.sh
 00dc2c2d5319710f73f5f54616c5b652aa3f99879f8c75444c8002abeeb13483  .claude/hooks/testes/transcrito-agente.sh
 0354c304ed52b1d41becc8df83b36f4a3bf0b3543316bf0e569347ca719fe43d  .claude/settings.json
-b74d0e40a32d8bb8a64c8fd3580666383f7ba8218931bfc5aa39d54d8e7425c7  .claude/skills/sprintx/DECISOES-DA-SKILL.md
+fe33378a606a7c629c16aabb7d4272c4a2c83c29d09e945c6ac05bb4d99aa87e  .claude/skills/sprintx/DECISOES-DA-SKILL.md
 598819d4cbfb452e4b357ff73285d7c190ff85217b88f2725e4d7964ef76dd36  .claude/skills/sprintx/SKILL.md
 296b12dd80970ea12c8ac42de6de82a7f34b98e257587d139c8db8d7a4041343  .claude/skills/sprintx/assets/TEMPLATE-BLOQUEIOS.md
 87e9ed363f1a083e60fc37d2c48cb3315513a3a47950858dd445d8d5bc780de3  .claude/skills/sprintx/assets/TEMPLATE-DECISOES.md
@@ -58,12 +58,12 @@ ac3084e6f5f53fc19f53874467f4dcce3ccf9e8e0bac836bb1aa714acc5463f6  .claude/skills
 4db575c8ae17011a2868eae1b7aceb32b247b9eb7db37b51b847bce981a0817d  .claude/skills/sprintx/assets/TEMPLATE-tasks.md
 be133494a6bda66c7b28a4317fe7369a1e2eb6132f0f2328fe62d2d373ffc33e  .claude/skills/sprintx/decisoes/ajustes-anteriores-ao-p0.md
 991d36bfe7a2445f4b26aadbd129015181f507864529a55d3b0ad2ee49a87cd9  .claude/skills/sprintx/references/00-schema.md
-7ffbc9185688fe77dd5d6f12a1171018b9de323d3fea63195d054e91163b9503  .claude/skills/sprintx/references/01-ingestao.md
+62bba1d49bd43f1dc10768966123649815e861265034ad1034da2bb8b3518dd2  .claude/skills/sprintx/references/01-ingestao.md
 a4102c98bdd79bd6adb347ae31550e2c3f159a116dfe877650d19953fb6833e0  .claude/skills/sprintx/references/02-descoberta.md
 ea4f7911c1c4fdd412313c64566275b80b00f39d97e10ee69efd7c86cdd77642  .claude/skills/sprintx/references/03-plano.md
 81fc160be05bde218ab4e187eba2f84f9c565ff4de1126749ac041bd4ea1ca2e  .claude/skills/sprintx/references/04-orquestrador.md
 dee6609e9cb22c467a775a6a94372e4f3c9ff7ab968ff4d1d4332d195e744f5b  .claude/skills/sprintx/references/05-auditoria.md
-e46cf93647b4298758f257e7ed43f571f2e0eeea190cdf95641dca8546b14c5f  .claude/skills/sprintx/references/06-execucao.md
+db6ccd834dd2cb77bf07ed332636e42a43e2c9856a7c80f01c21312e5679b8b3  .claude/skills/sprintx/references/06-execucao.md
 7470ee3c03e137f825555b7f57f79aa529b54e0ecd5663b0bf9d095752fb90cf  .claude/skills/sprintx/references/07-estimativa.md
 8991177f18210ed91348742eb5f5d144962eafff604cd78406f5b9f5bf5c836a  .claude/skills/sprintx/references/08-rastro.md
 c4267a0df409dfc4f06c668640c7e135cdf7237ebbea0c8d88278ac792ec9129  .claude/skills/sprintx/references/09-diagrama.md
