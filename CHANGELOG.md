@@ -9,6 +9,14 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.13.27 — os achados da instalação da 0.13.26 no Login
+
+Instale por PR, como a 0.13.26. Muda o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`), a runx (AxisGov/runx#24, merge f8cdc2c, DR-116) e a sprintx (AxisGov/sprintx#77, merge 5921cc4, DS-219). O `init` passa a instalar esses dois commits. Os eventos, o `doctor`, o painel e o `expx sessao` seguem como na 0.13.26. Os achados são da CodeAnt no katosmv/login#78, confirmados no código.
+
+- **O `rejeitar` recusa a evidência desatualizada.** Se um arquivo da task mudava entre o `revisar` e o `rejeitar`, o `rejeitar` gravava `ok` sobre o blob antigo, e só o `conferir` do commit reprovava (`evidencia-nao-bate`). Agora ele sai 1, sem gravar nada (`evidencia desatualizada: <arquivo>`), quando o `hash-object` do checkout difere do blob gravado ou quando o arquivo dado por removido existe de novo, inclusive como link quebrado. A regra da F6 e do passo 8 do 03-fix passa a ser revisar de novo se um arquivo mudou depois do último `revisar`.
+- **O caminho real da worktree.** O `expx-worktree-isolada.sh` só reconhece a worktree do agente na branch inicial. Ao retomar a F1 ou o E1 nela, já na branch do trabalho, a sprintx e a runx gravavam `../<repo>--<slug>`. Agora gravam o caminho real do worktree em que a branch está, como o `git worktree list --porcelain` o lista.
+- **Não exercitado:** a retomada real de um subagente isolado (os testes são de conteúdo).
+
 ## 0.13.26 — código movido, o subagente isolado e os achados do Login na 0.13.24
 
 Instale por PR, como a 0.13.25. Muda o núcleo (`expx-revisao.mjs`, o novo `expx-worktree-isolada.sh` e os contratos `expx-revisao` e `expx-orquestracao`), a runx (AxisGov/runx#23, merge 473db26, DR-114 e DR-115) e a sprintx (AxisGov/sprintx#76, merge 0c3c8ef, DS-216 a DS-218). O `init` passa a instalar esses dois commits da runx e da sprintx. Os eventos, o `doctor`, o painel e o `expx sessao` seguem como na 0.13.25.

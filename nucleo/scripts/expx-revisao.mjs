@@ -901,11 +901,22 @@ function listar() {
   process.exitCode = tasks.some((t) => t.listagem === "invalida") ? 1 : tasks.some((t) => t.listagem === "ausente") ? 3 : 0;
 }
 
+/** `f` está no checkout, link quebrado inclusive (o `existsSync` segue o link e o daria por ausente; o git o commitaria).
+ *  Só a ausência provada (`ENOENT`, `ENOTDIR`) é ausência: permissão ou E/S que falha não prova nada e conta como presente. */
+function presenteSemSeguirLink(f) {
+  try { lstatSync(join(op.raiz, f)); return true; } catch (e) { return !["ENOENT", "ENOTDIR"].includes(e?.code); }
+}
+
 function rejeitar() {
   const erro = comTrava(op.task, () => {
     const ev = le(caminhoEv(op.task));
     const alvo = (ev?.achados ?? []).filter((a) => a.identidade === op.identidade);
     if (alvo.length === 0) return ev ? "achado nao encontrado" : "evidencia ausente";
+    // o arquivo da task que mudou depois do `revisar` (ou o removido que voltou): a rejeição valeria para um conteúdo que
+    // não vai ao commit, e o `conferir` reprovaria (`evidencia-nao-bate`). O `revisar` gravou o blob igual ao do checkout
+    const mudou = Object.entries(ehMapa(ev.arquivos) ? ev.arquivos : {})
+      .find(([f, m]) => (m === null ? presenteSemSeguirLink(f) : ehMapa(m) && m.blob !== idDe("hash-object", "--", f)))?.[0];
+    if (mudou !== undefined) return `evidencia desatualizada: ${mudou} mudou depois do revisar; rode o revisar de novo`;
     for (const a of alvo) a.estado = "rejeitado";
     ev.rejeicoes = [...(Array.isArray(ev.rejeicoes) ? ev.rejeicoes : []), { identidade: op.identidade, motivo: op.motivo, em: new Date().toISOString() }];
     // rejeitar um achado não muda o que a revisão não pôde fazer (indisponivel) nem o que ela não cobriu (incompleta)

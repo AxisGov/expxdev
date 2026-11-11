@@ -282,7 +282,10 @@ nunca menos).
 Acrescenta `{identidade, motivo, em}` em `rejeicoes` e muda o achado para
 `rejeitado`; o `resultado` é recalculado, exceto `indisponivel` e `incompleta`, que
 não mudam (rejeitar um achado não cobre o que a CLI não revisou). Sai 1 se a evidência
-ou o achado não existe.
+ou o achado não existe, e também, sem gravar nada, se um arquivo da evidência mudou depois do
+`revisar`: o `hash-object` do checkout difere do `blob` gravado, ou o arquivo dado por removido
+existe de novo, inclusive como link quebrado, ou não se prova ausente (só `ENOENT`/`ENOTDIR` provam; permissão ou E/S que falha não) (`evidencia desatualizada: <arquivo>`). A rejeição valeria para um conteúdo que
+não vai ao commit; a rota é rodar o `revisar` de novo.
 
 Só o desenvolvedor rejeita. O agente classifica, deduplica e contesta (bloqueio
 `revisao_contestada`), nunca aceita risco. Como o agente pode escrever o arquivo,
@@ -354,7 +357,8 @@ roda o `revisar` de novo "para conferir": a CLI varia entre chamadas ("O que o `
 atesta") e redescreve o mesmo ponto com outra vizinhança ou outro `label`, o que dá outra
 identidade, reabre o achado e troca a evidência que o desenvolvedor fechou (Login,
 ui-react-046, T-01.01). Só se revisa de novo quando um arquivo da task que vai ao commit
-mudou depois do `rejeitar`: aí a evidência não bate mais com o blob.
+mudou depois do último `revisar`: aí a evidência não bate mais com o blob. Se ele mudou antes
+do `rejeitar`, o `rejeitar` recusa (`evidencia desatualizada`).
 
 **Limite conhecido: o lock não revisável.** `package-lock.json` (e os outros nomes
 excluídos do perfil) não vai à CLI nem ao snapshot, e a CLI não tem canal para saber que
@@ -424,3 +428,4 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-11-10 | **`derivacao: 2`** (Login, ui-react-046: um teste dividido em dois arquivos fez o achado sobre código antigo ficar `aberto`): o trecho que a task só moveu, igual byte a byte, não é linha alterada, e o achado nele vira `anterior`. Diff por blob da partida ao commit, com algoritmo fixo; trecho com linha substantiva; cada remoção paga uma adição; do maior para o menor; teto de comparações. A evidência sem `derivacao` continua conferida pela regra 1. Desenho com o Codex (2 rodadas). |
 | 2026-11-10 | Revisão do expxdev#162 (CodeAnt): a derivação 2 tem também teto de linhas reunidas (1.000.000 `+` e `-`), antes da busca; o blob antigo só tinha o limite de 1 MiB, e 40 deles enchiam a memória antes do teto de comparações. Passou, nenhum crédito. |
 | 2026-11-10 | Lock contestado, alinhado à runx (03-fix) e à sprintx (06-execucao): a instalação congelada que falha por outro motivo não prova nada e vai com a contestação ao desenvolvedor; depois dela, o subconjunto de testes afetado roda de novo. |
+| 2026-11-10 | Achado do CodeAnt no katosmv/login#78 (instalação da 0.13.26): o `rejeitar` recusa, sem gravar, se um arquivo da evidência mudou depois do `revisar` (`evidencia desatualizada: <arquivo>`, saída 1). Antes, gravava `ok` sobre os blobs antigos, e só o `conferir` do commit reprovava. A regra de revisar de novo passa a ser "depois do último `revisar`". |

@@ -11,15 +11,15 @@ próxima release do ExpxDev. `--to <ref>` sai do certificado de propósito, uma
 skill por vez. O portão da release confere que cada certificado é ancestral da
 `main` da skill, e `catalogo.test.ts` confere esta tabela contra o catálogo.
 
-Commits certificados (confirmados na organização AxisGov em 2026-11-10; as trocas mais recentes são a runx e a sprintx da 0.13.26, com o subagente isolado do Claude Code, o lock contestado e os achados do login#77, DR-114, DR-115 e DS-216 a DS-218):
+Commits certificados (confirmados na organização AxisGov em 2026-11-10; as trocas mais recentes são a runx e a sprintx da 0.13.27, com os achados do login#78, DR-116 e DS-219):
 
 | Repositório | Commit certificado |
 |---|---|
-| `AxisGov/runx` | `473db26ec09fe70109db1aeeddeb80f4a3dde096` |
+| `AxisGov/runx` | `f8cdc2cd2b6dd49393cfb780472ec371617605f7` |
 | `AxisGov/legadox` | `a6a4629c47dc0fdfab75de0f6246ce6609088970` |
 | `AxisGov/stackx` | `03ff770d7bc257cf2271ff08e77904e351e80d5a` |
 | `AxisGov/mergex` | `326af490bed1fdd469be4b7d612a2758ad5605c8` |
-| `AxisGov/sprintx` | `0c3c8ef09b66c972f21142f3abad54f7431e8a7e` |
+| `AxisGov/sprintx` | `5921cc4247afff437011bd6552a86d3543ea54fc` |
 | `AxisGov/MemoX` | `db64a04ff3c9bd7f7c1b8e0685c3a5ece4773f1d` |
 | `AxisGov/prodx` | `06ce57a42db8eaae3f98ea60fc3895f1536383c5` |
 | `AxisGov/buildx` | `caf4fbe9dfac60a0ae8f34d7a36e9eb779c3cb0b` |
