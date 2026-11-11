@@ -39,13 +39,13 @@ describe("pacote publicável", () => {
     expect(p.files).toContain("CHANGELOG.md");
   });
 
-  it("integração: package e lock declaram 0.13.27", () => {
+  it("integração: package e lock declaram 0.14.0", () => {
     const p = pacote();
     const lock = JSON.parse(readFileSync("package-lock.json", "utf8")) as {
       version: string;
       packages: Record<string, { version?: string }>;
     };
-    expect(p.version).toBe("0.13.27");
+    expect(p.version).toBe("0.14.0");
     expect(lock.version).toBe(p.version);
     expect(lock.packages[""]?.version).toBe(p.version);
   });
