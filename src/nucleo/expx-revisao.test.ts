@@ -973,7 +973,7 @@ describe("expx-revisao.mjs: código só movido (derivacao 2)", () => {
     const { c, r, estados } = movido({ "src/t.js": TESTE }, { "src/t.js": SEM_DOIS, "src/t2.js": PARTE2 },
       [achado("src/t2.js", 4), achado("src/t2.js", 1)]);
     expect(estados).toEqual(["src/t2.js:4=anterior", "src/t2.js:1=aberto"]);
-    expect(r).toMatchObject({ rc: 1, ev: { resultado: "achados", derivacao: 2 } });
+    expect(r).toMatchObject({ rc: 1, ev: { resultado: "achados", derivacao: 3 } });
     expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
   });
 
@@ -1058,7 +1058,7 @@ describe("expx-revisao.mjs: código só movido (derivacao 2)", () => {
     const raiz = temp("expx-revisao-sem-commit-");
     git(raiz, "init", "-q", "-b", "main");
     escreve(raiz, "src/n.js", "n = 1;\n");
-    expect(revisar({ ...c, raiz }, "src/n.js")).toMatchObject({ rc: 1, ev: { derivacao: 2, achados: [{ estado: "aberto" }] } });
+    expect(revisar({ ...c, raiz }, "src/n.js")).toMatchObject({ rc: 1, ev: { derivacao: 3, achados: [{ estado: "aberto" }] } });
   });
 
   it("funcional: evidência sem derivacao, que a regra 1 deriva igual, é aceita pelo conferir", () => {
@@ -1079,7 +1079,7 @@ describe("expx-revisao.mjs: código só movido (derivacao 2)", () => {
   });
 
   it.each([
-    ["3", 3],
+    ["4", 4],
     ["o texto \"2\"", "2"],
   ])("funcional: derivacao %s → FALHA evidencia-invalida:derivacao", (_nome, valor) => {
     const { c } = movido({ "src/t.js": TESTE }, { "src/t.js": SEM_DOIS, "src/t2.js": PARTE2 }, [achado("src/t2.js", 4)]);
@@ -1929,10 +1929,12 @@ describe("expx-revisao.mjs: correções P1 do Login (falha fechada)", () => {
 });
 
 describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
-  it("estrutural: o ambiente de teste nunca deixa o núcleo chamar o `codex` do PATH (EXPX_REVISAO_TESTE_CODEX definida e ausente)", () => {
-    const falso = process.env["EXPX_REVISAO_TESTE_CODEX"];
-    expect(falso).toBeTruthy();
-    expect(existsSync(falso ?? "")).toBe(false);
+  it("estrutural: o núcleo não tem gancho que troque o Codex (conselhos#315), e o PATH da suíte não tem `codex` de verdade", () => {
+    expect(readFileSync(SCRIPT, "utf8")).not.toMatch(/EXPX_REVISAO_TESTE_CODEX|process\.env\.[A-Z_]*CODEX/);
+    // a chave do PATH em qualquer caixa (`Path` no Windows)
+    const chave = Object.keys(process.env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+    const comCodex = (process.env[chave] ?? "").split(delimiter).filter((d) => ["codex", "codex.exe", "codex.com", "codex.cmd"].some((n) => existsSync(join(d, n))));
+    expect(comCodex).toEqual([]);
   });
 
   const SEM_CODEANT = dirname(noPath("git") ?? "");
@@ -1940,9 +1942,10 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
   function escala(cfg: CfgCodex, codeant: CfgFalsa | null = null) {
     const c = cenario(codeant ?? {});
     const codex = instalarCodexFalso(temp("expx-codex-"), cfg);
-    const env = { EXPX_REVISAO_TESTE_CODEX: codex.script };
-    const rev = (arquivos = "src/a.js", mais: string[] = []) => revisar(c, arquivos, "T-01", codeant ? undefined : SEM_CODEANT, env, c.script, mais);
-    return { c, codex, rev };
+    // o Codex falso na frente do PATH, como o `codex` que o núcleo acha; sem a CodeAnt, só o git atrás dele
+    const path = `${codex.path}${delimiter}${codeant ? `${c.falsa.path}${delimiter}${PATH}` : SEM_CODEANT}`;
+    const rev = (arquivos = "src/a.js", mais: string[] = [], extra: Record<string, string> = {}) => revisar(c, arquivos, "T-01", path, extra, c.script, mais);
+    return { c, codex, rev, path };
   }
   const resposta = (issues: object[] = [], revisados = ["src/a.js"]) => ({ arquivos_revisados: revisados, issues });
   const doCodex = (arquivo: string, linha: number, mensagem = "defeito") => ({ arquivo, linha, severidade: "alta", mensagem });
@@ -2021,9 +2024,10 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
     ["fora do schema", { resposta: { arquivos_revisados: ["src/a.js"], issues: [{ arquivo: "src/a.js", linha: "3", mensagem: "x" }] } }, "codex-saida-invalida"],
     ["que não revisou a task inteira", { resposta: { arquivos_revisados: [], issues: [] } }, "codex-saida-invalida"],
   ])("funcional: CodeAnt e Codex %s fora → indisponivel:<CodeAnt>+<Codex> (rc 2), FALHA em obrigatoria e AVISO em se_disponivel", (_n, cfg, codexMotivo) => {
-    const { c, codex } = escala(cfg ?? {});
+    const { c, rev } = escala(cfg ?? {});
     altera3(c.raiz);
-    const r = revisar(c, "src/a.js", "T-01", SEM_CODEANT, { EXPX_REVISAO_TESTE_CODEX: cfg === null ? join(codex.dir, "nao-existe.cjs") : codex.script });
+    // ausente: o PATH sem o Codex falso (o da suíte não tem nenhum)
+    const r = cfg === null ? revisar(c, "src/a.js", "T-01", SEM_CODEANT) : rev();
     expect(r.rc).toBe(2);
     expect(r.out.trim()).toBe(`T-01 indisponivel:cli-ausente+${codexMotivo}`);
     expect(r.ev).toMatchObject({ expx_revisao: 3, resultado: "indisponivel", motivo: `cli-ausente+${codexMotivo}`, escala: { de: "codeant", motivo: "cli-ausente" }, achados: [] });
@@ -2049,10 +2053,10 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
   });
 
   it("funcional: Codex que não responde no tempo → codex-tempo-esgotado, sem esperar ele terminar", () => {
-    const { c, codex } = escala({ dorme: 20_000, resposta: resposta() });
+    const { c, rev } = escala({ dorme: 20_000, resposta: resposta() });
     altera3(c.raiz);
     const inicio = Date.now();
-    const r = revisar(c, "src/a.js", "T-01", SEM_CODEANT, { EXPX_REVISAO_TESTE_CODEX: codex.script, EXPX_REVISAO_TESTE_TEMPO_CLI: "500" });
+    const r = rev("src/a.js", [], { EXPX_REVISAO_TESTE_TEMPO_CLI: "500" });
     expect(Date.now() - inicio).toBeLessThan(15_000);
     expect(r).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "cli-ausente+codex-tempo-esgotado" } });
   });
@@ -2082,28 +2086,46 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
     }
   });
 
-  it.skipIf(process.platform !== "win32")("funcional: no Windows, o `codex.cmd` do npm (sem `codex.exe`) roda pelo alvo do shim, pelo node (Codex)", () => {
-    const c = cenario();
-    const codex = instalarCodexFalso(temp("expx-codex-"), { resposta: resposta() });
-    const prefixo = temp("expx-codex-npm-");
-    const alvo = join(prefixo, "node_modules", "@openai", "codex", "bin");
-    mkdirSync(alvo, { recursive: true });
-    writeFileSync(join(alvo, "codex.js"), `require(${JSON.stringify(codex.script)});\n`);
-    writeFileSync(join(prefixo, "codex.cmd"), '@ECHO off\r\n"%_prog%"  "%dp0%\\node_modules\\@openai\\codex\\bin\\codex.js" %*\r\n');
+  it("funcional: a v3 grava o executável que revisou (caminho real e sha256), e o conferir recusa a v3 sem ele (conselhos#315)", () => {
+    const { c, codex, rev } = escala({ resposta: resposta() });
     altera3(c.raiz);
-    // sem EXPX_REVISAO_TESTE_CODEX: o `codex` do PATH, que aqui é só o shim
-    const env: NodeJS.ProcessEnv = {};
-    for (const [k, v] of Object.entries(process.env)) if (k !== "EXPX_REVISAO_TESTE_CODEX" && k.toUpperCase() !== "PATH") env[k] = v;
-    env["PATH"] = `${prefixo}${delimiter}${SEM_CODEANT}`;
-    const r = spawnSync(process.execPath, [c.script, "revisar", "--trabalho", "w", "--task", "T-01", "--arquivos", "src/a.js", "--raiz", c.raiz], { encoding: "utf8", env });
-    expect(r.stdout.trim()).toBe("T-01 ok");
+    const r = rev();
+    const sha = createHash("sha256").update(readFileSync(codex.executavel)).digest("hex");
+    expect(r.ev).toMatchObject({ revisor: { executavel: { caminho: realpathSync(codex.executavel), sha256: sha } } });
+    const ev = evidencia(c.raiz) as Record<string, Record<string, unknown>>;
+    escreve(c.raiz, EV, JSON.stringify({ ...ev, revisor: { ...ev["revisor"], executavel: undefined } }));
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:revisor" });
+  });
+
+  it("funcional: o Codex roda sem NODE_OPTIONS do ambiente (código injetado não passaria no caminho e no hash gravados; Codex no #315)", () => {
+    const { c, codex, rev } = escala({ resposta: resposta() });
+    altera3(c.raiz);
+    expect(rev("src/a.js", [], { NODE_OPTIONS: "--max-old-space-size=4096" }).rc).toBe(0);
+    expect(chamadasDoCodex(codex)[0]?.nodeOptions).toBeNull();
+  });
+
+  it.skipIf(process.platform === "win32")("funcional: fora do Windows, o `codex` com `#!/usr/bin/env node` roda pelo node do núcleo, nunca pelo `node` do PATH (Codex no #315)", () => {
+    const c = cenario();
+    const codex = instalarCodexFalso(temp("expx-codex-"), { resposta: resposta() }, "env");
+    const falso = temp("expx-node-falso-");
+    const marca = join(falso, "rodou");
+    writeFileSync(join(falso, "node"), `#!/bin/sh\necho rodou > ${JSON.stringify(marca)}\nexit 1\n`, { mode: 0o755 });
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js", "T-01", `${falso}${delimiter}${codex.path}${delimiter}${SEM_CODEANT}`);
+    expect([r.rc, existsSync(marca)]).toEqual([0, false]);
     expect(chamadasDoCodex(codex)).toHaveLength(1);
   });
 
-  it("funcional: conferir recusa o motivo do Codex fora dos cinco do contrato (Codex)", () => {
-    const { c, codex } = escala({ logado: false });
+  it("funcional: o executável do Codex que muda durante a revisão → codex-erro, nada revisado (Codex no #315)", () => {
+    const { c, rev } = escala({ resposta: resposta(), alteraSiMesmo: true });
     altera3(c.raiz);
-    revisar(c, "src/a.js", "T-01", SEM_CODEANT, { EXPX_REVISAO_TESTE_CODEX: codex.script });
+    expect(rev()).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "cli-ausente+codex-erro" } });
+  });
+
+  it("funcional: conferir recusa o motivo do Codex fora dos cinco do contrato (Codex)", () => {
+    const { c, rev } = escala({ logado: false });
+    altera3(c.raiz);
+    rev();
     const ev = evidencia(c.raiz) as Record<string, unknown>;
     expect(ev["motivo"]).toBe("cli-ausente+codex-sem-login");
     escreve(c.raiz, EV, JSON.stringify({ ...ev, motivo: "cli-ausente+codex-inventado" }));
@@ -2119,5 +2141,49 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
     expect(rev("src/a.js", ["--base-commit", base])).toMatchObject({ rc: 1, ev: { expx_revisao: 3, modo: "base-commit", achados: [{ estado: "aberto" }] } });
     expect(chamadasDoCodex(codex)[0]?.stdin).toContain(base);
     expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
+  });
+});
+
+describe("expx-revisao.mjs: derivacao 3 (a issue que não se liga a uma linha da task fica aberta, para a CodeAnt e o Codex)", () => {
+  it("funcional: issue da CodeAnt numa linha além do fim do arquivo fica aberta; a evidência grava derivacao 3 e o conferir refaz igual", () => {
+    const c = cenario({ issues: [achado("src/a.js", 99)] });
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 1, ev: { derivacao: 3, achados: [{ linha: 99, estado: "aberto" }] } });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
+  });
+
+  it.skipIf(process.platform === "win32")("funcional: issue da CodeAnt num caminho que sai da raiz (`../../../../dev/zero`) não é lida e fica aberta", () => {
+    // a resposta montada: a falsa filtraria a issue pelo `--include`, e a leitura nunca aconteceria
+    const c = cenario({ resposta: resp({}, { issues: [achado("../../../../dev/zero", 1)] }) });
+    altera3(c.raiz);
+    const inicio = Date.now();
+    const r = spawnSync(process.execPath, [c.script, "revisar", "--trabalho", "w", "--task", "T-01", "--arquivos", "src/a.js", "--raiz", c.raiz],
+      { encoding: "utf8", env: ambienteCom(`${c.falsa.path}${delimiter}${PATH}`), timeout: 30_000 });
+    expect(Date.now() - inicio).toBeLessThan(30_000);
+    expect(r.status).toBe(1);
+    expect(evidencia(c.raiz)).toMatchObject({ derivacao: 3, achados: [{ estado: "aberto" }] });
+  });
+
+  it("funcional: a evidência com derivacao 2 continua conferida pela regra dela (a linha além do fim, anterior)", () => {
+    const c = cenario({ issues: [achado("src/a.js", 99)] });
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    const ev = evidencia(c.raiz) as { derivacao: number; resultado: string; achados: { estado: string }[] };
+    ev.derivacao = 2;
+    ev.resultado = "ok";
+    ev.achados[0]!.estado = "anterior";
+    escreve(c.raiz, EV, JSON.stringify(ev));
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it("funcional: arquivo sem-alteracao da task que muda durante a chamada → arquivo-mudou-durante-revisao (conselhos#312)", () => {
+    const c = cenario();
+    // caminho absoluto: a falsa roda com o cwd no snapshot, e o que muda é o checkout
+    configurarFalsa(c.falsa, { durante: [join(c.raiz, "src/b.js"), "mudou\n"] });
+    escreve(c.raiz, "src/b.js", "b\n");
+    git(c.raiz, "add", "-A");
+    git(c.raiz, "commit", "-q", "-m", "b");
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js,src/b.js")).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "arquivo-mudou-durante-revisao" } });
   });
 });

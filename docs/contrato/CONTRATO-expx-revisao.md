@@ -62,7 +62,7 @@ Não há parâmetro: vale em `obrigatoria` e em `se_disponivel`. A evidência da
   (`caminho-com-virgula`, `arquivo-inexistente`, `fatiamento-invalido`,
   `arquivo-nao-commitado`), o `snapshot`, o `arquivo-mudou-durante-revisao` e toda
   `incompleta`: cobertura parcial não é indisponibilidade.
-- **O Codex** é o `codex` do `PATH` (no Windows, sem `codex.exe`, o alvo do primeiro `codex.cmd` do npm, `node_modules/@openai/codex/...`, pelo `node`, como na CodeAnt), numa tentativa só: `codex --version` (a versão),
+- **O Codex** é o `codex` do `PATH`, achado pelo núcleo, que roda e mede o mesmo arquivo: no POSIX, o primeiro `codex` executável (o script com shebang de `node`, como o do npm, roda pelo `node` do próprio núcleo, nunca pelo `node` do `PATH`); no Windows, `codex.com` ou `codex.exe`, senão o alvo do primeiro `codex.cmd` do npm (`node_modules/@openai/codex/...`), pelo `node`, como na CodeAnt. Não há gancho que o troque (conselhos#315). O Codex roda sem `NODE_OPTIONS`, `NODE_PATH`, `LD_PRELOAD`, `LD_AUDIT`, `DYLD_INSERT_LIBRARIES` e `DYLD_LIBRARY_PATH` do ambiente, que injetariam código sem mudar o arquivo medido, e o arquivo é medido de novo depois de rodar: mudou, `codex-erro`. Numa tentativa só: `codex --version` (a versão),
   `codex login status` (saída ≠ 0 é `codex-sem-login`; o agente nunca roda `codex login`) e
   `codex exec --ephemeral --ignore-user-config -s read-only -m gpt-5.6-terra -c model_reasoning_effort="high" -C <snapshot> --output-schema <schema> -o <arquivo> -`,
   com o pedido fixo pelo stdin e o prazo da CLI (15 minutos). O modelo é fixo no núcleo,
@@ -77,22 +77,26 @@ Não há parâmetro: vale em `obrigatoria` e em `se_disponivel`. A evidência da
   `issue_content` = `mensagem`), com a identidade calculada com `codex:<versão>:<modelo>:<formato>`
   no lugar da versão da CLI. Toda issue tem de estar num arquivo enviado: a de outro caminho (inclusive
   um que sai da raiz) faz a resposta inválida, e nada se lê dele. A linha além do fim do arquivo não se
-  liga a nada e fica `aberto`, nunca `anterior` (CodeAnt no expxdev#164). `aberto`/`anterior`, `derivacao` e `rejeitar` valem como sempre.
+  liga a nada e fica `aberto`, nunca `anterior` (CodeAnt no expxdev#164; desde a 0.14.1, a `derivacao: 3` vale isso também para a CodeAnt). `aberto`/`anterior`, `derivacao` e `rejeitar` valem como sempre.
 - **Os dois fora:** `indisponivel:<motivo da CodeAnt>+<motivo do Codex>`, com `codex-ausente`,
-  `codex-sem-login`, `codex-erro` (saída ≠ 0, ou a versão que não se lê),
+  `codex-sem-login`, `codex-erro` (saída ≠ 0, a versão que não se lê, ou o executável que muda durante a revisão),
   `codex-tempo-esgotado` ou `codex-saida-invalida` (texto livre, fora do schema, ou
   `arquivos_revisados` diferente dos enviados, ou issue fora deles). Em `obrigatoria`, FALHA; em
   `se_disponivel`, AVISO. Achado do Codex, evidência inválida e `incompleta` continuam
   FALHA.
 - **Limite aceito.** O Codex não tem perfil nem manifesto como a CodeAnt: a evidência guarda a
-  versão da CLI, o modelo, os campos da resposta na forma do schema, o `stdout_sha256` do texto devolvido e o `prompt_sha256` do
-  pedido, que o `conferir` refaz. Como na CodeAnt, quem edita a evidência edita as `issues`, e
-  só o núcleo grava a escala, com o motivo da CodeAnt nela; a defesa é o diff da evidência no PR.
+  versão da CLI, o modelo, o executável que rodou (`executavel`: o caminho real e o sha256 dele), os
+  campos da resposta na forma do schema, o `stdout_sha256` do texto devolvido e o `prompt_sha256` do
+  pedido, que o `conferir` refaz. Um `codex` falso posto antes no `PATH` revisa como o verdadeiro:
+  o caminho e o hash gravados são o que o PR mostra dele. Quem troca o arquivo e o destroca entre as
+  duas medidas também passa: é quem já controla a máquina. Como na CodeAnt, quem edita a evidência edita
+  as `issues`, e só o núcleo grava a escala, com o motivo da CodeAnt nela; a defesa é o diff da
+  evidência no PR.
 - **Recusado no desenho:** a escala nas skills, a escala depois de cobertura parcial, repetir
   até sair "zero achados", texto livre do Codex e falha do Codex virar `ok`.
-- **Teste:** `EXPX_REVISAO_TESTE_CODEX` (só para teste) troca o `codex` do `PATH` pelo script
-  dado, rodado pelo `node`; caminho relativo ou que não existe é o Codex ausente. A suíte a
-  define para todo teste do núcleo, e nenhum teste chama o `codex` de verdade.
+- **Teste:** o núcleo não lê variável que troque o Codex (a `EXPX_REVISAO_TESTE_CODEX` da 0.14.0 saiu na
+  0.14.1, conselhos#315). O teste põe o Codex falso no `PATH`, como faz com a CodeAnt, e a suíte tira do
+  `PATH` toda pasta com um `codex`: nenhum teste chama o de verdade.
 
 ## Os dois portões
 
@@ -132,7 +136,7 @@ exceto `motivo`:
 | Chave | O que é |
 |---|---|
 | `expx_revisao` | `2`; `3` quando houve a escala para o Codex (as chaves só da v3 estão no fim da tabela) |
-| `derivacao` | `2`: a regra das linhas alteradas com o trecho movido (abaixo). Ausente na evidência de antes da 0.13.26, que vale como `1`, a regra de antes; o `conferir` usa a da evidência |
+| `derivacao` | `3` (desde a 0.14.1): a regra das linhas alteradas com o trecho movido (abaixo), e a issue que não se liga a uma linha da task (fora dela, ou além do fim do arquivo) fica `aberto`, sem ler o arquivo de fora. `2` (0.13.26 a 0.14.0): a mesma, mas a linha além do fim é `anterior`, e a do Codex não. Ausente na evidência de antes da 0.13.26, que vale como `1`, a regra de antes; o `conferir` usa a da evidência |
 | `trabalho`, `task` | o slug e o id da task |
 | `modo` | `uncommitted` ou `base-commit` |
 | `base_commit` | o SHA completo de `--base-commit`, ou `null` |
@@ -147,7 +151,7 @@ exceto `motivo`:
 | `rejeicoes` | `[{identidade, motivo, em}]` |
 | `removidos_sem_revisao` | caminhos apagados pela task |
 | `escala` | só na v3: `{de: "codeant", motivo}`, o motivo escalável da CodeAnt. `cli` e `chamada` guardam a tentativa dela |
-| `revisor` | só na v3: `{nome: "codex", versao, modelo, formato: 1}`, ou `null` se o Codex não revisou |
+| `revisor` | só na v3: `{nome: "codex", versao, modelo, formato: 1, executavel: {caminho, sha256}}` (o arquivo que rodou: o caminho real e o sha256 dele), ou `null` se o Codex não revisou |
 | `chamada_codex` | só na v3: `{include, arquivos_revisados, issues, stdout_sha256, prompt_sha256}`, ou `null` se o Codex não respondeu. `issues` e `arquivos_revisados` crus, na forma do schema (`null` fora dele); `stdout_sha256` da resposta e `prompt_sha256` do pedido |
 
 **Identidade** de um achado: sha256, em hex, de
@@ -160,7 +164,9 @@ da CLI muda a identidade e reabre o achado.
 `arquivo` é o `relevant_file` (no Windows, `\` vira `/`), `linha` o `start_line` como
 número, `label` e `texto` o `label` e o `issue_content` como texto, a identidade como
 acima, e `estado` `aberto` se a linha foi alterada pela task (`revisar`, abaixo), senão
-`anterior`; `rejeitado` se a identidade está em `rejeicoes`. O `revisar` lê as linhas
+`anterior`; `rejeitado` se a identidade está em `rejeicoes`. Na `derivacao: 3`, o achado num arquivo
+fora da task ou numa linha além do fim do arquivo fica `aberto`, e o arquivo fora da task não é lido
+(as vizinhas ficam vazias): o caminho vem do revisor, e `../../dev/zero` travava a leitura. O `revisar` lê as linhas
 vizinhas no checkout; o `conferir`, no blob `<sha>:<arquivo>` do commit da task, que é o
 mesmo (a evidência só vale se os blobs batem). Assim `achados` é derivável das `issues`
 gravadas, e o `conferir` o refaz.
@@ -207,7 +213,7 @@ saída (para a sprintx e a runx, como a 2).
   (precedência 3).
 - **Com `--base-commit`**, cada arquivo da task tem de estar commitado: o
   `hash-object` do checkout igual a `HEAD:<arquivo>`, e o apagado ausente do `HEAD`.
-- Linha alterada (`derivacao: 2`, a que o `revisar` grava) é a linha `+` do diff de cada caminho de
+- Linha alterada (`derivacao: 2` e `3`; o `revisar` grava a 3) é a linha `+` do diff de cada caminho de
   `arquivos` entre o blob da partida (`<head>`; com `--base-commit`, `<sha>`) e o blob que vai ao commit
   (`git diff -U0 --diff-algorithm=myers --indent-heuristic <blob> <blob>`, sem a configuração do usuário;
   ausente de um lado, o arquivo inteiro é um hunk), **fora a do trecho movido**. Trecho movido: uma
@@ -268,7 +274,7 @@ O primeiro que se aplica decide o resultado:
 | 9 | `incompleta:sobra:<f>` | revisado fora dos enviados, ou pulado fora deles por motivo que não seja `binary/generated`, `deleted` ou `excluded by pattern` (os filtros que vêm antes do `--include`) |
 | 9 | `incompleta:pulado:<f>` | enviado em `skipped` |
 | 9 | `incompleta:faltante:<f>` | enviado em nenhum dos dois (inclusive caminho com metacaractere de glob, como `src/[id].ts`, que o `--include` toma por padrão) |
-| 10 | `indisponivel:arquivo-mudou-durante-revisao` | o blob, o checkout ou a medida de um enviado mudou durante a chamada |
+| 10 | `indisponivel:arquivo-mudou-durante-revisao` | o blob, o checkout ou a medida de um arquivo presente da task (enviado ou não, desde a 0.14.1) mudou durante a chamada |
 | 11 | `achados` / `ok` | algum achado aberto / nenhum |
 
 **Escala.** O `indisponivel` das linhas 4, 6 (`acesso-negado`) e 7, e o `tempo-esgotado` da
@@ -297,7 +303,7 @@ linhas valem na ordem em que aparecem.
 | v3 com `escala` que não é `{de: "codeant", motivo}` com motivo escalável, ou `indisponivel` cujo `motivo` não é `<motivo da escala>+codex-<motivo>`, `snapshot` nem `arquivo-mudou-durante-revisao` | FALHA `evidencia-invalida:escala` | FALHA |
 | JSON ilegível; outra task ou trabalho; `arquivos` que não é mapa, vazio ou com valor que não é mapa nem `null`; `achados` fora da forma; `resultado` fora dos quatro | FALHA `evidencia-invalida` | FALHA |
 | `rejeicoes` que não é lista de `{identidade, motivo, em}` (hex de 64, texto, texto) (`rejeicoes`); `removidos_sem_revisao` que não é lista de textos sem repetição igual aos arquivos `null` de `arquivos` (`removidos_sem_revisao`) | FALHA `evidencia-invalida:<campo>` | FALHA |
-| `derivacao` presente e diferente do inteiro `1` ou `2` | FALHA `evidencia-invalida:derivacao` | FALHA |
+| `derivacao` presente e diferente do inteiro `1`, `2` ou `3` | FALHA `evidencia-invalida:derivacao` | FALHA |
 | `ok`/`achados` com `executada_em` fora de ISO 8601 ou data impossível | FALHA `evidencia-invalida:executada_em` | FALHA |
 | `blob` ≠ `git rev-parse <sha>:<arquivo>` (ou `null` e o arquivo existe no commit) | FALHA `evidencia-nao-bate:<arquivo>` | FALHA |
 | arquivo que a task altera fora das chaves de `arquivos`, em qualquer `resultado` (abaixo, "Cobertura do commit"); o primeiro, na ordem do `git diff`; sem o nome, se o diff falha | FALHA `evidencia-invalida:cobertura:<arquivo>` | FALHA |
@@ -305,7 +311,7 @@ linhas valem na ordem em que aparecem.
 | `incompleta` (não depende do modo) | FALHA `incompleta:<motivo>` | FALHA `incompleta:<motivo>` |
 | `ok`/`achados` com a `revisao` de algum arquivo diferente da refeita no `conferir` (`excluido` só nas exclusões do núcleo, que em `ok`/`achados` são as únicas; senão o predicado do perfil; `sem-alteracao` só com `<sha>:<arquivo>` igual a `<de>:<arquivo>`, `<de>` o `base_commit` com `--base-commit`, senão o `head`; o igual também pode estar `enviado`) (`revisao`) | FALHA `evidencia-invalida:revisao` | FALHA |
 | `ok`/`achados` com algum `enviado` e: `cli.versao` sem perfil (`cli.versao`); `cli.integridade` ≠ `conferida` (`integridade`); `chamada` nula, com `error` não nulo, sem `issues` lista de objetos ou sem `stdout_sha256` de 64 hex (`chamada`), o que reprova a v2 gravada antes de 2026-10-20; `meta` que não é mapa, `max_files` ≠ perfil ou motivo de pulo fora do perfil (`perfil`); `falhas_de_lote` não vazia (`lote-falhou`); mais de 40 `enviado` (`L1`); `enviado` acima de 5.000 linhas ou 204.800 bytes, ou com `bytes`/`linhas` menores que os do blob `<sha>:<arquivo>` medido de novo (`L2`); `include` diferente dos enviados, ou a reconciliação do `revisar` (repetido, sobra, pulado, faltante) que não fecha (`cobertura`) | FALHA `evidencia-invalida:<campo>` | FALHA |
-| v3 `ok`/`achados` com algum `enviado`, no lugar da linha acima: `revisor` que não é o Codex com o modelo e o formato do núcleo (`revisor`); `chamada_codex` fora da forma, resposta fora do schema, issue fora dos enviados, `stdout_sha256` que não é hex de 64 ou `prompt_sha256` diferente do pedido refeito com a base da evidência e o `include` (`chamada`); mais de 40 `enviado` (`L1`); L2 como acima, pelo perfil homologado (`L2`); `include` ou `arquivos_revisados` diferentes dos enviados (`cobertura`) | FALHA `evidencia-invalida:<campo>` | FALHA |
+| v3 `ok`/`achados` com algum `enviado`, no lugar da linha acima: `revisor` que não é o Codex com o modelo e o formato do núcleo, ou sem `executavel` (`revisor`: a v3 da 0.14.0, que não o gravava e pode ter vindo do gancho, se revisa de novo); `chamada_codex` fora da forma, resposta fora do schema, issue fora dos enviados, `stdout_sha256` que não é hex de 64 ou `prompt_sha256` diferente do pedido refeito com a base da evidência e o `include` (`chamada`); mais de 40 `enviado` (`L1`); L2 como acima, pelo perfil homologado (`L2`); `include` ou `arquivos_revisados` diferentes dos enviados (`cobertura`) | FALHA `evidencia-invalida:<campo>` | FALHA |
 | `ok`/`achados` com algum `enviado` e `head` que não é `null` nem o SHA completo de um commit (`head`), ou `modo` `base-commit` com `base_commit` que não é o SHA completo de um commit, ou `modo` `uncommitted` com `base_commit` não nulo, ou outro `modo` (`base_commit`) | FALHA `evidencia-invalida:<campo>` | FALHA |
 | `ok`/`achados` com `achados` diferente dos derivados de `chamada.issues` (na v3, de `chamada_codex.issues`, com `codex:<versão>:<modelo>:<formato>` na identidade; de nenhuma, sem `enviado`), com as linhas alteradas pela `derivacao` da evidência, entre `<de>` e `<sha>` (`<de>`: `base_commit` com `--base-commit`, senão `head`; na 2, os blobs de `<de>:<arquivo>` e `<sha>:<arquivo>`; na 1, `git diff -U0 <de> <sha>`) e as vizinhas do blob do commit: outra quantidade, ordem, `identidade`, `arquivo`, `linha`, `label` ou `texto`, ou `estado` diferente do derivado, exceto `rejeitado` com a identidade em `rejeicoes` da evidência ou de outra evidência do trabalho no commit; ou `resultado` que não é `achados` com algum `aberto` e `ok` sem nenhum | FALHA `evidencia-invalida:achados` | FALHA |
 | achado `aberto` | FALHA `achados-abertos:<n>` | FALHA |
@@ -488,3 +494,4 @@ mapeia a saída 3 do `revisar` e o `FALHA incompleta:<motivo>` do `conferir`.
 | 2026-11-11 | **Escala para o Codex** (0.14.0; pedido da orquestra_conselho depois do 403 de 2026-11-10; decisão do Flávio: "não é parâmetro, é escala"; desenho com o Codex): a CodeAnt fora por motivo escalável, o `revisar` revisa com o Codex sobre o mesmo snapshot, e a evidência é a v3 (`escala`, `revisor`, `chamada_codex`); os dois fora, `indisponivel:<CodeAnt>+codex-<motivo>`. O `conferir` aceita a v2 e a v3, refaz o pedido (`prompt_sha256`) e deriva os achados das `issues` do Codex. Modelo fixo, uma tentativa, 15 minutos; a severidade não decide. |
 | 2026-11-11 | Achados do Codex e do CodeAnt na 0.14.0: o motivo do Codex com os dois fora é um dos cinco do contrato, e o `conferir` recusa outro (`evidencia-invalida:escala`); no Windows, sem `codex.exe`, o alvo do `codex.cmd` do npm roda pelo `node`; o `rejeitar` confere os blobs de novo depois de gravar e desfaz a gravação se algum mudou no meio (katosmv/login#79). |
 | 2026-11-11 | Revisão do expxdev#164 (CodeAnt): a issue do Codex fora dos enviados (inclusive o caminho que sai da raiz, que o `revisar` leria) faz a resposta inválida (`codex-saida-invalida`), e o `conferir` a recusa (`chamada`); a linha do Codex além do fim do arquivo fica `aberto`. A regra da CodeAnt não muda: mudaria os achados das evidências v2 já gravadas. |
+| 2026-11-11 | 0.14.1: sai o gancho `EXPX_REVISAO_TESTE_CODEX` (CodeAnt no conselhos#315: ele trocava o Codex por qualquer script no núcleo instalado); o núcleo acha o `codex` no `PATH`, roda e mede o mesmo arquivo, e a v3 grava `revisor.executavel` (caminho real e sha256), que o `conferir` exige. **`derivacao: 3`**: a issue fora da task não é lida e, como a linha além do fim do arquivo, fica `aberto`, também para a CodeAnt (a 1 e a 2 continuam conferidas pela regra delas). A releitura depois da revisão cobre todo arquivo presente da task, não só os enviados (conselhos#312). O Codex roda sem as variáveis que injetam código (`NODE_OPTIONS` e o carregador dinâmico), o script de `node` roda pelo `node` do núcleo, e o executável é medido antes e depois (Codex na revisão da 0.14.1). |
