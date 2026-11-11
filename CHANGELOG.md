@@ -9,6 +9,19 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.1 — a falha de segurança da escala e a derivacao 3
+
+Instale por PR, como a 0.14.0, e o quanto antes onde a 0.14.0 está instalada. Muda o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`), a runx (AxisGov/runx#26, merge d48f7db, DR-119) e a sprintx (AxisGov/sprintx#79, merge eaee574, DS-221). O `init` passa a instalar esses dois commits. Os eventos, o `doctor`, o painel e o `expx sessao` seguem como na 0.14.0. Os achados são da CodeAnt no conselhos-municipais#315 (instalação da 0.14.0) e #312 (instalação da 0.13.27), e da revisão do Codex.
+
+- **Sai o gancho de teste que trocava o Codex** (conselhos#315, segurança). Na 0.14.0, a `EXPX_REVISAO_TESTE_CODEX` valia também no núcleo instalado: quem a definisse trocava o Codex por qualquer script, e a evidência passava no `conferir`.
+  - **Como é agora:** o núcleo acha o `codex` no `PATH`, roda e mede o mesmo arquivo. A evidência v3 grava `revisor.executavel` (o caminho real e o sha256), que o `conferir` exige.
+  - **O que o Codex achou na revisão:** o Codex roda sem `NODE_OPTIONS`, `NODE_PATH`, `LD_PRELOAD` e afins, que injetariam código sem mudar o arquivo medido. O script de `node` do npm roda pelo `node` do próprio núcleo, e o executável é medido de novo depois de rodar.
+  - **Limite declarado:** um `codex` falso posto antes no `PATH` revisa como o verdadeiro. O caminho e o hash dele aparecem no PR.
+- **`derivacao: 3`**, para a CodeAnt e o Codex. A issue num arquivo fora da task não é lida e fica `aberto`, como a da linha além do fim do arquivo. Antes, uma resposta apontando para `../../dev/zero` travava a revisão, e a linha além do fim virava `anterior`. As evidências com `derivacao` 1 ou 2 continuam conferidas pela regra delas. As rejeições antigas de achados fora da task deixam de casar com as identidades novas, mas esses achados nunca deixaram de ser `aberto`.
+- **A releitura depois da revisão** cobre todo arquivo presente da task, não só os enviados (conselhos#312). Antes, o `sem-alteracao` que mudasse durante a chamada só era pego no `conferir`.
+- **Na runx e na sprintx, só texto:** a escala dá "saída 0 ou 1" (não 3), e `git worktree remove "<caminho>"` ganhou aspas.
+- **Não exercitado:** o Windows com o Codex de verdade (a CI do Windows roda o falso como `codex.cmd`).
+
 ## 0.14.0 — a escala da CodeAnt para o Codex
 
 Instale por PR, como a 0.13.27. Muda o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`, agora v3), a runx (AxisGov/runx#25, merge e52769e, DR-117 e DR-118) e a sprintx (AxisGov/sprintx#78, merge 2ad1587, DS-220). O `init` passa a instalar esses dois commits. Os eventos, o `doctor`, o painel e o `expx sessao` seguem como na 0.13.27. É versão menor nova porque a evidência ganha a v3: um núcleo 0.13.x a recusa (`evidencia-invalida:versao`), e o núcleo e as skills se atualizam juntos, como sempre pelo `init`.
