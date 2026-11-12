@@ -15,7 +15,7 @@
 // `continuar` entre a releitura e a gravação.
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { closeSync, existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statSync,
+import { chmodSync, closeSync, existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statSync,
   writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, posix, relative } from "node:path";
@@ -226,6 +226,15 @@ function limparSnapshotsAbandonados() {
     rmSync(base, { recursive: true, force: true });
   }
 }
+/** O arquivo vai executável ao commit: com `--base-commit`, o modo dele no `HEAD`; sem, o do checkout, menos onde o git não
+ *  lê o bit do disco (no Windows e com `core.fileMode=false`), em que vale o do índice, o que o `git add` preserva. */
+function executavelNoCommit(f, base) {
+  if (base || process.platform === "win32" || git("config", "--type=bool", "core.fileMode").stdout.trim() === "false") {
+    const r = git(...(base ? ["ls-tree", "HEAD", "--"] : ["ls-files", "-s", "--"]), f);
+    return r.status === 0 && r.stdout.startsWith("100755");
+  }
+  try { return (statSync(join(op.raiz, f)).mode & 0o111) !== 0; } catch { return false; }
+}
 /** Materializa o HEAD capturado em worktree descartável e sobrepõe os blobs medidos.
  *  A CLI nunca lê o checkout mutável que o usuário pode editar e restaurar durante a revisão. */
 function snapshotDaRevisao(head, blobs) {
@@ -256,7 +265,7 @@ function snapshotDaRevisao(head, blobs) {
     }
   }
   try {
-    for (const [f, oid] of blobs) {
+    for (const [f, oid, executavel] of blobs) {
       const conteudo = blobGit(oid);
       if (conteudo === undefined) throw new Error(`blob ilegível: ${f}`);
       const destino = join(raiz, f);
@@ -267,6 +276,8 @@ function snapshotDaRevisao(head, blobs) {
       rmSync(destino, { recursive: true, force: true });
       mkdirSync(dirname(destino), { recursive: true });
       writeFileSync(destino, conteudo);
+      // o bit de executável chega ao revisor como vai ao commit (conselhos#315); a mudança só de modo é `sem-alteracao`
+      if (executavel) chmodSync(destino, 0o755);
     }
     return { raiz, limpar };
   } catch (e) {
@@ -381,9 +392,10 @@ function scriptDeNode(f) {
 // katosmv/login#83), os módulos do iconv (`GCONV_PATH`), o node (`NODE_OPTIONS`, `NODE_PATH`), o arquivo que o shell roda ao
 // abrir (`BASH_ENV`, `ENV`), os injetores conhecidos dos runtimes (Python, Perl, Ruby, Java, .NET, Lua; CodeAnt no #167),
 // só eles, e não a configuração deles (`JAVA_HOME`, `PYTHONIOENCODING` passam), e o git por prefixo (`GIT_*`: outro
-// repositório, outra configuração, outro diff). O Codex nunca o herda; o resto do ambiente (proxy, certificado, `CODEX_*`)
+// repositório, outra configuração, outro diff), e o npm e o Yarn por prefixo (`npm_config_*`, `YARN_*`: quase toda configuração
+// deles redireciona a execução, como `node_options`, `script_shell`, `userconfig`, `yarnPath`; conselhos#315). O Codex nunca o herda; o resto do ambiente (proxy, certificado, `CODEX_*`)
 // passa. É defesa a mais, não fronteira: quem controla o ambiente põe um `codex` falso no PATH (limite do contrato)
-const INJETA = new RegExp("^(LD_|DYLD_|GIT_|CORECLR_PROFILER|LUA_INIT)|^(" + ["GCONV_PATH", "NODE_OPTIONS", "NODE_PATH", "BASH_ENV", "ENV",
+const INJETA = new RegExp("^(LD_|DYLD_|GIT_|NPM_CONFIG_|YARN_|CORECLR_PROFILER|LUA_INIT)|^(" + ["GCONV_PATH", "NODE_OPTIONS", "NODE_PATH", "BASH_ENV", "ENV",
   "PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP", "PYTHONUSERBASE", "PERL5OPT", "PERL5LIB", "PERLLIB", "PERL5DB", "RUBYOPT", "RUBYLIB",
   "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS", "DOTNET_STARTUP_HOOKS", "CORECLR_ENABLE_PROFILING"].join("|") + ")$", "i");
 const ambienteDoCodex = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !INJETA.test(k)));
@@ -630,7 +642,8 @@ function medida(f) {
   const b = medirArquivo(f);
   if (!b) return undefined;
   const linhas = a.linhas === null || b.linhas === null ? null : Math.max(a.linhas, b.linhas);
-  return { blob, bytes: Math.max(a.bytes, b.bytes), linhas, disco };
+  // o modo entra na medida: a releitura depois da revisão o compara, e o `chmod` no meio é `arquivo-mudou-durante-revisao`
+  return { blob, bytes: Math.max(a.bytes, b.bytes), linhas, disco, executavel: executavelNoCommit(f, op["base-commit"]) };
 }
 /** A resposta fora da forma do perfil (emenda, 6): topo, `meta`, `max_files`, a conta e os motivos. */
 function foraDoPerfil(j, perfil, status) {
@@ -712,7 +725,7 @@ function revisar() {
   /** O snapshot dos enviados, um só por revisão (a CodeAnt e, na escala, o Codex leem o mesmo). */
   const abreSnapshot = () => {
     if (limparSnapshot) return true;
-    const snapshot = snapshotDaRevisao(headDaRevisao, enviados.map((f) => [f, medidas[f].blob]));
+    const snapshot = snapshotDaRevisao(headDaRevisao, enviados.map((f) => [f, medidas[f].blob, medidas[f].executavel]));
     if (!snapshot) return false;
     raizRevisao = snapshot.raiz;
     limparSnapshot = snapshot.limpar;
@@ -724,7 +737,7 @@ function revisar() {
     // partida (conselhos#312)
     for (const f of presentes) {
       const m = medida(f);
-      if (!m || ["blob", "bytes", "linhas", "disco"].some((k) => m[k] !== medidas[f][k])) return fim("indisponivel", "arquivo-mudou-durante-revisao");
+      if (!m || ["blob", "bytes", "linhas", "disco", "executavel"].some((k) => m[k] !== medidas[f][k])) return fim("indisponivel", "arquivo-mudou-durante-revisao");
     }
     const rejeitadas = new Set([...ev.rejeicoes.map((r) => r?.identidade), ...rejeitadasDoTrabalho()]);
     const lido = (f) => { try { return readFileSync(join(raizRevisao, f), "utf8"); } catch { return ""; } };
@@ -907,7 +920,9 @@ function semSinalDaCli(ev, sha) {
   for (const f of enviados) {
     const a = ev.arquivos[f];
     const m = medirBlob(`${sha}:./${f}`);
-    if (!m || !Number.isSafeInteger(a.bytes) || !Number.isSafeInteger(a.linhas) || a.bytes > perfil.max_bytes || a.linhas > perfil.max_linhas
+    // o git que não lê o blob não é L2: é diagnóstico próprio, e continua FALHA (conselhos#316)
+    if (!m) return `blob-ilegivel:${f}`;
+    if (!Number.isSafeInteger(a.bytes) || !Number.isSafeInteger(a.linhas) || a.bytes > perfil.max_bytes || a.linhas > perfil.max_linhas
       || a.bytes < m.bytes || a.linhas < m.linhas) return "L2";
   }
   // a mesma reconciliação do `revisar`, com o `--include` igual aos enviados
@@ -930,7 +945,9 @@ function semSinalDoCodex(ev, sha, enviados, perfil) {
   for (const f of enviados) {
     const a = ev.arquivos[f];
     const m = medirBlob(`${sha}:./${f}`);
-    if (!m || !Number.isSafeInteger(a.bytes) || !Number.isSafeInteger(a.linhas) || a.bytes > perfil.max_bytes || a.linhas > perfil.max_linhas
+    // o git que não lê o blob não é L2: é diagnóstico próprio, e continua FALHA (conselhos#316)
+    if (!m) return `blob-ilegivel:${f}`;
+    if (!Number.isSafeInteger(a.bytes) || !Number.isSafeInteger(a.linhas) || a.bytes > perfil.max_bytes || a.linhas > perfil.max_linhas
       || a.bytes < m.bytes || a.linhas < m.linhas) return "L2";
   }
   if (!mesmosArquivos(ch.include, enviados) || !mesmosArquivos(ch.arquivos_revisados, enviados)) return "cobertura";

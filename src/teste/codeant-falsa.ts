@@ -22,6 +22,8 @@ export interface CfgFalsa {
   issues?: object[];
   /** Escreve `[caminho, conteúdo]` (relativo à raiz do projeto) durante a chamada. */
   durante?: [string, string];
+  /** `chmod` de um caminho absoluto durante a chamada (`[caminho, modo octal]`). */
+  chmodDurante?: [string, number];
   /** Reescreve o arquivo durante a chamada. */
   reescreve?: string;
   /** Altera e restaura um caminho absoluto do checkout original enquanto a revisão lê o snapshot. */
@@ -54,6 +56,8 @@ export interface Chamada {
   shim: boolean;
   cwd: string;
   conteudos: Record<string, string>;
+  /** Se cada arquivo do `--include` chegou executável ao snapshot (POSIX). */
+  executaveis: Record<string, boolean>;
 }
 
 const sha256 = (b: Buffer): string => createHash("sha256").update(b).digest("hex");
@@ -68,11 +72,13 @@ const i = a.indexOf("--include");
 const inc = i >= 0 ? a[i + 1].split(",") : [];
 if (a[0] === "review" && cfg.oscilaOrigem) fs.writeFileSync(cfg.oscilaOrigem[0], cfg.oscilaOrigem[1]);
 const conteudos = Object.fromEntries(inc.map((f) => [f, fs.readFileSync(f, "utf8")]));
-fs.appendFileSync(dir + "/chamadas.jsonl", JSON.stringify({ args: a, arquivo: process.argv[1], shim: process.env.EXPX_FALSA_PELO_SHIM === "1", cwd: process.cwd(), conteudos }) + "\\n");
+const executaveis = Object.fromEntries(inc.map((f) => [f, (fs.statSync(f).mode & 0o111) !== 0]));
+fs.appendFileSync(dir + "/chamadas.jsonl", JSON.stringify({ args: a, arquivo: process.argv[1], shim: process.env.EXPX_FALSA_PELO_SHIM === "1", cwd: process.cwd(), conteudos, executaveis }) + "\\n");
 if (a[0] === "review" && cfg.oscilaOrigem) fs.writeFileSync(cfg.oscilaOrigem[0], cfg.oscilaOrigem[2]);
 if (a[0] === "--version") { process.stdout.write(cfg.versao + "\\n"); process.exit(0); }
 if (a[0] === "review" && cfg.dorme) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, cfg.dorme);
 if (cfg.durante) fs.writeFileSync(cfg.durante[0], cfg.durante[1]);
+if (cfg.chmodDurante) fs.chmodSync(cfg.chmodDurante[0], cfg.chmodDurante[1]);
 if (cfg.reescreve) fs.writeFileSync(cfg.reescreve, "mudou\\n");
 if (cfg.stderr) process.stderr.write(cfg.stderr);
 let erro = cfg.error ?? null;
