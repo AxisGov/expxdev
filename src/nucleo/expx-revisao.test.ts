@@ -2104,6 +2104,26 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
     expect(chamadasDoCodex(codex)[0]?.nodeOptions).toBeNull();
   });
 
+  it("funcional: o Codex não herda o que injeta código ou muda o que os comandos dele veem (LD_*, DYLD_*, GCONV_PATH, BASH_ENV, GIT_*...), e o resto passa (CodeAnt no katosmv/login#83; Codex)", () => {
+    const { c, codex, rev } = escala({ resposta: resposta() });
+    altera3(c.raiz);
+    const fora = temp("expx-libs-");
+    const injeta = Object.fromEntries(["LD_LIBRARY_PATH", "LD_QUALQUER", "DYLD_FRAMEWORK_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "GCONV_PATH", "BASH_ENV", "ENV",
+      "NODE_PATH", "PYTHONPATH", "PYTHONSTARTUP", "PYTHONHOME", "PYTHONUSERBASE", "PERL5OPT", "PERL5LIB", "PERLLIB", "PERL5DB", "RUBYOPT", "RUBYLIB",
+      "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS", "DOTNET_STARTUP_HOOKS", "CORECLR_PROFILER", "CORECLR_PROFILER_PATH",
+      "CORECLR_ENABLE_PROFILING", "LUA_INIT", "LUA_INIT_5_4", "GIT_QUALQUER"].map((k) => [k, fora]));
+    // a configuração legítima dos mesmos runtimes passa (Codex no #167: os prefixos de família tiravam o `JAVA_HOME`)
+    const legitimas = { JAVA_HOME: fora, PYTHONIOENCODING: "utf-8", PERL_MM_OPT: "INSTALL_BASE=x" };
+    // `GIT_*` que não quebram o git do próprio núcleo (um `GIT_DIR` trocaria o repositório dele também): o prefixo é o que se prova
+    const r = rev("src/a.js", [], { ...injeta, ...legitimas, GIT_TRACE: "0", HTTPS_PROXY: "http://proxy.exemplo.invalid:3128" });
+    expect(r.rc).toBe(0);
+    // a ausência das bloqueadas e a presença do proxy, não a igualdade: o ambiente de quem roda a suíte pode ter `https_proxy` (CodeAnt no #167)
+    const recebido = chamadasDoCodex(codex)[0]?.ambiente ?? {};
+    expect(Object.keys(recebido).filter((k) => Object.hasOwn(injeta, k) || /^(GIT_|LD_|DYLD_)/i.test(k))).toEqual([]);
+    expect(recebido["HTTPS_PROXY"]).toBe("http://proxy.exemplo.invalid:3128");
+    expect(Object.fromEntries(Object.keys(legitimas).map((k) => [k, recebido[k]]))).toEqual(legitimas);
+  });
+
   it.skipIf(process.platform === "win32")("funcional: fora do Windows, o `codex` com `#!/usr/bin/env node` roda pelo node do núcleo, nunca pelo `node` do PATH (Codex no #315)", () => {
     const c = cenario();
     const codex = instalarCodexFalso(temp("expx-codex-"), { resposta: resposta() }, "env");
