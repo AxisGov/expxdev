@@ -22,6 +22,8 @@ export interface CfgFalsa {
   issues?: object[];
   /** Escreve `[caminho, conteúdo]` (relativo à raiz do projeto) durante a chamada. */
   durante?: [string, string];
+  /** `chmod` de um caminho absoluto durante a chamada (`[caminho, modo octal]`). */
+  chmodDurante?: [string, number];
   /** Reescreve o arquivo durante a chamada. */
   reescreve?: string;
   /** Altera e restaura um caminho absoluto do checkout original enquanto a revisão lê o snapshot. */
@@ -76,6 +78,7 @@ if (a[0] === "review" && cfg.oscilaOrigem) fs.writeFileSync(cfg.oscilaOrigem[0],
 if (a[0] === "--version") { process.stdout.write(cfg.versao + "\\n"); process.exit(0); }
 if (a[0] === "review" && cfg.dorme) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, cfg.dorme);
 if (cfg.durante) fs.writeFileSync(cfg.durante[0], cfg.durante[1]);
+if (cfg.chmodDurante) fs.chmodSync(cfg.chmodDurante[0], cfg.chmodDurante[1]);
 if (cfg.reescreve) fs.writeFileSync(cfg.reescreve, "mudou\\n");
 if (cfg.stderr) process.stderr.write(cfg.stderr);
 let erro = cfg.error ?? null;

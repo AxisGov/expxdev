@@ -54,7 +54,7 @@ que vale onde os dois divergem. Os limites L1, L2 e L3 estão em
 ## Escala para o Codex
 
 Desde a 0.14.0 (decisão do Flávio, 2026-11-10: "não é parâmetro, é escala"), quando a
-CodeAnt não está funcional, o próprio `revisar` revisa com o Codex, sobre o mesmo snapshot. O snapshot leva o conteúdo e, desde a 0.14.4, o bit de executável de cada enviado como vai ao commit (com `--base-commit`, o modo no `HEAD`; sem, o do checkout; no Windows, o do índice; conselhos#315). Limite: a mudança só de modo, com o mesmo blob, é `sem-alteracao` e não vai ao revisor.
+CodeAnt não está funcional, o próprio `revisar` revisa com o Codex, sobre o mesmo snapshot. O snapshot leva o conteúdo e, desde a 0.14.4, o bit de executável de cada enviado como vai ao commit (com `--base-commit`, o modo no `HEAD`; sem, o do checkout, menos no Windows e com `core.fileMode=false`, em que o git não lê o bit do disco e vale o do índice; conselhos#315). O modo entra na medida que a releitura depois da revisão compara: o `chmod` no meio dá `arquivo-mudou-durante-revisao`. Limite: a mudança só de modo, com o mesmo blob, é `sem-alteracao` e não vai ao revisor.
 Não há parâmetro: vale em `obrigatoria` e em `se_disponivel`. A evidência da escala é a v3.
 
 - **Escalam** os `indisponivel` da CodeAnt fora: `cli-ausente`, `versao`, `integridade`,
@@ -278,7 +278,7 @@ O primeiro que se aplica decide o resultado:
 | 9 | `incompleta:sobra:<f>` | revisado fora dos enviados, ou pulado fora deles por motivo que não seja `binary/generated`, `deleted` ou `excluded by pattern` (os filtros que vêm antes do `--include`) |
 | 9 | `incompleta:pulado:<f>` | enviado em `skipped` |
 | 9 | `incompleta:faltante:<f>` | enviado em nenhum dos dois (inclusive caminho com metacaractere de glob, como `src/[id].ts`, que o `--include` toma por padrão) |
-| 10 | `indisponivel:arquivo-mudou-durante-revisao` | o blob, o checkout ou a medida de um arquivo presente da task (enviado ou não, desde a 0.14.1) mudou durante a chamada |
+| 10 | `indisponivel:arquivo-mudou-durante-revisao` | o blob, o checkout, a medida ou, desde a 0.14.4, o modo de um arquivo presente da task (enviado ou não, desde a 0.14.1) mudou durante a chamada |
 | 11 | `achados` / `ok` | algum achado aberto / nenhum |
 
 **Escala.** O `indisponivel` das linhas 4, 6 (`acesso-negado`) e 7, e o `tempo-esgotado` da

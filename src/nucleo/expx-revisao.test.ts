@@ -2248,6 +2248,22 @@ describe("expx-revisao.mjs: 0.14.4 (conselhos#315 e #316)", () => {
     expect(chamadasDa(c.falsa).at(-1)?.executaveis).toEqual({ "src/a.js": true });
   });
 
+  it.skipIf(process.platform === "win32")("funcional: com core.fileMode=false, o bit do disco não vale: o snapshot leva o modo do índice, como o commit (Codex na 0.14.4)", () => {
+    const c = cenario();
+    git(c.raiz, "config", "core.fileMode", "false");
+    altera3(c.raiz);
+    chmodSync(join(c.raiz, "src/a.js"), 0o755);
+    expect(revisar(c, "src/a.js").rc).toBe(0);
+    expect(chamadasDa(c.falsa).at(-1)?.executaveis).toEqual({ "src/a.js": false });
+  });
+
+  it.skipIf(process.platform === "win32")("funcional: o modo que muda durante a chamada → arquivo-mudou-durante-revisao (Codex na 0.14.4)", () => {
+    const c = cenario();
+    configurarFalsa(c.falsa, { chmodDurante: [join(c.raiz, "src/a.js"), 0o755] });
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "arquivo-mudou-durante-revisao" } });
+  });
+
   it.skipIf(process.platform === "win32")("funcional: blob que o git não lê no conferir → FALHA evidencia-invalida:blob-ilegivel:<arquivo>, não L2 (conselhos#316)", () => {
     const c = cenario();
     altera3(c.raiz);

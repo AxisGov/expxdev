@@ -226,10 +226,10 @@ function limparSnapshotsAbandonados() {
     rmSync(base, { recursive: true, force: true });
   }
 }
-/** O arquivo vai executável ao commit: com `--base-commit`, o modo dele no `HEAD`; sem, o do checkout (no Windows, que não
- *  tem o bit, o do índice). */
+/** O arquivo vai executável ao commit: com `--base-commit`, o modo dele no `HEAD`; sem, o do checkout, menos onde o git não
+ *  lê o bit do disco (no Windows e com `core.fileMode=false`), em que vale o do índice, o que o `git add` preserva. */
 function executavelNoCommit(f, base) {
-  if (base || process.platform === "win32") {
+  if (base || process.platform === "win32" || git("config", "--type=bool", "core.fileMode").stdout.trim() === "false") {
     const r = git(...(base ? ["ls-tree", "HEAD", "--"] : ["ls-files", "-s", "--"]), f);
     return r.status === 0 && r.stdout.startsWith("100755");
   }
@@ -642,7 +642,8 @@ function medida(f) {
   const b = medirArquivo(f);
   if (!b) return undefined;
   const linhas = a.linhas === null || b.linhas === null ? null : Math.max(a.linhas, b.linhas);
-  return { blob, bytes: Math.max(a.bytes, b.bytes), linhas, disco };
+  // o modo entra na medida: a releitura depois da revisão o compara, e o `chmod` no meio é `arquivo-mudou-durante-revisao`
+  return { blob, bytes: Math.max(a.bytes, b.bytes), linhas, disco, executavel: executavelNoCommit(f, op["base-commit"]) };
 }
 /** A resposta fora da forma do perfil (emenda, 6): topo, `meta`, `max_files`, a conta e os motivos. */
 function foraDoPerfil(j, perfil, status) {
@@ -724,7 +725,7 @@ function revisar() {
   /** O snapshot dos enviados, um só por revisão (a CodeAnt e, na escala, o Codex leem o mesmo). */
   const abreSnapshot = () => {
     if (limparSnapshot) return true;
-    const snapshot = snapshotDaRevisao(headDaRevisao, enviados.map((f) => [f, medidas[f].blob, executavelNoCommit(f, base)]));
+    const snapshot = snapshotDaRevisao(headDaRevisao, enviados.map((f) => [f, medidas[f].blob, medidas[f].executavel]));
     if (!snapshot) return false;
     raizRevisao = snapshot.raiz;
     limparSnapshot = snapshot.limpar;
@@ -736,7 +737,7 @@ function revisar() {
     // partida (conselhos#312)
     for (const f of presentes) {
       const m = medida(f);
-      if (!m || ["blob", "bytes", "linhas", "disco"].some((k) => m[k] !== medidas[f][k])) return fim("indisponivel", "arquivo-mudou-durante-revisao");
+      if (!m || ["blob", "bytes", "linhas", "disco", "executavel"].some((k) => m[k] !== medidas[f][k])) return fim("indisponivel", "arquivo-mudou-durante-revisao");
     }
     const rejeitadas = new Set([...ev.rejeicoes.map((r) => r?.identidade), ...rejeitadasDoTrabalho()]);
     const lido = (f) => { try { return readFileSync(join(raizRevisao, f), "utf8"); } catch { return ""; } };
