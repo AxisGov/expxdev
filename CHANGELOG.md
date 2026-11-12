@@ -9,6 +9,13 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.5 — o link no snapshot e o limite do modo
+
+Instale por PR, como a 0.14.4. Muda só o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`). A runx, a sprintx, os eventos, o `init`, o `doctor`, o painel e o `expx sessao` seguem como na 0.14.4.
+
+- **O link simbólico não chega executável ao snapshot** (CodeAnt no katosmv/login#85). Sem `--base-commit` e com `core.fileMode` ligado, o modo vinha do `stat`, que segue o link. Um link para um alvo executável chegava ao revisor com 0755, embora o git o guarde como `120000`. Agora vem do `lstat`, e o link nunca é executável. O snapshot continua materializando o link como arquivo comum, com o texto do alvo, como antes.
+- **O limite da mudança de modo depois do `revisar`, declarado** (CodeAnt no conselhos#315). O `rejeitar` e o `conferir` comparam o blob, não o modo, então um `chmod` feito depois da revisão não é visto. A decisão do Flávio foi declarar o limite, sem gravar o modo: a mudança só de modo, com o mesmo blob, já não vai ao revisor, e gravar o modo ganharia pouco.
+
 ## 0.14.4 — o npm no ambiente do Codex, o modo no snapshot e o blob ilegível
 
 Instale por PR, como a 0.14.3. Muda só o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`). A runx, a sprintx, os eventos, o `init`, o `doctor`, o painel e o `expx sessao` seguem como na 0.14.3. Os achados são da CodeAnt no conselhos-municipais#315 (instalação da 0.14.3) e do diagnóstico do #316.
