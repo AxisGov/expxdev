@@ -233,7 +233,8 @@ function executavelNoCommit(f, base) {
     const r = git(...(base ? ["ls-tree", "HEAD", "--"] : ["ls-files", "-s", "--"]), f);
     return r.status === 0 && r.stdout.startsWith("100755");
   }
-  try { return (statSync(join(op.raiz, f)).mode & 0o111) !== 0; } catch { return false; }
+  // `lstat`, não `stat`: o link nunca é executável no commit (o git o guarda como 120000), qualquer que seja o alvo (login#85)
+  try { const e = lstatSync(join(op.raiz, f)); return !e.isSymbolicLink() && (e.mode & 0o111) !== 0; } catch { return false; }
 }
 /** Materializa o HEAD capturado em worktree descartável e sobrepõe os blobs medidos.
  *  A CLI nunca lê o checkout mutável que o usuário pode editar e restaurar durante a revisão. */

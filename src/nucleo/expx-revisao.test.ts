@@ -2248,6 +2248,16 @@ describe("expx-revisao.mjs: 0.14.4 (conselhos#315 e #316)", () => {
     expect(chamadasDa(c.falsa).at(-1)?.executaveis).toEqual({ "src/a.js": true });
   });
 
+  it.skipIf(process.platform === "win32")("funcional: fora do Windows, o arquivo da task que é link para um alvo executável não chega executável (o git o guarda como 120000; CodeAnt no katosmv/login#85)", () => {
+    const c = cenario();
+    const alvo = join(temp("expx-alvo-"), "roda.sh");
+    writeFileSync(alvo, "#!/bin/sh\n", { mode: 0o755 });
+    rmSync(join(c.raiz, "src/a.js"));
+    symlinkSync(alvo, join(c.raiz, "src/a.js"));
+    expect(revisar(c, "src/a.js").rc).toBe(0);
+    expect(chamadasDa(c.falsa).at(-1)?.executaveis).toEqual({ "src/a.js": false });
+  });
+
   it.skipIf(process.platform === "win32")("funcional: com core.fileMode=false, o bit do disco não vale: o snapshot leva o modo do índice, como o commit (Codex na 0.14.4)", () => {
     const c = cenario();
     git(c.raiz, "config", "core.fileMode", "false");
