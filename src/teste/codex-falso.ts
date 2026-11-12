@@ -53,7 +53,7 @@ if (a[0] === "login" && a[1] === "status") process.exit(cfg.logado === false ? 1
 if (a[0] !== "exec") process.exit(2);
 const stdin = fs.readFileSync(0, "utf8");
 fs.appendFileSync(path.join(dir, "chamadas.jsonl"), JSON.stringify({ args: a, cwd: process.cwd(), stdin, nodeOptions: process.env.NODE_OPTIONS ?? null,
-  ambiente: Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(LD_|DYLD_|GIT_|PYTHON|PERL|RUBY|JAVA|_JAVA_OPTIONS$|JDK_JAVA_OPTIONS$|DOTNET_STARTUP_HOOKS$|CORECLR_|LUA_INIT|NODE_OPTIONS$|NODE_PATH$|GCONV_PATH$|BASH_ENV$|ENV$|HTTPS_PROXY$)/i.test(k))) }) + "\\n");
+  ambiente: Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(LD_|DYLD_|GIT_|NPM_CONFIG_|YARN_|PYTHON|PERL|RUBY|JAVA|_JAVA_OPTIONS$|JDK_JAVA_OPTIONS$|DOTNET_STARTUP_HOOKS$|CORECLR_|LUA_INIT|NODE_OPTIONS$|NODE_PATH$|GCONV_PATH$|BASH_ENV$|ENV$|HTTPS_PROXY$)/i.test(k))) }) + "\\n");
 if (cfg.alteraSiMesmo) fs.appendFileSync(__filename, "\\n// trocado durante a revisao\\n");
 if (cfg.dorme) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, cfg.dorme);
 if (cfg.saida) process.exit(cfg.saida);

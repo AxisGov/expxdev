@@ -550,16 +550,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.14.3 -R AxisGov/expxdev -D ~/expx-cli/v0.14.3 &&
+gh release download v0.14.4 -R AxisGov/expxdev -D ~/expx-cli/v0.14.4 &&
 (
-  cd ~/expx-cli/v0.14.3
+  cd ~/expx-cli/v0.14.4
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.14.3.tgz.sha256
+    sha256sum -c expxdev-0.14.4.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.14.3.tgz.sha256
+    shasum -a 256 -c expxdev-0.14.4.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.14.3/expxdev-0.14.3.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.14.4/expxdev-0.14.4.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -573,7 +573,7 @@ npx --yes --package ~/expx-cli/v0.14.3/expxdev-0.14.3.tgz expx init --skills bui
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.14.3 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.14.4 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -723,6 +723,8 @@ npx --yes --package ~/expx-cli/v0.14.3/expxdev-0.14.3.tgz expx init --skills bui
 - `0.14.2` põe a mensagem do Codex na identidade do achado: dois defeitos na mesma linha, com mensagens diferentes, não colidem mais (login#81).
 - `0.14.3` tira do ambiente do Codex o que injeta código (`LD_*`, `DYLD_*`, `GIT_*`, `BASH_ENV`...; login#83), e a
   runx e a sprintx refazem testes e revisão quando um arquivo muda durante a revisão (runx#27).
+- `0.14.4` tira o npm e o Yarn do ambiente do Codex, leva o bit de executável ao snapshot e dá `blob-ilegivel`
+  no lugar do `L2` quando o git não lê o blob (conselhos#315 e #316).
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

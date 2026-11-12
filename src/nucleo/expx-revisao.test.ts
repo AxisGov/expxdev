@@ -1446,11 +1446,11 @@ describe("expx-revisao.mjs conferir v2", () => {
     }, (raiz) => { escreve(raiz, "src/a.js", grande); grandeBlob = git(raiz, "hash-object", "src/a.js"); }), "L2");
   });
 
-  it("funcional: blob do enviado ilegível para o git (objeto apagado) → FALHA evidencia-invalida:L2, nunca medida de 0 bytes", () => {
+  it("funcional: blob do enviado ilegível para o git (objeto apagado) → FALHA evidencia-invalida:blob-ilegivel:<arquivo> (antes, L2), nunca medida de 0 bytes", () => {
     const f = forjada(() => undefined);
     const blob = git(f.raiz, "rev-parse", `${f.sha}:src/a.js`);
     rmSync(join(f.raiz, ".git", "objects", blob.slice(0, 2), blob.slice(2)), { force: true });
-    reprova(f, "L2");
+    reprova(f, "blob-ilegivel:src/a.js");
   });
 
   it("funcional: ok com enviado acima da leitura máxima forjado pequeno → FALHA evidencia-invalida:L2", () => {
@@ -2111,7 +2111,8 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
     const injeta = Object.fromEntries(["LD_LIBRARY_PATH", "LD_QUALQUER", "DYLD_FRAMEWORK_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "GCONV_PATH", "BASH_ENV", "ENV",
       "NODE_PATH", "PYTHONPATH", "PYTHONSTARTUP", "PYTHONHOME", "PYTHONUSERBASE", "PERL5OPT", "PERL5LIB", "PERLLIB", "PERL5DB", "RUBYOPT", "RUBYLIB",
       "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS", "DOTNET_STARTUP_HOOKS", "CORECLR_PROFILER", "CORECLR_PROFILER_PATH",
-      "CORECLR_ENABLE_PROFILING", "LUA_INIT", "LUA_INIT_5_4", "GIT_QUALQUER"].map((k) => [k, fora]));
+      "CORECLR_ENABLE_PROFILING", "LUA_INIT", "LUA_INIT_5_4", "GIT_QUALQUER", "npm_config_node_options", "NPM_CONFIG_SCRIPT_SHELL",
+      "npm_config_userconfig", "YARN_YARN_PATH", "YARN_RC_FILENAME"].map((k) => [k, fora]));
     // a configuração legítima dos mesmos runtimes passa (Codex no #167: os prefixos de família tiravam o `JAVA_HOME`)
     const legitimas = { JAVA_HOME: fora, PYTHONIOENCODING: "utf-8", PERL_MM_OPT: "INSTALL_BASE=x" };
     // `GIT_*` que não quebram o git do próprio núcleo (um `GIT_DIR` trocaria o repositório dele também): o prefixo é o que se prova
@@ -2119,7 +2120,7 @@ describe("expx-revisao.mjs: escala para o Codex (CodeAnt fora)", () => {
     expect(r.rc).toBe(0);
     // a ausência das bloqueadas e a presença do proxy, não a igualdade: o ambiente de quem roda a suíte pode ter `https_proxy` (CodeAnt no #167)
     const recebido = chamadasDoCodex(codex)[0]?.ambiente ?? {};
-    expect(Object.keys(recebido).filter((k) => Object.hasOwn(injeta, k) || /^(GIT_|LD_|DYLD_)/i.test(k))).toEqual([]);
+    expect(Object.keys(recebido).filter((k) => Object.hasOwn(injeta, k) || /^(GIT_|LD_|DYLD_|NPM_CONFIG_|YARN_)/i.test(k))).toEqual([]);
     expect(recebido["HTTPS_PROXY"]).toBe("http://proxy.exemplo.invalid:3128");
     expect(Object.fromEntries(Object.keys(legitimas).map((k) => [k, recebido[k]]))).toEqual(legitimas);
   });
@@ -2235,5 +2236,27 @@ describe("expx-revisao.mjs: derivacao 3 (a issue que não se liga a uma linha da
     git(c.raiz, "commit", "-q", "-m", "b");
     altera3(c.raiz);
     expect(revisar(c, "src/a.js,src/b.js")).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "arquivo-mudou-durante-revisao" } });
+  });
+});
+
+describe("expx-revisao.mjs: 0.14.4 (conselhos#315 e #316)", () => {
+  it.skipIf(process.platform === "win32")("funcional: fora do Windows, o arquivo executável da task chega executável ao snapshot (conselhos#315)", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    chmodSync(join(c.raiz, "src/a.js"), 0o755);
+    expect(revisar(c, "src/a.js").rc).toBe(0);
+    expect(chamadasDa(c.falsa).at(-1)?.executaveis).toEqual({ "src/a.js": true });
+  });
+
+  it.skipIf(process.platform === "win32")("funcional: blob que o git não lê no conferir → FALHA evidencia-invalida:blob-ilegivel:<arquivo>, não L2 (conselhos#316)", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    const sha = commita(c.raiz);
+    const falso = temp("expx-git-falso-");
+    writeFileSync(join(falso, "git"), `#!/bin/sh\n[ "$1" = "cat-file" ] && [ "$2" = "-s" ] && exit 128\nexec ${JSON.stringify(noPath("git") ?? "git")} "$@"\n`, { mode: 0o755 });
+    const r = spawnSync(process.execPath, [SCRIPT, "conferir", "--trabalho", "w", "--modo", "obrigatoria", "--task", `T-01=${sha}`, "--raiz", c.raiz],
+      { encoding: "utf8", env: ambienteCom(`${falso}${delimiter}${PATH}`) });
+    expect(r.stdout.trim()).toBe("T-01 FALHA evidencia-invalida:blob-ilegivel:src/a.js");
   });
 });

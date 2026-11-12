@@ -9,6 +9,14 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.4 — o npm no ambiente do Codex, o modo no snapshot e o blob ilegível
+
+Instale por PR, como a 0.14.3. Muda só o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`). A runx, a sprintx, os eventos, o `init`, o `doctor`, o painel e o `expx sessao` seguem como na 0.14.3. Os achados são da CodeAnt no conselhos-municipais#315 (instalação da 0.14.3) e do diagnóstico do #316.
+
+- **O Codex não herda a configuração do npm nem a do Yarn** (`npm_config_*`, `YARN_*`, por prefixo). Quase toda configuração deles redireciona a execução: `node_options` passa código aos `node` que o npm abre, `script_shell` troca o shell dos scripts, `userconfig` aponta para um `.npmrc` qualquer, e `yarnPath` roda um JS qualquer. O custo é o npm do sandbox perder registry e proxy, o que quase não pesa, porque o sandbox é só leitura e em geral sem rede.
+- **O snapshot leva o bit de executável.** Antes, o arquivo que virava executável chegava ao revisor como não executável. Agora o modo é o que vai ao commit. Limite declarado: a mudança só de modo, com o mesmo conteúdo, continua `sem-alteracao` e não vai ao revisor.
+- **`blob-ilegivel` no lugar do `L2`.** No `conferir`, o blob que o git não consegue ler, como num clone parcial sem rede, dava `evidencia-invalida:L2`, e isso despistou o diagnóstico do #316. Agora dá `evidencia-invalida:blob-ilegivel:<arquivo>`. Continua FALHA; muda só o diagnóstico.
+
 ## 0.14.3 — o ambiente do Codex e o arquivo que muda durante a revisão
 
 Instale por PR, como a 0.14.2. Muda o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`), a runx (AxisGov/runx#27, merge 575677f, DR-120) e a sprintx (AxisGov/sprintx#80, merge 9e4de6d, DS-222). O `init` passa a instalar esses dois commits. Os eventos, o `doctor`, o painel e o `expx sessao` seguem como na 0.14.2. Os achados são da CodeAnt no katosmv/login#83 (instalação da 0.14.2), do CodeRabbit no runx#27 e da revisão do Codex.
