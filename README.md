@@ -552,7 +552,7 @@ a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de se
 ```bash
 gh release download v0.14.4 -R AxisGov/expxdev -D ~/expx-cli/v0.14.4 &&
 (
-  cd ~/expx-cli/v0.14.4
+  cd ~/expx-cli/v0.14.4 || exit 1
   if command -v sha256sum >/dev/null 2>&1; then
     sha256sum -c expxdev-0.14.4.tgz.sha256
   else
