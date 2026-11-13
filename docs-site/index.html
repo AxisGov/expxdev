@@ -1741,7 +1741,7 @@ invalida: se todo usuário tiver exatamente o mesmo acesso aos
       <tr><td><code>artefato-alterado</code></td><td><span class="selo selo--erro">erro</span></td><td>arquivo instalado não bate com o hash travado no lock</td></tr>
       <tr><td><code>lock-adulterado</code></td><td><span class="selo selo--erro">erro</span></td><td>o próprio lock foi editado à mão</td></tr>
       <tr><td><code>settings-divergente</code></td><td><span class="selo selo--erro">erro</span></td><td>entrada de hook gerenciada ausente ou alterada no <code>settings.json</code></td></tr>
-      <tr><td><code>gitattributes-sem-bloco</code></td><td><span class="selo selo--erro">erro</span></td><td>o <code>.gitattributes</code> sem o bloco do expx, ou fora do índice</td></tr>
+      <tr><td><code>gitattributes-sem-bloco</code></td><td><span class="selo selo--erro">erro</span></td><td>o <code>.gitattributes</code> sem o bloco do expx; aviso se só o bloco falta no índice e o <code>.expx/</code> está lá</td></tr>
       <tr><td><code>modos-ausente</code></td><td><span class="selo selo--erro">erro</span></td><td><code>.expx/hooks.json</code> ausente, e os hooks caem no modo padrão de cada um</td></tr>
       <tr><td><code>modos-divergente</code></td><td><span class="selo selo--erro">erro</span></td><td><code>.expx/hooks.json</code> difere do composto travado, além do campo <code>modo</code></td></tr>
       <tr><td><code>modo-executavel-nao-versionado</code></td><td><span class="selo selo--erro">erro</span></td><td>executável gerenciado rastreado como <code>100644</code> no índice: o bit não está versionado</td></tr>
