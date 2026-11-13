@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
@@ -142,5 +143,47 @@ describe("busca de um commit exato", () => {
     criados.push(repo);
     const r = await buscarSkill({ nome: "sprintx", repositorio: pathToFileURL(repo).href, referencia: "main", commit: "0".repeat(40) });
     expect(r.ok).toBe(false);
+  });
+});
+
+/**
+ * conselhos-municipais, 0.14.6 no Windows: com `core.autocrlf=true` na config global, o clone temporário da skill
+ * saía em CRLF, o `init`/`update` copiava esses bytes e o lock gravava o hash deles; o projeto commitado em LF
+ * dava "modificacao local" em qualquer outra máquina. A busca traz os bytes do commit, sem conversão.
+ */
+describe("busca: os bytes do commit, qualquer que seja a config global do git (0.14.7)", () => {
+  const comAutocrlf = async <T>(f: () => Promise<T>): Promise<T> => {
+    const dir = mkdtempSync(join(tmpdir(), "expx-gitconfig-"));
+    criados.push(dir);
+    const cfg = join(dir, "gitconfig");
+    writeFileSync(cfg, "[core]\n\tautocrlf = true\n\teol = crlf\n");
+    const antes = { g: process.env["GIT_CONFIG_GLOBAL"], s: process.env["GIT_CONFIG_NOSYSTEM"] };
+    process.env["GIT_CONFIG_GLOBAL"] = cfg;
+    process.env["GIT_CONFIG_NOSYSTEM"] = "1";
+    try {
+      return await f();
+    } finally {
+      for (const [k, v] of [["GIT_CONFIG_GLOBAL", antes.g], ["GIT_CONFIG_NOSYSTEM", antes.s]] as const) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
+  };
+
+  it.each([
+    ["pela referência (clone raso)", (commit: string) => ({ referencia: "v1.0.0", commit: undefined as string | undefined, _c: commit })],
+    ["pelo commit certificado", (commit: string) => ({ referencia: "v1.0.0", commit, _c: commit })],
+  ])("funcional: com core.autocrlf=true global, %s chega em LF, byte a byte como o commit", async (_nome, pedido) => {
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
+    criados.push(repo);
+    const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim();
+    const { referencia, commit: c } = pedido(commit);
+    const r = await comAutocrlf(() => buscarSkill({ nome: "sprintx", repositorio: pathToFileURL(repo).href, referencia, ...(c ? { commit: c } : {}) }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    criados.push(r.caminho);
+    const rel = ".claude/skills/sprintx/SKILL.md";
+    const doCommit = execFileSync("git", ["cat-file", "blob", `${commit}:${rel}`], { cwd: repo });
+    expect(readFileSync(join(r.caminho, rel)).equals(doCommit)).toBe(true);
   });
 });

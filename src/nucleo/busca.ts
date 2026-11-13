@@ -7,6 +7,14 @@ import { basename, join } from "node:path";
 const exec = promisify(execFile);
 
 /**
+ * O checkout da skill sem conversão de fim de linha: o `init` copia esses bytes e o lock grava o hash deles. Com
+ * `core.autocrlf=true` na config global (o padrão do Git para Windows), o clone saía em CRLF, e o projeto, commitado
+ * em LF, dava "modificacao local" em qualquer outra máquina (conselhos-municipais, 0.14.6). O `.gitattributes` da
+ * própria skill continua valendo: é escolha de quem a publica, igual em toda máquina.
+ */
+const SEM_CONVERSAO = ["-c", "core.autocrlf=false", "-c", "core.eol=lf"];
+
+/**
  * Traz os arquivos de uma skill para o disco, na referência alvo.
  *
  * Usa o `git` do sistema em vez da API do GitHub: assim a credencial já
@@ -84,7 +92,7 @@ async function trazerCommit(repositorio: string, commit: string, destino: string
       cwd: destino,
     });
   }
-  await exec("git", ["checkout", "--quiet", "--detach", commit], { cwd: destino });
+  await exec("git", [...SEM_CONVERSAO, "checkout", "--quiet", "--detach", commit], { cwd: destino });
 }
 
 /** Clona só a referência pedida, com profundidade 1 — ou o commit pedido. Devolve a pasta temporária. */
@@ -96,6 +104,7 @@ export async function buscarSkill(p: PedidoBusca): Promise<ResultadoBusca> {
       await trazerCommit(p.repositorio, p.commit, destino);
     } else {
       await exec("git", [
+        ...SEM_CONVERSAO,
         "clone",
         "--quiet",
         "--depth",
