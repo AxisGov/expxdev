@@ -815,6 +815,35 @@ skill encolhe entre versões.
 > investigue antes de commitar. O lock prova que o arquivo é o instalado, não que o conteúdo seja
 > inofensivo.
 
+### Fim de linha no Windows
+
+O lock guarda o hash dos **bytes** de cada arquivo instalado. Um checkout com `core.autocrlf=true`, o
+padrão do Git para Windows, converte esses arquivos para CRLF. O hash deixa de bater, o `update`
+recusa "modificacao local" e o `doctor` acusa artefato alterado, sem que ninguém tenha mexido em
+nada. Desde a 0.14.7:
+
+- a busca das skills traz os bytes do commit, qualquer que seja a config global do git. Antes, o
+  `update` no Windows gravava no lock o hash das cópias em CRLF, e o projeto, commitado em LF, dava
+  "modificacao local" em qualquer outra máquina;
+- o `init` e o `update` mantêm no `.gitattributes` da raiz um bloco entre `# >>> expx` e `# <<< expx`
+  que marca `-text` nas pastas que o expx escreve (`.expx/`, `.claude/skills/`, `.claude/hooks/`,
+  `.claude/agents/`, `.opencode/commands/`, `.opencode/plugins/`, `.codex/hooks/`). Sem conversão, o
+  que está no commit é o que chega ao disco, em qualquer máquina. As regras fora do bloco são suas e
+  ficam onde estão; o lock trava o hash do bloco, e o `doctor` acusa `gitattributes-sem-bloco`.
+
+**Migração de um checkout que já está em CRLF.** O `update` recusa e diz que a modificação é **só de
+fim de linha**. Para sair dela:
+
+1. traga o bloco: faça o `expx update` num clone em que o checkout não converte (WSL, Linux ou
+   macOS), commite e integre; ou copie o bloco do `.gitattributes` de um projeto já na 0.14.7 e
+   commite;
+2. no checkout do Windows, depois do `git pull`, os arquivos instalados aparecem modificados no
+   `git status`. Confira que nada além do fim de linha mudou, por exemplo com
+   `git diff --ignore-cr-at-eol --stat -- .expx .claude`, e restaure-os:
+   `git restore -- .expx .claude/skills .claude/hooks .claude/agents`, só com as pastas que existem.
+   O `git restore` descarta o que não foi commitado nesses caminhos, e a conferência do passo
+   anterior é o que garante que só havia fim de linha.
+
 ---
 
 ## O que o `doctor` verifica
@@ -823,7 +852,7 @@ skill encolhe entre versões.
 npx expxdev doctor
 ```
 
-Trinta e seis verificações, cada uma com severidade e correção sugerida. Achado de severidade
+Trinta e sete verificações, cada uma com severidade e correção sugerida. Achado de severidade
 `aviso` não derruba a saída; `erro` sim.
 
 | Verificação | Severidade |
@@ -844,6 +873,7 @@ Trinta e seis verificações, cada uma com severidade e correção sugerida. Ach
 | nenhum arquivo instalado foi alterado (hash de cada um) | erro |
 | o próprio lock não foi adulterado | erro |
 | as entradas de hook do `settings.json` são as que o lock travou | erro |
+| o `.gitattributes` tem o bloco do expx que o lock travou (desde a 0.14.7) | erro |
 | `.expx/hooks.json` presente quando o lock declara modos | erro |
 | `.expx/hooks.json` é o composto que foi escrito | erro |
 | hook instalado tem o motor da skill ao lado | erro |

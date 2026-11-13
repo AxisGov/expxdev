@@ -16,7 +16,8 @@ import {
   semBitNoDisco,
   type ConsultaAoHead,
 } from "../nucleo/modo-executavel.js";
-import { jsonCanonico } from "../plugin/plano.js";
+import { hashDeBytes, jsonCanonico } from "../plugin/plano.js";
+import { blocoDoExpx, CAMINHO_GITATTRIBUTES } from "../nucleo/gitattributes.js";
 import { raizDoNucleo } from "../plugin/montagem.js";
 import {
   descreverEntrada,
@@ -313,6 +314,21 @@ function verificarInstalacao(raiz: string, inst: InstalacaoTravada, push: (a: Ac
         severidade: "erro",
         problema: `hook gerenciado ausente ou alterado no .claude/settings.json: ${amostra(faltam.map(descreverEntrada))}`,
         correcao: "rode `expx init` para recompor o settings; as entradas que sao suas ficam onde estao",
+      });
+    }
+  }
+
+  // o bloco que tira os arquivos instalados da conversão de fim de linha (0.14.7); o lock anterior não o declara,
+  // e o aviso de CLI mais nova já manda rodar o update
+  if (inst.gitattributes !== undefined) {
+    const caminho = join(raiz, CAMINHO_GITATTRIBUTES);
+    const bloco = existsSync(caminho) ? blocoDoExpx(readFileSync(caminho, "utf8")) : undefined;
+    if (bloco === undefined || hashDeBytes(bloco) !== inst.gitattributes.hash) {
+      push({
+        id: "gitattributes-sem-bloco",
+        severidade: "erro",
+        problema: `${CAMINHO_GITATTRIBUTES} sem o bloco do expx, ou com ele alterado: um checkout com core.autocrlf converte os arquivos instalados, e eles deixam de bater com o lock`,
+        correcao: "rode `expx init` para recompor o bloco; as regras que sao suas ficam onde estao",
       });
     }
   }

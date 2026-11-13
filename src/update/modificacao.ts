@@ -1,5 +1,6 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { join, sep } from "node:path";
 import { lerLock } from "../nucleo/lock.js";
 import { compararComHashes } from "../nucleo/integridade.js";
 import { ORIGEM_DO_PLUGIN } from "../plugin/manifestos.js";
@@ -26,8 +27,29 @@ export type Verificacao = {
   alterados: string[];
   removidos: string[];
   novos: string[];
+  /**
+   * A modificação é só de fim de linha: nada sumiu nem apareceu, e cada alterado volta ao hash do lock com o CRLF
+   * trocado por LF. É o checkout com `core.autocrlf` sem o bloco do `.gitattributes` (ver `nucleo/gitattributes.ts`),
+   * e o update continua recusando: só a mensagem muda, para dizer o caminho.
+   */
+  soFimDeLinha?: boolean;
   erro?: string;
 };
+
+/** O que o update diz da modificação só de fim de linha. */
+export const MIGRACAO_FIM_DE_LINHA =
+  "so fim de linha (o checkout converteu para CRLF): commite o bloco do expx no .gitattributes " +
+  "(veja \"Fim de linha no Windows\" no README do expxdev), confira com `git diff --ignore-cr-at-eol` que nada mais mudou e " +
+  "rode `git restore -- .expx` antes do update";
+
+/** O alterado volta ao hash do lock com o CRLF trocado por LF. */
+function soCrlf(pasta: string, rel: string, esperado: string | undefined): boolean {
+  if (esperado === undefined) return false;
+  const bruto = readFileSync(join(pasta, rel));
+  if (!bruto.includes("\r\n")) return false;
+  const lf = Buffer.from(bruto.toString("latin1").replace(/\r\n/g, "\n"), "latin1");
+  return createHash("sha256").update(lf).digest("hex") === esperado;
+}
 
 /** A pasta onde a skill instalada vive dentro do projeto. */
 export function pastaDaSkill(raizProjeto: string, nome: string): string {
@@ -49,10 +71,13 @@ export function verificarModificacaoLocal(raizProjeto: string, nome: string): Ve
   }
 
   const d = compararComHashes(pasta, travada.arquivos);
+  const soFimDeLinha = d.alterados.length > 0 && d.removidos.length === 0 && d.novos.length === 0
+    && d.alterados.every((rel) => soCrlf(pasta, rel, travada.arquivos[rel.split(sep).join("/")]));
   return {
     temModificacao: !d.limpo,
     alterados: d.alterados,
     removidos: d.removidos,
     novos: d.novos,
+    soFimDeLinha,
   };
 }

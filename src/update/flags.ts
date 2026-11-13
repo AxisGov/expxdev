@@ -2,7 +2,7 @@ import { caminhoDoLock, compararVersoes, lerLock, versaoDoCli, type Lock } from 
 import { repositorioCanonico, resolverOrigem } from "../nucleo/catalogo.js";
 import { ehCaminhoLocal, executarInit, retratoDoLock } from "../cli/init.js";
 import { compararComRemoto, type ItemComparacao } from "./comparar.js";
-import { verificarModificacaoLocal } from "./modificacao.js";
+import { MIGRACAO_FIM_DE_LINHA, verificarModificacaoLocal } from "./modificacao.js";
 import { escreverArquivoAtomico } from "../plugin/atomico.js";
 import { adquirirBloqueioOperacao } from "../nucleo/bloqueio-operacao.js";
 
@@ -213,7 +213,8 @@ export async function executarUpdate(op: OpcoesUpdate): Promise<ResultadoUpdate>
   const bloquearSeModificada = (nome: string): boolean => {
     const mod = verificarModificacaoLocal(op.raiz, nome);
     if (!mod.temModificacao) return false;
-    bloqueadas.push({ nome, motivo: `modificacao local em: ${[...mod.alterados, ...mod.removidos].join(", ")}` });
+    const lista = [...mod.alterados, ...mod.removidos].join(", ");
+    bloqueadas.push({ nome, motivo: `modificacao local em: ${lista}${mod.soFimDeLinha === true ? ` (${MIGRACAO_FIM_DE_LINHA})` : ""}` });
     modificadas.push(nome);
     return true;
   };

@@ -18,6 +18,7 @@ import {
 import { verificarRuntime } from "../nucleo/runtime.js";
 import { avisoDeFilemode } from "../nucleo/modo-executavel.js";
 import { escreverArquivoAtomico, prepararTroca } from "../plugin/atomico.js";
+import { BLOCO_GITATTRIBUTES, CAMINHO_GITATTRIBUTES, comBlocoDoExpx } from "../nucleo/gitattributes.js";
 import { montarMarketplace, planejarPlugin, type SkillMontavel } from "../plugin/montagem.js";
 import {
   aplicarArtefatos,
@@ -31,7 +32,7 @@ import {
 } from "../plugin/plano.js";
 import { artefatosOpenCode, pontesDeHooks } from "../harness/opencode.js";
 import { entradasPorNome, formaSemAspas, gravarSettings, planejarSettings, type PlanoSettings } from "../harness/settings.js";
-import { verificarModificacaoLocal } from "../update/modificacao.js";
+import { MIGRACAO_FIM_DE_LINHA, verificarModificacaoLocal } from "../update/modificacao.js";
 import { artefatosDeHooks, comHooks, hooksPorNome } from "../harness/hooks.js";
 import { conferirPisoDoClaude, PISO_CLAUDE } from "../harness/versao-claude.js";
 import {
@@ -272,6 +273,7 @@ function instalacaoTravada(plano: Plano): InstalacaoTravada {
   }
   if (typeof plano.papeis === "string") inst.papeis = { hash: hashDeBytes(plano.papeis) };
   else if (plano.papeis === undefined && plano.papeisTravados !== undefined) inst.papeis = plano.papeisTravados;
+  inst.gitattributes = { hash: hashDeBytes(BLOCO_GITATTRIBUTES) };
   return inst;
 }
 
@@ -671,13 +673,15 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
       };
     }
     if (op.recusarModificacaoLocal === true) {
-      const modificadas = Object.keys(travadasAntes).filter((n) => verificarModificacaoLocal(op.raiz, n).temModificacao);
+      const verificadas = Object.keys(travadasAntes).map((n) => [n, verificarModificacaoLocal(op.raiz, n)] as const).filter(([, v]) => v.temModificacao);
+      const modificadas = verificadas.map(([n]) => n);
       if (modificadas.length > 0) {
+        const fimDeLinha = verificadas.every(([, v]) => v.soFimDeLinha === true) ? ` (${MIGRACAO_FIM_DE_LINHA})` : "";
         return {
           ok: false,
           instaladas: [],
           falhas,
-          erros: [`modificacao local em ${modificadas.join(", ")}: nada foi escrito`],
+          erros: [`modificacao local em ${modificadas.join(", ")}: nada foi escrito${fimDeLinha}`],
           naoTravadas,
           avisos,
         };
@@ -698,6 +702,11 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
       if (typeof p.plano.papeis === "string") escreverArquivoAtomico(join(op.raiz, ...CAMINHO_PAPEIS.split("/")), p.plano.papeis);
       else if (p.plano.papeis === null) rmSync(join(op.raiz, ...CAMINHO_PAPEIS.split("/")), { force: true });
       aplicarArtefatos(op.raiz, p.plano.projeto);
+      // o bloco que tira os arquivos instalados da conversão de fim de linha; as regras da pessoa ficam
+      const atributos = join(op.raiz, CAMINHO_GITATTRIBUTES);
+      const atuais = existsSync(atributos) ? readFileSync(atributos, "utf8") : undefined;
+      const comBloco = comBlocoDoExpx(atuais);
+      if (comBloco !== atuais) escreverArquivoAtomico(atributos, comBloco);
       for (const rel of p.plano.remover) rmSync(join(op.raiz, ...rel.split("/")), { force: true });
       if (p.plano.settings !== undefined) {
         const s = gravarSettings(p.plano.settings);
