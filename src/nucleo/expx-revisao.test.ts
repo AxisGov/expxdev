@@ -429,6 +429,18 @@ describe("expx-revisao.mjs revisar v2: portões antes da CLI", () => {
     expect(readFileSync(alvo, "utf8")).toBe("segredo\n");
   });
 
+  // CodeAnt no expxdev#171: com `caminho(f, plataforma)`, o `.map(caminho)` passava o índice como plataforma, e no
+  // Windows o `\` do pedido não virava `/`: o `..\` escapava da checagem da raiz
+  it.runIf(process.platform === "win32")("funcional: no Windows, barra invertida no --arquivos: `..\\` é fora da raiz, e `src\\a.js` é `src/a.js` (expxdev#171)", () => {
+    const c = cenario();
+    const fora = temp("expx-fora-");
+    writeFileSync(join(fora, "alvo.js"), "segredo\n");
+    const r = revisar(c, `..\\${fora.split(/[\\/]/).pop() ?? ""}\\alvo.js`);
+    expect([r.rc, r.err.includes("fora da raiz do projeto"), r.chamadas]).toEqual([64, true, []]);
+    altera3(c.raiz);
+    expect(Object.keys(revisar(c, "src\\a.js").ev.arquivos)).toEqual(["src/a.js"]);
+  });
+
   const comLink = suportaSymlinkDeDiretorio();
   it.skipIf(!comLink)(`funcional: caminho que atravessa diretório-link para fora da raiz é erro de uso${comLink ? "" : " [pulado: sem link de diretório]"}`, () => {
     const c = cenario();
@@ -2339,6 +2351,10 @@ describe("expx-revisao.mjs: a plataforma da evidência (0.14.7)", () => {
     ev.chamada.meta.skipped = [{ file: "src\\c.js", reason: "excluded by pattern" }];
     ev.chamada.meta.total_changed = 2;
   };
+
+  it("estrutural: `caminho` e `daCli` não vão a `map` sem lambda: o índice cairia na plataforma (CodeAnt no expxdev#171)", () => {
+    expect(readFileSync(SCRIPT, "utf8")).not.toMatch(/\.map\((caminho|daCli)\)/);
+  });
 
   it("funcional: o revisar grava a plataforma em que rodou", () => {
     const c = cenario();

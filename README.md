@@ -842,8 +842,9 @@ fim de linha**. Para sair dela:
    commite;
 2. no checkout do Windows, depois do `git pull`, os arquivos instalados aparecem modificados no
    `git status`. Confira que nada além do fim de linha mudou, por exemplo com
-   `git diff --ignore-cr-at-eol --stat -- .expx .claude`, e restaure-os:
-   `git restore -- .expx .claude/skills .claude/hooks .claude/agents`, só com as pastas que existem.
+   `git diff --ignore-cr-at-eol --stat -- .expx .claude .opencode .codex`, e restaure-os:
+   `git restore -- .expx .claude/skills .claude/hooks .claude/agents .opencode/commands .opencode/plugins .codex/hooks`,
+   só com as pastas que existem.
    O `git restore` descarta o que não foi commitado nesses caminhos, e a conferência do passo
    anterior é o que garante que só havia fim de linha.
 
@@ -876,7 +877,7 @@ Trinta e sete verificações, cada uma com severidade e correção sugerida. Ach
 | nenhum arquivo instalado foi alterado (hash de cada um) | erro |
 | o próprio lock não foi adulterado | erro |
 | as entradas de hook do `settings.json` são as que o lock travou | erro |
-| o `.gitattributes` tem o bloco do expx que o lock travou (desde a 0.14.7) | erro |
+| o `.gitattributes` tem o bloco do expx que o lock travou (desde a 0.14.7); com o `.expx/` no índice do git e o bloco fora dele, aviso | erro |
 | `.expx/hooks.json` presente quando o lock declara modos | erro |
 | `.expx/hooks.json` é o composto que foi escrito | erro |
 | hook instalado tem o motor da skill ao lado | erro |

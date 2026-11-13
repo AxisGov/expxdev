@@ -681,7 +681,8 @@ function reconciliar(I, meta, plataforma = process.platform) {
 
 function revisar() {
   // sem aparar: espaço na ponta é parte do nome, e aparado o caminho seria outro arquivo (ou nenhum)
-  const arquivos = op.arquivos.split(",").map(caminho).filter(Boolean);
+  // a lambda, não `map(caminho)`: o índice do `map` cairia na plataforma, e no Windows o `\` ficaria (expxdev#171)
+  const arquivos = op.arquivos.split(",").map((f) => caminho(f)).filter(Boolean);
   if (arquivos.length === 0) uso("--arquivos sem nenhum caminho");
   // o caminho é relativo à raiz e fica dentro dela: com `..` ou absoluto, o snapshot apagaria e
   // reescreveria um caminho fora do checkout temporário

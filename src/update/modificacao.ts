@@ -45,7 +45,13 @@ export const MIGRACAO_FIM_DE_LINHA =
 /** O alterado volta ao hash do lock com o CRLF trocado por LF. */
 function soCrlf(pasta: string, rel: string, esperado: string | undefined): boolean {
   if (esperado === undefined) return false;
-  const bruto = readFileSync(join(pasta, rel));
+  let bruto: Buffer;
+  // o arquivo que sumiu ou virou pasta depois da comparação não é só fim de linha (CodeAnt no expxdev#171)
+  try {
+    bruto = readFileSync(join(pasta, rel));
+  } catch {
+    return false;
+  }
   if (!bruto.includes("\r\n")) return false;
   const lf = Buffer.from(bruto.toString("latin1").replace(/\r\n/g, "\n"), "latin1");
   return createHash("sha256").update(lf).digest("hex") === esperado;

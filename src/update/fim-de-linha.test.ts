@@ -160,4 +160,17 @@ describe("init e update: o .gitattributes e o lock", () => {
     rmSync(join(p.raiz, ".gitattributes"));
     expect(diagnosticar(p.raiz).achados).toContainEqual(expect.objectContaining({ id: "gitattributes-sem-bloco", severidade: "erro" }));
   });
+
+  it("funcional: num repositório git, o .expx/ no índice sem o bloco é aviso: o clone novo não o recebe (CodeAnt no expxdev#171)", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    git(p.raiz, "init", "-q");
+    expect((await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: origens(["sprintx"]) })).ok).toBe(true);
+    const doBloco = () => diagnosticar(p!.raiz).achados.filter((a) => a.id === "gitattributes-sem-bloco");
+    // logo depois do init, nada no índice: nada a cobrar
+    expect(doBloco()).toEqual([]);
+    git(p.raiz, "add", ".expx");
+    expect(doBloco()).toEqual([expect.objectContaining({ severidade: "aviso" })]);
+    git(p.raiz, "add", ".gitattributes");
+    expect(doBloco()).toEqual([]);
+  });
 });
