@@ -102,6 +102,28 @@ describe("init e update: o .gitattributes e o lock", () => {
     expect(arquivos(join(clone, ".expx")).filter((f) => readFileSync(f).includes("\r\n"))).toEqual([]);
   });
 
+  it("integração: no clone com core.autocrlf=true, os artefatos fora do .expx (.claude, .opencode) também batem com o lock (Codex)", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    git(p.raiz, "init", "-q");
+    const repo = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"], hooks: ["sprintx-hook.sh"] });
+    temporarios.push(repo);
+    const r = await executarInit({ raiz: p.raiz, skills: ["sprintx"], harness: ["claude", "opencode"], origens: { sprintx: pathToFileURL(repo).href } });
+    expect(r.ok, r.erros.join("\n")).toBe(true);
+    const l = lerLock(p.raiz);
+    const travados = Object.keys((l.ok && l.lock.instalacao?.arquivos) || {});
+    for (const pasta of [".claude/", ".opencode/"]) expect(travados.some((f) => f.startsWith(pasta)), pasta).toBe(true);
+    git(p.raiz, "add", "-A");
+    git(p.raiz, "commit", "-q", "-m", "expx");
+    const clone = join(mkdtempSync(join(tmpdir(), "expx-clone-crlf-")), "c");
+    temporarios.push(clone);
+    git(p.raiz, "-c", "core.autocrlf=true", "clone", "-q", "-c", "core.autocrlf=true", p.raiz, clone);
+    const ids = diagnosticar(clone).achados.map((a) => a.id);
+    expect(ids).not.toContain("artefato-alterado");
+    expect(ids).not.toContain("gitattributes-sem-bloco");
+    // o settings.json fica fora do bloco: é da pessoa, e o lock trava as entradas gerenciadas, não os bytes
+    expect(travados.filter((f) => readFileSync(join(clone, f)).includes("\r\n"))).toEqual([]);
+  });
+
   it("funcional: arquivo instalado que só mudou de fim de linha → o update recusa e diz que é fim de linha, com o caminho da migração", async () => {
     const sprintx = criarRepoSkill({ nome: "sprintx", tags: ["v1.0.0"] });
     temporarios.push(sprintx);
