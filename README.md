@@ -550,16 +550,16 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.14.6 -R AxisGov/expxdev -D ~/expx-cli/v0.14.6 &&
+gh release download v0.14.7 -R AxisGov/expxdev -D ~/expx-cli/v0.14.7 &&
 (
-  cd ~/expx-cli/v0.14.6 || exit 1
+  cd ~/expx-cli/v0.14.7 || exit 1
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.14.6.tgz.sha256
+    sha256sum -c expxdev-0.14.7.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.14.6.tgz.sha256
+    shasum -a 256 -c expxdev-0.14.7.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.14.6/expxdev-0.14.6.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npx --yes --package ~/expx-cli/v0.14.7/expxdev-0.14.7.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -573,7 +573,7 @@ npx --yes --package ~/expx-cli/v0.14.6/expxdev-0.14.6.tgz expx init --skills bui
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.14.6 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.14.7 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -729,6 +729,9 @@ npx --yes --package ~/expx-cli/v0.14.6/expxdev-0.14.6.tgz expx init --skills bui
   modo depois do `revisar` (conselhos#315).
 - `0.14.6` lê com `/` os caminhos que a CLI do CodeAnt escreve com `\` no Windows: o 403 em todo lote volta a
   escalar para o Codex, e a reconciliação aceita a revisão (conselhos-municipais-91).
+- `0.14.7` grava a plataforma na evidência, para a do Windows conferir fora dele (login#88). Traz as skills com
+  os bytes do commit e mantém no `.gitattributes` o bloco que tira os arquivos instalados da conversão de fim de
+  linha (conselhos-municipais, Windows).
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -815,6 +818,36 @@ skill encolhe entre versões.
 > investigue antes de commitar. O lock prova que o arquivo é o instalado, não que o conteúdo seja
 > inofensivo.
 
+### Fim de linha no Windows
+
+O lock guarda o hash dos **bytes** de cada arquivo instalado. Um checkout com `core.autocrlf=true`, o
+padrão do Git para Windows, converte esses arquivos para CRLF. O hash deixa de bater, o `update`
+recusa "modificacao local" e o `doctor` acusa artefato alterado, sem que ninguém tenha mexido em
+nada. Desde a 0.14.7:
+
+- a busca das skills traz os bytes do commit, qualquer que seja a config global do git. Antes, o
+  `update` no Windows gravava no lock o hash das cópias em CRLF, e o projeto, commitado em LF, dava
+  "modificacao local" em qualquer outra máquina;
+- o `init` e o `update` mantêm no `.gitattributes` da raiz um bloco entre `# >>> expx` e `# <<< expx`
+  que marca `-text` nas pastas que o expx escreve (`.expx/`, `.claude/skills/`, `.claude/hooks/`,
+  `.claude/agents/`, `.opencode/commands/`, `.opencode/plugins/`, `.codex/hooks/`). Sem conversão, o
+  que está no commit é o que chega ao disco, em qualquer máquina. As regras fora do bloco são suas e
+  ficam onde estão; o lock trava o hash do bloco, e o `doctor` acusa `gitattributes-sem-bloco`.
+
+**Migração de um checkout que já está em CRLF.** O `update` recusa e diz que a modificação é **só de
+fim de linha**. Para sair dela:
+
+1. traga o bloco: faça o `expx update` num clone em que o checkout não converte (WSL, Linux ou
+   macOS), commite e integre; ou copie o bloco do `.gitattributes` de um projeto já na 0.14.7 e
+   commite;
+2. no checkout do Windows, depois do `git pull`, os arquivos instalados aparecem modificados no
+   `git status`. Confira que nada além do fim de linha mudou, por exemplo com
+   `git diff --ignore-cr-at-eol --stat -- .expx .claude .opencode .codex`, e restaure-os:
+   `git restore -- .expx .claude/skills .claude/hooks .claude/agents .opencode/commands .opencode/plugins .codex/hooks`,
+   só com as pastas que existem.
+   O `git restore` descarta o que não foi commitado nesses caminhos, e a conferência do passo
+   anterior é o que garante que só havia fim de linha.
+
 ---
 
 ## O que o `doctor` verifica
@@ -823,7 +856,7 @@ skill encolhe entre versões.
 npx expxdev doctor
 ```
 
-Trinta e seis verificações, cada uma com severidade e correção sugerida. Achado de severidade
+Trinta e sete verificações, cada uma com severidade e correção sugerida. Achado de severidade
 `aviso` não derruba a saída; `erro` sim.
 
 | Verificação | Severidade |
@@ -844,6 +877,7 @@ Trinta e seis verificações, cada uma com severidade e correção sugerida. Ach
 | nenhum arquivo instalado foi alterado (hash de cada um) | erro |
 | o próprio lock não foi adulterado | erro |
 | as entradas de hook do `settings.json` são as que o lock travou | erro |
+| o `.gitattributes` tem o bloco do expx que o lock travou (desde a 0.14.7); com o `.expx/` no índice do git e o bloco fora dele, aviso | erro |
 | `.expx/hooks.json` presente quando o lock declara modos | erro |
 | `.expx/hooks.json` é o composto que foi escrito | erro |
 | hook instalado tem o motor da skill ao lado | erro |

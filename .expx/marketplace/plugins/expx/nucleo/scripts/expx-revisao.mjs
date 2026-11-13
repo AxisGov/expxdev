@@ -103,10 +103,10 @@ function medirArquivo(f) {
 }
 
 // `\` é separador só no Windows; fora dele é parte do nome, e trocá-lo daria por ausente um arquivo que existe
-const caminho = (f) => (process.platform === "win32" ? f.replace(/\\/g, "/") : f).replace(/^\.\//, "");
 // o caminho que a CLI do CodeAnt devolve: no Windows ela escreve com `\` (conselhos-municipais-91); o `./` fica, para
-// a cobertura não aceitar menos do que pede
-const daCli = (f) => (process.platform === "win32" ? f.replace(/\\/g, "/") : f);
+// a cobertura não aceitar menos do que pede. A plataforma é a da evidência no `conferir` (CodeAnt no AxisGov/login#88)
+const daCli = (f, plataforma = process.platform) => (plataforma === "win32" ? f.replace(/\\/g, "/") : f);
+const caminho = (f, plataforma = process.platform) => daCli(f, plataforma).replace(/^\.\//, "");
 /** O primeiro diretório de `f` (relativo a `raiz`) que é link simbólico: por ele o caminho sairia da raiz. */
 function linkNoCaminho(raiz, f) {
   const partes = f.split("/");
@@ -662,9 +662,9 @@ function foraDoPerfil(j, perfil, status) {
 // os filtros que a #60 mostrou virem antes do `--include`: pulado fora da task só por eles
 const ANTES_DO_INCLUDE = ["binary/generated", "deleted", "excluded by pattern"];
 /** O motivo de `incompleta` da reconciliação entre os enviados (`I`) e a resposta, ou undefined. */
-function reconciliar(I, meta) {
-  const revisadosDaCli = meta.reviewed_files.map(daCli);
-  const skipped = meta.skipped.map((s) => ({ file: daCli(s.file), reason: s.reason }));
+function reconciliar(I, meta, plataforma = process.platform) {
+  const revisadosDaCli = meta.reviewed_files.map((f) => daCli(f, plataforma));
+  const skipped = meta.skipped.map((s) => ({ file: daCli(s.file, plataforma), reason: s.reason }));
   const vistos = new Set();
   for (const f of [...revisadosDaCli, ...skipped.map((s) => s.file)]) {
     if (vistos.has(f)) return `repetido:${f}`;
@@ -681,7 +681,8 @@ function reconciliar(I, meta) {
 
 function revisar() {
   // sem aparar: espaço na ponta é parte do nome, e aparado o caminho seria outro arquivo (ou nenhum)
-  const arquivos = op.arquivos.split(",").map(caminho).filter(Boolean);
+  // a lambda, não `map(caminho)`: o índice do `map` cairia na plataforma, e no Windows o `\` ficaria (expxdev#171)
+  const arquivos = op.arquivos.split(",").map((f) => caminho(f)).filter(Boolean);
   if (arquivos.length === 0) uso("--arquivos sem nenhum caminho");
   // o caminho é relativo à raiz e fica dentro dela: com `..` ou absoluto, o snapshot apagaria e
   // reescreveria um caminho fora do checkout temporário
@@ -699,7 +700,7 @@ function revisar() {
   // o HEAD da revisão: sem `--base-commit`, as linhas alteradas são as do checkout desde ele (o `conferir` as refaz até o commit)
   const headDaRevisao = idDe("rev-parse", "--verify", "-q", "HEAD^{commit}") ?? null;
   const ev = { expx_revisao: 2, derivacao: 3, trabalho: op.trabalho, task: op.task, modo: base ? "base-commit" : "uncommitted", base_commit: base, head: headDaRevisao, cli: null,
-    executada_em: new Date().toISOString(), arquivos: {}, chamada: null, resultado: "ok", achados: [],
+    plataforma: process.platform, executada_em: new Date().toISOString(), arquivos: {}, chamada: null, resultado: "ok", achados: [],
     rejeicoes: Array.isArray(anterior?.rejeicoes) ? anterior.rejeicoes : [], removidos_sem_revisao: [] };
   const fim = (resultado, motivo) => Object.assign(ev, { resultado, motivo });
   const head = arvore("HEAD");
@@ -864,10 +865,10 @@ function rejeitadasDoTrabalho() {
 /** Os achados das `issues` da CLI, sem rejeição: `aberto` (linha alterada) ou `anterior`. `alt(f)` dá as linhas alteradas
  *  de um arquivo da task (Set, ou `true` para todas) e `texto(f)` o conteúdo (ou ""). A mesma regra no `revisar` (checkout)
  *  e no `conferir` (commit da task), para que `achados` seja derivável das `issues` gravadas. */
-function derivar(issues, arquivos, versao, alt, texto, derivacao = 1, extra = undefined) {
+function derivar(issues, arquivos, versao, alt, texto, derivacao = 1, extra = undefined, plataforma = process.platform) {
   const cache = new Map();
   return issues.map((i) => {
-    const arquivo = caminho(String(i.relevant_file ?? ""));
+    const arquivo = caminho(String(i.relevant_file ?? ""), plataforma);
     const linha = Number(i.start_line);
     // na 3, o arquivo fora da task nunca é lido: o caminho vem do revisor (`../../dev/zero` travava a leitura)
     const daTask = Object.hasOwn(arquivos, arquivo);
@@ -894,6 +895,9 @@ function semData(ev) {
   const dia = iso && new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])));
   return !iso || dia.getUTCMonth() !== Number(iso[2]) - 1 || dia.getUTCDate() !== Number(iso[3]);
 }
+/** A plataforma em que a evidência foi gravada: ela decide se o `\` da CLI é separador. Sem o campo (antes da 0.14.7),
+ *  a da máquina que confere, como era. */
+const plataformaDa = (ev) => ev.plataforma ?? process.platform;
 /** Em `ok`/`achados` com algum arquivo enviado, o campo que não prova a revisão completa pela CLI homologada
  *  (ou undefined): versão, integridade, a chamada, o perfil, falha de lote, L1, L2 (medido de novo no blob do
  *  commit) e a cobertura de cada enviado. */
@@ -933,7 +937,7 @@ function semSinalDaCli(ev, sha) {
   }
   // a mesma reconciliação do `revisar`, com o `--include` igual aos enviados
   const include = Array.isArray(ev.chamada.include) ? ev.chamada.include : [];
-  if (include.length !== enviados.length || !enviados.every((f) => include.includes(f)) || reconciliar(enviados, meta)) return "cobertura";
+  if (include.length !== enviados.length || !enviados.every((f) => include.includes(f)) || reconciliar(enviados, meta, plataformaDa(ev))) return "cobertura";
 }
 
 /** O `semSinalDaCli` da evidência v3 (a escala): o revisor, a chamada do Codex (o pedido refeito, a resposta na forma do
@@ -1024,6 +1028,8 @@ function avaliar(task, sha) {
   }
   // ausente é a 1 (a evidência de antes da 0.13.26); só o inteiro 1, 2 ou 3 (a 3 desde a 0.14.1)
   if (Object.hasOwn(ev, "derivacao") && ![1, 2, 3].includes(ev.derivacao)) return falha("evidencia-invalida:derivacao");
+  // ausente é a evidência de antes da 0.14.7, que segue a máquina que confere; presente, um texto não vazio
+  if (Object.hasOwn(ev, "plataforma") && (typeof ev.plataforma !== "string" || ev.plataforma === "")) return falha("evidencia-invalida:plataforma");
   const concluida = ["ok", "achados"].includes(ev.resultado);
   if (concluida && semData(ev)) return falha("evidencia-invalida:executada_em");
   for (const [f, a] of Object.entries(ev.arquivos)) {
@@ -1091,7 +1097,7 @@ function achadosDivergem(ev, sha) {
     // pelo JSON, como foi gravado (`NaN` vira `null`)
     const [issues, versao, extra] = ev.expx_revisao === 3
       ? [issuesDoCodex(ev.chamada_codex.issues), versaoDoRevisor(ev.revisor), extraDoCodex(ev.revisor.formato)] : [ev.chamada.issues, ev.cli.versao, undefined];
-    derivados = JSON.parse(JSON.stringify(derivar(issues, ev.arquivos, versao, alt, texto, ev.derivacao ?? 1, extra)));
+    derivados = JSON.parse(JSON.stringify(derivar(issues, ev.arquivos, versao, alt, texto, ev.derivacao ?? 1, extra, plataformaDa(ev))));
   }
   const rejeitadas = rejeicoesNoCommit(ev, sha);
   if (ev.achados.length !== derivados.length || derivados.some((d, k) => {

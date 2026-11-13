@@ -52,6 +52,7 @@ const EXTENSO: Record<number, string> = {
   34: "Trinta e quatro",
   35: "Trinta e cinco",
   36: "Trinta e seis",
+  37: "Trinta e sete",
 };
 
 function extenso(n: number): string {

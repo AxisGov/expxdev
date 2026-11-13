@@ -9,6 +9,16 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.7 — a plataforma na evidência e o fim de linha no Windows
+
+Instale por PR, como a 0.14.6, **de um clone em que o checkout não converte o fim de linha** (WSL, Linux ou macOS): veja a migração em "Fim de linha no Windows", no README. Muda o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`), a busca das skills, o `init`, o `update`, o lock e o `doctor`. A runx, a sprintx, os eventos, o painel e o `expx sessao` seguem como na 0.14.6.
+
+- **A evidência grava a plataforma** (CodeAnt no AxisGov/login#88, r4566897200). A evidência gravada no Windows guarda o `meta` e as `issues` da CLI com `\`. Conferida no Linux ou no WSL, dava FALHA `cobertura`, e os achados divergiam. Agora o `revisar` grava `plataforma`, e o `conferir` troca `\` por `/` pela plataforma da evidência, não pela da máquina. A evidência sem o campo (anterior à 0.14.7) segue a máquina, como antes. O campo que não é texto dá `evidencia-invalida:plataforma`.
+- **A skill chega com os bytes do commit** (conselhos-municipais, 0.14.6 no Windows). Com `core.autocrlf=true` na config global, o clone temporário da skill saía em CRLF, e o lock gravava o hash dessas cópias. O projeto, commitado em LF, dava "modificacao local" em qualquer outra máquina. O clone e o checkout passam a rodar com `core.autocrlf=false` e `core.eol=lf`.
+- **O bloco do expx no `.gitattributes`.** O checkout com `core.autocrlf=true` punha CRLF nos arquivos instalados, e o `update` recusava "modificacao local" em todas as skills. O `init` e o `update` mantêm, entre `# >>> expx` e `# <<< expx`, `-text` nas pastas que escrevem. As regras da pessoa ficam onde estão. O lock trava o hash do bloco (`instalacao.gitattributes`), e o `doctor` ganha `gitattributes-sem-bloco` (37 verificações).
+- **A modificação só de fim de linha continua recusada**, mas a mensagem diz que é só fim de linha e dá o caminho da migração.
+- **Não exercitado:** a migração no checkout real do conselhos. A suíte simula o checkout com `core.autocrlf=true` no Linux.
+
 ## 0.14.6 — os caminhos da CLI no Windows
 
 Instale por PR, como a 0.14.5. Muda só o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`). A runx, a sprintx, os eventos, o `init`, o `doctor`, o painel e o `expx sessao` seguem como na 0.14.5. O relato é do conselhos-municipais-91 (Windows, CLI 0.5.14).

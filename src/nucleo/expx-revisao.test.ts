@@ -429,6 +429,18 @@ describe("expx-revisao.mjs revisar v2: portões antes da CLI", () => {
     expect(readFileSync(alvo, "utf8")).toBe("segredo\n");
   });
 
+  // CodeAnt no expxdev#171: com `caminho(f, plataforma)`, o `.map(caminho)` passava o índice como plataforma, e no
+  // Windows o `\` do pedido não virava `/`: o `..\` escapava da checagem da raiz
+  it.runIf(process.platform === "win32")("funcional: no Windows, barra invertida no --arquivos: `..\\` é fora da raiz, e `src\\a.js` é `src/a.js` (expxdev#171)", () => {
+    const c = cenario();
+    const fora = temp("expx-fora-");
+    writeFileSync(join(fora, "alvo.js"), "segredo\n");
+    const r = revisar(c, `..\\${fora.split(/[\\/]/).pop() ?? ""}\\alvo.js`);
+    expect([r.rc, r.err.includes("fora da raiz do projeto"), r.chamadas]).toEqual([64, true, []]);
+    altera3(c.raiz);
+    expect(Object.keys(revisar(c, "src\\a.js").ev.arquivos)).toEqual(["src/a.js"]);
+  });
+
   const comLink = suportaSymlinkDeDiretorio();
   it.skipIf(!comLink)(`funcional: caminho que atravessa diretório-link para fora da raiz é erro de uso${comLink ? "" : " [pulado: sem link de diretório]"}`, () => {
     const c = cenario();
@@ -2322,5 +2334,89 @@ describe("expx-revisao.mjs: 0.14.4 (conselhos#315 e #316)", () => {
     const r = spawnSync(process.execPath, [SCRIPT, "conferir", "--trabalho", "w", "--modo", "obrigatoria", "--task", `T-01=${sha}`, "--raiz", c.raiz],
       { encoding: "utf8", env: ambienteCom(`${falso}${delimiter}${PATH}`) });
     expect(r.stdout.trim()).toBe("T-01 FALHA evidencia-invalida:blob-ilegivel:src/a.js");
+  });
+});
+
+// CodeAnt no AxisGov/login#88 (r4566897200): a evidência gravada no Windows guarda o `meta` e as `issues` da CLI com `\`.
+// Conferida fora dele, a troca de `\` por `/` segue a plataforma da evidência, não a da máquina que confere.
+describe("expx-revisao.mjs: a plataforma da evidência (0.14.7)", () => {
+  /** Reescreve a evidência da T-01 no disco, antes do commit. */
+  const mudaEv = (raiz: string, muda: (ev: Record<string, any>) => void) => {
+    const ev = evidencia(raiz) as Record<string, any>;
+    muda(ev);
+    writeFileSync(join(raiz, EV), JSON.stringify(ev, null, 2));
+  };
+  const comoWindows = (ev: Record<string, any>) => {
+    ev.chamada.meta.reviewed_files = ["src\\a.js"];
+    ev.chamada.meta.skipped = [{ file: "src\\c.js", reason: "excluded by pattern" }];
+    ev.chamada.meta.total_changed = 2;
+  };
+
+  it("estrutural: `caminho` e `daCli` não vão a `map` sem lambda: o índice cairia na plataforma (CodeAnt no expxdev#171)", () => {
+    expect(readFileSync(SCRIPT, "utf8")).not.toMatch(/\.map\((caminho|daCli)\)/);
+  });
+
+  it("funcional: o revisar grava a plataforma em que rodou", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js").ev).toMatchObject({ resultado: "ok", plataforma: process.platform });
+  });
+
+  it("funcional: evidência do Windows (meta com `\\`) conferida em qualquer máquina → ok", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    mudaEv(c.raiz, (ev) => { ev.plataforma = "win32"; comoWindows(ev); });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it("funcional: a mesma evidência dizendo linux → o `\\` é nome, e o conferir dá FALHA evidencia-invalida:cobertura", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    mudaEv(c.raiz, (ev) => { ev.plataforma = "linux"; comoWindows(ev); });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:cobertura" });
+  });
+
+  it.skipIf(process.platform === "win32")("funcional: fora do Windows, a evidência sem plataforma (anterior à 0.14.7) segue a máquina, como antes: `\\` é nome", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    mudaEv(c.raiz, (ev) => { delete ev.plataforma; comoWindows(ev); });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:cobertura" });
+  });
+
+  it("funcional: achado de evidência do Windows (relevant_file com `\\`) → o conferir deriva a mesma identidade", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js").rc).toBe(1);
+    mudaEv(c.raiz, (ev) => { ev.plataforma = "win32"; comoWindows(ev); ev.chamada.issues[0].relevant_file = "src\\a.js"; });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
+  });
+
+  it("funcional: o mesmo achado dizendo linux → o arquivo `src\\a.js` não é da task, e os achados divergem", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    mudaEv(c.raiz, (ev) => { ev.plataforma = "linux"; ev.chamada.issues[0].relevant_file = "src\\a.js"; });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:achados" });
+  });
+
+  it.each([["número", 1], ["texto vazio", ""], ["nulo", null]])("funcional: plataforma %s → FALHA evidencia-invalida:plataforma", (_nome, valor) => {
+    const c = cenario();
+    altera3(c.raiz);
+    revisar(c, "src/a.js");
+    mudaEv(c.raiz, (ev) => { ev.plataforma = valor; });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:plataforma" });
+  });
+
+  it("funcional: na escala para o Codex (v3), a evidência também grava a plataforma, e a do Windows confere", () => {
+    const c = cenario({ stderr: "[error] Failed to review src/a.js: Access denied (403). Please run `codeant logout` and then `codeant login` to re-authenticate.\n" });
+    const codex = instalarCodexFalso(temp("expx-codex-"), { resposta: { arquivos_revisados: ["src/a.js"], issues: [{ arquivo: "src/a.js", linha: 3, severidade: "alta", mensagem: "x" }] } });
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js", "T-01", `${codex.path}${delimiter}${c.falsa.path}${delimiter}${PATH}`);
+    expect(r.ev).toMatchObject({ expx_revisao: 3, resultado: "achados", plataforma: process.platform });
+    mudaEv(c.raiz, (ev) => { ev.plataforma = "win32"; });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 1, out: "T-01 FALHA achados-abertos:1" });
   });
 });

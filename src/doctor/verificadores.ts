@@ -16,7 +16,8 @@ import {
   semBitNoDisco,
   type ConsultaAoHead,
 } from "../nucleo/modo-executavel.js";
-import { jsonCanonico } from "../plugin/plano.js";
+import { hashDeBytes, jsonCanonico } from "../plugin/plano.js";
+import { blocoDoExpx, CAMINHO_GITATTRIBUTES } from "../nucleo/gitattributes.js";
 import { raizDoNucleo } from "../plugin/montagem.js";
 import {
   descreverEntrada,
@@ -65,6 +66,18 @@ function lerJson(caminho: string): unknown | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * O bloco do `.gitattributes` no índice confere. Só se cobra quando a instalação já está no índice (o lock está lá):
+ * logo depois do `init`, nada foi adicionado ainda, e o aviso seria só sobre este arquivo. Fora de um repositório
+ * git, não há índice a conferir.
+ */
+function blocoNoIndice(raiz: string, confere: (texto: string | undefined) => boolean): boolean {
+  const lock = spawnSync("git", ["-C", raiz, "ls-files", "--error-unmatch", "--", "./.expx/expx-lock.json"], { encoding: "utf8" });
+  if (lock.status !== 0) return true;
+  const r = spawnSync("git", ["-C", raiz, "show", `:./${CAMINHO_GITATTRIBUTES}`], { encoding: "utf8" });
+  return confere(r.status === 0 ? r.stdout : undefined);
 }
 
 export function diagnosticar(raiz: string, env: NodeJS.ProcessEnv = process.env): Diagnostico {
@@ -313,6 +326,32 @@ function verificarInstalacao(raiz: string, inst: InstalacaoTravada, push: (a: Ac
         severidade: "erro",
         problema: `hook gerenciado ausente ou alterado no .claude/settings.json: ${amostra(faltam.map(descreverEntrada))}`,
         correcao: "rode `expx init` para recompor o settings; as entradas que sao suas ficam onde estao",
+      });
+    }
+  }
+
+  // o bloco que tira os arquivos instalados da conversão de fim de linha (0.14.7); o lock anterior não o declara,
+  // e o aviso de CLI mais nova já manda rodar o update. No disco, erro; só fora do índice, aviso: o clone novo não
+  // o recebe (CodeAnt no expxdev#171). Um achado só, com a severidade do caso.
+  if (inst.gitattributes !== undefined) {
+    const hash = inst.gitattributes.hash;
+    const confere = (texto: string | undefined): boolean => {
+      const bloco = texto === undefined ? undefined : blocoDoExpx(texto);
+      return bloco !== undefined && hashDeBytes(bloco) === hash;
+    };
+    const caminho = join(raiz, CAMINHO_GITATTRIBUTES);
+    const noDisco = confere(existsSync(caminho) ? readFileSync(caminho, "utf8") : undefined);
+    const noIndice = noDisco ? blocoNoIndice(raiz, confere) : true;
+    if (!noDisco || !noIndice) {
+      push({
+        id: "gitattributes-sem-bloco",
+        severidade: noDisco ? "aviso" : "erro",
+        problema: noDisco
+          ? `o .expx/ esta no indice do git, e o bloco do expx no ${CAMINHO_GITATTRIBUTES} nao: um clone novo nao o recebe e converte os arquivos instalados`
+          : `${CAMINHO_GITATTRIBUTES} sem o bloco do expx, ou com ele alterado: um checkout com core.autocrlf converte os arquivos instalados, e eles deixam de bater com o lock`,
+        correcao: noDisco
+          ? `\`git add ${CAMINHO_GITATTRIBUTES}\` e commite-o com o .expx/`
+          : "rode `expx init` para recompor o bloco; as regras que sao suas ficam onde estao",
       });
     }
   }

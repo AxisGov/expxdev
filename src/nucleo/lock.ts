@@ -56,6 +56,8 @@ export type EntradaTravada = z.infer<typeof EntradaTravada>;
  *   ExpxDev não a gerencia.
  * - `modos`: o que as skills publicaram para `.expx/hooks.json` e o hash do
  *   arquivo composto que foi escrito.
+ * - `gitattributes`: o hash do bloco do expx no `.gitattributes` da raiz (desde a 0.14.7; ver
+ *   `nucleo/gitattributes.ts`). O bloco, não o arquivo: o resto é da pessoa. Opcional: lock anterior.
  * - `papeis`: o hash de `.expx/papeis.tsv` que o plano escreveu (F4). O lock não
  *   guarda qual skill publica cada agente; o hash é o que prova que a coluna da
  *   skill é a do plano. Opcional: sem agente com papel, ou lock anterior à F4.
@@ -69,6 +71,7 @@ export const InstalacaoTravada = z.object({
   settings: z.object({ hash: z.string(), entradas: z.array(EntradaTravada) }).optional(),
   modos: z.object({ hash: z.string(), publicados: z.record(z.string(), z.record(z.string(), z.unknown())) }).optional(),
   papeis: z.object({ hash: z.string() }).optional(),
+  gitattributes: z.object({ hash: z.string() }).optional(),
 });
 export type InstalacaoTravada = z.infer<typeof InstalacaoTravada>;
 
