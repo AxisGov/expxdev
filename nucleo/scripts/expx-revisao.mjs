@@ -104,6 +104,9 @@ function medirArquivo(f) {
 
 // `\` é separador só no Windows; fora dele é parte do nome, e trocá-lo daria por ausente um arquivo que existe
 const caminho = (f) => (process.platform === "win32" ? f.replace(/\\/g, "/") : f).replace(/^\.\//, "");
+// o caminho que a CLI do CodeAnt devolve: no Windows ela escreve com `\` (conselhos-municipais-91); o `./` fica, para
+// a cobertura não aceitar menos do que pede
+const daCli = (f) => (process.platform === "win32" ? f.replace(/\\/g, "/") : f);
 /** O primeiro diretório de `f` (relativo a `raiz`) que é link simbólico: por ele o caminho sairia da raiz. */
 function linkNoCaminho(raiz, f) {
   const partes = f.split("/");
@@ -660,17 +663,19 @@ function foraDoPerfil(j, perfil, status) {
 const ANTES_DO_INCLUDE = ["binary/generated", "deleted", "excluded by pattern"];
 /** O motivo de `incompleta` da reconciliação entre os enviados (`I`) e a resposta, ou undefined. */
 function reconciliar(I, meta) {
+  const revisadosDaCli = meta.reviewed_files.map(daCli);
+  const skipped = meta.skipped.map((s) => ({ file: daCli(s.file), reason: s.reason }));
   const vistos = new Set();
-  for (const f of [...meta.reviewed_files, ...meta.skipped.map((s) => s.file)]) {
+  for (const f of [...revisadosDaCli, ...skipped.map((s) => s.file)]) {
     if (vistos.has(f)) return `repetido:${f}`;
     vistos.add(f);
   }
   const enviado = new Set(I);
-  for (const f of meta.reviewed_files) if (!enviado.has(f)) return `sobra:${f}`;
-  for (const s of meta.skipped) if (!enviado.has(s.file) && !ANTES_DO_INCLUDE.includes(s.reason)) return `sobra:${s.file}`;
-  const pulados = new Set(meta.skipped.map((s) => s.file));
+  for (const f of revisadosDaCli) if (!enviado.has(f)) return `sobra:${f}`;
+  for (const s of skipped) if (!enviado.has(s.file) && !ANTES_DO_INCLUDE.includes(s.reason)) return `sobra:${s.file}`;
+  const pulados = new Set(skipped.map((s) => s.file));
   for (const f of I) if (pulados.has(f)) return `pulado:${f}`;
-  const revisados = new Set(meta.reviewed_files);
+  const revisados = new Set(revisadosDaCli);
   for (const f of I) if (!revisados.has(f)) return `faltante:${f}`;
 }
 
@@ -816,7 +821,7 @@ function revisar() {
       // a linha inteira, como a CLI 0.5.14 a escreve; o caminho com vírgula já foi recusado antes
       const m = /^\[error\] Failed to review (.+?): Access denied \(403\)\. Please run `codeant logout` and then `codeant login` to re-authenticate\.$/.exec(l);
       if (!m) return false;
-      for (const f of m[1].split(", ")) negados.add(f);
+      for (const f of m[1].split(", ")) negados.add(daCli(f));
       return true;
     });
     if (todos403 && enviados.every((f) => negados.has(f)) && Array.isArray(j?.issues) && j.issues.length === 0 && j.error === null) {

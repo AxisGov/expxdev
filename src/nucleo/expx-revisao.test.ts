@@ -638,6 +638,44 @@ describe("expx-revisao.mjs revisar v2: depois da CLI", () => {
     expect(revisar(c, "src/a.js,src/b.js")).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "lote-falhou" } });
   });
 
+  // conselhos-municipais-91, onda-2 T-01.01: no Windows, a CLI 0.5.14 escreve os caminhos da linha de 403, do
+  // `reviewed_files` e do `skipped` com `\`, e a linha de 403 repete cada arquivo (a, a, b, b). Fora do Windows
+  // o `\` é parte do nome e nada muda.
+  it.runIf(process.platform === "win32")("funcional: no Windows, os 403 com `\\` e repetição cobrem os enviados → indisponivel:acesso-negado (conselhos-municipais-91)", () => {
+    const c = cenario({ stderr: `[files] Reviewing 2 file(s)\n${negado("src\\a.js, src\\a.js, src\\b.js, src\\b.js")}\n`,
+      resposta: resp({ reviewed_files: ["src\\a.js", "src\\b.js"], total_changed: 2 }) });
+    doisArquivos(c.raiz);
+    expect(revisar(c, "src/a.js,src/b.js")).toMatchObject({ rc: 2, ev: { resultado: "indisponivel", motivo: "acesso-negado+codex-ausente" } });
+  });
+
+  it.runIf(process.platform === "win32")("funcional: no Windows, a revisão com `reviewed_files` e `skipped` em `\\` é ok, e o conferir aceita (conselhos-municipais-91)", () => {
+    const c = cenario({ resposta: resp({ reviewed_files: ["src\\a.js"], skipped: [{ file: "src\\c.js", reason: "excluded by pattern" }], total_changed: 2 }) });
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 0, ev: { resultado: "ok" } });
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it.runIf(process.platform === "win32").each([
+    ["`./` na frente não se tira", { reviewed_files: [".\\src\\a.js"] }, /^sobra:/],
+    ["o mesmo arquivo com `\\` e com `/` é repetido", { reviewed_files: ["src\\a.js", "src/a.js"], total_changed: 2 }, /^repetido:/],
+    ["o mesmo arquivo revisado e pulado é repetido", { skipped: [{ file: "src\\a.js", reason: "excluded by pattern" }], total_changed: 2 }, /^repetido:/],
+  ])("funcional: no Windows, %s → incompleta", (_nome, meta, motivo) => {
+    const c = cenario({ resposta: resp(meta) });
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js");
+    expect(r).toMatchObject({ rc: 3, ev: { resultado: "incompleta" } });
+    expect(r.ev.motivo).toMatch(motivo);
+  });
+
+  it.skipIf(process.platform === "win32")("funcional: fora do Windows, o `\\` da CLI é nome: o 403 de `src\\a.js` não cobre `src/a.js`, e o `reviewed_files` com ele sobra", () => {
+    const c = cenario({ stderr: `${negado("src\\a.js")}\n` });
+    altera3(c.raiz);
+    expect(revisar(c, "src/a.js")).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "lote-falhou" } });
+    const d = cenario({ resposta: resp({ reviewed_files: ["src\\a.js"] }) });
+    altera3(d.raiz);
+    expect(revisar(d, "src/a.js")).toMatchObject({ rc: 3, ev: { resultado: "incompleta", motivo: "sobra:src\\a.js" } });
+  });
+
   it.each([
     ["junto de outro erro", (l: string) => `${l}\n[error] Failed to review src/a.js: 500\n`, {}],
     ["fora do formato literal", () => "[error] Failed to review batch 1: Access denied (403)\n", {}],

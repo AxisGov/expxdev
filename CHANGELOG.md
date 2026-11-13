@@ -9,6 +9,15 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.6 — os caminhos da CLI no Windows
+
+Instale por PR, como a 0.14.5. Muda só o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`). A runx, a sprintx, os eventos, o `init`, o `doctor`, o painel e o `expx sessao` seguem como na 0.14.5. O relato é do conselhos-municipais-91 (Windows, CLI 0.5.14).
+
+- **O 403 em todo lote escala no Windows.** No Windows, a CLI escreve os caminhos com `\` na linha `[error] Failed to review …: Access denied (403)`, no `reviewed_files` e no `skipped`, e repete cada arquivo na linha de 403. Os enviados têm `/`, então a união dos negados nunca os cobria: o resultado era `incompleta:lote-falhou`, sem escala para o Codex. Agora, no Windows, o `\` desses caminhos vale como `/`, e o 403 dá `indisponivel:acesso-negado` e escala.
+- **A reconciliação também, no Windows.** A mesma barra daria `incompleta:sobra` a uma revisão bem-sucedida, e o `conferir` a recusaria (`cobertura`). Um arquivo que vinha revisado com `/` e pulado com `\` passava. Agora dá `repetido`. O `./` na frente não se tira, e fora do Windows o `\` continua sendo parte do nome.
+- **Limite:** a evidência gravada no Windows e conferida fora dele dá FALHA (`cobertura`). A identidade dos achados já tinha esse limite.
+- **Não exercitado:** a CLI real no Windows com a revisão bem-sucedida. A conta dá 403, e a suíte usa a CLI falsa com os caminhos da captura do conselhos.
+
 ## 0.14.5 — o link no snapshot e o limite do modo
 
 Instale por PR, como a 0.14.4. Muda só o núcleo (`expx-revisao.mjs` e o contrato `expx-revisao`). A runx, a sprintx, os eventos, o `init`, o `doctor`, o painel e o `expx sessao` seguem como na 0.14.4.
