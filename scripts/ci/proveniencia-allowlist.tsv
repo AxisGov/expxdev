@@ -1,4 +1,4 @@
-# arquivo<TAB>ocorrencia normalizada (%2E representa ponto)<TAB>quantidade<TAB>finalidade<TAB>justificativa
+# arquivo<TAB>ocorrencia normalizada (%2E representa ponto, %20 representa espaco)<TAB>quantidade<TAB>finalidade<TAB>justificativa
 docs/expx-cli/base/10-proveniencia-skills.md	github%2Ecom/bittencourtthulio/sprintx	1	documentacao historica de proveniencia	registra de forma explicita a origem anterior para orientar migracoes
 docs/expx-cli/base/10-proveniencia-skills.md	github%2Ecom/bittencourtthulio/runx	1	documentacao historica de proveniencia	registra de forma explicita a origem anterior para orientar migracoes
 docs/expx-cli/base/10-proveniencia-skills.md	github%2Ecom/bittencourtthulio/mergex	1	documentacao historica de proveniencia	registra de forma explicita a origem anterior para orientar migracoes
@@ -48,3 +48,9 @@ src/nucleo/catalogo.test.ts	github%2Ecom/bittencourtthulio/memox	1	fixture de mi
 src/nucleo/catalogo.test.ts	github%2Ecom/bittencourtthulio/prodx	1	fixture de migracao do catalogo	prova o mapeamento exato entre origem anterior e origem AxisGov
 src/nucleo/catalogo.ts	github%2Ecom/bittencourtthulio/memox	1	mapa explicito origensLegadas	permite reconhecer e migrar instalacoes memox existentes
 src/nucleo/catalogo.ts	github%2Ecom/bittencourtthulio/prodx	1	mapa explicito origensLegadas	permite reconhecer e migrar instalacoes prodx existentes
+docs/memox-painel/ORQUESTRADOR.md	npx%20expxdev	1	registro historico de plano	preserva o comando como o plano ja executado o registrou
+docs/memox-painel/00-DECISOES.md	npx%20expxdev	2	registro historico de decisao	preserva o comando como a decisao da MemoX o registrou
+docs/memox-painel/sprint-03/sprint.md	npx%20expxdev	2	registro historico de sprint	preserva os criterios originais ja executados
+docs/memox-painel/base/04-cli-catalogo-e-instalacao.md	npx%20expxdev	1	base historica de planejamento	preserva a base do plano da MemoX como foi escrita
+fixtures/candidatos/mergex/README.md	npx%20expxdev	2	fixture candidata mergex	preserva byte a byte o commit certificado; sai com a certificacao nova
+fixtures/candidatos/sprintx/README.md	npx%20expxdev	2	fixture candidata sprintx	preserva byte a byte o commit certificado; sai com a certificacao nova

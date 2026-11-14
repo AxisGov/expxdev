@@ -73,7 +73,7 @@ export async function principal(argv: readonly string[]): Promise<number> {
           `    http://${HOST_PAINEL}:${String(e.porta)}`,
           "",
           "  ou suba numa porta livre:",
-          `    npx expxdev panel --porta ${String(e.porta + 1)}`,
+          `    expx panel --porta ${String(e.porta + 1)}`,
           "",
         ].join("\n"),
       );

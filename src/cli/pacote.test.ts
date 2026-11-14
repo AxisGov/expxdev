@@ -60,6 +60,15 @@ describe("pacote publicável", () => {
     expect(readme).not.toContain("www.npmjs.com/package/expxdev");
   });
 
+  it("integração: a release instala o expx no PATH, que os exemplos do README e das skills usam", () => {
+    // `npx --package <tgz>` roda uma vez e não deixa o `expx` instalado (Codex, 2026-11-14)
+    const readme = readFileSync("README.md", "utf8");
+    const release = readme.slice(readme.indexOf("## Instalar a partir da release"), readme.indexOf("### Histórico de versões"));
+    expect(release).toMatch(/npm install -g ~\/expx-cli\/v[0-9.]+\/expxdev-[0-9.]+\.tgz/);
+    expect(release).toMatch(/\nexpx init --skills /);
+    expect(readme).not.toMatch(/npx\s+expxdev/);
+  });
+
   it("integração: catálogo compilado contém as quatro origens canônicas AxisGov", () => {
     const compilado = readFileSync("dist/nucleo/catalogo.js", "utf8");
     for (const nome of ["runx", "mergex", "sprintx", "buildx"]) {

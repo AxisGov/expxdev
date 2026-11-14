@@ -40,8 +40,10 @@ de skills para <a href="https://claude.com/claude-code">Claude Code</a> e <a hre
 > técnico navegável — pronto para um dev sênior ou CTO usar em reunião de engenharia, mostrando como o
 > time passa a trabalhar com IA usando a stack Expx de ponta a ponta.
 
+Com o CLI `expx` instalado pela [release do expxdev](https://github.com/AxisGov/expxdev#instalar-a-partir-da-release):
+
 ```bash
-npx expxdev init
+expx init
 ```
 
 O `init` busca as skills que você escolher nos repositórios oficiais, empacota apenas as
@@ -346,9 +348,9 @@ O que faltava era **ver**: a tabela de violações diz que existe um ciclo, mas 
 fecha, e a lista de tasks não mostra o que de fato pode rodar em paralelo.
 
 ```bash
-npx expxdev grafo              # todos os trabalhos do docs/
-npx expxdev grafo memox-painel # só um
-npx expxdev grafo --conferir   # calcula e relata, sem escrever nada
+expx grafo              # todos os trabalhos do docs/
+expx grafo memox-painel # só um
+expx grafo --conferir   # calcula e relata, sem escrever nada
 ```
 
 O artefato é um **SVG auto-contido** — sem script, sem fonte externa, sem imagem embutida — e
@@ -392,8 +394,10 @@ clique e zoom, que uma imagem nunca faria. As três formas partem da mesma topol
 A seleção é feita por flag — a escolha é declarativa, o que faz a mesma linha servir ao seu
 terminal e ao CI:
 
+Com o CLI `expx` instalado pela [release do expxdev](https://github.com/AxisGov/expxdev#instalar-a-partir-da-release):
+
 ```bash
-npx expxdev init --skills sprintx,runx,mergex --harness claude,opencode --yes
+expx init --skills sprintx,runx,mergex --harness claude,opencode --yes
 ```
 
 | Flag | Efeito |
@@ -540,7 +544,7 @@ só lê o artefato que cada uma produz e chama o comando de verdade.
 
 ## Instalar a partir da release
 
-O `expxdev` publicado no npm é de outro autor: `npx expxdev` instala o CLI dele, não o deste
+O `expxdev` publicado no npm é de outro autor: rodá-lo pelo `npx` instala o CLI dele, não o deste
 repositório. A linha AxisGov não executa `npm publish`. Como o `dist/` não é versionado, use o
 pacote certificado de uma GitHub Release SemVer explícita:
 
@@ -559,8 +563,15 @@ gh release download v0.14.7 -R AxisGov/expxdev -D ~/expx-cli/v0.14.7 &&
     shasum -a 256 -c expxdev-0.14.7.tgz.sha256
   fi
 ) &&
-npx --yes --package ~/expx-cli/v0.14.7/expxdev-0.14.7.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes
+npm install -g ~/expx-cli/v0.14.7/expxdev-0.14.7.tgz &&
+expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
+
+O `npm install -g` do pacote conferido põe o `expx` no PATH, e é ele que os exemplos deste README
+e das skills usam (`expx init`, `expx update`, `expx doctor`). Para rodar uma vez, sem instalar,
+troque as duas últimas linhas por
+`npx --yes --package ~/expx-cli/v0.14.7/expxdev-0.14.7.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes`.
+Atualizar o CLI é baixar a release nova e repetir o `npm install -g`.
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
 - A release exige **Actions → Release CLI → Run workflow**, versão SemVer e SHA completo da
@@ -775,6 +786,16 @@ travada em versão publicada, o commit exato, a data e **o hash de cada arquivo*
 > até isso acontecer. Até a 0.13.0, o `update` dizia `em dia` e não entregava o núcleo novo:
 > nessas versões, use `expx init` com as skills do lock.
 
+> **Comandos antigos em `.claude/commands/` (0.14.8).** Projetos que copiaram à mão a pasta
+> `.claude/` das skills, antes do `expxdev`, guardam comandos sem prefixo que rodam o texto antigo
+> (`/mergex-check` com 11 verificações, enquanto `/expx:mergex-check` tem 12). Com o harness
+> `claude`, o `init` e o `update` removem cada um desses arquivos quando o homônimo está no plugin
+> **e** o conteúdo é uma versão que o fork AxisGov publicou daquele comando (um manifesto embarcado
+> no CLI, gerado por `scripts/comandos-legados.sh`), e só depois de a instalação terminar. A saída
+> diz `removido: ...; desfaca com git restore -- ...`. Conteúdo editado fica, com o aviso
+> `mantido: ...`. O comando sem homônimo no plugin é da pessoa e nunca é tocado. O lock não
+> autoriza essa remoção: ele é editável.
+
 A aplicação **remonta o plugin do zero** com a seleção inteira do lock, em vez de editar a
 árvore montada. É mais lento e é de propósito: editar no lugar deixa arquivo órfão quando uma
 skill encolhe entre versões.
@@ -853,7 +874,7 @@ fim de linha**. Para sair dela:
 ## O que o `doctor` verifica
 
 ```bash
-npx expxdev doctor
+expx doctor
 ```
 
 Trinta e sete verificações, cada uma com severidade e correção sugerida. Achado de severidade
@@ -930,7 +951,7 @@ Trinta e sete verificações, cada uma com severidade e correção sugerida. Ach
 ## O painel
 
 ```bash
-npx expxdev panel
+expx panel
 ```
 
 Lê a pasta `docs/` do projeto, descobre os trabalhos gravados pelas skills e mostra no

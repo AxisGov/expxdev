@@ -161,6 +161,16 @@ git -C "$repo_nul_sem_shebang" add bootstrap.sh
 git -C "$repo_nul_sem_shebang" -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm 'fixture: texto operacional ofuscado por NUL'
 esperar_falha nul_sem_shebang "$repo_nul_sem_shebang"
 
+# O npx do pacote expxdev instala o CLI do upstream (o npm é dele): bloqueado como
+# as URLs, e autorizável pela allowlist com o espaço como %20 (2026-11-14)
+caso_bloqueado npx_upstream docs/ecossistema.md \
+  "npx ""expxdev init --skills runx"
+repo_npx="$(nova_fixture npx_historico)"
+rastrear_texto "$repo_npx" docs/historico-proveniencia.md "npx ""expxdev init"
+adicionar_excecao "$repo_npx" docs/historico-proveniencia.md \
+  'npx%20expxdev' 'registro historico' 'preserva o comando como o plano antigo o registrou'
+esperar_sucesso npx_historico "$repo_npx"
+
 repo_extra="$(nova_fixture extra_allowlisted)"
 rastrear_texto "$repo_extra" docs/historico-proveniencia.md \
   "https://$github_host/$proprietario/runx https://$github_host/$proprietario/runx"

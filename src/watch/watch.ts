@@ -99,7 +99,7 @@ export async function executarWatch(op: OpcoesExecucao): Promise<SessaoWatch> {
       [
         "este projeto nao tem o Expx instalado (falta a pasta .expx/).",
         "",
-        "  npx expxdev init      instala as skills neste projeto",
+        "  expx init             instala as skills neste projeto",
         "",
       ].join("\n"),
     );

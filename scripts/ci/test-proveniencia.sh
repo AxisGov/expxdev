@@ -4,7 +4,7 @@ set -euo pipefail
 raiz="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$raiz"
 
-legada_base='((github[.]com[/:]|raw[.]githubusercontent[.]com/)bittencourtthulio/(runx|legadox|stackx|mergex|sprintx|buildx|designx|memox|prodx|expxdev)([.]git)?|bittencourtthulio[.]github[.]io/expxdev)'
+legada_base='((github[.]com[/:]|raw[.]githubusercontent[.]com/)bittencourtthulio/(runx|legadox|stackx|mergex|sprintx|buildx|designx|memox|prodx|expxdev)([.]git)?|bittencourtthulio[.]github[.]io/expxdev|npx[ ]expxdev)'
 legada="$legada_base([^[:alnum:]_.-]|$)"
 allowlist='scripts/ci/proveniencia-allowlist.tsv'
 separador=$'\x1f'
@@ -133,6 +133,7 @@ while IFS=$'\t' read -r arquivo ocorrencia quantidade finalidade justificativa e
   }
 
   decodificada="${ocorrencia//%2E/.}"
+  decodificada="${decodificada//%20/ }"
   normalizada="$(printf '%s' "$decodificada" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
   [ "$decodificada" = "$normalizada" ] || {
     printf 'ocorrencia da allowlist deve estar normalizada em lowercase, linha %d\n' "$numero_linha" >&2

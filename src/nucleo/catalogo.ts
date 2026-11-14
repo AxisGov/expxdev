@@ -129,7 +129,7 @@ function candidatasLocais(nome: string): string[] {
  * num projeto real exige commitar e publicar a cada tentativa, porque o `init`
  * só sabe clonar do GitHub.
  *
- *     EXPX_SKILLS_LOCAIS=~/Documents/Projetos npx expxdev init --skills runx --yes
+ *     EXPX_SKILLS_LOCAIS=~/Documents/Projetos expx init --skills runx --yes
  *
  * Não é um caminho de código novo na busca: `git clone` aceita caminho de
  * sistema de arquivos como origem, então a skill local percorre exatamente o
