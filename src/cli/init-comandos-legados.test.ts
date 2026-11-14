@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { criarRepoSkill } from "../teste/repo-fixture.js";
 import { projetoTemporario, type ProjetoTemporario } from "../teste/projeto-temporario.js";
@@ -85,6 +85,39 @@ describe("init: comandos legados em .claude/commands/", () => {
     });
     await expect(init).rejects.toThrow("falha injetada antes do lock");
     expect(existsSync(join(p.raiz, ".claude", "commands", "sprintx.md"))).toBe(true);
+  });
+
+  it("o comando alterado entre o plano e a remoção fica (revalidado antes de cada remoção)", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    comLegados(p.raiz);
+    const alvo = join(p.raiz, ".claude", "commands", "sprintx.md");
+    const r = await executarInit({
+      raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: origens(["sprintx"]), manifestoDeComandos: manifesto,
+      aposPublicar: () => writeFileSync(alvo, `${ANTIGO_SPRINTX}nota escrita durante o init\n`),
+    });
+    expect(r.ok).toBe(true);
+    expect(readFileSync(alvo, "utf8")).toContain("nota escrita durante o init");
+    expect(r.avisos.join("\n")).not.toContain("removido: .claude/commands/sprintx.md");
+    expect(r.avisos).toContainEqual(expect.stringContaining("mantido: .claude/commands/sprintx.md"));
+  });
+
+  it.runIf(process.platform !== "win32")("o comando trocado por link entre o plano e a remoção não é seguido", async () => {
+    p = projetoTemporario("fixtures/cli/projeto-limpo");
+    comLegados(p.raiz);
+    const fora = join(p.raiz, "fora-do-claude.md");
+    const alvo = join(p.raiz, ".claude", "commands", "sprintx.md");
+    const r = await executarInit({
+      raiz: p.raiz, skills: ["sprintx"], harness: ["claude"], origens: origens(["sprintx"]), manifestoDeComandos: manifesto,
+      aposPublicar: () => {
+        writeFileSync(fora, ANTIGO_SPRINTX);
+        rmSync(alvo);
+        symlinkSync(fora, alvo);
+      },
+    });
+    expect(r.ok).toBe(true);
+    expect(existsSync(fora)).toBe(true);
+    expect(lstatSync(alvo).isSymbolicLink()).toBe(true);
+    expect(r.avisos.join("\n")).not.toContain("removido: .claude/commands/sprintx.md");
   });
 
   it("o init que falha não remove nada", async () => {

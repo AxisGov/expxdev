@@ -91,3 +91,23 @@ export function planejarRemocaoDeComandosLegados(
   }
   return { remover, mantidos };
 }
+
+/**
+ * A reconferência imediatamente antes de remover: entre o plano e a remoção (depois
+ * do lock), a pessoa pode ter editado o comando, ou o caminho pode ter virado link.
+ * Só remove o que continua exatamente como o plano autorizou: as duas pastas de
+ * verdade, o arquivo comum, e o conteúdo ainda uma versão publicada daquele nome.
+ */
+export function aindaRemovivel(raiz: string, rel: string, manifesto: ManifestoDeComandos): boolean {
+  const m = /^\.claude\/commands\/([a-z0-9][a-z0-9-]*\.md)$/.exec(rel);
+  if (m === null) return false;
+  const nome = m[1] ?? "";
+  if (!pastaDeVerdade(join(raiz, ".claude")) || !pastaDeVerdade(join(raiz, ".claude", "commands"))) return false;
+  const arquivo = join(raiz, ".claude", "commands", nome);
+  try {
+    if (!lstatSync(arquivo).isFile()) return false;
+    return (manifesto.comandos[nome] ?? []).includes(hashNormalizado(readFileSync(arquivo)));
+  } catch {
+    return false;
+  }
+}

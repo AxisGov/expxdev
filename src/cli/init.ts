@@ -57,7 +57,7 @@ import { CAMINHO_PROJECAO, serializarProjecao } from "../orquestracao/projecao.j
 import { CAMINHO_PAPEIS, projetarPapeis } from "../orquestracao/papeis.js";
 import type { OrquestracaoTravada } from "../nucleo/lock.js";
 import { adquirirBloqueioOperacao } from "../nucleo/bloqueio-operacao.js";
-import { planejarRemocaoDeComandosLegados, type ManifestoDeComandos } from "../nucleo/comandos-legados.js";
+import { aindaRemovivel, planejarRemocaoDeComandosLegados, type ManifestoDeComandos } from "../nucleo/comandos-legados.js";
 import { MANIFESTO_DE_COMANDOS } from "../nucleo/comandos-legados-manifesto.js";
 
 /** O marketplace no `.claude/settings.json` do projeto (ver `planejarSettings`). */
@@ -759,6 +759,11 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
     // As cópias antigas dos comandos só saem com a instalação completa: o plugin que
     // as substitui já está publicado. Uma falha antes daqui não apaga nada.
     for (const rel of p.plano.removerLegados) {
+      // reconfere agora: o comando pode ter sido editado, ou o caminho virado link, desde o plano
+      if (!aindaRemovivel(op.raiz, rel, op.manifestoDeComandos ?? MANIFESTO_DE_COMANDOS)) {
+        avisos.push(`mantido: ${rel} (mudou desde o planejamento; nao foi removido)`);
+        continue;
+      }
       rmSync(join(op.raiz, ...rel.split("/")), { force: true });
       const nome = rel.slice(".claude/commands/".length).replace(/\.md$/, "");
       avisos.push(`removido: ${rel} (copia antiga de uma versao publicada; o comando vem do plugin como /expx:${nome}); desfaca com git restore -- ${rel}`);
