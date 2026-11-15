@@ -11,7 +11,7 @@ import { ambienteCom, noPath } from "../teste/candidatos.js";
 import { arquivosDoCaso } from "../teste/conformidade.js";
 import { configurarFalsa, type CfgFalsa } from "../teste/codeant-falsa.js";
 import { suportaNomeComCaractereReservado, suportaSymlinkDeDiretorio } from "../teste/fs-capacidades.js";
-import { SCRIPT, criados, temp, git, escreve, cenario, PATH, revisar, resp, achado, identidade, rejeita, altera3, grava, poeCaso, doFixture, semCodeant, naoChamou, roda, conferir, EV, evidencia, commita } from "../teste/expx-revisao-apoio.js";
+import { SCRIPT, criados, temp, git, escreve, cenario, PATH, revisar, resp, achado, identidade, rejeita, altera3, grava, poeCaso, doFixture, semCodeant, naoChamou, conferir, EV, evidencia, commita } from "../teste/expx-revisao-apoio.js";
 
 afterEach(() => { for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true }); });
 

@@ -11,7 +11,7 @@ import { pathToFileURL } from "node:url";
 import { ambienteCom, noPath } from "../teste/candidatos.js";
 import { chamadasDa, configurarFalsa, type CfgFalsa } from "../teste/codeant-falsa.js";
 import { chamadasDoCodex, instalarCodexFalso, type CfgCodex } from "../teste/codex-falso.js";
-import { SCRIPT, criados, temp, git, escreve, cenario, PATH, revisar, resp, achado, identidade, altera3, grava, semCodeant, roda, conferir, EV, evidencia, commita } from "../teste/expx-revisao-apoio.js";
+import { SCRIPT, criados, temp, git, escreve, cenario, PATH, revisar, resp, achado, identidade, altera3, semCodeant, roda, conferir, EV, evidencia, commita } from "../teste/expx-revisao-apoio.js";
 
 afterEach(() => { for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true }); });
 

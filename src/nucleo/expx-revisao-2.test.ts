@@ -7,12 +7,9 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, ut
 import { delimiter, dirname, join } from "node:path";
 import { ambienteCom, noPath } from "../teste/candidatos.js";
 import { configurarFalsa } from "../teste/codeant-falsa.js";
-import { criados, temp, git, escreve, cenario, PATH, revisar, resp, achado, identidade, altera3, grava, naoChamou, roda, conferir, EV, evidencia, commita, type Cenario, type Arquivo, type Ev } from "../teste/expx-revisao-apoio.js";
+import { criados, temp, git, escreve, cenario, PATH, revisar, resp, achado, altera3, naoChamou, roda, conferir, EV, evidencia, commita, type Cenario, type Arquivo, type Ev } from "../teste/expx-revisao-apoio.js";
 
 afterEach(() => { for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true }); });
-
-let grandeBlob = "";
-const blobs: Record<string, string> = {};
 
 describe("expx-revisao.mjs revisar v2: --base-commit", () => {
   it("funcional: chama --base-commit <sha>; linhas alteradas pelo diff desde <sha>", () => {

@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { arquivosDoCaso, respostaDoCaso } from "../teste/conformidade.js";
-import { criados, git, escreve, cenario, revisar, achado, identidade, rejeita, altera3, grava, poeCaso, doFixture, roda, conferir, EV, evidencia, commita, type Cenario } from "../teste/expx-revisao-apoio.js";
+import { criados, git, escreve, cenario, revisar, achado, identidade, rejeita, altera3, poeCaso, doFixture, roda, conferir, EV, evidencia, commita, type Cenario } from "../teste/expx-revisao-apoio.js";
 
 afterEach(() => { for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true }); });
 
