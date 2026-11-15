@@ -125,7 +125,7 @@ export function diagnosticar(raiz: string, env: NodeJS.ProcessEnv = process.env)
       id: "lock-futuro",
       severidade: "erro",
       problema: "o .expx/ foi criado por uma versao MAIS NOVA deste CLI",
-      correcao: "atualize o CLI (`npx expxdev@latest`) antes de operar este projeto",
+      correcao: "atualize o CLI pela GitHub Release do expxdev (https://github.com/AxisGov/expxdev#instalar-a-partir-da-release) antes de operar este projeto; o pacote expxdev do npm e de outro autor",
     });
   }
   // O plugin e os hooks do núcleo vêm da CLI: um lock de CLI anterior diz que

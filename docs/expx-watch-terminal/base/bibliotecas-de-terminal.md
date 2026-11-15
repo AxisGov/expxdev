@@ -26,7 +26,7 @@ Busca por pacotes de terminal em `node_modules` (`chalk|ink|blessed|kleur|picoco
 | `ansi-styles` | 5.2.0 | `pretty-format` (via `@testing-library/dom`) |
 | `ansi-regex` | 5.0.1 | `pretty-format` (via `@testing-library/dom`) |
 
-Nenhum dos três é dependência direta. Todos somem numa instalação de produção (`npm i --omit=dev`, ou `npx expxdev`). **Usá-los seria depender de dependência transitiva de devDependency** — quebra silenciosa na mão do usuário.
+Nenhum dos três é dependência direta. Todos somem numa instalação de produção (`npm i --omit=dev`, ou o pacote da release). **Usá-los seria depender de dependência transitiva de devDependency** — quebra silenciosa na mão do usuário.
 
 ## Limites e cotas
 

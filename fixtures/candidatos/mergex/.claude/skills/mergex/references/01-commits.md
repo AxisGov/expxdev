@@ -369,7 +369,7 @@ Três limites valem para os artefatos de método, e nenhum é flexível:
 
 ### Lifecycle dos artefatos de método
 
-O lifecycle tem três checkpoints executáveis e cumulativos: `pre-e2`, `pre-e6` e `e8`. Quatro checkpoints estreitos ficam fora da cadeia cumulativa: `reconciliacao-base`, depois de um merge de base integrado após o E8 (`references/11-reconciliacao-base.md`); `predecessores`, que persiste somente o manifesto SprintX; `retomar-v9-predecessores`, que persiste somente a reabertura da entrega; e `e9-merge`, que persiste somente o registro do merge pelo E9, antes do merge de integração da sprint seguinte. O enum fechado (um conjunto, não a ordem em que rodam) é `pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | e9-merge | pre-e6 | e8`.
+O lifecycle tem três checkpoints executáveis e cumulativos: `pre-e2`, `pre-e6` e `e8`. Cinco checkpoints estreitos ficam fora da cadeia cumulativa: `reconciliacao-base`, depois de um merge de base integrado após o E8 (`references/11-reconciliacao-base.md`); `predecessores`, que persiste somente o manifesto SprintX; `retomar-v9-predecessores`, que persiste somente a reabertura da entrega; `e9-merge`, que persiste somente o registro do merge pelo E9, antes do merge de integração da sprint seguinte; e `e0-abertura`, que persiste somente a abertura do E0 (a sprint e a base reancorada), antes da primeira task (`references/00-abertura.md`, "Persistir a abertura"). O enum fechado (um conjunto, não a ordem em que rodam) é `pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | e9-merge | e0-abertura | pre-e6 | e8`.
 
 **O `HISTORICO.md` não entra no commit de uma task.** Se estiver dirty, o catálogo `pre-e2` o seleciona pelo caminho global exato e prova, contra HEAD, que a mudança pertence ao trabalho explícito.
 
@@ -438,9 +438,18 @@ Trabalho: <trabalho_id>
 Metodo: e9-merge
 ```
 
-**Commit de método é classe de primeira classe e não é E1.** A gramática é exatamente `Trabalho: <trabalho_id>` + `Metodo: pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | e9-merge | pre-e6 | e8`, sem `Task:`. Ele não entra em `ENTREGA.commits`, não consome `seq` e não satisfaz V11.
+**8. `e0-abertura`, logo depois de o E0 reancorar a base** (`--abrir-sprint` na entrega por sprint, `--retomar-planejamento` na por trabalho depois do merge do planejamento). Persiste somente `docs/entregas/<trabalho_id>/ENTREGA.md`, e só a transição que a gravação do E0 faz (DM-328): a prova a refaz sobre o `ENTREGA.md` de HEAD, com a base do disco, e exige o mesmo resultado, salvo `atualizado_em`. Abertura já em HEAD é `noop=true`, mesmo com o `ENTREGA.md` sujo dos appends do E1. Sem ele, a reconciliação de uma main que chega no meio da sprint lê, no primeiro pai do merge, a base da sprint anterior.
 
-**Por que três checkpoints cumulativos e quatro estreitos.** Eles carregam estados diferentes do mesmo trabalho.
+```
+chore(mergex): persiste metodo e0-abertura
+
+Trabalho: <trabalho_id>
+Metodo: e0-abertura
+```
+
+**Commit de método é classe de primeira classe e não é E1.** A gramática é exatamente `Trabalho: <trabalho_id>` + `Metodo: pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | e9-merge | e0-abertura | pre-e6 | e8`, sem `Task:`. Ele não entra em `ENTREGA.commits`, não consome `seq` e não satisfaz V11.
+
+**Por que três checkpoints cumulativos e cinco estreitos.** Eles carregam estados diferentes do mesmo trabalho.
 
 1. **pre-e2** — torna duráveis as provas que o portão vai avaliar.
 2. **pre-e6** — torna duráveis descrição, atenção e pacote de QA antes da publicação.
@@ -449,6 +458,7 @@ Metodo: e9-merge
 5. **predecessores** — torna durável somente o manifesto que prova os documentos consumidos antes do nascimento SprintX.
 6. **retomar-v9-predecessores** — torna durável somente a reabertura terminal autorizada; não reescreve tasks concluídas.
 7. **e9-merge** — torna durável o registro do merge pelo E9, antes do merge de integração da sprint seguinte. A prova refaz a escrita do E9 sobre o `ENTREGA.md` de HEAD e exige o mesmo resultado, salvo a data de `atualizado_em`; outra mudança no arquivo, ou outro arquivo sujo, é recusa.
+8. **e0-abertura** — torna durável a base que o E0 reancorou, antes de qualquer task e de qualquer merge da base: a reconciliação lê `B0` do `ENTREGA.md` do primeiro pai do merge. A prova refaz a gravação do E0; outra mudança no `ENTREGA.md` é recusa. Não exige a árvore limpa.
 
 Nenhum deles é task e nenhum deles entra na lista `commits`. **Ao retornar do E8, nenhuma atualização final da entrega fica dependendo de um trabalho futuro**: o que a entrega afirma está no commit para o qual a branch aponta.
 
@@ -458,7 +468,7 @@ O executor é o único escritor desses commits:
 bash .claude/skills/mergex/scripts/persistir-metodo.sh --persistir \
   --entrega docs/entregas/<trabalho_id>/ENTREGA.md \
   --origem <sprintx|runx> --trabalho <trabalho_id> \
-  --checkpoint <pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|e9-merge|pre-e6|e8>
+  --checkpoint <pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|e9-merge|e0-abertura|pre-e6|e8>
 ```
 
 Ele deriva paths exatos, só inclui os que existem e estão dirty, usa a mesma trava C5, exige stage vazio, roda o gate de segredo e não cria commit vazio. E2 e E6 chamam somente `--verificar`; nunca usam gravação para corrigir o lifecycle por trás.
@@ -532,7 +542,7 @@ Testes: <o que os dois testes cobrem, resumido>
 | Classe | Trailers de controle | Quem cria |
 |---|---|---|
 | **E1** | exatamente um `Task:` e um `Trabalho:`; nenhum `Metodo:` | o E1, uma task por commit |
-| **método** | exatamente um `Trabalho:` e um `Metodo:` (`pre-e2`, `reconciliacao-base`, `predecessores`, `retomar-v9-predecessores`, `e9-merge`, `pre-e6` ou `e8`); nenhum `Task:` | `persistir-metodo.sh` |
+| **método** | exatamente um `Trabalho:` e um `Metodo:` (`pre-e2`, `reconciliacao-base`, `predecessores`, `retomar-v9-predecessores`, `e9-merge`, `e0-abertura`, `pre-e6` ou `e8`); nenhum `Task:` | `persistir-metodo.sh` |
 | **integração de base** | exatamente um `Trabalho:` e um `Integra-base:` com o SHA completo da base integrada (40 hex no SHA-1, 64 no SHA-256, o formato do repositório); nenhum `Task:`, nenhum `Metodo:` | a pessoa (ou o agente, sob autorização) que concluiu o merge da base |
 
 O commit de integração da base é o merge `M` da reconciliação (`references/11-reconciliacao-base.md`): tem **exatamente dois pais**, e o segundo é o `Integra-base:`. Não é E1, não entra em `ENTREGA.commits`, não consome `seq` e não satisfaz V11. A MergeX não o cria — valida e registra.
@@ -542,7 +552,14 @@ O commit de integração da base é o merge `M` da reconciliação (`references/
 
 Trabalho: <trabalho_id>
 Integra-base: <sha completo do segundo pai>
+Co-Authored-By: <se houver, no mesmo bloco>
 ```
+
+**Todos os trailers no mesmo bloco, o último parágrafo da mensagem** (DM-328). O Git só lê como
+trailer o último parágrafo: com `Trabalho:` e `Integra-base:` num parágrafo e o `Co-Authored-By:`
+noutro, separados por uma linha em branco, o merge deixa de ser integração, e o
+`contrato-de-commit.sh` recusa dizendo `fora do bloco final de trailers`. Vale para toda classe:
+`Task:`/`Trabalho:` do E1 e `Trabalho:`/`Metodo:` de método também ficam no bloco final.
 
 Os hooks de commit reconhecem a classe pela mensagem (`.claude/hooks/README.md`): o `commit-por-task` não a trata como mistura de tasks, e o `arquivo-fora-do-plano` avalia só os caminhos que diferem do segundo pai — o que a integração mudou, não tudo o que veio da base. Arquivo nascido na base e ajustado pela integração, que nenhuma task declara, nunca é acrescentado a uma task: o único caminho para ele passar na V9 é a reconciliação (`reconciliacao-base.sh --registrar`, com as quatro provas). Sem ela, continua fora do plano.
 

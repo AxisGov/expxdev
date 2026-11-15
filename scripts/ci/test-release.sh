@@ -34,6 +34,8 @@ grep -Fq 'node scripts/ci/preparar-release.mjs' "$release" || falha 'workflow n�
 # na main da skill e que o init instala exatamente esses commits, antes da tag.
 grep -Fq 'bash scripts/ci/test-certificados.sh' <<<"$(sed -n '/^  prepare:/,/^  publish:/p' "$release")" \
   || falha 'a preparação não confere os commits certificados das skills'
+grep -Fq 'bash scripts/ci/test-manifesto-de-comandos.sh' <<<"$(sed -n '/^  prepare:/,/^  publish:/p' "$release")" \
+  || falha 'a preparação não confere o manifesto dos comandos legados contra os forks'
 grep -Fq 'bash scripts/ci/test-distribuicao-sem-segredo.sh' <<<"$(sed -n '/^  prepare:/,/^  publish:/p' "$release")" \
   || falha 'a preparação não instala a distribuição certificada'
 grep -Fq 'gh release create' "$release" || falha 'workflow não publica a GitHub Release validada'

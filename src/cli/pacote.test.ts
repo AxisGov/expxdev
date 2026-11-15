@@ -39,13 +39,13 @@ describe("pacote publicável", () => {
     expect(p.files).toContain("CHANGELOG.md");
   });
 
-  it("integração: package e lock declaram 0.14.7", () => {
+  it("integração: package e lock declaram 0.14.8", () => {
     const p = pacote();
     const lock = JSON.parse(readFileSync("package-lock.json", "utf8")) as {
       version: string;
       packages: Record<string, { version?: string }>;
     };
-    expect(p.version).toBe("0.14.7");
+    expect(p.version).toBe("0.14.8");
     expect(lock.version).toBe(p.version);
     expect(lock.packages[""]?.version).toBe(p.version);
   });
@@ -58,6 +58,15 @@ describe("pacote publicável", () => {
     const readme = readFileSync("README.md", "utf8");
     expect(readme).not.toContain("bittencourtthulio.github.io/expxdev");
     expect(readme).not.toContain("www.npmjs.com/package/expxdev");
+  });
+
+  it("integração: a release instala o expx no PATH, que os exemplos do README e das skills usam", () => {
+    // `npx --package <tgz>` roda uma vez e não deixa o `expx` instalado (Codex, 2026-11-14)
+    const readme = readFileSync("README.md", "utf8");
+    const release = readme.slice(readme.indexOf("## Instalar a partir da release"), readme.indexOf("### Histórico de versões"));
+    expect(release).toMatch(/npm install -g ~\/expx-cli\/v[0-9.]+\/expxdev-[0-9.]+\.tgz/);
+    expect(release).toMatch(/\nexpx init --skills /);
+    expect(readme).not.toMatch(/npx(\s+-\S+)*\s+expxdev/);
   });
 
   it("integração: catálogo compilado contém as quatro origens canônicas AxisGov", () => {

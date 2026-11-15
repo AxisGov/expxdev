@@ -57,6 +57,8 @@ import { CAMINHO_PROJECAO, serializarProjecao } from "../orquestracao/projecao.j
 import { CAMINHO_PAPEIS, projetarPapeis } from "../orquestracao/papeis.js";
 import type { OrquestracaoTravada } from "../nucleo/lock.js";
 import { adquirirBloqueioOperacao } from "../nucleo/bloqueio-operacao.js";
+import { aindaRemovivel, planejarRemocaoDeComandosLegados, type ManifestoDeComandos } from "../nucleo/comandos-legados.js";
+import { MANIFESTO_DE_COMANDOS } from "../nucleo/comandos-legados-manifesto.js";
 
 /** O marketplace no `.claude/settings.json` do projeto (ver `planejarSettings`). */
 export const CAMINHO_MARKETPLACE_NO_PROJETO = "./.expx/marketplace";
@@ -91,6 +93,16 @@ export const CAMINHO_MARKETPLACE_NO_PROJETO = "./.expx/marketplace";
 
 export type OpcoesInit = {
   raiz: string;
+  /**
+   * As versões publicadas dos comandos, que autorizam remover a cópia antiga em
+   * `.claude/commands/`. Só os testes passam: em produção, o manifesto embarcado.
+   */
+  manifestoDeComandos?: ManifestoDeComandos;
+  /**
+   * Só os testes passam: roda entre a publicação do plugin e a gravação do lock,
+   * para provar que uma falha ali não remove os comandos legados.
+   */
+  aposPublicar?: () => void;
   skills: readonly string[];
   harness: readonly string[];
   /** Origem de cada skill. Nos testes, repositórios locais; em produção, o catálogo. */
@@ -173,6 +185,11 @@ type Plano = {
   avisos: string[];
   /** Agentes de instalação anterior que saíram do plano (relativos à raiz). */
   remover: string[];
+  /**
+   * Cópias antigas de comandos em `.claude/commands/` (nunca do lock): saem só
+   * depois do lock gravado, quando a instalação já está completa.
+   */
+  removerLegados: string[];
   /**
    * Só com a política de orquestração ativa: uma resolução por agente, para o
    * registro `.expx/resolucoes/` e a seção `orquestracao` do lock.
@@ -368,6 +385,7 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
     hooksDeSkill: false,
     avisos: avisosDoPlano,
     remover: [],
+    removerLegados: [],
     ...(resolucoes !== undefined ? { resolucoes } : {}),
     ...(projecao !== undefined ? { projecao } : {}),
     ...(papeis !== undefined ? { papeis } : {}),
@@ -384,6 +402,12 @@ function planejar(op: OpcoesInit, montaveis: readonly SkillMontavel[]): { ok: tr
     erros.push(...lim.erros);
     plano.avisos.push(...lim.avisos);
     plano.remover = lim.remover;
+    // Comandos que o projeto copiou à mão antes do expxdev (o "framework p0"): a
+    // autoridade é o manifesto embarcado, nunca o lock (src/nucleo/comandos-legados.ts).
+    const doPlugin = new Set(plano.plugin.filter((a) => a.destino.startsWith("commands/")).map((a) => a.destino.slice("commands/".length)));
+    const leg = planejarRemocaoDeComandosLegados(op.raiz, doPlugin, op.manifestoDeComandos ?? MANIFESTO_DE_COMANDOS);
+    plano.removerLegados = leg.remover;
+    for (const m of leg.mantidos) plano.avisos.push(`mantido: ${m} (conteudo nao e uma versao publicada pelo fork)`);
   }
 
   // Destino bloqueado (arquivo onde precisa haver pasta) é previsível: falha aqui.
@@ -729,8 +753,21 @@ export async function executarInit(op: OpcoesInit): Promise<ResultadoInit> {
       troca.descartar();
       throw e;
     }
+    op.aposPublicar?.();
     // O lock por último: ele é a afirmação de que a instalação está completa.
     escreverArquivoAtomico(caminhoDoLock(op.raiz), `${JSON.stringify(lock, null, 2)}\n`);
+    // As cópias antigas dos comandos só saem com a instalação completa: o plugin que
+    // as substitui já está publicado. Uma falha antes daqui não apaga nada.
+    for (const rel of p.plano.removerLegados) {
+      // reconfere agora: o comando pode ter sido editado, ou o caminho virado link, desde o plano
+      if (!aindaRemovivel(op.raiz, rel, op.manifestoDeComandos ?? MANIFESTO_DE_COMANDOS)) {
+        avisos.push(`mantido: ${rel} (mudou desde o planejamento; nao foi removido)`);
+        continue;
+      }
+      rmSync(join(op.raiz, ...rel.split("/")), { force: true });
+      const nome = rel.slice(".claude/commands/".length).replace(/\.md$/, "");
+      avisos.push(`removido: ${rel} (copia antiga de uma versao publicada; o comando vem do plugin como /expx:${nome}); desfaca com git restore -- ${rel}`);
+    }
   } finally {
     bloqueio.liberar();
   }

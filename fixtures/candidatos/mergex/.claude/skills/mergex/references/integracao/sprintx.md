@@ -29,7 +29,7 @@ A mergex procura **o canônico primeiro e o antigo como fallback**, em todas as 
 | Momento na sprintx | Etapa da mergex | O que acontece |
 |---|---|---|
 | Fim da F5, com o plano aprovado e **commitado** | **E0–E8 com `--planejamento`** | O PR de planejamento: só os artefatos de método (`^docs/(sprintx\|entregas\|eventos)/`), merge do desenvolvedor. A F6 espera o merge ("PR de planejamento — no fim da F5") |
-| Início da F6, **antes da primeira task de cada sprint** | **E0 ABERTURA** | Adota `feature/<slug>` e o worktree da F1 (ou cria a branch, se ela não existir). Em `por_sprint`, a F6 passa `--sprint <NN>`; o E0 fixa a sprint e só abre a seguinte depois do merge registrado da anterior |
+| Início da F6, **antes da primeira task de cada sprint** | **E0 ABERTURA** | Adota `feature/<slug>` e o worktree da F1 (ou cria a branch, se ela não existir). Em `por_sprint`, a F6 passa `--sprint <NN>`; o E0 fixa a sprint e só abre a seguinte depois do merge registrado da anterior. A abertura que reancora a base (a sprint, ou a retomada depois do planejamento) é persistida em seguida pelo checkpoint `e0-abertura`, antes da primeira task (DM-328) |
 | Ao fechar **cada** task (status `concluida`, `suite: parcial` ou `verde`) | **E1 COMMIT** | Um commit por task, com a mensagem no formato da mergex |
 | Fim da F6, com todas as tasks executadas | **pre-e2 → E2 → E8** | Em `por_sprint`, roda ao fim de cada sprint e fecha o PR dela; o E9 continua manual, registra o merge, e só então a sprintx atualiza a branch a partir da main e começa a seguinte |
 | Fim da F6, com o portão **bloqueado** | **E2 → E8 (fechamento bloqueado)** | E3 a E7 **não executam**. O E8 grava `estado: bloqueado`, persiste o registro por commit e **não publica a branch**; o controle volta à sprintx com o que falta |
@@ -157,7 +157,9 @@ Os **artefatos de método do próprio trabalho** — a pasta `docs/sprintx/featu
 ### E2 a E8 — ao fim da F6
 
 Rodam quando a F6 termina: todas as tasks executadas, ou nada mais executável. Em `por_sprint`,
-"termina" aqui significa o fim da sprint atual: E2–E8 usam a `sprint_atual` que o E0 registrou.
+"termina" aqui significa o fim da sprint atual: E2–E8 usam a `sprint_atual` que o E0 registrou, e o
+portão cobra só as tasks dela (`entrega-de-planejamento.sh --escopo-de-tasks`; `02-prontidao.md`,
+"O escopo das tasks", DM-328). As sprints seguintes, ainda pendentes, não barram o PR.
 Depois do E8, o PR aguarda o comando manual E9; quando o desenvolvedor o mergeia, o E9 registra
 esse merge no item da sprint. A sprintx então **atualiza a branch a partir da main** e só depois
 chama o E0 com a sprint seguinte. PR ainda aberto, merge sem registro ou branch sem a main faz o E0

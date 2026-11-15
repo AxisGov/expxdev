@@ -106,8 +106,12 @@ que chegar depois dele entra por reconciliação.
 
 As três pré-condições e a base nova, em toda retomada sem `--planejamento` (`<base>` é a base
 buscada: a ref remota depois do `git fetch`, por exemplo `origin/main`, e não a branch local, que
-numa worktree pode estar atrás — DM-312). Saída 0 com as duas linhas: grave-as. Saída 0 sem nada: não
-é a primeira sprint depois do planejamento, e a base fica como está. Saída 1: recusa, sem escrever
+numa worktree pode estar atrás — DM-312). Quem grava é o leitor único
+(`entrega-de-planejamento.sh --retomar-planejamento`, DM-328): `sprint_atual: null`, `pr_url` e
+`pr_estado` em `null`, `entrega: por_trabalho`, a base nova e `origem_base: registrada_sprint`; a
+repetição com a mesma base é retomada, sem gravar. Saída 0 sem nada: não é a primeira sprint
+depois do planejamento, e a base fica como está. Depois de gravar, persista a abertura (seção
+"Persistir a abertura", abaixo). Saída 1: recusa, sem escrever
 nada. Saída 2: entrega ilegível ou base inexistente; relate o motivo.
 
 ```bash
@@ -135,7 +139,10 @@ git merge-base --is-ancestor "$base_sha" HEAD 2>/dev/null || {
   printf 'mergex E0 BLOQUEADO — a branch não foi atualizada a partir de <base> depois do merge do planejamento\n' >&2
   exit 1
 }
-printf 'base_validada_sha=%s\norigem_base=registrada_sprint\n' "$(git merge-base HEAD "$base_sha")"
+bash .claude/skills/mergex/scripts/entrega-de-planejamento.sh --retomar-planejamento \
+  --base-validada-sha "$(git merge-base HEAD "$base_sha")" --entrega "docs/entregas/<trabalho_id>/ENTREGA.md" || {
+  rc=$?; [ "$rc" = 1 ] && printf 'mergex E0 BLOQUEADO — a retomada do planejamento não grava (motivo acima)\n' >&2; exit "$rc"
+}
 ```
 
 Esse bloco é o da entrega `por_trabalho`. Na entrega por sprint, a F6 chama o E0 com `--sprint`, e
@@ -180,10 +187,13 @@ estado: null, merge_sha: null, merge: null, base_sha: null}` no fim de `prs`, vo
 <base>` e `origem_base: registrada_sprint` (a mesma exceção da retomada depois do planejamento,
 DM-261). Com `--sprint <NN>` igual à `sprint_atual` e o PR dela ainda não `merged`, é retomada da
 mesma sprint: nada disso muda. **Sprint fechada é imutável:** `--sprint <NN>` de uma sprint já
-`merged` é recusa — defeito achado depois do merge vira task da sprint seguinte ou correção
-própria, nunca reabertura.
+`merged` é recusa — defeito achado depois do merge vira task da sprint seguinte, enquanto a F6
+ainda pode replanejar, ou correção própria, nunca reabertura. Com o teto da F6 esgotado
+(`replanejamento_execucao_esgotado`), não há sprint seguinte que o receba: a correção do que já
+está na main sai por OC da runx, e o que só existe num PR aberto vai a trabalho sucessor (sprintx,
+DS-223).
 
-Saída 0: aberta (ou retomada). Saída 1: recusa, sem escrever nada. Saída 2: entrega ou configuração
+Saída 0: aberta (ou retomada); persista em seguida ("Persistir a abertura", abaixo). Saída 1: recusa, sem escrever nada. Saída 2: entrega ou configuração
 ilegível, ou base inexistente. `$sprint` é o `<NN>` que a F6 passou; `<base>` é a base buscada:
 
 ```bash
@@ -250,6 +260,31 @@ bash .claude/skills/mergex/scripts/entrega-de-planejamento.sh --abrir-sprint "$s
   rc=$?; [ "$rc" = 1 ] && printf 'mergex E0 BLOQUEADO — a sprint %s não abre (motivo acima)\n' "$sprint" >&2; exit "$rc"
 }
 ```
+
+### Persistir a abertura (`e0-abertura`)
+
+*DM-328 (conselhos, onda 2).* As duas gravações que reancoram a base — o `--abrir-sprint` do E0
+`--sprint` e o `--retomar-planejamento` da entrega por trabalho — só valem para a reconciliação
+depois de commitadas. O `reconciliacao-base.sh --registrar` lê `B0` do `ENTREGA.md` do primeiro
+pai do merge, nunca do disco; e o E1 não commita o `ENTREGA.md`, que só o `pre-e2` persiste no fim
+da execução. Sem este checkpoint, a main que chega no meio da sprint é registrada contra a base da
+sprint anterior: o merge que trouxe a main antes do E0 volta para a fila e a recusa diz "ordem".
+
+Logo depois de qualquer das duas gravações, **antes da primeira task e antes de qualquer merge
+da base**:
+
+```bash
+bash .claude/skills/mergex/scripts/persistir-metodo.sh --persistir \
+  --entrega docs/entregas/<trabalho_id>/ENTREGA.md --origem sprintx --trabalho <trabalho_id> \
+  --checkpoint e0-abertura
+```
+
+O commit leva só o `ENTREGA.md`, com `Metodo: e0-abertura`. A prova refaz a gravação sobre o
+`ENTREGA.md` de `HEAD` (`--abrir-sprint <NN>` ou `--retomar-planejamento`, com a base que o disco
+traz) e exige o resultado do disco, salvo a data de `atualizado_em`; qualquer outra mudança no
+arquivo recusa, sem commit. Com a abertura já em `HEAD` (a retomada da mesma sprint, ou o E0
+repetido), sai `noop=true`, sem commit, mesmo com o `ENTREGA.md` sujo dos appends do E1. Não exige
+a árvore limpa: os artefatos da F5 e o que mais estiver sujo ficam como estão.
 
 ## Passo 1 — Detectar se o repositório usa versionamento
 

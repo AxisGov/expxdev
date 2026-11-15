@@ -6,7 +6,7 @@ import { executarExpx, usarPerguntador } from "./expx.js";
 import { perguntadorDeRoteiro, perguntadorDeTerminal } from "./perguntar.js";
 
 /**
- * O bug que este arquivo tranca: `npx expxdev init` sem flag nenhuma saía com
+ * O bug que este arquivo tranca: `expx init` sem flag nenhuma saía com
  * "nenhuma skill selecionada" porque nada nunca perguntava. O wizard existia
  * na especificação e nas flags ("o equivalente não interativo de cada
  * pergunta"), mas não no código.

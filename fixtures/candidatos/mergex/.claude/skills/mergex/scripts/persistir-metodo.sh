@@ -40,7 +40,7 @@ TRAVA_TOKEN_RECEBIDO=""
 
 uso() {
   printf '%s\n' \
-    'uso: persistir-metodo.sh --listar|--persistir|--verificar --entrega <ENTREGA.md> --origem <sprintx|runx> --trabalho <id> --checkpoint <pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|e9-merge|pre-e6|e8> [--trava-token <token>]' >&2
+    'uso: persistir-metodo.sh --listar|--persistir|--verificar --entrega <ENTREGA.md> --origem <sprintx|runx> --trabalho <id> --checkpoint <pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|e9-merge|e0-abertura|pre-e6|e8> [--trava-token <token>]' >&2
   exit 64
 }
 
@@ -60,7 +60,7 @@ done
 
 case "$MODO" in listar|persistir|verificar) ;; *) uso ;; esac
 case "$ORIGEM" in sprintx|runx) ;; *) uso ;; esac
-case "$CHECKPOINT" in pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|e9-merge|pre-e6|e8) ;; *) uso ;; esac
+case "$CHECKPOINT" in pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|e9-merge|e0-abertura|pre-e6|e8) ;; *) uso ;; esac
 [ -z "$TRAVA_TOKEN_RECEBIDO" ] \
   || { [ "$MODO" = persistir ] && [ "$CHECKPOINT" = retomar-v9-predecessores ]; } \
   || uso
@@ -837,6 +837,65 @@ prova_e9_merge() {
 }
 prova_e9_merge
 
+# DM-328: o e0-abertura persiste só a abertura do E0 — a sprint e a base que o
+# `--abrir-sprint` grava, ou a retomada do planejamento na entrega por trabalho
+# (`--retomar-planejamento`). O reconciliacao-base.sh lê B0 do ENTREGA.md do
+# primeiro pai do merge; sem a abertura commitada, a main que chega no meio da
+# sprint é registrada contra a base da sprint anterior. A prova refaz a gravação
+# sobre o ENTREGA.md de HEAD, com a base do disco, e exige o do disco, salvo
+# `atualizado_em`. Abertura já em HEAD (as três chaves iguais): noop, mesmo com o
+# ENTREGA.md sujo dos appends do E1 — e, no --verificar, ok. Não exige árvore limpa.
+E0_NOOP=0
+abertura_de() { # <ENTREGA.md> — sprint_atual, base_validada_sha e origem_base, uma por linha
+  printf 'sprint_atual=%s\nbase_validada_sha=%s\norigem_base=%s\n' \
+    "$(catalogo_fm "$1" sprint_atual)" "$(catalogo_fm "$1" base_validada_sha)" "$(catalogo_fm "$1" origem_base)"
+}
+prova_e0_abertura() {
+  [ "$CHECKPOINT" = e0-abertura ] || return 0
+  local t sprint base
+  t="$(mktemp -d "${TMPDIR:-/tmp}/mergex-e0-abertura.XXXXXX")" || para 'não foi possível preparar a prova do e0-abertura'
+  cp "$RAIZ/$ENTREGA" "$t/provado.md" 2>/dev/null \
+    && E9_BLOB="$(git -C "$RAIZ" hash-object --path="$ENTREGA" -- "$t/provado.md" 2>/dev/null)" && [ -n "$E9_BLOB" ] \
+    || { rm -rf "$t"; para "não foi possível copiar $ENTREGA para a prova do e0-abertura"; }
+  if ! git -C "$RAIZ" cat-file --filters "HEAD:$ENTREGA" > "$t/ENTREGA.md" 2>/dev/null; then
+    rm -rf "$t"; para "$ENTREGA ausente de HEAD: o e0-abertura só persiste a abertura de um ENTREGA.md versionado"
+  fi
+  if [ "$(abertura_de "$t/ENTREGA.md")" = "$(abertura_de "$t/provado.md")" ]; then
+    rm -rf "$t"; E9_BLOB=""; E0_NOOP=1
+    [ "$MODO" != verificar ] || { printf 'ok=true\n'; exit 0; }
+    return 0
+  fi
+  if [ "$MODO" = verificar ]; then
+    rm -rf "$t"
+    printf 'persistir-metodo: checkpoint e0-abertura pendente; a abertura do E0 em %s não está em HEAD\n' "$ENTREGA" >&2
+    exit 1
+  fi
+  if ! bash "$PLANEJAMENTO_SH" --entrega "$t/ENTREGA.md" > "$t/antes" 2>/dev/null \
+    || ! bash "$PLANEJAMENTO_SH" --entrega "$t/provado.md" > "$t/depois" 2>/dev/null; then
+    rm -rf "$t"; para "e0-abertura: $ENTREGA não se lê como entrega (entrega-de-planejamento.sh): recusado"
+  fi
+  sprint="$(sed -n 's/^sprint_atual=//p' "$t/depois")"
+  base="$(catalogo_fm "$t/provado.md" base_validada_sha)"
+  cp "$t/ENTREGA.md" "$t/refeito.md"
+  case "$sprint" in
+    [0-9][0-9])
+      ( cd "$RAIZ" && bash "$PLANEJAMENTO_SH" --abrir-sprint "$sprint" --base-validada-sha "$base" --entrega "$t/refeito.md" ) >/dev/null 2>&1 \
+        || { rm -rf "$t"; para "e0-abertura: o --abrir-sprint $sprint não se refaz sobre o $ENTREGA de HEAD"; } ;;
+    null)
+      grep -qx 'planejamento=sim' "$t/antes" \
+        || { rm -rf "$t"; para "e0-abertura: $ENTREGA muda sem abrir sprint nem retomar o planejamento"; }
+      ( cd "$RAIZ" && bash "$PLANEJAMENTO_SH" --retomar-planejamento --base-validada-sha "$base" --entrega "$t/refeito.md" ) >/dev/null 2>&1 \
+        || { rm -rf "$t"; para "e0-abertura: o --retomar-planejamento não se refaz sobre o $ENTREGA de HEAD"; } ;;
+    *) rm -rf "$t"; para "e0-abertura: $ENTREGA com sprint_atual ${sprint:-ausente}: não é abertura do E0" ;;
+  esac
+  sed -E 's/^atualizado_em: [0-9]{4}-[0-9]{2}-[0-9]{2}(\r?)$/atualizado_em: -\1/' "$t/provado.md" > "$t/disco"
+  sed -E 's/^atualizado_em: [0-9]{4}-[0-9]{2}-[0-9]{2}(\r?)$/atualizado_em: -\1/' "$t/refeito.md" > "$t/refeito"
+  if cmp -s "$t/refeito" "$t/disco"; then rm -rf "$t"; return 0; fi
+  rm -rf "$t"
+  para "e0-abertura: $ENTREGA muda além da abertura do E0 (só sprint_atual, prs, pr_url, pr_estado, base_validada_sha, origem_base, entrega e atualizado_em mudam, como o --abrir-sprint ou o --retomar-planejamento gravam)" # guarda:E0ABERTURA
+}
+prova_e0_abertura
+
 # DM-311: o e8 fecha o fluxo. Sem o estado terminal gravado, um `noop=true`
 # passava por fechamento (no Conselhos, depois de uma reconciliação pós-E8 o
 # ENTREGA.md ficou `estado: aberto` com o PR publicado e mesclado). Vale nos
@@ -933,7 +992,7 @@ if [ "$MODO" = verificar ]; then
   exit 0
 fi
 
-if [ ! -s "$TMP_LISTA" ]; then
+if [ ! -s "$TMP_LISTA" ] || [ "$E0_NOOP" = 1 ]; then
   printf 'noop=true\n'
   exit 0
 fi
@@ -968,9 +1027,9 @@ git diff --name-only -z "$ANTES" "$ARVORE" > "$TMP_STAGED" 2>/dev/null \
 STAGED="$(tr '\0' '\n' < "$TMP_STAGED" | LC_ALL=C sort -u)"
 ESPERADO="$(cat "$TMP_LISTA")"
 [ "$STAGED" = "$ESPERADO" ] || para 'o staged diff diverge do catálogo exato; stage preservado'
-# o e9-merge commita o conteúdo que a prova leu, e nenhum outro
+# o e9-merge e o e0-abertura commitam o conteúdo que a prova leu, e nenhum outro
 [ -z "$E9_BLOB" ] || [ "$(git rev-parse -q --verify "$ARVORE:$ENTREGA" 2>/dev/null)" = "$E9_BLOB" ] \
-  || para "e9-merge: $ENTREGA mudou entre a prova e o git add; o stage tem conteúdo não provado. Nenhum commit foi criado e o stage foi preservado" # guarda:E9MERGE
+  || para "$CHECKPOINT: $ENTREGA mudou entre a prova e o git add; o stage tem conteúdo não provado. Nenhum commit foi criado e o stage foi preservado" # guarda:E9MERGE
 
 # Reutiliza literalmente o gate de segurança dos hooks sobre o staged diff.
 # Falha de jq ou do hook também é fechada: método não ganha atalho de segredo.

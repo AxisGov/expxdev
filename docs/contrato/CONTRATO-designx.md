@@ -583,8 +583,10 @@ violada é a que mais precisa de atenção. Cada violação mostra:
 
 ### `expx init`
 
+Com o CLI `expx` instalado pela [release do expxdev](https://github.com/AxisGov/expxdev#instalar-a-partir-da-release):
+
 ```bash
-npx expxdev init --skills sprintx,runx,mergex,designx --harness claude,opencode --yes
+expx init --skills sprintx,runx,mergex,designx --harness claude,opencode --yes
 ```
 
 O `init` com `designx`:

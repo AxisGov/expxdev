@@ -22,13 +22,14 @@
 #   catalogo_metodo <raiz> <origem> <trabalho> <pasta> <checkpoint>
 #     <pasta> relativa à raiz (a pasta resolvida do trabalho);
 #     <checkpoint> pre-e2 | reconciliacao-base | predecessores |
-#     retomar-v9-predecessores | e9-merge | pre-e6 | e8 (cumulativo; e8 é o conjunto
+#     retomar-v9-predecessores | e9-merge | e0-abertura | pre-e6 | e8 (cumulativo; e8 é o conjunto
 #     inteiro). Os checkpoints de recuperação e o do E9 têm catálogo estreito:
 #     reconciliacao-base é só ENTREGA.md e os
 #     RECONCILIACAO-BASE-NNN.md de ENTREGA.reconciliacoes; pre-e6 e e8 também
 #     incluem esses artefatos; predecessores é só 00-PREDECESSORES.md;
 #     retomar-v9-predecessores é só ENTREGA.md; e9-merge (o registro do merge
-#     pelo E9, sprintx) é só ENTREGA.md. Nome fora do contrato retorna 1.
+#     pelo E9, sprintx) é só ENTREGA.md; e0-abertura (a base que o E0 reancorou,
+#     sprintx, DM-328) é só ENTREGA.md. Nome fora do contrato retorna 1.
 #   Imprime um caminho relativo por linha, sem ordem garantida.
 #   Retorna 1 com CATALOGO_ERRO preenchido quando o índice da base é inválido.
 #   Chame SEM subshell (`catalogo_metodo ... > arquivo`) para ler CATALOGO_ERRO.
@@ -216,7 +217,7 @@ EOF
 catalogo_metodo() { # <raiz> <origem> <trabalho> <pasta> <checkpoint>
   local raiz="$1" origem="$2" trabalho="$3" pasta="$4" checkpoint="$5" nome
   CATALOGO_ERRO=""
-  case "$checkpoint" in pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|e9-merge|pre-e6|e8) ;;
+  case "$checkpoint" in pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|e9-merge|e0-abertura|pre-e6|e8) ;;
     *) CATALOGO_ERRO="checkpoint desconhecido: $checkpoint"; return 1 ;;
   esac
   if [ "$checkpoint" = reconciliacao-base ]; then # guarda:CAT-RECONCILIACAO
@@ -238,7 +239,7 @@ catalogo_metodo() { # <raiz> <origem> <trabalho> <pasta> <checkpoint>
     CATALOGO_ERRO="e9-merge exige origem sprintx: a $origem só tem entrega por trabalho, e nela o E9 não grava pr_estado depois do merge (DM-317)"
     return 1
   fi
-  if [ "$checkpoint" = retomar-v9-predecessores ] || [ "$checkpoint" = e9-merge ]; then
+  if [ "$checkpoint" = retomar-v9-predecessores ] || [ "$checkpoint" = e9-merge ] || [ "$checkpoint" = e0-abertura ]; then
     [ "$origem" = sprintx ] || { CATALOGO_ERRO="$checkpoint exige origem sprintx"; return 1; }
     printf '%s\n' "docs/entregas/$trabalho/ENTREGA.md"
     return 0

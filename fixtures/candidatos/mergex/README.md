@@ -44,13 +44,13 @@ O método Expx é um conjunto de skills que se compõem, instaladas e mantidas p
 
 | Peça | Papel | Relação com a `mergex` |
 |---|---|---|
-| **[expxdev](https://github.com/AxisGov/expxdev)** | o CLI: instala, atualiza e diagnostica o ecossistema, e sobe o painel de operação | é quem instala esta skill (`npx expxdev init`) |
+| **[expxdev](https://github.com/AxisGov/expxdev)** | o CLI: instala, atualiza e diagnostica o ecossistema, e sobe o painel de operação | é quem instala esta skill (`expx init`) |
 | **[sprintx](https://github.com/AxisGov/sprintx)** | **Build** — feature nova, F1…F6 | E0 no início da F6, E1 a cada task, E2–E8 ao fim |
 | **[runx](https://github.com/AxisGov/runx)** | **Run** — ocorrência em produção, E1…E5 | E0 no início do fix, E1 a cada task, E2–E8 entre o QA e o relatório |
-| **[legadox](https://github.com/bittencourtthulio/legadox)** | **camada** de segurança para código legado | raio, caracterização, reversão e dívida alimentam o portão, a classificação e o PR |
-| **[stackx](https://github.com/bittencourtthulio/stackx)** | **camada** de convenções do repositório | convenções de branch, commit e teste vêm do `CONVENCOES.md` |
-| **[memox](https://github.com/bittencourtthulio/MemoX)** | **camada** de memória do projeto | arquivo com histórico de regressão sobe de faixa de atenção |
-| **[prodx](https://github.com/bittencourtthulio/prodx)** | **camada** de produto: decide **se** há trabalho | a montante: o `PD-ID` de origem acompanha o trabalho até a descrição do PR |
+| **[legadox](https://github.com/AxisGov/legadox)** | **camada** de segurança para código legado | raio, caracterização, reversão e dívida alimentam o portão, a classificação e o PR |
+| **[stackx](https://github.com/AxisGov/stackx)** | **camada** de convenções do repositório | convenções de branch, commit e teste vêm do `CONVENCOES.md` |
+| **[memox](https://github.com/AxisGov/MemoX)** | **camada** de memória do projeto | arquivo com histórico de regressão sobe de faixa de atenção |
+| **[prodx](https://github.com/AxisGov/prodx)** | **camada** de produto: decide **se** há trabalho | a montante: o `PD-ID` de origem acompanha o trabalho até a descrição do PR |
 | **[buildx](https://github.com/AxisGov/buildx)** | orquestra um projeto inteiro, da descrição ao sistema pronto | não chama a mergex diretamente: quem a aciona é a **F6 da sprintx**, dona de E0, E1 e E2→E8 em cada feature do mapa. A buildx **consome o resultado** (entrega registrada ou bloqueio persistido) e **nunca invoca `mergex-revisar`** — merge continua decisão humana |
 | **mergex** *(este repositório)* | entrega: o último metro, E0…E9 | — |
 
@@ -91,8 +91,10 @@ O `AGENTS.md` na raiz instrui o agente a acionar a skill nos pontos certos, em q
 
 ### Pelo CLI do método (recomendado)
 
+Com o CLI `expx` instalado pela [release do expxdev](https://github.com/AxisGov/expxdev#instalar-a-partir-da-release):
+
 ```bash
-npx expxdev init
+expx init
 ```
 
 O `init` busca a `mergex` na versão publicada, empacota como plugin local e configura o harness. Os comandos ficam com namespace no Claude Code (`/expx:mergex-check`) e sem namespace no OpenCode (`/mergex-check`).
@@ -318,8 +320,8 @@ Os dois agentes fixam `model: opus` e `effort: high` no frontmatter, em vez de h
 |---|---|
 | [`sprintx`](https://github.com/AxisGov/sprintx) | E0 no início da F6, E1 a cada task, E2–E8 ao fim — [patch](docs/integracao/patch-sprintx.md) |
 | [`runx`](https://github.com/AxisGov/runx) | E0 no início do fix, E1 a cada task, E2–E8 entre o QA e o relatório — [patch](docs/integracao/patch-runx.md) |
-| [`legadox`](https://github.com/bittencourtthulio/legadox) | Sem acionamento próprio: raio, caracterização, reversão e dívida alimentam o portão, a classificação e o PR — [patch](docs/integracao/patch-legadox.md) |
-| [`stackx`](https://github.com/bittencourtthulio/stackx) | Convenções de branch, commit e teste vêm do `CONVENCOES.md` — [patch](docs/integracao/patch-stackx.md) |
+| [`legadox`](https://github.com/AxisGov/legadox) | Sem acionamento próprio: raio, caracterização, reversão e dívida alimentam o portão, a classificação e o PR — [patch](docs/integracao/patch-legadox.md) |
+| [`stackx`](https://github.com/AxisGov/stackx) | Convenções de branch, commit e teste vêm do `CONVENCOES.md` — [patch](docs/integracao/patch-stackx.md) |
 
 Na integração com a SprintX, `00-PREDECESSORES.md` pode provar spec e plano consumidos antes de o planejamento nascer. A MergeX valida o manifesto por conteúdo e código de saída, inclui somente esses caminhos exatos na V9 e falha fechado quando o protocolo é inconclusivo. Uma entrega encerrada sem publicação apenas por essa V9 pode usar a retomada estreita descrita em `references/13-predecessores-sprintx.md`; ela não altera tasks concluídas nem a sequência E1 e sempre volta ao E2 completo.
 
@@ -396,7 +398,7 @@ Contribuições que preservam as regras invioláveis da skill são bem-vindas. A
 <a href="https://github.com/AxisGov/buildx">buildx</a> ·
 <a href="https://github.com/AxisGov/sprintx">sprintx</a> ·
 <a href="https://github.com/AxisGov/runx">runx</a> ·
-<a href="https://github.com/bittencourtthulio/legadox">legadox</a> ·
-<a href="https://github.com/bittencourtthulio/stackx">stackx</a> ·
+<a href="https://github.com/AxisGov/legadox">legadox</a> ·
+<a href="https://github.com/AxisGov/stackx">stackx</a> ·
 mergex</sub>
 </div>

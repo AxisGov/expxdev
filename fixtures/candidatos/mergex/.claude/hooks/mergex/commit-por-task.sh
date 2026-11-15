@@ -153,6 +153,18 @@ exatamente Trabalho + Integra-base (SHA completo de MERGE_HEAD) e nunca aceita
 Task nem Metodo." >&2
       exit 2 ;;
     valida) expx_permite "$RAIZ" "$HOOK" "merge de integracao da base" ;;
+    nenhuma)
+      # Integra-base escrito, mas fora do bloco final: o merge não é integração, e
+      # a reconciliação o recusará depois. Só aviso (stderr), nos dois modos; as
+      # regras de sempre seguem abaixo (DM-328).
+      if integracao_fora_do_bloco "$MSG_LIDA"; then
+        printf '%s\n' "mergex/commit-por-task — aviso: Integra-base fora do bloco final de trailers
+
+O Git só lê como trailer o último parágrafo da mensagem. Com Trabalho/Integra-base
+num parágrafo e o Co-Authored-By noutro, este merge NÃO é integração da base, e o
+reconciliacao-base.sh --registrar vai recusá-lo. Ponha Trabalho, Integra-base e
+Co-Authored-By no mesmo último parágrafo, sem linha em branco entre eles." >&2
+      fi ;;
   esac
 fi
 
@@ -188,7 +200,7 @@ Um commit declarou Task ou Metodo, mas sua classe não pode ser provada." >&2
 
 $SAIDA_CONTRATO
 
-Commit de método exige exatamente Trabalho + Metodo (pre-e2, reconciliacao-base, predecessores, retomar-v9-predecessores, e9-merge, pre-e6 ou e8)
+Commit de método exige exatamente Trabalho + Metodo (pre-e2, reconciliacao-base, predecessores, retomar-v9-predecessores, e9-merge, e0-abertura, pre-e6 ou e8)
 e nunca aceita Task." >&2
       exit 2
     fi

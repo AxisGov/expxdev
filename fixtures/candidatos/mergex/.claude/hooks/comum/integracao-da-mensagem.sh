@@ -84,6 +84,17 @@ integracao_entrega_desta_branch() {
 # Variável opcional INT_SEM_CONTRATO: `invalida` (padrão) ou `nenhuma` — o que
 # fazer quando o contrato-de-commit.sh não está instalado.
 # Define INT_CLASSE (nenhuma | valida | invalida) e INT_SAIDA.
+#
+# integracao_fora_do_bloco <mensagem> — 0 quando a mensagem tem `Integra-base:`
+# como linha, mas não como trailer: está num parágrafo anterior ao último, que é o
+# único que o Git lê (o Co-Authored-By separado por linha em branco é o caso
+# típico; conselhos, onda 2, DM-328). O merge não é integração; quem chama só avisa.
+integracao_fora_do_bloco() {
+  local tr
+  tr="$(printf '%s\n' "$1" | git interpret-trailers --parse 2>/dev/null)"
+  printf '%s\n' "$tr" | grep -E '^Integra-base:' >/dev/null && return 1
+  printf '%s\n' "$1" | grep -E '^Integra-base:[[:space:]]*[^[:space:]]' >/dev/null
+}
 integracao_da_mensagem() {
   INT_CLASSE=nenhuma; INT_SAIDA=""
   local txt tr integra trab tmp mh rc n

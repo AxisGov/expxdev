@@ -146,7 +146,7 @@ Em modo legado, esta seção fica **em destaque** — é a informação que muda
 
 ### 6. O que foi testado
 
-Fonte: `sprint-NN/tasks.md` (campos de teste), mais o resultado da suíte. As tasks vêm da chave `tasks` **nos dois formatos** da sprintx — condensado (`kind: plano`) e três arquivos —, sem exigir `sprint.md` nem `fases.md` (`references/integracao/sprintx.md`).
+Fonte: os `tasks.md` do escopo (campos de teste; `02-prontidao.md`, "O escopo das tasks": na entrega `por_sprint`, só a sprint do PR), mais o resultado da suíte. As tasks vêm da chave `tasks` **nos dois formatos** da sprintx — condensado (`kind: plano`) e três arquivos —, sem exigir `sprint.md` nem `fases.md` (`references/integracao/sprintx.md`).
 
 - Os testes por task, resumidos — um item por task, não a descrição inteira.
 - **O teste de regressão e o que ele reproduzia** — em trabalho de bug, é a prova de que o defeito existia. Diga o que ele fazia falhar antes.

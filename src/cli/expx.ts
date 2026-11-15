@@ -63,7 +63,7 @@ function comoEscolherSkills(): string {
   return [
     "escolha as skills com --skills, ou rode num terminal para responder na hora:",
     "",
-    `  npx expxdev init --skills ${NOMES.slice(0, 2).join(",")} --yes`,
+    `  expx init --skills ${NOMES.slice(0, 2).join(",")} --yes`,
     "",
     `disponiveis: ${NOMES.join(", ")}`,
   ].join("\n");
@@ -85,7 +85,7 @@ const EXECUTORES: Partial<Record<Subcomando, Executor>> = {
 
     // Faltou o que instalar e há alguém para responder? Pergunta, em vez de
     // sair com "nenhuma skill selecionada" — que era o beco sem saída do
-    // `npx expxdev init` puro.
+    // `expx init` puro.
     if (opcoes.skills.length === 0 && ehInterativo()) {
       saida.escrever(hero(versaoDoCli()));
       const p = criarPerguntador();
