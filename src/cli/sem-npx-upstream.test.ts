@@ -5,10 +5,10 @@ import { join, relative } from "node:path";
 import { diagnosticar } from "../doctor/verificadores.js";
 
 /*
- * `npx expxdev` instala o pacote `expxdev` do npm, que é do upstream (0.9.0), e não
+ * Rodar o pacote `expxdev` pelo `npx` instala o `expxdev` do npm, que é do upstream (0.9.0), e não
  * este CLI: a linha AxisGov não publica no npm (README, "Instalar a partir da
  * release"). As mensagens do CLI mandavam a pessoa rodá-lo, e o doctor sugeria
- * `npx expxdev@latest` para atualizar (conselhos-municipais, 2026-11-14). O bin do
+ * o `@latest` desse pacote pelo `npx` para atualizar (conselhos-municipais, 2026-11-14). O bin do
  * fork é `expx`; o CLI desatualizado se atualiza pela GitHub Release.
  */
 
@@ -25,9 +25,9 @@ function fontes(dir: string): string[] {
 }
 
 describe("o CLI nunca manda instalar o pacote do upstream", () => {
-  it("nenhum código do CLI (src/ e nucleo/) cita npx expxdev", () => {
+  it("nenhum código do CLI (src/ e nucleo/) manda rodar o pacote expxdev pelo npx", () => {
     const comNpx = [...fontes(join(RAIZ, "src")), ...fontes(join(RAIZ, "nucleo"))]
-      .filter((f) => /npx\s+expxdev/.test(readFileSync(f, "utf8")))
+      .filter((f) => /npx(\s+-\S+)*\s+expxdev/.test(readFileSync(f, "utf8")))
       .map((f) => relative(RAIZ, f));
     expect(comNpx).toEqual([]);
   });

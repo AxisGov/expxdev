@@ -66,7 +66,7 @@ describe("pacote publicável", () => {
     const release = readme.slice(readme.indexOf("## Instalar a partir da release"), readme.indexOf("### Histórico de versões"));
     expect(release).toMatch(/npm install -g ~\/expx-cli\/v[0-9.]+\/expxdev-[0-9.]+\.tgz/);
     expect(release).toMatch(/\nexpx init --skills /);
-    expect(readme).not.toMatch(/npx\s+expxdev/);
+    expect(readme).not.toMatch(/npx(\s+-\S+)*\s+expxdev/);
   });
 
   it("integração: catálogo compilado contém as quatro origens canônicas AxisGov", () => {

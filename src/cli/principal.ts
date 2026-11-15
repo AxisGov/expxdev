@@ -31,6 +31,24 @@ function pastaEstaticos(): string | undefined {
   return undefined;
 }
 
+/**
+ * A dica para a porta ocupada. Repete o `--dir` da chamada: sem ele, a dica copiada
+ * subia o painel em `./docs`, não na pasta pedida (CodeRabbit no expxdev#172).
+ */
+export function dicaDePortaOcupada(porta: number, dir: string): string {
+  const pasta = /^[A-Za-z0-9._\/~-]+$/.test(dir) ? dir : `'${dir.replace(/'/g, "'\\''")}'`;
+  return [
+    `a porta ${String(porta)} ja esta em uso`,
+    "",
+    "  se o painel ja estiver rodando, abra:",
+    `    http://${HOST_PAINEL}:${String(porta)}`,
+    "",
+    "  ou suba numa porta livre:",
+    `    expx panel --dir ${pasta} --porta ${String(porta + 1)}`,
+    "",
+  ].join("\n");
+}
+
 export async function principal(argv: readonly string[]): Promise<number> {
   const r = interpretar(argv);
   if (!r.ok) {
@@ -65,18 +83,7 @@ export async function principal(argv: readonly string[]): Promise<number> {
     if (e instanceof ErroDePorta) {
       // Quase sempre é um painel que já está no ar: mandar abrir aquele
       // resolve mais rápido do que mandar matar processo.
-      process.stderr.write(
-        [
-          `a porta ${String(e.porta)} ja esta em uso`,
-          "",
-          "  se o painel ja estiver rodando, abra:",
-          `    http://${HOST_PAINEL}:${String(e.porta)}`,
-          "",
-          "  ou suba numa porta livre:",
-          `    expx panel --porta ${String(e.porta + 1)}`,
-          "",
-        ].join("\n"),
-      );
+      process.stderr.write(dicaDePortaOcupada(e.porta, r.opcoes.dir));
       return 1;
     }
     throw e;

@@ -170,6 +170,38 @@ rastrear_texto "$repo_npx" docs/historico-proveniencia.md "npx ""expxdev init"
 adicionar_excecao "$repo_npx" docs/historico-proveniencia.md \
   'npx%20expxdev' 'registro historico' 'preserva o comando como o plano antigo o registrou'
 esperar_sucesso npx_historico "$repo_npx"
+# CodeAnt/CodeRabbit nos PRs de 2026-11-14: o npx do pacote expxdev com opções,
+# espaços a mais ou tab; o link fechado por ponto final; o README com um fork de
+# nome parecido; continue-on-error no passo do guarda; quantidade sem limite
+caso_bloqueado npx_opcao_longa docs/ecossistema.md "npx --yes ""expxdev init"
+caso_bloqueado npx_opcao_curta docs/ecossistema.md "npx -y ""expxdev init"
+caso_bloqueado npx_dois_espacos docs/ecossistema.md "npx  ""expxdev init"
+caso_bloqueado npx_tab docs/ecossistema.md "npx"$'\t'"expxdev init"
+caso_bloqueado npx_pacote_upstream docs/ecossistema.md "npx --package ""expxdev expx init"
+caso_bloqueado link_com_ponto_final docs/ecossistema.md \
+  "Veja https://$github_host/$proprietario/legadox."
+repo_release="$(nova_fixture npx_da_release)"
+rastrear_texto "$repo_release" docs/instalar.md \
+  "npx --yes --package ~/expx-cli/v0.14.7/expxdev-0.14.7.tgz expx init --skills runx --yes"
+esperar_sucesso npx_da_release "$repo_release"
+repo_parecido="$(nova_fixture readme_fork_parecido)"
+sed "s#AxisGov/runx\$#AxisGov/runx-fork#" "$repo_parecido/README.md" > "$repo_parecido/README.tmp" \
+  && mv "$repo_parecido/README.tmp" "$repo_parecido/README.md"
+git -C "$repo_parecido" add README.md
+git -C "$repo_parecido" -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm 'fixture: fork de nome parecido'
+esperar_falha readme_fork_parecido "$repo_parecido"
+repo_coe="$(nova_fixture continue_on_error)"
+printf '%s\n' '        continue-on-error: true' >> "$repo_coe/.github/workflows/proveniencia.yml"
+git -C "$repo_coe" add .github/workflows/proveniencia.yml
+git -C "$repo_coe" -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm 'fixture: continue-on-error'
+esperar_falha continue_on_error "$repo_coe"
+repo_qtd="$(nova_fixture quantidade_grande)"
+rastrear_texto "$repo_qtd" docs/historico.md "https://$github_host/$proprietario/runx"
+printf 'docs/historico.md\tgithub%%2Ecom/bittencourtthulio/runx\t99999999999999999999\thistorico\tquantidade alem do inteiro do shell\n' \
+  >> "$repo_qtd/scripts/ci/proveniencia-allowlist.tsv"
+git -C "$repo_qtd" add scripts/ci/proveniencia-allowlist.tsv
+git -C "$repo_qtd" -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm 'fixture: quantidade grande'
+esperar_falha quantidade_grande "$repo_qtd"
 
 repo_extra="$(nova_fixture extra_allowlisted)"
 rastrear_texto "$repo_extra" docs/historico-proveniencia.md \
