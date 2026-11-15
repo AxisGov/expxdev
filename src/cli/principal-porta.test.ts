@@ -19,5 +19,7 @@ describe("dica de porta ocupada", () => {
   it("pasta com espaço ou aspas sai entre aspas simples, pronta para copiar", () => {
     expect(dicaDePortaOcupada(4000, "/tmp/minha pasta")).toContain("expx panel --dir '/tmp/minha pasta' --porta 4001");
     expect(dicaDePortaOcupada(4000, "/tmp/d'agua")).toContain(`expx panel --dir '/tmp/d'\\''agua' --porta 4001`);
+    // o `~` literal recebido não pode virar o HOME de quem copiar a dica
+    expect(dicaDePortaOcupada(4000, "~/docs")).toContain("expx panel --dir '~/docs' --porta 4001");
   });
 });

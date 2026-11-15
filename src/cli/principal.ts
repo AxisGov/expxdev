@@ -36,7 +36,8 @@ function pastaEstaticos(): string | undefined {
  * subia o painel em `./docs`, não na pasta pedida (CodeRabbit no expxdev#172).
  */
 export function dicaDePortaOcupada(porta: number, dir: string): string {
-  const pasta = /^[A-Za-z0-9._\/~-]+$/.test(dir) ? dir : `'${dir.replace(/'/g, "'\\''")}'`;
+  // sem `~` no conjunto seguro: copiado, o shell o expandiria para outra pasta (Codex)
+  const pasta = /^[A-Za-z0-9._\/-]+$/.test(dir) ? dir : `'${dir.replace(/'/g, "'\\''")}'`;
   return [
     `a porta ${String(porta)} ja esta em uso`,
     "",
