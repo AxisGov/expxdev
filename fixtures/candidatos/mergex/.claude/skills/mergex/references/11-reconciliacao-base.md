@@ -96,7 +96,9 @@ Condições estruturais, todas obrigatórias:
   não há o que buscar, e a base vale pela ref local (DM-323).
 - A mensagem de `M` tem exatamente um `Trabalho: <trabalho_id>` igual ao da `ENTREGA.md`, um
   `Integra-base:` seguido do SHA completo de `B1`, e nenhum `Task:` nem `Metodo:` (a classe
-  "integração de base" de `references/01-commits.md`).
+  "integração de base" de `references/01-commits.md`), todos no mesmo bloco, o último parágrafo da
+  mensagem, junto do `Co-Authored-By:` se houver: num parágrafo anterior, o Git não os lê como
+  trailers e o merge não é integração (DM-328).
 
 `M` não é criado pela MergeX: é o merge que a pessoa (ou o agente, sob autorização) concluiu. A
 MergeX valida e registra. A integração continua humana.
@@ -300,7 +302,7 @@ Os mesmos nos dois modos:
 ## Checkpoint de método `reconciliacao-base`
 
 O enum de `persistir-metodo.sh`, `contrato-de-commit.sh` e `catalogo-de-metodo.sh` é
-`pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | e9-merge | pre-e6 | e8`.
+`pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | e9-merge | e0-abertura | pre-e6 | e8`.
 
 - Catálogo do checkpoint: `docs/entregas/<trabalho_id>/ENTREGA.md` e os
   `RECONCILIACAO-BASE-NNN.md` de `ENTREGA.reconciliacoes`, sujos. Nada de produto, de teste ou de

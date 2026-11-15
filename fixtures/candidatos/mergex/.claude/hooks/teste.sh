@@ -1541,6 +1541,11 @@ printf 'outro\n' > docs/sprintx/estimativas/CALIBRAGEM.md
 git add -f docs/sprintx/estimativas/CALIBRAGEM.md
 caso "outro arquivo em estimativas/ NAO e isento" mergex/arquivo-fora-do-plano.sh "$(bash_json 'git commit -m x')" 2
 git reset -q; rm -f docs/sprintx/estimativas/CALIBRAGEM.md
+# fora da pasta do trabalho, nada sob docs/sprintx/ e isento alem do HISTORICO (da branch fix/p0-1-historico-hook, set/2026)
+printf 'solto\n' > docs/sprintx/NOTAS.md
+git add -f docs/sprintx/NOTAS.md
+caso "outro arquivo em docs/sprintx/ NAO e isento" mergex/arquivo-fora-do-plano.sh "$(bash_json 'git commit -m x')" 2
+git reset -q; rm -f docs/sprintx/NOTAS.md
 
 # 3 — a varredura de segredo vale igual no artefato de metodo
 caso "fechamento final: segredo no artefato barra" comum/sem-segredo.sh "$(write_json "token: \"$SK\"")" 2
@@ -2271,6 +2276,21 @@ rm -rf docs/entregas/ft-gemeo
 cp "$INT_BAK" "$INT_E"
 rm -f "$INT_BAK"
 caso "-m sem Integra-base segue as regras de sempre (bloqueio: mistura)" mergex/commit-por-task.sh "$(bash_json 'git commit -m "integra a base"')" 2
+# Trabalho/Integra-base num parágrafo e Co-Authored-By noutro (conselhos, onda 2;
+# DM-328): para o Git não são trailers. O hook avisa, nos dois modos, e segue as
+# regras de sempre (aqui, em bloqueio, a mistura barra); nunca vira bloqueio por isso.
+printf 'merge(mergex): integra a base\n\nTrabalho: ft-02\nIntegra-base: %s\n\nCo-Authored-By: X <x@x>\n' \
+  "$(git rev-parse -q --verify MERGE_HEAD)" > msg-malformada.txt
+SAIDA_MAL="$(printf '%s' "$(bash_json 'git commit -F msg-malformada.txt')" | bash "$H/mergex/commit-por-task.sh" 2>&1 >/dev/null)"
+if printf '%s' "$SAIDA_MAL" | grep -q 'fora do bloco final'; then
+  OK=$((OK+1)); printf '  ok    %s\n' 'Integra-base fora do bloco final: o hook avisa com o motivo'
+else
+  FALHOU=$((FALHOU+1)); printf '  FALHA %s\n' 'Integra-base fora do bloco final: o hook avisa com o motivo'; printf '%s\n' "$SAIDA_MAL" | sed 's/^/        /'
+fi
+echo '{"expx_hooks":1,"hooks":{"commit-por-task":{"modo":"aviso"},"arquivo-fora-do-plano":{"modo":"bloqueio"}}}' > .expx/hooks.json
+caso "Integra-base fora do bloco final, em aviso: nao barra" mergex/commit-por-task.sh "$(bash_json 'git commit -F msg-malformada.txt')" 0
+echo '{"expx_hooks":1,"hooks":{"commit-por-task":{"modo":"bloqueio"},"arquivo-fora-do-plano":{"modo":"bloqueio"}}}' > .expx/hooks.json
+rm -f msg-malformada.txt
 caso "fora-do-plano não acusa o que veio da base" mergex/arquivo-fora-do-plano.sh "$(bash_json 'git commit -F msg-integracao.txt')" 0
 # -F/--file com caminho entre aspas e espaco (CodeAnt 4235529198): a mensagem tem
 # de ser lida inteira. Truncada no espaco, a integracao virava commit comum:

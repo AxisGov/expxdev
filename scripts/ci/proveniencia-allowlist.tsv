@@ -7,10 +7,6 @@ docs/expx-cli/base/10-proveniencia-skills.md	github%2Ecom/bittencourtthulio/lega
 docs/expx-cli/base/10-proveniencia-skills.md	github%2Ecom/bittencourtthulio/stackx	1	documentacao historica de proveniencia	registra de forma explicita a origem anterior para orientar migracoes
 docs/expx-cli/base/10-proveniencia-skills.md	github%2Ecom/bittencourtthulio/designx	1	documentacao historica de proveniencia	registra de forma explicita a origem anterior para orientar migracoes
 docs/superpowers/plans/2026-10-21-otimizacao-arquitetura-skills-expx-baseline.md	github%2Ecom/bittencourtthulio/runx.git	1	registro historico de benchmark	preserva a medicao anterior sem autorizar operacao remota atual
-fixtures/candidatos/mergex/README.md	github%2Ecom/bittencourtthulio/legadox	3	fixture de migracao mergex	snapshot legado usado para testar descoberta e migracao de candidatos
-fixtures/candidatos/mergex/README.md	github%2Ecom/bittencourtthulio/stackx	3	fixture de migracao mergex	snapshot legado usado para testar descoberta e migracao de candidatos
-fixtures/candidatos/sprintx/README.md	github%2Ecom/bittencourtthulio/legadox	2	fixture de migracao sprintx	snapshot legado usado para testar descoberta e migracao de candidatos
-fixtures/candidatos/sprintx/README.md	github%2Ecom/bittencourtthulio/stackx	2	fixture de migracao sprintx	snapshot legado usado para testar descoberta e migracao de candidatos
 src/cli/pacote.test.ts	bittencourtthulio%2Egithub%2Eio/expxdev	1	teste negativo de empacotamento	prova que a documentacao publicada nao conserva o site legado
 src/nucleo/catalogo.test.ts	github%2Ecom/bittencourtthulio/runx	1	fixture de migracao do catalogo	prova o mapeamento exato entre origem anterior e origem AxisGov
 src/nucleo/catalogo.test.ts	github%2Ecom/bittencourtthulio/mergex	1	fixture de migracao do catalogo	prova o mapeamento exato entre origem anterior e origem AxisGov
@@ -39,11 +35,6 @@ docs/expx-cli/base/10-proveniencia-skills.md	github%2Ecom/bittencourtthulio/prod
 docs/memox-painel/00-DECISOES.md	github%2Ecom/bittencourtthulio/memox	2	registro historico de decisao	preserva a origem observada quando o plano da MemoX foi escrito
 docs/memox-painel/ORQUESTRADOR.md	github%2Ecom/bittencourtthulio/memox	1	registro historico de plano	preserva o criterio original ja executado
 docs/memox-painel/sprint-03/tasks.md	github%2Ecom/bittencourtthulio/memox	2	registro historico de tasks	preserva os criterios originais ja executados
-fixtures/candidatos/mergex/README.md	github%2Ecom/bittencourtthulio/memox	1	fixture candidata mergex	preserva byte a byte o commit certificado da skill
-fixtures/candidatos/mergex/README.md	github%2Ecom/bittencourtthulio/prodx	1	fixture candidata mergex	preserva byte a byte o commit certificado da skill
-fixtures/candidatos/mergex/.claude/skills/mergex/references/integracao/memox.md	github%2Ecom/bittencourtthulio/memox	1	fixture candidata mergex	preserva byte a byte o commit certificado da skill
-fixtures/candidatos/sprintx/README.md	github%2Ecom/bittencourtthulio/memox	1	fixture candidata sprintx	preserva byte a byte o commit certificado da skill
-fixtures/candidatos/sprintx/README.md	github%2Ecom/bittencourtthulio/prodx	1	fixture candidata sprintx	preserva byte a byte o commit certificado da skill
 src/nucleo/catalogo.test.ts	github%2Ecom/bittencourtthulio/memox	1	fixture de migracao do catalogo	prova o mapeamento exato entre origem anterior e origem AxisGov
 src/nucleo/catalogo.test.ts	github%2Ecom/bittencourtthulio/prodx	1	fixture de migracao do catalogo	prova o mapeamento exato entre origem anterior e origem AxisGov
 src/nucleo/catalogo.ts	github%2Ecom/bittencourtthulio/memox	1	mapa explicito origensLegadas	permite reconhecer e migrar instalacoes memox existentes
@@ -52,5 +43,3 @@ docs/memox-painel/ORQUESTRADOR.md	npx%20expxdev	1	registro historico de plano	pr
 docs/memox-painel/00-DECISOES.md	npx%20expxdev	2	registro historico de decisao	preserva o comando como a decisao da MemoX o registrou
 docs/memox-painel/sprint-03/sprint.md	npx%20expxdev	2	registro historico de sprint	preserva os criterios originais ja executados
 docs/memox-painel/base/04-cli-catalogo-e-instalacao.md	npx%20expxdev	1	base historica de planejamento	preserva a base do plano da MemoX como foi escrita
-fixtures/candidatos/mergex/README.md	npx%20expxdev	2	fixture candidata mergex	preserva byte a byte o commit certificado; sai com a certificacao nova
-fixtures/candidatos/sprintx/README.md	npx%20expxdev	2	fixture candidata sprintx	preserva byte a byte o commit certificado; sai com a certificacao nova

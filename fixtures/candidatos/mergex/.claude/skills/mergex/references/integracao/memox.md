@@ -1,6 +1,6 @@
 # Integração — memox
 
-A [`memox`](https://github.com/bittencourtthulio/memox) é a **camada de memória** do método
+A [`memox`](https://github.com/AxisGov/MemoX) é a **camada de memória** do método
 Expx. Ela não tem fluxo próprio: indexa os artefatos que as outras skills já gravaram e devolve
 o histórico de um arquivo quando alguém declara que vai tocá-lo.
 

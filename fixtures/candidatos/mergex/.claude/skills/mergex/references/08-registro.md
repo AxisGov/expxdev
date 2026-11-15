@@ -21,7 +21,7 @@ Ao longo do trabalho, sempre no mesmo arquivo — e **nunca recriado do zero**:
 
 O resultado do E2 (`portao`, `portao_sha`, `falhas_portao`) é gravado só por `registrar-portao.sh`
 (`references/02-prontidao.md`). Os checkpoints de método que levam o arquivo ao histórico formam o
-enum fechado `pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | e9-merge | pre-e6 | e8`.
+enum fechado `pre-e2 | reconciliacao-base | predecessores | retomar-v9-predecessores | e9-merge | e0-abertura | pre-e6 | e8`.
 
 ## O contrato — `kind: entrega`
 

@@ -21,7 +21,7 @@ evidência.
 Passe a ele:
 
 - o diff (`git diff --name-status <branch-base>...HEAD`) e a `<branch-base>`, que o classificador usa
-- o `tasks.md` do trabalho
+- os `tasks.md` do escopo (`02-prontidao.md`, "O escopo das tasks": na entrega `por_sprint`, só o da sprint do PR)
 - o `01-CAUSA-RAIZ.md`, quando é da runx
 - o arquivo de raio da legadox
 - o `PERFIL.md` da legadox

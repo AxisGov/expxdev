@@ -69,10 +69,25 @@ V_TRABALHO="$(printf '%s\n' "$TRAILERS" | sed -n 's/^Trabalho:[[:space:]]*//p')"
 V_METODO="$(printf '%s\n' "$TRAILERS" | sed -n 's/^Metodo:[[:space:]]*//p')"
 V_INTEGRA="$(printf '%s\n' "$TRAILERS" | sed -n 's/^Integra-base:[[:space:]]*//p')"
 
+# fora_do_bloco <chave>... — uma chave exigida pela classe que não é trailer, mas
+# aparece como linha da mensagem: está num parágrafo anterior ao último, que é o
+# único que o Git lê como trailers (o Co-Authored-By separado por linha em branco é
+# o caso típico, DM-328). Só diagnóstico: a recusa é a mesma, com o motivo certo.
+fora_do_bloco() {
+  local k q
+  for k in "$@"; do
+    q="$(printf '%s\n' "$TRAILERS" | grep -Ec "^$k:[[:space:]]*")"
+    [ "$q" = 0 ] || continue
+    grep -Eq "^$k:[[:space:]]*[^[:space:]]" <<<"$TEXTO" || continue
+    invalido "$k fora do bloco final de trailers: o Git só lê como trailer o último parágrafo da mensagem; ponha $k no último parágrafo, junto do Co-Authored-By e dos outros trailers, sem linha em branco entre eles"
+  done
+}
+
 case "$ACAO" in
   --validar-e1)
     [ -n "$TASK" ] || uso 'falta --task'
     [ -z "$CHECKPOINT" ] || uso '--validar-e1 não recebe --checkpoint'
+    fora_do_bloco Task Trabalho
     [ "$Q_TASK" = 1 ] || invalido "E1 exige exatamente um Task; encontrou $Q_TASK"
     [ "$Q_TRABALHO" = 1 ] || invalido "E1 exige exatamente um Trabalho; encontrou $Q_TRABALHO"
     [ "$Q_METODO" = 0 ] || invalido "E1 não aceita Metodo; encontrou $Q_METODO"
@@ -84,7 +99,8 @@ case "$ACAO" in
     ;;
   --validar-metodo)
     [ -z "$TASK" ] || uso '--validar-metodo não recebe --task'
-    case "$CHECKPOINT" in pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|e9-merge|pre-e6|e8) ;; *) uso "checkpoint inválido: ${CHECKPOINT:-ausente}" ;; esac
+    case "$CHECKPOINT" in pre-e2|reconciliacao-base|predecessores|retomar-v9-predecessores|e9-merge|e0-abertura|pre-e6|e8) ;; *) uso "checkpoint inválido: ${CHECKPOINT:-ausente}" ;; esac
+    fora_do_bloco Trabalho Metodo
     [ "$Q_TASK" = 0 ] || invalido "commit de método não aceita Task; encontrou $Q_TASK"
     [ "$Q_TRABALHO" = 1 ] || invalido "método exige exatamente um Trabalho; encontrou $Q_TRABALHO"
     [ "$Q_METODO" = 1 ] || invalido "método exige exatamente um Metodo; encontrou $Q_METODO"
@@ -99,6 +115,7 @@ case "$ACAO" in
   --validar-integracao)
     [ -z "$TASK" ] || uso '--validar-integracao não recebe --task'
     [ -z "$CHECKPOINT" ] || uso '--validar-integracao não recebe --checkpoint'
+    fora_do_bloco Trabalho Integra-base
     [ "$Q_TASK" = 0 ] || invalido "integração não aceita Task; encontrou $Q_TASK"
     [ "$Q_METODO" = 0 ] || invalido "integração não aceita Metodo; encontrou $Q_METODO"
     [ "$Q_TRABALHO" = 1 ] || invalido "integração exige exatamente um Trabalho; encontrou $Q_TRABALHO"

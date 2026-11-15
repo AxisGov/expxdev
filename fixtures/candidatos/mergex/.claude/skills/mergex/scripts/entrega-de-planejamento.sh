@@ -7,6 +7,7 @@
 #
 # Uso:
 #   entrega-de-planejamento.sh --entrega <ENTREGA.md> [--rev <commit>]
+#   entrega-de-planejamento.sh --escopo-de-tasks --pasta <pasta do trabalho> --entrega <ENTREGA.md>
 #
 # Com --rev, lê o frontmatter da versão commitada (`git show <rev>:./<caminho>`,
 # caminho relativo ao diretório atual), nunca o do disco.
@@ -33,8 +34,19 @@
 #
 # Códigos: 0 leu; 2 ilegível ou incoerente (motivo em stderr); 64 uso.
 #
+# `--escopo-de-tasks` (leitura, só do disco, sem --rev) diz de quais `tasks.md` o
+# portão (E2: V1, V2, V3, V7, V11 e V12) e os E3–E5 cobram as tasks: a primeira
+# linha é `escopo=sprint:NN` (por_sprint com a sprint NN aberta: só
+# `<pasta>/sprint-NN/tasks.md`), `escopo=trabalho` (todas as `sprint-NN` da pasta,
+# em ordem) ou `escopo=planejamento` (PR de planejamento: nenhuma task); depois,
+# uma linha `tasks=<caminho>` por arquivo. A V9 não usa o escopo: ela compara com a
+# união de todas as tasks do trabalho. Sprint sem `tasks.md` regular e legível,
+# pasta inexistente, ou por_sprint sem sprint aberta: 2, sem escopo nenhum.
+#
 # As ações de escrita são: `--registrar-pr` (E8), `--registrar-merge` (E9),
-# `--completar-base` (E9, migração de item merged), `--abrir-sprint` (E0).
+# `--completar-base` (E9, migração de item merged), `--abrir-sprint` (E0) e
+# `--retomar-planejamento` (E0 da entrega por trabalho depois do merge do
+# planejamento: sprint_atual null e a base reancorada, DM-261 e DM-328).
 # `--modo-efetivo` fixa a precedência plano > projeto antes
 # do primeiro registro. Todas reescrevem só as chaves de que são donas, conferem o
 # temporário com este mesmo leitor e recusam link simbólico.
@@ -50,14 +62,16 @@ uso() {
     '     entrega-de-planejamento.sh --completar-base <planejamento|NN> --merge-sha <sha> --base-sha <sha> --entrega <ENTREGA.md>' \
     '     entrega-de-planejamento.sh --registrar-pr --url <url|null> --estado <estado> --entrega <ENTREGA.md>' \
     '     entrega-de-planejamento.sh --abrir-sprint <NN> --base-validada-sha <sha> --entrega <ENTREGA.md>' \
-    '     entrega-de-planejamento.sh --modo-efetivo --plano <00-PLANEJAMENTO.md> --projeto <modo> --entrega <ENTREGA.md>' >&2
+    '     entrega-de-planejamento.sh --retomar-planejamento --base-validada-sha <sha> --entrega <ENTREGA.md>' \
+    '     entrega-de-planejamento.sh --modo-efetivo --plano <00-PLANEJAMENTO.md> --projeto <modo> --entrega <ENTREGA.md>' \
+    '     entrega-de-planejamento.sh --escopo-de-tasks --pasta <pasta do trabalho> --entrega <ENTREGA.md>' >&2
   exit 64
 }
 ilegivel() { printf 'entrega-de-planejamento: %s\n' "$1" >&2; exit 2; }
 recusa() { printf 'entrega-de-planejamento: %s\n' "$1" >&2; exit 1; }
 
 ENTREGA=""; REV=""; TEM_REV=0; ACAO=ler; MERGE_SHA=""; BASE_SHA=""; ALVO_SPRINT=""
-URL=""; TEM_URL=0; ESTADO=""; NN=""; BASE_VALIDADA=""; PLANO=""; PROJETO=""
+URL=""; TEM_URL=0; ESTADO=""; NN=""; BASE_VALIDADA=""; PLANO=""; PROJETO=""; PASTA=""
 acao() { [ "$ACAO" = ler ] || uso 'uma ação por vez'; ACAO="$1"; }
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -67,7 +81,10 @@ while [ "$#" -gt 0 ]; do
     --completar-base) [ "$#" -ge 2 ] || uso; acao completar-base; ALVO_SPRINT="$2"; shift 2 ;;
     --registrar-pr) acao registrar-pr; shift ;;
     --abrir-sprint) [ "$#" -ge 2 ] || uso; acao abrir-sprint; NN="$2"; shift 2 ;;
+    --retomar-planejamento) acao retomar-planejamento; shift ;;
     --modo-efetivo) acao modo-efetivo; shift ;;
+    --escopo-de-tasks) acao escopo-de-tasks; shift ;;
+    --pasta) [ "$#" -ge 2 ] && [ -z "$PASTA" ] && [ -n "$2" ] || uso; PASTA="$2"; shift 2 ;;
     --merge-sha) [ "$#" -ge 2 ] && [ -z "$MERGE_SHA" ] || uso; MERGE_SHA="$2"; shift 2 ;;
     --base-sha) [ "$#" -ge 2 ] && [ -z "$BASE_SHA" ] || uso; BASE_SHA="$2"; shift 2 ;;
     --url) [ "$#" -ge 2 ] && [ "$TEM_URL" = 0 ] || uso; URL="$2"; TEM_URL=1; shift 2 ;;
@@ -81,6 +98,8 @@ done
 [ -n "$ENTREGA" ] || uso 'falta --entrega'
 [ "$TEM_REV" = 0 ] || [ -n "$REV" ] || uso '--rev vazio'
 [ "$ACAO" = ler ] || [ "$TEM_REV" = 0 ] || uso '--rev só na leitura'
+[ "$ACAO" = escopo-de-tasks ] || [ -z "$PASTA" ] || uso '--pasta só com --escopo-de-tasks'
+[ "$ACAO" != escopo-de-tasks ] || [ -n "$PASTA" ] || uso '--escopo-de-tasks precisa de --pasta'
 sha_uso() { # <nome> <valor> <comprimento exigido, ou vazio para 40|64>
   case "$2" in *[!0-9a-f]*|'') uso "$1 inválido: ${2:-ausente}" ;; esac
   if [ -n "${3:-}" ]; then [ "${#2}" = "$3" ] || uso "$1 inválido: $2"
@@ -88,7 +107,7 @@ sha_uso() { # <nome> <valor> <comprimento exigido, ou vazio para 40|64>
 }
 case "$ACAO" in registrar-merge|completar-base) ;; *) [ -z "$MERGE_SHA$BASE_SHA" ] || uso '--merge-sha e --base-sha só com --registrar-merge ou --completar-base' ;; esac
 [ "$ACAO" = registrar-pr ] || { [ "$TEM_URL" = 0 ] && [ -z "$ESTADO" ]; } || uso '--url e --estado só com --registrar-pr'
-[ "$ACAO" = abrir-sprint ] || [ -z "$BASE_VALIDADA" ] || uso '--base-validada-sha só com --abrir-sprint'
+case "$ACAO" in abrir-sprint|retomar-planejamento) ;; *) [ -z "$BASE_VALIDADA" ] || uso '--base-validada-sha só com --abrir-sprint ou --retomar-planejamento' ;; esac
 [ "$ACAO" = modo-efetivo ] || [ -z "$PLANO$PROJETO" ] || uso '--plano e --projeto só com --modo-efetivo'
 case "$ACAO" in
   registrar-merge|completar-base)
@@ -102,14 +121,15 @@ case "$ACAO" in
     case "$URL" in *[[:space:]\"\'#]*) uso "url fora da forma: $URL" ;; esac
     # merged e fechado são do E9: o E8 nunca os grava
     case "$ESTADO" in aberto|rascunho|aguardando_merge|null) ;; *) uso "estado do E8 fora de aberto|rascunho|aguardando_merge|null: ${ESTADO:-ausente}" ;; esac ;;
-  abrir-sprint)
-    case "$NN" in [0-9][0-9]) [ "$NN" != 00 ] || uso 'sprint 00' ;; *) uso "sprint fora da forma NN: $NN" ;; esac
+  abrir-sprint|retomar-planejamento)
+    [ "$ACAO" = retomar-planejamento ] \
+      || case "$NN" in [0-9][0-9]) [ "$NN" != 00 ] || uso 'sprint 00' ;; *) uso "sprint fora da forma NN: $NN" ;; esac
     # SHA local: o tamanho do formato do repositório (DM-315); o merge_sha e o
     # base_sha acima vêm do serviço, e ficam em 40|64
     case "$(git rev-parse --show-object-format 2>/dev/null)" in
       sha1) sha_uso base_validada_sha "$BASE_VALIDADA" 40 ;;
       sha256) sha_uso base_validada_sha "$BASE_VALIDADA" 64 ;;
-      *) uso '--abrir-sprint fora de um repositório Git: a base validada não tem formato' ;;
+      *) uso "--$ACAO fora de um repositório Git: a base validada não tem formato" ;;
     esac ;;
   modo-efetivo)
     [ -n "$PLANO" ] || uso 'falta --plano'
@@ -124,7 +144,7 @@ libera_lock() {
   [ -z "$LOCK_DIR" ] || rmdir "$LOCK_DIR" 2>/dev/null || :
 }
 case "$ACAO" in
-  registrar-merge|completar-base|registrar-pr|abrir-sprint)
+  registrar-merge|completar-base|registrar-pr|abrir-sprint|retomar-planejamento)
     LOCK_DIR="$ENTREGA.lock"
     tentativas=0
     until mkdir "$LOCK_DIR" 2>/dev/null; do
@@ -139,7 +159,7 @@ case "$ACAO" in
 esac
 
 # antes de ler: um link quebrado também é link, e a recusa é a mesma
-case "$ACAO" in registrar-merge|completar-base|registrar-pr|abrir-sprint)
+case "$ACAO" in registrar-merge|completar-base|registrar-pr|abrir-sprint|retomar-planejamento)
   [ ! -L "$ENTREGA" ] || recusa "$ENTREGA é link simbólico: o registro só grava um arquivo regular" ;;
 esac
 conteudo=""
@@ -343,6 +363,32 @@ saida() {
 
 case "$ACAO" in
   ler) saida; exit 0 ;;
+  escopo-de-tasks)
+    [ -d "$PASTA" ] || ilegivel "pasta do trabalho inexistente: $PASTA"
+    PASTA="${PASTA%/}"
+    if [ "$PLANEJAMENTO" = sim ]; then printf 'escopo=planejamento\n'; exit 0; fi
+    case "$sprint" in
+      [0-9][0-9])
+        f="$PASTA/sprint-$sprint/tasks.md"
+        [ -f "$f" ] && [ ! -L "$f" ] && [ -r "$f" ] || ilegivel "sprint_atual $sprint sem tasks.md regular e legível: $f"
+        printf 'escopo=sprint:%s\ntasks=%s\n' "$sprint" "$f"; exit 0 ;;
+    esac
+    [ "$MODO_EF" != por_sprint ] || ilegivel 'entrega por_sprint sem sprint aberta: o portão não tem escopo (o E0 --sprint abre a sprint)'
+    # o trabalho inteiro: toda pasta sprint-NN, em ordem lexical; nenhuma é omitida
+    lista=""
+    for d in "$PASTA"/sprint-*; do
+      [ -d "$d" ] || continue
+      # o nome inteiro, e não linha a linha: um nome com quebra de linha não é sprint (CodeAnt no mergex#93)
+      [[ "${d##*/}" =~ ^sprint-[0-9]{2,}$ ]] || continue
+      f="$d/tasks.md"
+      [ -f "$f" ] && [ ! -L "$f" ] && [ -r "$f" ] || ilegivel "${d##*/} sem tasks.md regular e legível: $f"
+      lista="$lista$f
+"
+    done
+    [ -n "$lista" ] || ilegivel "nenhuma sprint-NN com tasks.md em $PASTA"
+    printf 'escopo=trabalho\n'
+    printf '%s' "$lista" | LC_ALL=C sort | sed 's/^/tasks=/'
+    exit 0 ;;
   modo-efetivo)
     if [ "$tem_m" = 1 ]; then printf 'entrega=%s\norigem=registrada\n' "$modo"; exit 0; fi
     v_plano=""
@@ -504,7 +550,7 @@ case "$ACAO" in
     # o modo é registrado uma vez: entrega por_trabalho registrada não abre sprint
     [ "$tem_m" = 0 ] || [ "$modo" = por_sprint ] || recusa "a entrega está registrada como $modo: --abrir-sprint só em por_sprint"
     if [ "$sprint" = "$NN" ]; then
-      [ "$u_estado" != merged ] || recusa "a sprint $NN já está merged: sprint fechada é imutável (defeito vira task da sprint seguinte)"
+      [ "$u_estado" != merged ] || recusa "a sprint $NN já está merged: sprint fechada é imutável (o destino do defeito está em 00-abertura.md: a sprint seguinte enquanto a F6 replaneja, senão OC da runx ou trabalho sucessor)"
       printf 'aberta=%s\nretomada=sim\n' "$NN"; exit 0
     fi
     [ "$p_sprint" = planejamento ] || recusa "a sprint $NN só abre depois do PR de planejamento (prs sem o item de planejamento)"
@@ -514,4 +560,23 @@ case "$ACAO" in
     grava 0 "" "entrega=por_sprint;sprint_atual=$NN;pr_url=null;pr_estado=null;base_validada_sha=$BASE_VALIDADA;origem_base=registrada_sprint;atualizado_em=$hoje" "$NN"
     confere_e_troca "entrega=por_sprint" "sprint_atual=$NN" "atual_estado=null"
     printf 'aberta=%s\nbase_validada_sha=%s\norigem_base=registrada_sprint\n' "$NN" "$BASE_VALIDADA" ;;
+  retomar-planejamento)
+    # Só na entrega por trabalho: na por sprint, quem abre a 01 é o --abrir-sprint
+    [ "$tem_m" = 0 ] || [ "$modo" = por_trabalho ] || recusa "a entrega está registrada como $modo: na entrega por sprint, a primeira sprint abre com --abrir-sprint 01"
+    [ "$p_sprint" = planejamento ] || recusa 'a entrega não tem o item de planejamento em prs: não há planejamento a retomar'
+    [ "$p_estado" = merged ] || recusa 'o merge do PR de planejamento não está registrado: rode o E9, que o lê no serviço e o registra'
+    if [ "$PLANEJAMENTO" != sim ]; then
+      # já retomada (sprint_atual: null): a mesma base é retomada sem gravar; outra é recusa
+      # o valor YAML: sem comentário no fim e sem as aspas (CodeAnt no mergex#93)
+      b_atual="$(printf '%s\n' "$conteudo" | awk -v q="'" '{ sub(/\r$/, "") } NR == 1 { next } /^---/ { exit }
+        /^base_validada_sha:/ { sub(/^base_validada_sha:[[:space:]]*/, ""); sub(/[[:space:]]+#.*$/, ""); sub(/[[:space:]]+$/, "")
+          a = substr($0, 1, 1); z = substr($0, length($0))
+          if (length($0) >= 2 && a == z && (a == "\"" || a == q)) $0 = substr($0, 2, length($0) - 2)
+          print; exit }')"
+      [ "$b_atual" = "$BASE_VALIDADA" ] || recusa "a retomada do planejamento já está gravada com outra base ($b_atual)"
+      printf 'retomada=sim\nbase_validada_sha=%s\n' "$BASE_VALIDADA"; exit 0
+    fi
+    grava 0 "" "entrega=por_trabalho;sprint_atual=null;pr_url=null;pr_estado=null;base_validada_sha=$BASE_VALIDADA;origem_base=registrada_sprint;atualizado_em=$hoje" ''
+    confere_e_troca "planejamento=nao" "entrega=por_trabalho" "sprint_atual=null"
+    printf 'retomada=nao\nbase_validada_sha=%s\norigem_base=registrada_sprint\n' "$BASE_VALIDADA" ;;
 esac

@@ -72,13 +72,43 @@ Saída 2 (entrega ilegível ou incoerente): o E2 não emite `PRONTO`; relate o m
 
 Com `planejamento=nao`, o portão é o de sempre.
 
+## O escopo das tasks
+
+*DM-328 (conselhos, onda 2).* O portão cobra as tasks **do PR que vai abrir**, nunca as de uma
+sprint que ainda não começou. Na entrega `por_sprint`, o PR é o da sprint que o E0 abriu
+(`sprint_atual`); as sprints seguintes estão pendentes por desenho, e exigi-las concluídas
+tornaria impossível o PR de qualquer sprint intermediária. Quem diz o escopo é o leitor único da
+entrega, nunca a releitura do plano:
+
+```bash
+# O escopo das tasks do portão (V1, V2, V3, V7, V11 e V12) e dos E3–E5 (DM-328)
+pasta="docs/sprintx/features/<slug>"   # a pasta do trabalho que o E0 encontrou
+escopo="$(bash .claude/skills/mergex/scripts/entrega-de-planejamento.sh --escopo-de-tasks \
+  --pasta "$pasta" --entrega docs/entregas/<trabalho_id>/ENTREGA.md)" \
+  || { printf 'mergex E2: escopo das tasks ilegível (motivo acima)\n' >&2; exit 2; }
+tasks_do_escopo="$(printf '%s\n' "$escopo" | sed -n 's/^tasks=//p')"
+```
+
+| Primeira linha | O escopo |
+|---|---|
+| `escopo=sprint:NN` | só `sprint-NN/tasks.md`: a sprint do PR, numa entrega `por_sprint` |
+| `escopo=trabalho` | toda `sprint-NN/tasks.md` da pasta, em ordem: entrega `por_trabalho` (ou anterior às chaves) |
+| `escopo=planejamento` | nenhuma task: o PR de planejamento (V1, V2, V3, V11 e V12 ficam `n/a`, seção acima) |
+
+Saída 2 (sprint sem `tasks.md` regular, pasta inexistente, `por_sprint` sem sprint aberta): V1,
+V2, V3, V11 e V12 são `vN_sem_prova`, com o motivo. Nenhuma sprint é omitida em silêncio.
+
+**V1, V2, V3, V7, V11 e V12 olham só `$tasks_do_escopo`.** A **V9 não**: ela pergunta se o
+arquivo foi planejado em qualquer task do trabalho, e continua na união de todas (seção da V9).
+Na sprintx no formato antigo, `pasta` é `docs/<slug>`; na runx, `docs/manutencao/<OC-ID>-<slug>`.
+
 ## As doze verificações
 
 Rode **todas**, sempre, mesmo depois de a primeira falhar. O usuário precisa da lista completa do que falta, não do primeiro erro. Verificação que não se aplica ao trabalho é marcada `n/a`, nunca omitida.
 
 ### V1 — Task com status diferente de `concluida`
 
-Leia o frontmatter de todo `sprint-NN/tasks.md` do trabalho. Toda task tem que estar `concluida`.
+Leia o frontmatter de cada `tasks.md` do escopo (`$tasks_do_escopo`, "O escopo das tasks"). Toda task dele tem que estar `concluida`. Na entrega `por_sprint`, a task de uma sprint seguinte, ainda `pendente`, está fora do escopo e não barra.
 
 **Os dois formatos de sprint da sprintx valem em V1, V2, V3, V9, V11 e V12.** As tasks vêm sempre da chave `tasks`, no `kind: plano` (condensado) e no `kind: tasks` (três arquivos) — regra única em `references/integracao/sprintx.md`, "Como ler uma sprint da sprintx". O formato nunca muda quais campos existem nem quanto rigor se cobra.
 
@@ -86,7 +116,7 @@ Falha: qualquer task em `pendente`, `em_andamento` ou `bloqueada`. Nomeie cada u
 
 ### V2 — Task concluída sem registro de suíte que a sustente
 
-Para cada task `concluida`, leia o campo `suite`:
+Para cada task `concluida` do escopo, leia o campo `suite`:
 
 | Valor | Resultado |
 |---|---|
@@ -99,7 +129,7 @@ Para cada task `concluida`, leia o campo `suite`:
 
 `vermelha` e `nao_executada` são FALHA. Nomeie a task.
 
-**O trabalho inteiro continua precisando da suíte inteira.** Além do registro por task, procure a **evidência da suíte inteira no fechamento de cada sprint**, onde a skill de origem a registra, com a saída da execução colada. **Onde procurar depende do formato da sprint:**
+**O trabalho inteiro continua precisando da suíte inteira.** Além do registro por task, procure a **evidência da suíte inteira no fechamento de cada sprint do escopo** (na entrega `por_sprint`, a da sprint do PR), onde a skill de origem a registra, com a saída da execução colada. **Onde procurar depende do formato da sprint:**
 
 | Formato | Onde está o fechamento da sprint |
 |---|---|
@@ -118,7 +148,7 @@ Para cada task `concluida`, leia o campo `suite`:
 
 ### V3 — Task sem teste de integração ou sem teste funcional
 
-Para cada task, `teste_integracao` e `teste_funcional` têm que existir e não estar vazios.
+Para cada task do escopo, `teste_integracao` e `teste_funcional` têm que existir e não estar vazios.
 
 Falha: campo ausente, vazio, ou preenchido com marcador de template (`{{...}}`, `TODO`, `NÃO DETERMINADO`). Nomeie a task e o campo.
 
@@ -154,7 +184,7 @@ Arquivo ausente: aviso, não bloqueio — a execução pode ter vindo de um flux
 
 Leia os bloqueios na pasta do trabalho: `docs/sprintx/features/<slug>/00-BLOQUEIOS.md` (canônico) ou `docs/<slug>/00-BLOQUEIOS.md` (formato antigo) na sprintx; `BLOQUEIOS.md` na runx.
 
-Falha: bloqueio com `resolvido_em: null` cuja `task` está dentro do escopo entregue. Nomeie o `B-NN`, a task e a descrição.
+Falha: bloqueio com `resolvido_em: null` cuja `task` está dentro do escopo entregue (uma task de `$tasks_do_escopo`). Nomeie o `B-NN`, a task e a descrição.
 
 Bloqueio resolvido, ou aberto sobre task fora do escopo entregue: não barra, mas entra como aviso na saída.
 
@@ -239,7 +269,7 @@ Para cada task marcada `concluida` no plano executado, tem que existir **pelo me
 ```
 bash .claude/skills/mergex/scripts/prova-de-commit.sh --verificar \
   docs/entregas/<trabalho_id>/ENTREGA.md \
-  docs/sprintx/features/<slug>/sprint-*/tasks.md
+  $tasks_do_escopo
 ```
 
 Falha: qualquer task `concluida` sem item que a prove. **Nomeie cada uma** (id e o `tasks.md` onde está). A saída do script é a lista, uma task por linha.
@@ -266,7 +296,7 @@ Na recuperação, essas provas adicionais pertencem ao escritor `--registrar-exi
 
 **Os dois formatos de sprint da sprintx valem aqui**, como em V1, V2, V3 e V9: as tasks vêm sempre da chave `tasks` (`references/integracao/sprintx.md`, "Como ler uma sprint da sprintx").
 
-**Vale nas duas origens.** A V11 não lê pasta: ela recebe o `ENTREGA.md` e os `tasks.md` do trabalho. Na runx, são os de `docs/manutencao/<OC-ID>-<slug>/sprint-*/tasks.md`. A regra e o resultado são os mesmos.
+**Vale nas duas origens.** A V11 não lê pasta: ela recebe o `ENTREGA.md` e os `tasks.md` do escopo. Na runx, o escopo sai da pasta `docs/manutencao/<OC-ID>-<slug>` (a entrega da runx é `por_trabalho`: todas as `sprint-NN`). A regra e o resultado são os mesmos.
 
 **Leitura histórica × entrega nova.** Uma `ENTREGA.md` anterior a este contrato pode ter task concluída sem o item correspondente. Ler esse snapshot continua possível. Numa entrega nova a inconsistência barra. Se nenhum commit de produto existe, faça o E1 tardio normal; se o commit já existe e só o registro falhou, use `fechamento-do-e1.sh --registrar-existente` com o SHA completo. Nunca crie um segundo commit para recuperar apenas o registro.
 
@@ -279,10 +309,10 @@ A revisão por task (contrato `expx-revisao` v2 do expxdev) grava, antes do comm
 ```
 bash .claude/skills/mergex/scripts/portao-v12.sh --verificar \
   --entrega docs/entregas/<trabalho_id>/ENTREGA.md --trabalho <trabalho_id> \
-  -- docs/sprintx/features/<slug>/sprint-*/tasks.md
+  -- $tasks_do_escopo
 ```
 
-Os `tasks.md` são os do trabalho, os mesmos da V11, da pasta que o E0 encontrou: na sprintx, `docs/sprintx/features/<slug>/sprint-*/tasks.md` (canônico) ou `docs/<slug>/sprint-*/tasks.md` (formato antigo); na runx, `docs/manutencao/<OC-ID>-<slug>/sprint-*/tasks.md`. Um caminho que não existe não é ignorado: o script sai `V12=SEM_PROVA` (`plano-ilegivel`).
+Os `tasks.md` são os do escopo, os mesmos da V11 ("O escopo das tasks", com a pasta que o E0 encontrou: na sprintx, `docs/sprintx/features/<slug>` (canônico) ou `docs/<slug>` (formato antigo); na runx, `docs/manutencao/<OC-ID>-<slug>`). Um caminho que não existe não é ignorado: o script sai `V12=SEM_PROVA` (`plano-ilegivel`).
 
 O script não decide a regra: ele pergunta ao `conferir` do núcleo do expx instalado (`expx-revisao.mjs conferir --trabalho <trabalho_id> --modo <modo> --task <T>=<commit>…`), com o commit do **último** item de cada task `concluida` em `ENTREGA.commits`, e traduz a resposta (DM-238). A primeira linha é sempre `V12=OK|AVISO|FALHA|SEM_PROVA|n/a`; depois vêm as linhas do `conferir` como vieram (`T-NN.MM ok`, `T-NN.MM AVISO <motivo>`, `T-NN.MM FALHA <motivo>`) ou `motivo=`. Códigos: 0 (OK, AVISO, `n/a`), 1 (FALHA), 2 (SEM_PROVA), 64 (uso).
 
