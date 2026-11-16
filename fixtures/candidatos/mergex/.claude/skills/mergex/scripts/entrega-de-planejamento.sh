@@ -278,7 +278,8 @@ nome_pr() { case "$1" in planejamento) printf 'o PR de planejamento' ;; *) print
 proxima() { printf '%02d' "$((10#$1 + 1))"; }
 
 # Todo item: enums; o de planejamento só na primeira posição; as sprints em
-# sequência (01, 02, ...), depois do planejamento; todo item antes do último merged.
+# sequência (01, 02, ...), depois do planejamento quando ele existe (o PR de
+# planejamento é opcional no por_sprint, DM-330); todo item antes do último merged.
 p_sprint=""; p_url=""; p_estado=""; p_sha=""; p_merge=""; p_base=""
 u_pos=0; u_sprint=""; u_estado=""; u_sha=""; u_base=""; u_merge=""; u_url=""
 a_pos=0; a_sprint=""; a_estado=""; a_sha=""; a_base=""; a_merge=""
@@ -292,7 +293,6 @@ while IFS="$TAB" read -r _ pos s_item url_item estado sha merge base; do
   case "$s_item" in
     planejamento) [ "$pos" = 1 ] || ilegivel "o item de planejamento está na posição $pos de prs (só a primeira)" ;;
     [0-9][0-9])
-      [ "$p_sprint" = planejamento ] || ilegivel "item de sprint $s_item sem o item de planejamento no início de prs"
       esperado="$(proxima "${ultima_nn:-00}")"
       [ "$s_item" = "$esperado" ] || ilegivel "sprint $s_item fora de sequência no item $pos de prs (esperada $esperado)"
       ultima_nn="$s_item" ;;
@@ -366,6 +366,15 @@ case "$ACAO" in
   escopo-de-tasks)
     [ -d "$PASTA" ] || ilegivel "pasta do trabalho inexistente: $PASTA"
     PASTA="${PASTA%/}"
+    # a pasta, ou um ancestral dela, que é link para fora da raiz traria tasks de outro lugar
+    # para o escopo do portão: o caminho real tem de ficar dentro da raiz (CodeAnt no login#95)
+    raiz_e="$(git rev-parse --show-toplevel 2>/dev/null)" || raiz_e=.
+    raiz_e="$(cd "$raiz_e" 2>/dev/null && pwd -P)" || ilegivel 'raiz do repositório ilegível'
+    real_p="$(cd "$PASTA" 2>/dev/null && pwd -P)" || ilegivel "pasta do trabalho ilegível: $PASTA"
+    case "$real_p" in
+      "$raiz_e"|"$raiz_e"/*) ;;
+      *) ilegivel "a pasta do trabalho resolve para fora da raiz do repositório (link simbólico nela ou num ancestral): $PASTA" ;;
+    esac
     if [ "$PLANEJAMENTO" = sim ]; then printf 'escopo=planejamento\n'; exit 0; fi
     case "$sprint" in
       [0-9][0-9])
@@ -557,9 +566,21 @@ case "$ACAO" in
       [ "$u_estado" != merged ] || recusa "a sprint $NN já está merged: sprint fechada é imutável (o destino do defeito está em 00-abertura.md: a sprint seguinte enquanto a F6 replaneja, senão OC da runx ou trabalho sucessor)"
       printf 'aberta=%s\nretomada=sim\n' "$NN"; exit 0
     fi
-    [ "$p_sprint" = planejamento ] || recusa "a sprint $NN só abre depois do PR de planejamento (prs sem o item de planejamento): por_sprint exige o PR de planejamento mergeado antes da sprint 01. Abra-o com a mergex E0 --planejamento, ou grave 'entrega: por_trabalho' no frontmatter do 00-PLANEJAMENTO.md do trabalho e entregue num PR só (00-abertura.md, DM-329)"
     esperado="$(proxima "${ultima_nn:-00}")"
     [ "$NN" = "$esperado" ] || recusa "sprint $NN fora de sequência: a próxima é a $esperado"
+    if [ "$u_pos" = 0 ]; then
+      # sem item nenhum (plano sem PR de planejamento, DM-330): a 01 abre direto e o plano vai no
+      # PR dela. Nada foi mergeado antes, então a base não se reancora: fica a do E0 (registrada_e0),
+      # e a V9 não precisa de merge que justifique uma registrada_sprint
+      b_e0="$(printf '%s\n' "$conteudo" | awk '{ sub(/\r$/, "") } NR == 1 { next } /^---/ { exit }
+        /^base_validada_sha:/ { sub(/^base_validada_sha:[[:space:]]*/, ""); sub(/[[:space:]]+#.*$/, ""); sub(/[[:space:]]+$/, ""); print; exit }')"
+      topo_base=""
+      sha_ok "$b_e0" || { b_e0="$BASE_VALIDADA"; topo_base="base_validada_sha=$b_e0;origem_base=registrada_e0;"; }
+      grava 0 "" "entrega=por_sprint;sprint_atual=$NN;pr_url=null;pr_estado=null;${topo_base}atualizado_em=$hoje" "$NN"
+      confere_e_troca "entrega=por_sprint" "sprint_atual=$NN" "atual_estado=null"
+      printf 'aberta=%s\nbase_validada_sha=%s\norigem_base=registrada_e0\n' "$NN" "$b_e0"
+      exit 0
+    fi
     [ "$u_estado" = merged ] || recusa "$(nome_pr "$u_sprint") não está merged: a sprint $NN só abre depois do merge dele (rode o E9, que o registra)"
     grava 0 "" "entrega=por_sprint;sprint_atual=$NN;pr_url=null;pr_estado=null;base_validada_sha=$BASE_VALIDADA;origem_base=registrada_sprint;atualizado_em=$hoje" "$NN"
     confere_e_troca "entrega=por_sprint" "sprint_atual=$NN" "atual_estado=null"

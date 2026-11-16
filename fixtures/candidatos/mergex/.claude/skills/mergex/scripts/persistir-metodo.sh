@@ -864,8 +864,9 @@ prova_e0_abertura() {
     # Iguais porque não há abertura nenhuma (sem base_validada_sha em HEAD e no disco) não é
     # "abertura já em HEAD": o E0 sempre grava a base que reancora, nos dois modos. Sem ela
     # não há o que persistir, e o ok=true do --verificar era falso (CodeAnt no login#93).
+    # so um OID completo e abertura: vazio, null, ~ (o nulo do YAML) ou outra coisa, nao (CodeAnt no login#95)
     case "$(catalogo_fm "$t/provado.md" base_validada_sha)" in
-      ''|null) rm -rf "$t"; para "e0-abertura: $ENTREGA sem a abertura do E0 (base_validada_sha ausente em HEAD e no disco): nada a persistir; rode o E0 antes" ;;
+      *[!0-9a-f]*|'') rm -rf "$t"; para "e0-abertura: $ENTREGA sem a abertura do E0 (base_validada_sha ausente em HEAD e no disco): nada a persistir; rode o E0 antes" ;;
     esac
     rm -rf "$t"; E9_BLOB=""; E0_NOOP=1
     [ "$MODO" != verificar ] || { printf 'ok=true\n'; exit 0; }

@@ -9,6 +9,15 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.10 — menos burocracia e os achados do login#95
+
+Instale por PR, como a 0.14.9. Só certifica a mergex (AxisGov/mergex#98 e #99, merge 07e4e54, DM-330), a sprintx (AxisGov/sprintx#84 e #85, merge d248ba5, DS-226 e DS-227) e a runx (AxisGov/runx#28 e #29, merge 5ff9d23, DR-121). O CLI, o núcleo de revisão, os eventos, o painel e o `expx sessao` seguem como na 0.14.9, e as outras seis skills, nos mesmos commits.
+
+- **MergeX, o PR de planejamento é opcional no `por_sprint` (DM-330).** Sem ele, a sprint 01 abre com um aviso de uma linha e o plano vai junto no PR dela, na base do E0 (`registrada_e0`); a V9 ancora a sprint 02 no merge da 01. O plano grande continua separado pelo limite do PR no E7 (100 arquivos). Quem usa o PR de planejamento segue igual. Decisão do dono: portão sem incidente real sai.
+- **SprintX e RunX, os hooks de aviso ignoram o que não é do projeto (DS-226, DR-121).** No rastro do conselhos, 85% dos 1.463 avisos eram sobre o scratchpad, `~/.claude`, as cópias e worktrees do Pylot em `.pylot-tmp/` e os rascunhos em `.expxv/`. `tdd-teste-antes`, `escopo-da-task`, `escopo-da-ocorrencia` e `arvore-limpa-antes-da-suite` saem em silêncio em caminho fora da raiz, ignorado pelo Git, em repositório ou worktree aninhado, ou em pasta oculta de topo sem nada versionado (no índice nem em `HEAD`). A RunX também traz a referência ao fork AxisGov e o guarda de proveniência (runx#28).
+- **Os achados do CodeAnt no AxisGov/login#95.** MergeX: o `--escopo-de-tasks` recusa (sai 2) a `--pasta`, ou um ancestral, que é link para fora da raiz; o `e0-abertura` só aceita um OID completo como abertura (o `~` do YAML passava). SprintX: a recusa terminal do `replanejar-execucao` relê os bloqueios sob a trava da F6 e não grava se eles mudaram no intervalo (`motivo=bloqueios_mudaram`), e o `bloqueios.sh registrar`/`resolver` usam a mesma trava (DS-227); o `06-execucao` deixa de citar comandos sem o caminho do script e remete às instruções canônicas.
+- **Não exercitado:** a suíte inteira do hook da mergex nesta máquina (falta de memória). A bancada inteira da sprintx rodou no WSL, igual à main (a única falha, `g-ciclo-completo-sem-expxdev`, já existe lá), e o CI das três skills passou.
+
 ## 0.14.9 — os achados do login#93 e os pedidos do conselhos
 
 Instale por PR, como a 0.14.8. Só certifica a mergex (AxisGov/mergex#95, #96 e #97, merge 1baef95, DM-329) e a sprintx (AxisGov/sprintx#83, merge c0ed278, DS-224 e DS-225). O CLI, o núcleo de revisão, os eventos, o painel e o `expx sessao` seguem como na 0.14.8, e as outras sete skills, nos mesmos commits.

@@ -236,6 +236,16 @@ if [ -n "$mp" ]; then
   M_PLAN="$(g rev-parse --verify -q "$mp^{commit}" 2>/dev/null)" \
     || sem_prova "o merge do planejamento registrado ($mp) não é um commit deste repositório" # guarda:V9PLAN
 fi
+# A âncora da primeira reancoragem: o merge do planejamento, ou, na entrega por sprint sem PR de
+# planejamento (DM-330), o merge do PR da sprint 01 — o primeiro PR fechado de `prs`
+P_ANCORA="$M_PLAN"
+if [ -z "$P_ANCORA" ] && grep -qx 'entrega=por_sprint' <<<"$MARCA_H" && ! grep -q '^pr=planejamento' <<<"$MARCA_H"; then
+  p1="$(printf '%s\n' "$MARCA_H" | awk -F'\t' '/^pr=/ && $2 == "merged" { print $3; exit }')"
+  if [ -n "$p1" ]; then
+    P_ANCORA="$(g rev-parse --verify -q "$p1^{commit}" 2>/dev/null)" \
+      || sem_prova "o merge do PR da sprint 01 registrado ($p1) não é um commit deste repositório" # guarda:V9PLAN
+  fi
+fi
 
 # ---------------------------------------------------------------------------
 # A cadeia de reconciliação: `reconciliacao-base.sh --verificar`, com o
@@ -316,7 +326,7 @@ elif [ -s "$VALORES" ]; then # guarda:V9SHA
     inferida_legado) OB_HEAD=inferida_legado ;;
     registrada_e0|'') OB_HEAD=registrada_e0 ;;
     registrada_sprint)
-      [ -n "$M_PLAN" ] || sem_prova 'origem_base registrada_sprint sem o merge do planejamento registrado na entrega de HEAD' # guarda:V9PLAN
+      [ -n "$P_ANCORA" ] || sem_prova 'origem_base registrada_sprint sem o merge do planejamento (nem, sem planejamento, o da sprint 01) registrado na entrega de HEAD' # guarda:V9PLAN
       OB_HEAD=registrada_sprint ;;
     *) sem_prova "origem_base de HEAD fora de registrada_e0|registrada_sprint|inferida_legado: $(catalogo_fm "$ENTREGA_H" origem_base)" ;;
   esac
@@ -437,8 +447,8 @@ if [ -z "$ULTIMO" ] && [ -s "$VALORES" ] && [ "$ORIGEM_BASE" = registrada_sprint
   awk -F'\t' '$3 != "registrada_sprint" { print $2 }' "$TMP_DIR/versoes-info" | LC_ALL=C sort -u > "$TMP_DIR/distintos"
   n="$(grep -c . "$TMP_DIR/distintos")"
   [ "$n" = 1 ] || sem_prova "as versões de $ENTREGA anteriores à reancoragem têm $n bases ($(tr '\n' ' ' < "$TMP_DIR/distintos")): a base anterior não é uma só" # guarda:V9PLAN
-  g merge-base --is-ancestor "$(sed -n 1p "$TMP_DIR/distintos")" "$M_PLAN" 2>/dev/null \
-    || sem_prova "a base anterior à reancoragem ($(sed -n 1p "$TMP_DIR/distintos")) não é ancestral do merge do planejamento $M_PLAN" # guarda:V9PLAN
+  g merge-base --is-ancestor "$(sed -n 1p "$TMP_DIR/distintos")" "$P_ANCORA" 2>/dev/null \
+    || sem_prova "a base anterior à reancoragem ($(sed -n 1p "$TMP_DIR/distintos")) não é ancestral do merge do planejamento (ou da sprint 01) $P_ANCORA" # guarda:V9PLAN
   # rebaixamento: uma versão de ordem menor (0 antes da reancoragem; r, a da sua
   # base registrada_sprint; 0 também para uma revisão sem a chave) que descende
   # de uma de ordem maior
@@ -545,7 +555,8 @@ done 3< "$TMP_DIR/da-base"
 so_metodo() { # <arquivo -z de caminhos> — o primeiro caminho fora deles, se houver
   tr '\0' '\n' < "$1" | awk '!/^docs\/(sprintx|entregas|eventos)\// && $0 != "" { print; exit }'
 }
-if [ -n "$EXCL" ]; then
+# sem PR de planejamento (DM-330) não há P a conferir: o que ^L desconta são PRs de sprint já revisados
+if [ -n "$EXCL" ] && [ -n "$M_PLAN" ]; then
   { g rev-list --no-merges --full-history "$M_PLAN" -- "$PASTA" "$DIR_E" \
     && g rev-list --no-merges --encoding=UTF-8 --grep="^Trabalho: $TRAB_RE\$" "$M_PLAN"; } > "$TMP_DIR/do-plan" 2>/dev/null \
     || sem_prova "histórico do merge do planejamento $M_PLAN ilegível" # guarda:V9PLAN
