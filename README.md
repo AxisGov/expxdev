@@ -554,23 +554,23 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.14.8 -R AxisGov/expxdev -D ~/expx-cli/v0.14.8 &&
+gh release download v0.14.9 -R AxisGov/expxdev -D ~/expx-cli/v0.14.9 &&
 (
-  cd ~/expx-cli/v0.14.8 || exit 1
+  cd ~/expx-cli/v0.14.9 || exit 1
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.14.8.tgz.sha256
+    sha256sum -c expxdev-0.14.9.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.14.8.tgz.sha256
+    shasum -a 256 -c expxdev-0.14.9.tgz.sha256
   fi
 ) &&
-npm install -g ~/expx-cli/v0.14.8/expxdev-0.14.8.tgz &&
+npm install -g ~/expx-cli/v0.14.9/expxdev-0.14.9.tgz &&
 expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 O `npm install -g` do pacote conferido põe o `expx` no PATH, e é ele que os exemplos deste README
 e das skills usam (`expx init`, `expx update`, `expx doctor`). Para rodar uma vez, sem instalar,
 troque as duas últimas linhas por
-`npx --yes --package ~/expx-cli/v0.14.8/expxdev-0.14.8.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes`.
+`npx --yes --package ~/expx-cli/v0.14.9/expxdev-0.14.9.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes`.
 Atualizar o CLI é baixar a release nova e repetir o `npm install -g`.
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -584,7 +584,7 @@ Atualizar o CLI é baixar a release nova e repetir o `npm install -g`.
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.14.8 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.14.9 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -747,6 +747,10 @@ Atualizar o CLI é baixar a release nova e repetir o `npm install -g`.
   publicou, tira do CLI e das skills o `npx` do pacote `expxdev` (o do npm é do upstream), e certifica a MergeX (escopo do
   portão por sprint e checkpoint `e0-abertura`), a SprintX (o teto da F6 não se amplia) e a BuildX
   (conselhos-municipais, onda 2).
+- `0.14.9` certifica a MergeX com os achados do CodeAnt no login#93 (V11 e V12 no planejamento, link em `sprint-NN`,
+  `e0-abertura` sem abertura, trailers fora do bloco), a parada do E0 com `core.hooksPath` no dispositivo nulo e o
+  aviso do `por_sprint` sem PR de planejamento, e a SprintX com a migração do plano legado no `defeito_de_plano`
+  (conselhos-municipais).
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

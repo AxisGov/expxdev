@@ -158,6 +158,7 @@ Task nem Metodo." >&2
       # a reconciliação o recusará depois. Só aviso (stderr), nos dois modos; as
       # regras de sempre seguem abaixo (DM-328).
       if integracao_fora_do_bloco "$MSG_LIDA"; then
+        AVISOU_INTEGRA=1
         printf '%s\n' "mergex/commit-por-task — aviso: Integra-base fora do bloco final de trailers
 
 O Git só lê como trailer o último parágrafo da mensagem. Com Trabalho/Integra-base
@@ -178,6 +179,27 @@ Q_METODO="$(printf '%s\n' "$TRAILERS_CONTROLE" | grep -Ec '^Metodo:[[:space:]]*'
 TASK_ATUAL="$(printf '%s\n' "$TRAILERS_CONTROLE" | sed -n 's/^Task:[[:space:]]*//p' | awk 'NR == 1')"
 TRABALHO_MENSAGEM="$(printf '%s\n' "$TRAILERS_CONTROLE" | sed -n 's/^Trabalho:[[:space:]]*//p' | awk 'NR == 1')"
 METODO_ATUAL="$(printf '%s\n' "$TRAILERS_CONTROLE" | sed -n 's/^Metodo:[[:space:]]*//p' | awk 'NR == 1')"
+
+# Task, Trabalho ou Metodo escrito como linha, mas fora do último parágrafo: para o
+# Git não é trailer, e o commit segue abaixo como se não tivesse a chave. O
+# contrato-de-commit.sh (fora_do_bloco) recusa depois, no registro; aqui só o aviso
+# antecipado (stderr), nos dois modos, como o do Integra-base (CodeAnt no login#93).
+# Com o Integra-base já avisado, o Trabalho não se repete: aquele aviso já o nomeia.
+FORA_DO_BLOCO=""
+for chave in Task Trabalho Metodo; do
+  [ "$chave" = Trabalho ] && [ "${AVISOU_INTEGRA:-0}" = 1 ] && continue
+  printf '%s\n' "$TRAILERS_CONTROLE" | grep -E "^$chave:" >/dev/null && continue
+  printf '%s\n' "$MSG" | grep -E "^$chave:[[:space:]]*[^[:space:]]" >/dev/null || continue
+  FORA_DO_BLOCO="$FORA_DO_BLOCO $chave"
+done
+if [ -n "$FORA_DO_BLOCO" ]; then
+  printf '%s\n' "mergex/commit-por-task — aviso:$FORA_DO_BLOCO fora do bloco final de trailers
+
+O Git só lê como trailer o último parágrafo da mensagem. Com estas chaves num
+parágrafo e o Co-Authored-By noutro, o commit fica sem elas, e o registro do E1
+(contrato-de-commit.sh) vai recusá-lo. Ponha Task, Trabalho ou Metodo no mesmo
+último parágrafo do Co-Authored-By, sem linha em branco entre eles." >&2
+fi
 
 if [ "$Q_TASK" -gt 0 ] || [ "$Q_METODO" -gt 0 ]; then
   [ -r "$CONTRATO_COMMIT" ] || {

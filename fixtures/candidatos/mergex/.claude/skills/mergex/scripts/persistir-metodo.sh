@@ -861,6 +861,12 @@ prova_e0_abertura() {
     rm -rf "$t"; para "$ENTREGA ausente de HEAD: o e0-abertura só persiste a abertura de um ENTREGA.md versionado"
   fi
   if [ "$(abertura_de "$t/ENTREGA.md")" = "$(abertura_de "$t/provado.md")" ]; then
+    # Iguais porque não há abertura nenhuma (sem base_validada_sha em HEAD e no disco) não é
+    # "abertura já em HEAD": o E0 sempre grava a base que reancora, nos dois modos. Sem ela
+    # não há o que persistir, e o ok=true do --verificar era falso (CodeAnt no login#93).
+    case "$(catalogo_fm "$t/provado.md" base_validada_sha)" in
+      ''|null) rm -rf "$t"; para "e0-abertura: $ENTREGA sem a abertura do E0 (base_validada_sha ausente em HEAD e no disco): nada a persistir; rode o E0 antes" ;;
+    esac
     rm -rf "$t"; E9_BLOB=""; E0_NOOP=1
     [ "$MODO" != verificar ] || { printf 'ok=true\n'; exit 0; }
     return 0

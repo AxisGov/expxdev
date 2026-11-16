@@ -2289,6 +2289,28 @@ else
 fi
 echo '{"expx_hooks":1,"hooks":{"commit-por-task":{"modo":"aviso"},"arquivo-fora-do-plano":{"modo":"bloqueio"}}}' > .expx/hooks.json
 caso "Integra-base fora do bloco final, em aviso: nao barra" mergex/commit-por-task.sh "$(bash_json 'git commit -F msg-malformada.txt')" 0
+# Task/Trabalho (E1) e Trabalho/Metodo (método) num parágrafo e Co-Authored-By noutro
+# (CodeAnt no login#93): para o Git não são trailers, e o hook seguia como commit sem
+# chave. Agora avisa antes, nomeando as chaves, e não muda o código de saída.
+printf 'feat: a tarefa\n\nTask: T-01.01\nTrabalho: ft-02\n\nCo-Authored-By: X <x@x>\n' > msg-e1-fora.txt
+printf 'docs(mergex): metodo\n\nTrabalho: ft-02\nMetodo: pre-e2\n\nCo-Authored-By: X <x@x>\n' > msg-metodo-fora.txt
+printf 'feat: a tarefa\n\nTask: T-01.01\nTrabalho: ft-02\nCo-Authored-By: X <x@x>\n' > msg-e1-dentro.txt
+for par in 'msg-e1-fora.txt:Task Trabalho' 'msg-metodo-fora.txt:Trabalho Metodo'; do
+  SAIDA_FORA="$(printf '%s' "$(bash_json "git commit -F ${par%%:*}")" | bash "$H/mergex/commit-por-task.sh" 2>&1 >/dev/null)"
+  if printf '%s' "$SAIDA_FORA" | grep -q "aviso: ${par#*:} fora do bloco final"; then
+    OK=$((OK+1)); printf '  ok    %s\n' "${par#*:} fora do bloco final: o hook avisa nomeando as chaves"
+  else
+    FALHOU=$((FALHOU+1)); printf '  FALHA %s\n' "${par#*:} fora do bloco final: o hook avisa nomeando as chaves"; printf '%s\n' "$SAIDA_FORA" | sed 's/^/        /'
+  fi
+done
+SAIDA_FORA="$(printf '%s' "$(bash_json 'git commit -F msg-e1-dentro.txt')" | bash "$H/mergex/commit-por-task.sh" 2>&1 >/dev/null)"
+if ! printf '%s' "$SAIDA_FORA" | grep -q 'fora do bloco final'; then
+  OK=$((OK+1)); printf '  ok    %s\n' 'Task/Trabalho no bloco final: sem aviso'
+else
+  FALHOU=$((FALHOU+1)); printf '  FALHA %s\n' 'Task/Trabalho no bloco final: sem aviso'; printf '%s\n' "$SAIDA_FORA" | sed 's/^/        /'
+fi
+caso "Task/Trabalho fora do bloco final, em aviso: o aviso nao muda a saida" mergex/commit-por-task.sh "$(bash_json 'git commit -F msg-e1-fora.txt')" 0
+rm -f msg-e1-fora.txt msg-metodo-fora.txt msg-e1-dentro.txt
 echo '{"expx_hooks":1,"hooks":{"commit-por-task":{"modo":"bloqueio"},"arquivo-fora-do-plano":{"modo":"bloqueio"}}}' > .expx/hooks.json
 rm -f msg-malformada.txt
 caso "fora-do-plano não acusa o que veio da base" mergex/arquivo-fora-do-plano.sh "$(bash_json 'git commit -F msg-integracao.txt')" 0

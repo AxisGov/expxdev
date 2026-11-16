@@ -68,6 +68,18 @@ bash .claude/skills/mergex/scripts/ativacao-pre-push.sh --instalar \
   caixa (`c:/users/x` contra `C:/Users/X`) ou nome curto 8.3 podem dar recusa indevida — sempre para
   o lado seguro (código `3` com a instrução) —, e um repositório cuja árvore é o próprio `$HOME`
   (dotfiles) tem qualquer `core.hooksPath` sob `$HOME` como "dentro".
+- **`core.hooksPath` no dispositivo nulo ou inutilizável** (os três modos): quando o diretório de
+  hooks efetivo é `NUL` (qualquer caixa), `/dev/null` (que o Git for Windows devolve como `nul`) ou
+  um caminho que existe e não é diretório, o Git não executa hook nenhum ali e o `pre-push` não pode
+  existir. O script **para com código `3` antes de criar qualquer arquivo ou diretório** — no Git
+  Bash do Windows, criar `<raiz>/NUL` deixaria um diretório literal `NUL` na árvore, que trava `grep`
+  e `find` — e diz como seguir: rodar o E0 e o E2 fora daquele ambiente (num Git Bash comum, por
+  exemplo) ou, se a pessoa quiser, desfazer a configuração com `git config --unset core.hooksPath`
+  (`--global`, `--system` ou `--worktree` quando o valor vem desse escopo). Vindo do ambiente do
+  processo (`git -c`, `GIT_CONFIG_COUNT`), não há arquivo a desfazer: quem abriu o ambiente é quem
+  deixa de defini-lo. `core.hooksPath` nunca é alterado pelo script. Exceção do `--reverter`: um
+  chamador gerenciado que uma versão anterior deixou ali (o `NUL/pre-push` literal) é removido —
+  só o arquivo, com o marcador — e o script sai `0`; o diretório fica, para ser removido à mão.
 - **Já é o chamador gerenciado:** nada muda (idempotente).
 - **Existe um `pre-push` de terceiro:** o E0 nunca o sobrescreve, renomeia ou edita. Quem decide é
   a prova funcional: aprovada, é **integração externa válida** e o E0 segue; reprovada, o script sai

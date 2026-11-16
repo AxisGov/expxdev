@@ -9,6 +9,16 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.9 — os achados do login#93 e os pedidos do conselhos
+
+Instale por PR, como a 0.14.8. Só certifica a mergex (AxisGov/mergex#95, #96 e #97, merge 1baef95, DM-329) e a sprintx (AxisGov/sprintx#83, merge c0ed278, DS-224 e DS-225). O CLI, o núcleo de revisão, os eventos, o painel e o `expx sessao` seguem como na 0.14.8, e as outras sete skills, nos mesmos commits.
+
+- **MergeX, os achados do CodeAnt no AxisGov/login#93.** Na entrega de planejamento (`escopo=planejamento`), a V11 e a V12 dão `n/a` em vez de cobrar commit de task que não existe. No `--escopo-de-tasks`, a pasta `sprint-NN` que é link simbólico torna o escopo ilegível (sai 2). O checkpoint `e0-abertura` sem abertura em HEAD nem no disco recusa, nunca `ok=true`. O hook `commit-por-task` avisa quando `Task`, `Trabalho` ou `Metodo` ficam fora do bloco final de trailers.
+- **MergeX, `core.hooksPath` no dispositivo nulo** (conselhos-municipais, Pylot). Com `NUL`, `/dev/null`, um caminho que não é pasta ou um link quebrado, a `ativacao-pre-push.sh` para (sai 3) antes de criar qualquer coisa, com as saídas: rodar fora desse ambiente ou tirar o `core.hooksPath` com `git config --unset` no nível em que ele está. O `--reverter` remove o `NUL/pre-push` que versões antigas deixavam, e o `/mergex-check` cobra a parada.
+- **MergeX, `por_sprint` sem PR de planejamento (DM-329).** O E0 `--sprint` recusa antes de gravar qualquer coisa quando não há ENTREGA.md ou o `prs` não tem o item de planejamento, e diz as duas saídas: abrir o E0 `--planejamento` ou declarar `entrega: por_trabalho` no `00-PLANEJAMENTO.md`.
+- **SprintX, plano legado no `defeito_de_plano` (DS-224 e DS-225).** Com o plano anterior ao `00-PLANEJAMENTO.md`, o `bloqueios.sh resolver` recusa (código 5) e imprime os comandos exatos da migração, com o caminho entre aspas que a shell não expande, e manda conferir a `fase` antes do `replanejar-execucao`. O próprio `replanejar-execucao` em plano legado recusa sem gravar nada, em vez de gravar o terminal `planejamento_legado`, e não gasta o orçamento da F6.
+- **Não exercitado:** a suíte inteira do hook `.claude/hooks/teste.sh` da mergex e a bancada inteira da sprintx, nesta máquina, que as derruba por falta de memória. Os casos novos do hook e as três partes da bancada que a sprintx#83 toca rodaram no WSL, e o CI das duas skills passou. O `planejamento_legado` que versões antigas já gravaram não tem saída pelo contrato: a mensagem pede decisão humana.
+
 ## 0.14.8 — comandos legados, o fork em primeiro lugar e a entrega por sprint
 
 Instale por PR, como a 0.14.7. Muda o `init` e o `update` (os comandos legados), as mensagens do CLI e do `doctor`, e certifica a mergex (AxisGov/mergex#93 e #94, merge af06b8b, DM-328), a sprintx (AxisGov/sprintx#81 e #82, merge 8154c86, DS-223) e a buildx (AxisGov/buildx#17, merge 235cf01). O núcleo de revisão, os eventos, o painel e o `expx sessao` seguem como na 0.14.7. As outras seis skills seguem nos mesmos commits; os repositórios delas só ganharam o README apontando para o fork e o guarda de proveniência.

@@ -67,7 +67,10 @@ done
 [ "$VERIFICAR" = 1 ] || uso 'falta --verificar'
 [ -n "$ENTREGA" ] || uso 'falta --entrega'
 [ -n "$TRABALHO" ] || uso 'falta --trabalho'
-[ "$#" -ge 1 ] || uso 'nenhum tasks.md informado'
+# Sem tasks.md: uso, salvo na entrega de planejamento, cujo escopo não tem tasks (o bloco do
+# E2 chama a V12 com nada depois do `--`; CodeAnt no login#93). A marca só se lê no HEAD, então
+# a recusa espera por ela; fora de um repositório Git não há marca, e é uso de imediato.
+NTASKS="$#"
 case "$TRABALHO" in [!A-Za-z0-9]*|*[!A-Za-z0-9._-]*) uso "trabalho invalido: $TRABALHO" ;; esac
 
 tmp="$(mktemp -d)" || { printf 'V12=SEM_PROVA\nmotivo=sem-temporario\n'; exit 2; }
@@ -144,6 +147,7 @@ fi
 # entrega: com `versionado: false` a V12 é `n/a` (não há commit de task), senão SEM_PROVA. O Git
 # que falha por outro motivo é sempre SEM_PROVA.
 if ! git -C "$raiz_leitura" rev-parse --git-dir >/dev/null 2>&1; then
+  [ "$NTASKS" -ge 1 ] || uso 'nenhum tasks.md informado'
   cwd_v12="$PWD"
   cd "$raiz_leitura" 2>/dev/null || sem_prova 'raiz-inexistente'
   sem_repositorio_git; rc_sem_git=$?; erro_sem_git="$SEM_GIT_ERRO"
@@ -188,6 +192,7 @@ case "$marca" in
   planejamento=nao*) ;;
   *) repassa; sem_prova 'entrega-de-planejamento-ilegivel' ;;
 esac
+[ "$NTASKS" -ge 1 ] || uso 'nenhum tasks.md informado'
 
 # 3. o modo, pelo leitor do projeto, do mesmo commit da entrega: o HEAD pode ter andado desde o
 # passo 2, e a V12 não decide com dois snapshots.

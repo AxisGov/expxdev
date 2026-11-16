@@ -370,6 +370,7 @@ case "$ACAO" in
     case "$sprint" in
       [0-9][0-9])
         f="$PASTA/sprint-$sprint/tasks.md"
+        [ ! -L "$PASTA/sprint-$sprint" ] || ilegivel "sprint-$sprint é link simbólico: a sprint fica dentro da pasta do trabalho"
         [ -f "$f" ] && [ ! -L "$f" ] && [ -r "$f" ] || ilegivel "sprint_atual $sprint sem tasks.md regular e legível: $f"
         printf 'escopo=sprint:%s\ntasks=%s\n' "$sprint" "$f"; exit 0 ;;
     esac
@@ -377,9 +378,12 @@ case "$ACAO" in
     # o trabalho inteiro: toda pasta sprint-NN, em ordem lexical; nenhuma é omitida
     lista=""
     for d in "$PASTA"/sprint-*; do
-      [ -d "$d" ] || continue
       # o nome inteiro, e não linha a linha: um nome com quebra de linha não é sprint (CodeAnt no mergex#93)
       [[ "${d##*/}" =~ ^sprint-[0-9]{2,}$ ]] || continue
+      # o [ -d ] segue link: uma sprint-NN que aponta para fora traria tasks de outra pasta
+      # para o escopo. Recusa, nunca omite (CodeAnt no login#93)
+      [ ! -L "$d" ] || ilegivel "${d##*/} é link simbólico: a sprint fica dentro da pasta do trabalho"
+      [ -d "$d" ] || continue
       f="$d/tasks.md"
       [ -f "$f" ] && [ ! -L "$f" ] && [ -r "$f" ] || ilegivel "${d##*/} sem tasks.md regular e legível: $f"
       lista="$lista$f
@@ -553,7 +557,7 @@ case "$ACAO" in
       [ "$u_estado" != merged ] || recusa "a sprint $NN já está merged: sprint fechada é imutável (o destino do defeito está em 00-abertura.md: a sprint seguinte enquanto a F6 replaneja, senão OC da runx ou trabalho sucessor)"
       printf 'aberta=%s\nretomada=sim\n' "$NN"; exit 0
     fi
-    [ "$p_sprint" = planejamento ] || recusa "a sprint $NN só abre depois do PR de planejamento (prs sem o item de planejamento)"
+    [ "$p_sprint" = planejamento ] || recusa "a sprint $NN só abre depois do PR de planejamento (prs sem o item de planejamento): por_sprint exige o PR de planejamento mergeado antes da sprint 01. Abra-o com a mergex E0 --planejamento, ou grave 'entrega: por_trabalho' no frontmatter do 00-PLANEJAMENTO.md do trabalho e entregue num PR só (00-abertura.md, DM-329)"
     esperado="$(proxima "${ultima_nn:-00}")"
     [ "$NN" = "$esperado" ] || recusa "sprint $NN fora de sequência: a próxima é a $esperado"
     [ "$u_estado" = merged ] || recusa "$(nome_pr "$u_sprint") não está merged: a sprint $NN só abre depois do merge dele (rode o E9, que o registra)"
