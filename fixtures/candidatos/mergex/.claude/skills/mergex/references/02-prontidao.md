@@ -17,7 +17,7 @@ bash .claude/skills/mergex/scripts/ativacao-pre-push.sh --provar \
   --entrega docs/entregas/<trabalho_id>/ENTREGA.md
 ```
 
-Falhou: **E2 não começa e nada é gravado** — nem `portao`, nem `falhas_portao`. Relate a saída do script e mande rodar o E0 (`ativacao-pre-push.sh --instalar`, que mostra a instrução de composição quando há hook de terceiro). Sem essa prova o E2 não emite `PRONTO`.
+Falhou: **E2 não começa e nada é gravado** — nem `portao`, nem `falhas_portao`. Relate a saída do script e mande rodar o E0 (`ativacao-pre-push.sh --instalar`, que mostra a instrução de composição quando há hook de terceiro). Sem essa prova o E2 não emite `PRONTO`. Se a saída diz que o `core.hooksPath` aponta para o dispositivo nulo (`NUL`, `/dev/null`) ou para um caminho que não é diretório, o E0 também não instala nada ali: relate a mensagem — rodar o E0 e o E2 fora daquele ambiente ou, se a pessoa quiser, o comando de desfazer que a própria mensagem dá (`git config --unset core.hooksPath`, com `--global`, `--system` ou `--worktree` quando o valor vem desse escopo; vindo do ambiente do processo, não há arquivo a desfazer) — e nunca crie o diretório de hooks à mão.
 
 **Fora de um repositório Git** (`git rev-parse --show-toplevel` falha; DM-186): não há push a proteger, e a prova é **dispensada** — não a rode; o `registrar-portao.sh` também a dispensa, grava `portao_sha: null` e emite `PRONTO` normalmente. O critério é só o Git real, **nunca pelo campo `versionado`** do `ENTREGA.md`: dentro de um repositório Git, um `ENTREGA.md` com `versionado: false` continua exigindo a prova.
 
@@ -267,10 +267,15 @@ O E1 commita uma task por vez e registra a prova em `ENTREGA.commits`, um item `
 Para cada task marcada `concluida` no plano executado, tem que existir **pelo menos um** item em `ENTREGA.commits` cujo campo `task` seja **exatamente** o id dessa task, com `commit` preenchido e válido.
 
 ```
-bash .claude/skills/mergex/scripts/prova-de-commit.sh --verificar \
-  docs/entregas/<trabalho_id>/ENTREGA.md \
-  $tasks_do_escopo
+case "$escopo" in
+  escopo=planejamento*) printf 'V11=n/a\nmotivo=planejamento: nenhuma task executada\n' ;;
+  *) bash .claude/skills/mergex/scripts/prova-de-commit.sh --verificar \
+       docs/entregas/<trabalho_id>/ENTREGA.md \
+       $tasks_do_escopo ;;
+esac
 ```
+
+`$escopo` e `$tasks_do_escopo` são os do bloco de "O escopo das tasks". No PR de planejamento a lista vem vazia, e o `prova-de-commit.sh` sem nenhum `tasks.md` responde `V11=SEM_PROVA` (`nenhum-tasks-md-informado`); por isso a guarda vem antes dele, e o resultado é `n/a` (seção "Entrega de planejamento"). Fora do planejamento, lista vazia continua `SEM_PROVA`.
 
 Falha: qualquer task `concluida` sem item que a prove. **Nomeie cada uma** (id e o `tasks.md` onde está). A saída do script é a lista, uma task por linha.
 

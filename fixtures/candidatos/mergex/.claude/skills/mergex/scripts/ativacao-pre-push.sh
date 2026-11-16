@@ -45,6 +45,18 @@
 #   `versionado` do ENTREGA.md — e só a AUSÊNCIA de repositório conta
 #   (sem_repositorio_git, abaixo): outra falha do Git é pré-requisito ausente.
 #
+#   core.hooksPath no dispositivo nulo ou inutilizável (os três modos): quando
+#   o diretório de hooks efetivo é `NUL` (qualquer caixa), `/dev/null` ou um
+#   caminho que existe e não é diretório, o Git não roda hook nenhum ali e o
+#   pre-push não pode existir. O script para com rc 3 ANTES de criar qualquer
+#   arquivo ou diretório (nunca um `NUL` literal na árvore), explica o motivo e
+#   como seguir: rodar o E0 e o E2 fora daquele ambiente ou, se a pessoa
+#   quiser, desfazer a configuração (`git config [--global] --unset`, com o
+#   escopo de onde o valor vem; vindo do ambiente do processo, quem o abriu é
+#   quem deixa de defini-lo). core.hooksPath nunca é alterado. Exceção do
+#   --reverter: um chamador gerenciado que uma versão anterior deixou ali (o
+#   `NUL/pre-push` literal) é removido, só o arquivo com o marcador, e sai 0.
+#
 # --provar (E0 e E2)
 #   Prova por comportamento, nunca por busca textual no hook. Monta, sem tocar
 #   remoto nem ref, um commit solto (`git commit-tree`, índice temporário)
@@ -91,7 +103,8 @@
 #
 # Códigos: 0 ok (inclusive --instalar fora de um repositório Git: nada a
 # instalar); 1 prova reprovada; 3 pré-requisito ausente (hook de terceiro que
-# não passa na prova, diretório de hooks efetivo fora do repositório, modelo
+# não passa na prova, diretório de hooks efetivo fora do repositório,
+# core.hooksPath no dispositivo nulo ou num caminho que não é diretório, modelo
 # ausente, diretório de hooks sem escrita, --provar ou --reverter fora de um
 # repositório Git); 64 uso. Nenhuma opção de força.
 #
@@ -204,6 +217,72 @@ RAIZ="$(git rev-parse --show-toplevel 2>/dev/null)" || {
 HOOKS="$(git -C "$RAIZ" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)/hooks"
 HOOKS="$(git -C "$RAIZ" rev-parse --path-format=absolute --git-path hooks 2>/dev/null)" # guarda:ATVHP
 [ -n "$HOOKS" ] || pre_requisito 'o Git não resolveu o diretório de hooks efetivo'
+
+# hooks_inutilizavel — core.hooksPath aponta para o dispositivo nulo (`NUL` em
+# qualquer caixa, `/dev/null`, que o Git for Windows devolve como `nul`) ou o
+# diretório de hooks efetivo existe e não é um diretório. Ali o Git não roda
+# hook nenhum e o pre-push não pode existir: os três modos param com rc 3
+# ANTES de criar qualquer arquivo ou diretório. No Git Bash do Windows o
+# `mkdir -p` de <raiz>/NUL cria um diretório literal `NUL`, que trava grep e
+# find; por isso a parada vem antes de tudo. Lê o valor cru (`--git-path
+# hooks` sem forma absoluta) e o resolvido; um diretório que se chame `nul`
+# num sistema POSIX também para (no Windows ele não pode existir). Bash 3.2.
+HOOKS_CRU="$(git -C "$RAIZ" rev-parse --git-path hooks 2>/dev/null)"
+hooks_inutilizavel() {
+  local c b
+  HOOKS_MOTIVO=""
+  for c in "$HOOKS_CRU" "$HOOKS"; do
+    b="${c%/}"; b="${b##*/}"
+    if [ "$c" = /dev/null ] || [ "$(printf '%s' "$b" | tr '[:upper:]' '[:lower:]')" = nul ]; then
+      HOOKS_MOTIVO="o core.hooksPath aponta para o dispositivo nulo (diretório de hooks efetivo: ${HOOKS_CRU:-$HOOKS}): ali o Git não executa hook nenhum"
+      return 0
+    fi
+  done
+  # o caminho como configurado (o cru, relativo à raiz) e o resolvido: a forma
+  # absoluta do Git já resolve links simbólicos, então um link quebrado só
+  # aparece no cru. Um link quebrado ocupa o caminho (`-e` segue o link; `-L`
+  # não) e não é diretório.
+  case "$HOOKS_CRU" in
+    /*|[A-Za-z]:/*) c="$HOOKS_CRU" ;;
+    *) c="$RAIZ/$HOOKS_CRU" ;;
+  esac
+  for c in "$c" "$HOOKS"; do
+    if { [ -e "$c" ] || [ -L "$c" ]; } && [ ! -d "$c" ]; then
+      HOOKS_MOTIVO="o diretório de hooks efetivo $c (core.hooksPath) existe e não é um diretório: ali o Git não executa hook nenhum"
+      return 0
+    fi
+  done
+  return 1
+}
+# A chave fica numa variável para que a linha da instrução não se pareça com
+# uma escrita de configuração: o validador do contrato barra qualquer linha de
+# código com `config ... core.hooksPath` (o E0 nunca escreve a chave).
+CHAVE_HOOKS='core.hooksPath'
+HOOKS_MOTIVO=""
+if hooks_inutilizavel; then # guarda:ATVNUL
+  # --reverter diante de um chamador gerenciado que uma versão anterior deixou
+  # ali (o `NUL/pre-push` literal): remove só o arquivo, que tem o marcador, e
+  # sai 0; o diretório fica, porque o script não o criou nesta execução e um
+  # `NUL` literal no Windows só sai à mão. Nada é criado.
+  if [ "$MODO" = reverter ] && [ -f "$HOOKS/pre-push" ] && [ ! -L "$HOOKS/pre-push" ] \
+    && grep -Fxq -- "$MARCADOR" "$HOOKS/pre-push" 2>/dev/null; then
+    rm -f "$HOOKS/pre-push" || pre_requisito "não foi possível remover $HOOKS/pre-push"
+    diz "chamador gerenciado removido de $HOOKS/pre-push ($HOOKS_MOTIVO); o diretório $HOOKS não foi removido: se ele é um \`NUL\` literal criado por engano, remova-o à mão"
+    exit 0
+  fi
+  # o escopo de onde vem o valor efetivo (o último lido pelo Git), para a
+  # instrução de desfazer apontar o arquivo certo
+  ESCOPO="$(git -C "$RAIZ" config --show-scope --get "$CHAVE_HOOKS" 2>/dev/null | cut -f1)"
+  case "$ESCOPO" in
+    command) DESFAZER="o valor vem do ambiente deste processo (\`git -c\`, GIT_CONFIG_COUNT ou GIT_CONFIG_PARAMETERS), não de um arquivo de configuração: quem abriu este ambiente é quem pode deixar de defini-lo" ;;
+    global|system|worktree) DESFAZER="se quiser, desfaça a configuração com \`git config --$ESCOPO --unset $CHAVE_HOOKS\` e rode o E0 de novo" ;;
+    *) DESFAZER="se quiser, desfaça a configuração com \`git config --unset $CHAVE_HOOKS\` e rode o E0 de novo" ;;
+  esac
+  [ "$MODO" != instalar ] || erro "mergex E0 BLOQUEADO — pre-push: $HOOKS_MOTIVO"
+  erro "$HOOKS_MOTIVO. O pre-push da MergeX não pode ser instalado nem provado neste ambiente. Nada foi criado (nenhum arquivo, nenhum diretório) e $CHAVE_HOOKS não foi alterado."
+  erro "Como seguir: (1) rode o E0 e o E2 fora deste ambiente, num terminal em que $CHAVE_HOOKS não aponte para o dispositivo nulo (um Git Bash comum, por exemplo); ou (2) $DESFAZER."
+  exit 3
+fi
 HOOK="$HOOKS/pre-push"
 COMUM="$(git -C "$RAIZ" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
 [ -n "$COMUM" ] || pre_requisito 'o Git não resolveu o diretório Git comum'

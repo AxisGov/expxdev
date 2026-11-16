@@ -122,6 +122,11 @@ Vale em `por_sprint` e em `por_trabalho` (DM-259). Com o plano aprovado na F5:
    retomada que volta `sprint_atual` a `null` (`references/00-abertura.md`, "Retomada depois do PR
    de planejamento"). Nada de código entra antes disso.
 
+**Plano feito fora da F5** (sem o PR de planejamento): `por_sprint` não entrega sem ele. O E0
+`--sprint 01` recusa logo, antes de qualquer escrita, e diz as duas saídas: abrir o PR de
+planejamento (passos 1 a 5 acima) ou gravar `entrega: por_trabalho` no frontmatter do
+`00-PLANEJAMENTO.md` e entregar o trabalho num PR só, sem `--sprint` (DM-329).
+
 ### E0 — no início da F6
 
 A F6 começa lendo o `ORQUESTRADOR.md` e retomando o estado das tasks. A mergex roda **depois dessa
