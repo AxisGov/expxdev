@@ -858,7 +858,26 @@ prova_e0_abertura() {
     && E9_BLOB="$(git -C "$RAIZ" hash-object --path="$ENTREGA" -- "$t/provado.md" 2>/dev/null)" && [ -n "$E9_BLOB" ] \
     || { rm -rf "$t"; para "não foi possível copiar $ENTREGA para a prova do e0-abertura"; }
   if ! git -C "$RAIZ" cat-file --filters "HEAD:$ENTREGA" > "$t/ENTREGA.md" 2>/dev/null; then
-    rm -rf "$t"; para "$ENTREGA ausente de HEAD: o e0-abertura só persiste a abertura de um ENTREGA.md versionado"
+    # DM-332: no por_sprint sem PR de planejamento (DM-330), o E0 cria o ENTREGA.md pelo caso 1
+    # (sprint_atual: null, prs: []) e logo abre a sprint 01, sem commit no meio: o arquivo ainda
+    # não está em HEAD (CodeAnt no conselhos-municipais#346). A base da prova é então o caso 1
+    # refeito do próprio disco, e a prova exige que o --abrir-sprint 01 sobre ela dê o do disco.
+    # Só o arquivo novo, fora do índice, e só a sprint 01: qualquer outro ausente de HEAD recusa.
+    if git -C "$RAIZ" ls-files --error-unmatch -- "$ENTREGA" >/dev/null 2>&1 \
+      || [ "$(catalogo_fm "$t/provado.md" sprint_atual)" != 01 ]; then
+      rm -rf "$t"; para "$ENTREGA ausente de HEAD: o e0-abertura só persiste a abertura de um ENTREGA.md versionado, ou a da sprint 01 num ENTREGA.md novo, fora do índice"
+    fi
+    # o caso 1: no frontmatter, sprint_atual: null e prs: [] (os itens indentados saem)
+    awk '
+      { cr = ""; if (sub(/\r$/, "")) cr = "\r" }
+      NR == 1 || fm == 1 { if ($0 == "---") fm++ }
+      fm == 1 && pulando && /^  / { next }
+      { pulando = 0 }
+      fm == 1 && /^sprint_atual: / { print "sprint_atual: null" cr; next }
+      fm == 1 && /^prs:/ { print "prs: []" cr; pulando = 1; next }
+      { print $0 cr }
+    ' "$t/provado.md" > "$t/ENTREGA.md" \
+      || { rm -rf "$t"; para "não foi possível refazer o caso 1 de $ENTREGA para a prova do e0-abertura"; }
   fi
   if [ "$(abertura_de "$t/ENTREGA.md")" = "$(abertura_de "$t/provado.md")" ]; then
     # Iguais porque não há abertura nenhuma (sem base_validada_sha em HEAD e no disco) não é

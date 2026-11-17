@@ -124,8 +124,11 @@ Vale em `por_sprint` e em `por_trabalho` (DM-259). Com o plano aprovado na F5:
 
 **Plano feito fora da F5** (sem o PR de planejamento): o PR de planejamento é opcional no
 `por_sprint` (DM-330). O E0 `--sprint 01` abre a sprint direto, com um aviso de uma linha, e o
-plano vai junto no PR da sprint 01. Se o plano e a sprint passarem dos 100 arquivos (L3), o E7 não
-abre o PR, e o plano vai num PR de planejamento (passos 1 a 5 acima).
+plano vai junto no PR da sprint 01. A escolha é feita **antes** do E0 `--sprint 01`: se o plano e
+a sprint 01 vão passar dos 100 arquivos (L3), abra o PR de planejamento primeiro (passos 1 a 5
+acima). Depois que a sprint tem commits, o `--planejamento` do E7 recusa (`ENTREGA.commits` não
+vazio) e o plano já não sai sozinho: o PR acima do L3 fica parado no E7 e a divisão é decisão
+humana.
 
 ### E0 — no início da F6
 

@@ -232,8 +232,10 @@ hooks_inutilizavel() {
   local c b
   HOOKS_MOTIVO=""
   for c in "$HOOKS_CRU" "$HOOKS"; do
-    b="${c%/}"; b="${b##*/}"
-    if [ "$c" = /dev/null ] || [ "$(printf '%s' "$b" | tr '[:upper:]' '[:lower:]')" = nul ]; then
+    # qualquer componente `nul`, não só o último: `NUL/hooks` também cria o `NUL` literal no
+    # Git Bash (CodeAnt no conselhos-municipais#346)
+    b="/$(printf '%s' "$c" | tr '\\' '/' | tr '[:upper:]' '[:lower:]')/"
+    if [ "$c" = /dev/null ] || case "$b" in */nul/*) true ;; *) false ;; esac; then
       HOOKS_MOTIVO="o core.hooksPath aponta para o dispositivo nulo (diretório de hooks efetivo: ${HOOKS_CRU:-$HOOKS}): ali o Git não executa hook nenhum"
       return 0
     fi

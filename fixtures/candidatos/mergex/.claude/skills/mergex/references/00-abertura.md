@@ -300,7 +300,10 @@ bash .claude/skills/mergex/scripts/persistir-metodo.sh --persistir \
 O commit leva só o `ENTREGA.md`, com `Metodo: e0-abertura`. A prova refaz a gravação sobre o
 `ENTREGA.md` de `HEAD` (`--abrir-sprint <NN>` ou `--retomar-planejamento`, com a base que o disco
 traz) e exige o resultado do disco, salvo a data de `atualizado_em`; qualquer outra mudança no
-arquivo recusa, sem commit. Com a abertura já em `HEAD` (a retomada da mesma sprint, ou o E0
+arquivo recusa, sem commit. No `por_sprint` sem PR de planejamento, o `ENTREGA.md` que o caso 1
+acabou de criar ainda não está em `HEAD`: a prova parte do caso 1 refeito do disco (`sprint_atual:
+null`, `prs: []`), refaz o `--abrir-sprint 01` e commita o arquivo inteiro (DM-332). Fora disso,
+`ENTREGA.md` ausente de `HEAD` recusa. Com a abertura já em `HEAD` (a retomada da mesma sprint, ou o E0
 repetido), sai `noop=true`, sem commit, mesmo com o `ENTREGA.md` sujo dos appends do E1. Sem
 abertura nenhuma (`base_validada_sha` ausente em `HEAD` e no disco), não há o que persistir: recusa,
 nos dois modos, e o `--verificar` nunca diz `ok=true`. Não exige a árvore limpa: os artefatos da F5
