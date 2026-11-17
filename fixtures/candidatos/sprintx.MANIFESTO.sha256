@@ -11,7 +11,7 @@ fcfde3bb2782b961aacb22b337c445cac654655f01c20ff6d51b7666c1756298  .claude/comman
 1aafd41d2fe7a6b9d638d254ec24597c162cbbb70c3eda4a268b4d470eb39205  .claude/commands/sprintx.md
 0a331e610b5cf60a364736e6487d8b0c40f18f03a5e99d34c65efdb911d763d3  .claude/hooks/comum/rastro-post.sh
 28e2a6d376da6e6ca964a7b9b27030dbc958be89b1b4e5d78493eba3e7d82925  .claude/hooks/comum/rastro-subagente.sh
-3c91b6358a2d4d25a579bd231e1b6f4142ef33759b6bf9ed2be21246498fb7b8  .claude/hooks/comum/rastro.sh
+e569a0f0104a9dcd336126a7fd1a88111a2d7957e8a868f293cfa497d05858dd  .claude/hooks/comum/rastro.sh
 5f765932b77771df0c9a0678b3a7664d99dc53251f0524843a98a83aa426269c  .claude/hooks/comum/segredo.sh
 738cff0b43985d074db4dc7fad7c87e776f5831400ce4bed4ec884d09470a55e  .claude/hooks/doctor.sh
 381260a3e8a485d63a8bcb181c4dd1cb1a0a833fe9ca4f7c72ee26c2cf501d5f  .claude/hooks/sprintx/arvore-limpa-antes-da-suite.sh
@@ -41,7 +41,7 @@ dfd202849b6170629dcb4a223981131173a3fc43e4382e325c0df839fd02bf67  .claude/hooks/
 d9370952ede36c379751835d4a711550bd37b95c16f127d841883a49e962d2a5  .claude/hooks/testes/fonte.sh
 00dc2c2d5319710f73f5f54616c5b652aa3f99879f8c75444c8002abeeb13483  .claude/hooks/testes/transcrito-agente.sh
 0354c304ed52b1d41becc8df83b36f4a3bf0b3543316bf0e569347ca719fe43d  .claude/settings.json
-28822c780248fb784eb93e3d931743cff6dde21ffb77cc3073e5e2d7bc0ad4b4  .claude/skills/sprintx/DECISOES-DA-SKILL.md
+c4be1e48953c5ff67f09fa39a70f2941b4afb4416a2f5370762d2c4edf808cc8  .claude/skills/sprintx/DECISOES-DA-SKILL.md
 41b9e375f12ec4b5fbb15015a2029227744e0761689f12cec2cb91fd7f11033f  .claude/skills/sprintx/SKILL.md
 296b12dd80970ea12c8ac42de6de82a7f34b98e257587d139c8db8d7a4041343  .claude/skills/sprintx/assets/TEMPLATE-BLOQUEIOS.md
 87e9ed363f1a083e60fc37d2c48cb3315513a3a47950858dd445d8d5bc780de3  .claude/skills/sprintx/assets/TEMPLATE-DECISOES.md
@@ -72,9 +72,9 @@ ddad9ed6cc45e9ddb885698d7f49cf45898c21deb70f6686993fc85f47982040  .claude/skills
 93b99115ee2a1fe966529bacdb97aa3df9429399d72290a2d982f7d6d5f6498d  .claude/skills/sprintx/scripts/bloqueios.sh
 a85f685e523ba0324e1956eff60486005afb7904943036b97faa1ff01c24ad54  .claude/skills/sprintx/scripts/caminho-git.sh
 d9b53506df9a6f69070ed39584b72d5bf5cc01bc225c2a65f168ce1cdf8f4829  .claude/skills/sprintx/scripts/lib/execucao.sh
-8d5971090a906922b243aa66cd63ffde34cebd667267ab0a1e74cdb91c51c1a3  .claude/skills/sprintx/scripts/lib/trava-autorizacao-f6.sh
+d9d991f37cbd4dfc046ee333fb84f658142d23291c7bef51e83a366cbe246689  .claude/skills/sprintx/scripts/lib/trava-autorizacao-f6.sh
 60fdf40452b4e4b482314f701a631c94c222f884fb0c0d666c3736acff8d522e  .claude/skills/sprintx/scripts/planejamento.sh
-74ba8a7cfe27191a4deacc23ce1cec0a731ac0b4e4973b22e4f815671d4d614f  .claude/skills/sprintx/scripts/predecessores.sh
+a4c69986124b1002692301d6ef66901e58538f1523c6b6385977bf06fbb91d1e  .claude/skills/sprintx/scripts/predecessores.sh
 4337608894dffc6b68b6d1f24858a86b73d372a1d6ea6b78fdb994ed0961b51b  .claude/skills/sprintx/scripts/rastro.sh
 04641afbcf0378878664dd21b76c320fbb42ab9e35b15fdf20041d8f45fbb843  .expx/hooks.json
 fa31a4fe370ac98d8d8369d4722e160a3114f4f02e85c18eb0734407d87cb3cb  LICENSE

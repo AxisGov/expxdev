@@ -44,18 +44,37 @@ BASE="refs/remotes/origin/$BASE"
 # build quando a pasta-mae tem um manifesto de build: uma pasta qualquer com esse nome pode
 # guardar dado que nao se refaz (CodeAnt no conselhos-municipais#350).
 # descartavel <caminho-ignorado> <worktree>
+# gitignore_do_hook <arquivo> — 0 quando e um arquivo comum cujo conteudo e so `*`
+gitignore_do_hook() {
+  [ -f "$1" ] && [ ! -L "$1" ] && [ "$(tr -d '\r' < "$1" 2>/dev/null)" = '*' ]
+}
+# so_gitignores_do_hook <lista> — 0 quando cada caminho da lista (um por linha) e `.gitignore` do hook
+so_gitignores_do_hook() {
+  local f
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    case "$f" in */.gitignore) gitignore_do_hook "$f" || return 1 ;; *) return 1 ;; esac
+  done <<<"$1"
+  return 0
+}
+
 descartavel() {
-  local resto="$1" c="$2" pre="" comp m
+  local resto="$1" c="$2" pre="" comp m lista
   case "$1" in
     node_modules/*|*/node_modules/*|__pycache__/*|*/__pycache__/*|.pytest_cache/*|*/.pytest_cache/*) return 0 ;;
     .mypy_cache/*|*/.mypy_cache/*|.ruff_cache/*|*/.ruff_cache/*) return 0 ;;
   esac
   # a pasta ignorada que so tem `.gitignore` (o `*` que o hook do rastro grava em docs/eventos/)
   # nao guarda nada: sem nenhum outro arquivo, sai junto (login, depois do DM-331)
+  # So vale o `.gitignore` que e exatamente o do hook (`*`): outro conteudo foi escrito por alguem
+  # e bloqueia. O `find` que falha numa parte da pasta nao a declara vazia (CodeAnt no
+  # conselhos-municipais#354).
   case "$1" in
     # sem a pasta no .gitignore da raiz, o Git mostra o proprio `.gitignore` que se ignora
-    .gitignore|*/.gitignore) return 0 ;;
-    */) [ -d "$c/$1" ] && [ -z "$(find "$c/$1" ! -type d ! -name .gitignore -print 2>/dev/null)" ] && return 0 ;;
+    .gitignore|*/.gitignore) gitignore_do_hook "$c/$1" && return 0 ;;
+    */) if [ -d "$c/$1" ] && lista="$(find "$c/$1" ! -type d -print 2>/dev/null)"; then
+          so_gitignores_do_hook "$lista" && return 0
+        fi ;;
   esac
   while [ -n "$resto" ]; do
     comp="${resto%%/*}"
@@ -84,6 +103,24 @@ ignorados_com_valor() {
   done <<<"$saida"
 }
 
+# dona_do_pre_push <worktree> — 0 quando o pre-push efetivo e o chamador gerenciado da MergeX e
+# guarda o validador DENTRO desta worktree pelo caminho absoluto: removida a worktree, todo push do
+# repositorio para com "validador ausente" (login, depois do #96). O chamador relativo a raiz
+# (`"$MERGEX_RAIZ"/...`) nao prende worktree nenhuma.
+dona_do_pre_push() {
+  local c="$1" hook v cfis vd vfis
+  hook="$(git -C "$c" rev-parse --path-format=absolute --git-path hooks/pre-push 2>/dev/null)" || return 1
+  [ -f "$hook" ] || return 1
+  v="$(awk 'index($0, "MERGEX_PORTAO_PUSH=") == 1 { print substr($0, 20); exit }' "$hook" 2>/dev/null)"
+  case "$v" in ''|'"$MERGEX_RAIZ"'*) return 1 ;; esac
+  v="${v#\"}"; v="${v%\"}"; v="${v//\\/}"
+  cfis="$(cd -P -- "$c" 2>/dev/null && pwd -P)" || cfis="$c"
+  vd="${v%/*}"; vfis="$(cd -P -- "$vd" 2>/dev/null && pwd -P)" || vfis="$vd"
+  case "$v/" in "$c"/*) return 0 ;; esac
+  case "$vfis/" in "$cfis"/*) return 0 ;; esac
+  return 1
+}
+
 # julga <caminho> <branch> <travada> <head> — estado<TAB>motivo
 julga() {
   local c="$1" b="$2" trava="$3" h="$4" saida ignorados
@@ -100,6 +137,7 @@ julga() {
   ignorados="$(ignorados_com_valor "$c")" || { printf 'bloqueada\tnao_verificado'; return; }
   [ -z "$ignorados" ] || { printf 'bloqueada\tignorado'; return; }
   git merge-base --is-ancestor "$h" "$BASE" 2>/dev/null || { printf 'bloqueada\tnao_entregue'; return; }
+  ! dona_do_pre_push "$c" || { printf 'bloqueada\tvalidador_do_pre_push'; return; }
   printf 'removivel\t-'
 }
 
@@ -148,6 +186,10 @@ case "$LINHA" in
     if [ "$MOTIVO" = ignorado ]; then
       ignorados_com_valor "$ALVO_GIT" | sed 's/^/  ignorado que nao se refaz: /' >&2
       echo "  guarde o que tiver valor (o rastro de docs/eventos/ e decisao do dono), apague o resto e rode de novo" >&2
+    fi
+    if [ "$MOTIVO" = validador_do_pre_push ]; then
+      echo "  o pre-push instalado chama o validador desta worktree pelo caminho absoluto: sem ela, todo push para" >&2
+      echo "  reinstale o chamador a partir do checkout principal (ativacao-pre-push.sh --reverter e depois --instalar) e rode de novo" >&2
     fi
     exit 1 ;;
 esac

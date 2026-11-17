@@ -9,6 +9,19 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.14 — o pre-push que sobrevive à worktree e as travas restantes
+
+Instale por PR, como a 0.14.13. Certifica a mergex (AxisGov/mergex#103, merge 8e02853, DM-335) e a sprintx (AxisGov/sprintx#88, merge 8b93764, DS-230), e muda a trava da rotação do rastro no núcleo. O CLI, o núcleo de revisão, os eventos, o painel e o `expx sessao` seguem como na 0.14.13, e as outras sete skills, nos mesmos commits.
+
+Achados do CodeAnt no conselhos-municipais#354 (5, todos confirmados) e no login#100 (3 confirmados; 2 e 3 rejeitados pela DM-332).
+
+- **MergeX, pre-push (login, depois do #96).** No Git Bash, a raiz `F:/x` não casava com o `/f/x` do script, e o chamador guardava o caminho absoluto da worktree. Removida a worktree, todo push parava com "validador ausente". A comparação passou a ser entre os caminhos físicos, e o chamador guarda o validador relativo à raiz. O `worktrees-entregues.sh --remover` recusa (`validador_do_pre_push`) a worktree dona de um chamador antigo, e o `--reverter` roda sem `--entrega`.
+- **MergeX, `worktrees-entregues.sh`.** Só sai o `.gitignore` cujo conteúdo é exatamente `*`, o do hook. O `find` que falha numa parte da pasta bloqueia. O texto diz como seguir quando a pessoa decide descartar os ignorados.
+- **MergeX, outros.** Fora do Git, o `portao-v12.sh` lê o `versionado: false` antes da lista de tasks: a entrega de planejamento sai `n/a`. A trava do `ENTREGA.md` tem dono exclusivo.
+- **SprintX.** A trava dos predecessores adia os sinais até a posse estar registrada. A marca que não se cria, sem outra na pasta, não deixa trava órfã, nos predecessores e na F6. O caminho físico dos hooks preserva a quebra de linha final.
+- **Núcleo, `expx-rastro.sh`.** A trava da rotação do rastro tem dono exclusivo: no Ubuntu 26.04, dois gravadores podiam girar juntos e perder os eventos antigos.
+- **Não exercitado:** um sinal real no meio da aquisição da trava, a marca que falha sem outra marca na pasta, e uma corrida real de dois registros no mesmo `ENTREGA.md`.
+
 ## 0.14.13 — os achados do conselhos#350 e as travas no Ubuntu 26.04
 
 Instale por PR, como a 0.14.12. Certifica a mergex (AxisGov/mergex#102, merge 411a27a, DM-333 e DM-334) e a sprintx (AxisGov/sprintx#87, merge 5e6d94a, DS-229). O CLI, o núcleo de revisão, os eventos, o painel e o `expx sessao` seguem como na 0.14.12, e as outras sete skills, nos mesmos commits.
