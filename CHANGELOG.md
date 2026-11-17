@@ -9,6 +9,18 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.13 — os achados do conselhos#350 e as travas no Ubuntu 26.04
+
+Instale por PR, como a 0.14.12. Certifica a mergex (AxisGov/mergex#102, merge 411a27a, DM-333 e DM-334) e a sprintx (AxisGov/sprintx#87, merge 5e6d94a, DS-229). O CLI, o núcleo de revisão, os eventos, o painel e o `expx sessao` seguem como na 0.14.12, e as outras sete skills, nos mesmos commits.
+
+Dos 17 achados do CodeAnt no conselhos-municipais#350, 14 foram confirmados e corrigidos; N1, N2 e N4 foram rejeitados pelo motivo da DS-228, repetido na DS-229.
+
+- **Travas no Ubuntu 26.04 (DM-334, DS-229).** O `mkdir` do uutils coreutils 0.10.0 sai 0 nos dois processos que criam a mesma pasta no mesmo instante. A trava do E1 da mergex, a trava da F6 e a de registro dos predecessores da sprintx deixavam dois processos entrarem. A posse passa a ser uma marca criada com O_EXCL pelo próprio bash (`set -C`).
+- **MergeX, `worktrees-entregues.sh --remover`.** `dist/` e `coverage/` só saem quando a pasta-mãe tem `package.json`, `pyproject.toml`, `setup.py` ou `setup.cfg`. `.mypy_cache/` e `.ruff_cache/` saem como os outros caches, e a pasta ignorada que só tem `.gitignore` (o `docs/eventos/` sem rastro) também sai.
+- **MergeX, outros.** O `nul` no meio do `core.hooksPath` só para no Windows. A escolha do PR de planejamento vem antes do E0 `--sprint 01` também no 00-abertura. O `--abrir-sprint` sem PR de planejamento lê a base do E0 sem aspas. O motivo do validador sai sem caracteres de controle.
+- **SprintX.** Os comandos da migração do plano legado usam marcadores que não são sintaxe da shell. O `resolver` relê o bloqueio sob a trava e não mascara um planejamento inválido como recusa. A feature sem Git tem trava na própria árvore. O caminho absoluto vale pelo lugar físico nos hooks.
+- **Não exercitado:** o motivo do validador com um trailer que tenha escape de terminal. O caso `g-ciclo-completo-sem-expxdev` da bancada da sprintx falha numa máquina com o `expxdev` instalado; os outros 1404 passaram.
+
 ## 0.14.12 — os achados do conselhos#346
 
 Instale por PR, como a 0.14.11. Certifica a mergex (AxisGov/mergex#101, merge aaef17d, DM-332) e a sprintx (AxisGov/sprintx#86, merge 924fabf, DS-228). O CLI, o núcleo de revisão, os eventos, o painel e o `expx sessao` seguem como na 0.14.11, e as outras sete skills, nos mesmos commits.

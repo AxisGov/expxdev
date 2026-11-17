@@ -40,12 +40,36 @@ fi
 BASE="refs/remotes/origin/$BASE"
 
 # Dependencia, cache e saida de build se refazem sozinhos a partir do commit, que ja esta na base
-# (DM-331). O resto do que esta ignorado e do dono.
+# (DM-331). O resto do que esta ignorado e do dono. `dist/` e `coverage/` so contam como saida de
+# build quando a pasta-mae tem um manifesto de build: uma pasta qualquer com esse nome pode
+# guardar dado que nao se refaz (CodeAnt no conselhos-municipais#350).
+# descartavel <caminho-ignorado> <worktree>
 descartavel() {
+  local resto="$1" c="$2" pre="" comp m
   case "$1" in
     node_modules/*|*/node_modules/*|__pycache__/*|*/__pycache__/*|.pytest_cache/*|*/.pytest_cache/*) return 0 ;;
-    dist/*|*/dist/*|coverage/*|*/coverage/*) return 0 ;;
+    .mypy_cache/*|*/.mypy_cache/*|.ruff_cache/*|*/.ruff_cache/*) return 0 ;;
   esac
+  # a pasta ignorada que so tem `.gitignore` (o `*` que o hook do rastro grava em docs/eventos/)
+  # nao guarda nada: sem nenhum outro arquivo, sai junto (login, depois do DM-331)
+  case "$1" in
+    # sem a pasta no .gitignore da raiz, o Git mostra o proprio `.gitignore` que se ignora
+    .gitignore|*/.gitignore) return 0 ;;
+    */) [ -d "$c/$1" ] && [ -z "$(find "$c/$1" ! -type d ! -name .gitignore -print 2>/dev/null)" ] && return 0 ;;
+  esac
+  while [ -n "$resto" ]; do
+    comp="${resto%%/*}"
+    [ "$comp" != "$resto" ] || return 1 # ultimo componente: arquivo, nao pasta
+    resto="${resto#*/}"
+    case "$comp" in
+      dist|coverage)
+        for m in package.json pyproject.toml setup.py setup.cfg; do
+          [ -f "$c/${pre:+$pre/}$m" ] && return 0
+        done
+        return 1 ;;
+    esac
+    pre="${pre:+$pre/}$comp"
+  done
   return 1
 }
 
@@ -56,7 +80,7 @@ ignorados_com_valor() {
   # não versionada que só tem ignorados aparece inteira (`packages/`) e não se distingue do resto.
   saida="$(git -C "$1" status --ignored=matching --porcelain 2>/dev/null)" || return 1
   while IFS= read -r x; do
-    case "$x" in '!! '*) descartavel "${x#'!! '}" || printf '%s\n' "${x#'!! '}" ;; esac
+    case "$x" in '!! '*) descartavel "${x#'!! '}" "$1" || printf '%s\n' "${x#'!! '}" ;; esac
   done <<<"$saida"
 }
 

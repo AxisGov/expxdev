@@ -228,14 +228,17 @@ HOOKS="$(git -C "$RAIZ" rev-parse --path-format=absolute --git-path hooks 2>/dev
 # hooks` sem forma absoluta) e o resolvido; um diretório que se chame `nul`
 # num sistema POSIX também para (no Windows ele não pode existir). Bash 3.2.
 HOOKS_CRU="$(git -C "$RAIZ" rev-parse --git-path hooks 2>/dev/null)"
+case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) SO_WINDOWS=1 ;; *) SO_WINDOWS=0 ;; esac
 hooks_inutilizavel() {
   local c b
   HOOKS_MOTIVO=""
   for c in "$HOOKS_CRU" "$HOOKS"; do
-    # qualquer componente `nul`, não só o último: `NUL/hooks` também cria o `NUL` literal no
-    # Git Bash (CodeAnt no conselhos-municipais#346)
+    # o último componente `nul` para em qualquer sistema; um componente do meio só no Windows,
+    # onde `NUL/hooks` cria o `NUL` literal no Git Bash (CodeAnt no conselhos-municipais#346).
+    # No POSIX, `/opt/tools/nul/hooks` é um caminho válido (CodeAnt no conselhos-municipais#350)
     b="/$(printf '%s' "$c" | tr '\\' '/' | tr '[:upper:]' '[:lower:]')/"
-    if [ "$c" = /dev/null ] || case "$b" in */nul/*) true ;; *) false ;; esac; then
+    if [ "$c" = /dev/null ] || case "$b" in */nul/) true ;; *) false ;; esac \
+      || { [ "$SO_WINDOWS" = 1 ] && case "$b" in */nul/*) true ;; *) false ;; esac; }; then
       HOOKS_MOTIVO="o core.hooksPath aponta para o dispositivo nulo (diretório de hooks efetivo: ${HOOKS_CRU:-$HOOKS}): ali o Git não executa hook nenhum"
       return 0
     fi

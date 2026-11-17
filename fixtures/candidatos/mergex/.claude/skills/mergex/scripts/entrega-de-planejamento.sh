@@ -572,8 +572,13 @@ case "$ACAO" in
       # sem item nenhum (plano sem PR de planejamento, DM-330): a 01 abre direto e o plano vai no
       # PR dela. Nada foi mergeado antes, então a base não se reancora: fica a do E0 (registrada_e0),
       # e a V9 não precisa de merge que justifique uma registrada_sprint
-      b_e0="$(printf '%s\n' "$conteudo" | awk '{ sub(/\r$/, "") } NR == 1 { next } /^---/ { exit }
-        /^base_validada_sha:/ { sub(/^base_validada_sha:[[:space:]]*/, ""); sub(/[[:space:]]+#.*$/, ""); sub(/[[:space:]]+$/, ""); print; exit }')"
+      # o valor YAML sem comentário e sem as aspas, como no retomar-planejamento: entre aspas, o
+      # sha_ok recusaria e a base do E0 seria trocada pela nova (CodeAnt no conselhos-municipais#350)
+      b_e0="$(printf '%s\n' "$conteudo" | awk -v q="'" '{ sub(/\r$/, "") } NR == 1 { next } /^---/ { exit }
+        /^base_validada_sha:/ { sub(/^base_validada_sha:[[:space:]]*/, ""); sub(/[[:space:]]+#.*$/, ""); sub(/[[:space:]]+$/, "")
+          a = substr($0, 1, 1); z = substr($0, length($0))
+          if (length($0) >= 2 && a == z && (a == "\"" || a == q)) $0 = substr($0, 2, length($0) - 2)
+          print; exit }')"
       topo_base=""
       sha_ok "$b_e0" || { b_e0="$BASE_VALIDADA"; topo_base="base_validada_sha=$b_e0;origem_base=registrada_e0;"; }
       grava 0 "" "entrega=por_sprint;sprint_atual=$NN;pr_url=null;pr_estado=null;${topo_base}atualizado_em=$hoje" "$NN"
