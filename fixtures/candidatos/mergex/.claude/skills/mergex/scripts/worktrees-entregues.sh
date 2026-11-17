@@ -3,10 +3,10 @@
 #
 # A F1 da sprintx abre uma worktree por feature, e nada a removia (DM-290). Removível é a
 # worktree com branch, sem trava, sem submódulo, com o HEAD na base remota, sem alteração,
-# sem arquivo novo e sem arquivo ignorado que não seja dependência (`node_modules`, caches de
-# Python). O rastro ignorado (`docs/eventos/`) bloqueia e aparece aqui: o descarte é decisão
-# humana. A base vem do remoto, e comando que falha é "nao_verificado", nunca removível. A
-# remoção não força nada, e a branch fica. Entregue é o HEAD ancestral da base: squash e
+# sem arquivo novo e sem arquivo ignorado que não se refaça sozinho: dependência (`node_modules`),
+# cache de Python e saída de build ou de cobertura (`dist/`, `coverage/`, DM-331). O rastro
+# ignorado (`docs/eventos/`) bloqueia e aparece aqui: o descarte é decisão humana. A base vem
+# do remoto, e comando que falha é "nao_verificado", nunca removível. A remoção não força nada, e a branch fica. Entregue é o HEAD ancestral da base: squash e
 # rebase aparecem como `nao_entregue`, e fica a sobra, nunca a perda. Limite assumido: um
 # arquivo ignorado criado entre a conferência e a remoção se perde; a janela é de milissegundos
 # numa worktree sem sessão.
@@ -14,7 +14,8 @@
 #   worktrees-entregues.sh --listar [--base <branch>]
 #       estado<TAB>motivo<TAB>caminho<TAB>branch, uma worktree por linha
 #   worktrees-entregues.sh --remover <caminho> [--base <branch>]
-#       remove essa worktree se ela estiver removível; senão sai 1, com o motivo
+#       remove essa worktree se ela estiver removível; senão sai 1, com o motivo e, quando o
+#       motivo é `ignorado`, cada caminho que ficaria perdido
 set -uo pipefail
 
 ACAO=""; ALVO=""; BASE=""
@@ -38,17 +39,30 @@ else
 fi
 BASE="refs/remotes/origin/$BASE"
 
-# So dependencia e cache se refazem sozinhos. O resto do que esta ignorado e do dono.
+# Dependencia, cache e saida de build se refazem sozinhos a partir do commit, que ja esta na base
+# (DM-331). O resto do que esta ignorado e do dono.
 descartavel() {
   case "$1" in
     node_modules/*|*/node_modules/*|__pycache__/*|*/__pycache__/*|.pytest_cache/*|*/.pytest_cache/*) return 0 ;;
+    dist/*|*/dist/*|coverage/*|*/coverage/*) return 0 ;;
   esac
   return 1
 }
 
+# ignorados_com_valor <caminho> — o que esta ignorado e nao se refaz, um caminho por linha
+ignorados_com_valor() {
+  local x saida
+  # `matching` mostra o caminho que casou no .gitignore (`packages/p/dist/`). Sem ele, a pasta
+  # não versionada que só tem ignorados aparece inteira (`packages/`) e não se distingue do resto.
+  saida="$(git -C "$1" status --ignored=matching --porcelain 2>/dev/null)" || return 1
+  while IFS= read -r x; do
+    case "$x" in '!! '*) descartavel "${x#'!! '}" || printf '%s\n' "${x#'!! '}" ;; esac
+  done <<<"$saida"
+}
+
 # julga <caminho> <branch> <travada> <head> — estado<TAB>motivo
 julga() {
-  local c="$1" b="$2" trava="$3" h="$4" saida ignorados x
+  local c="$1" b="$2" trava="$3" h="$4" saida ignorados
   [ "$trava" = 0 ] || { printf 'bloqueada\ttravada'; return; }
   [ -n "$b" ] || { printf 'bloqueada\tsem_branch'; return; }
   [ "$BASE_OK" = 1 ] || { printf 'bloqueada\tnao_verificado'; return; }
@@ -59,10 +73,8 @@ julga() {
   # `assume-unchanged` e `skip-worktree` escondem a alteração do status.
   saida="$(git -C "$c" ls-files -v 2>/dev/null | awk '/^[a-zS]/')" || { printf 'bloqueada\tnao_verificado'; return; }
   [ -z "$saida" ] || { printf 'bloqueada\toculta'; return; }
-  ignorados="$(git -C "$c" status --ignored --porcelain 2>/dev/null)" || { printf 'bloqueada\tnao_verificado'; return; }
-  while IFS= read -r x; do
-    case "$x" in '!! '*) descartavel "${x#'!! '}" || { printf 'bloqueada\tignorado'; return; } ;; esac
-  done <<<"$ignorados"
+  ignorados="$(ignorados_com_valor "$c")" || { printf 'bloqueada\tnao_verificado'; return; }
+  [ -z "$ignorados" ] || { printf 'bloqueada\tignorado'; return; }
   git merge-base --is-ancestor "$h" "$BASE" 2>/dev/null || { printf 'bloqueada\tnao_entregue'; return; }
   printf 'removivel\t-'
 }
@@ -105,5 +117,13 @@ LINHA="$(awk -F '\t' -v a="$ALVO_GIT" '$3 == a' <<<"$TODAS")"
 [ -n "$LINHA" ] || { echo "PARADO: nao e worktree deste repositorio: $ALVO" >&2; exit 1; }
 case "$LINHA" in
   removivel*) git worktree remove "$ALVO_GIT" || exit 1; echo "removida: $ALVO_GIT" ;;
-  *) echo "PARADO: $(cut -f2 <<<"$LINHA"): $ALVO_GIT" >&2; exit 1 ;;
+  *)
+    MOTIVO="$(cut -f2 <<<"$LINHA")"
+    echo "PARADO: $MOTIVO: $ALVO_GIT" >&2
+    # O operador decide sem investigar: cada ignorado que se perderia, e o que fazer com ele.
+    if [ "$MOTIVO" = ignorado ]; then
+      ignorados_com_valor "$ALVO_GIT" | sed 's/^/  ignorado que nao se refaz: /' >&2
+      echo "  guarde o que tiver valor (o rastro de docs/eventos/ e decisao do dono), apague o resto e rode de novo" >&2
+    fi
+    exit 1 ;;
 esac
