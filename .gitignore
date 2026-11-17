@@ -13,3 +13,6 @@ promptcli2.md
 
 __pycache__/
 *.pyc
+
+# estado local do pylot (missoes, briefings, checkpoints)
+.expxv/
