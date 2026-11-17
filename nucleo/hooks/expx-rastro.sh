@@ -685,15 +685,23 @@ expx_rastro_grava() {
     # remocao de trava velha: ela abriria a mesma corrida (um gravador apagaria a trava
     # NOVA do outro). Trava so sobra se o processo morrer entre o mkdir e o rmdir — e o
     # efeito e um arquivo grande, nunca evento perdido.
+    # O `mkdir` nem sempre exclui: o do uutils coreutils (Ubuntu 26.04) sai 0 nos dois
+    # processos que criam a mesma pasta no mesmo instante. A posse e a marca `.dono`, criada
+    # com O_EXCL pelo proprio bash (`set -C`): so um a cria. A marca que nao se cria, sem outra
+    # na pasta, tira a pasta, para nao virar trava orfa; com outra marca, a trava e de outro.
     if [ -f "$arq" ]; then
       local tam trava="$dir/.$tid.rotacao"
       tam=$(wc -c < "$arq" 2>/dev/null | tr -d ' ')
       if [ -n "$tam" ] && [ "$tam" -gt 5242880 ] 2>/dev/null; then
-        if mkdir "$trava" 2>/dev/null; then
+        if ( mkdir "$trava" 2>/dev/null || exit 1
+             ( set -C; printf '%s\n' "$$" > "$trava/.dono" ) 2>/dev/null && exit 0
+             [ -e "$trava/.dono" ] || rmdir "$trava" 2>/dev/null
+             exit 1 ); then
           tam=$(wc -c < "$arq" 2>/dev/null | tr -d ' ')
           if [ -n "$tam" ] && [ "$tam" -gt 5242880 ] 2>/dev/null; then
             mv -f "$arq" "$dir/$tid.1.jsonl" 2>/dev/null || true
           fi
+          rm -f "$trava/.dono" 2>/dev/null
           rmdir "$trava" 2>/dev/null
         fi
       fi

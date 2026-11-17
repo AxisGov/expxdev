@@ -147,13 +147,15 @@ fi
 # entrega: com `versionado: false` a V12 é `n/a` (não há commit de task), senão SEM_PROVA. O Git
 # que falha por outro motivo é sempre SEM_PROVA.
 if ! git -C "$raiz_leitura" rev-parse --git-dir >/dev/null 2>&1; then
-  [ "$NTASKS" -ge 1 ] || uso 'nenhum tasks.md informado'
   cwd_v12="$PWD"
   cd "$raiz_leitura" 2>/dev/null || sem_prova 'raiz-inexistente'
   sem_repositorio_git; rc_sem_git=$?; erro_sem_git="$SEM_GIT_ERRO"
   cd "$cwd_v12" 2>/dev/null || sem_prova 'retorno-ao-diretorio-falhou'
   [ "$rc_sem_git" = 0 ] || { printf 'portao-v12: %s\n' "$erro_sem_git" >&2; sem_prova 'git-falhou'; }
+  # o `versionado: false` vem antes da lista de tasks: a entrega de planejamento fora do Git nao
+  # tem tasks.md e e `n/a`, nao uso errado (CodeAnt no conselhos-municipais#354)
   [ "$(limpa "$(escalar "$ENTREGA" versionado)")" != false ] || na 'sem-versionador'
+  [ "$NTASKS" -ge 1 ] || uso 'nenhum tasks.md informado'
   sem_prova 'fora-de-um-repositorio-git'
 fi
 if [ -z "$RAIZ" ]; then

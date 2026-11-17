@@ -139,15 +139,18 @@ esac
 # Antes da primeira leitura de uma escrita, serializar todo ciclo de leitura/validação/
 # alteração/rename. mkdir é atômico também em Bash 3.2 (macOS); leitores não bloqueiam.
 # Lock órfão é falha fechada: nunca apagar automaticamente o lock de outra execução.
+# O `mkdir` nem sempre exclui: o do uutils coreutils (Ubuntu 26.04) sai 0 nos dois processos que
+# criam a mesma pasta no mesmo instante. A posse é a marca `.dono`, criada com O_EXCL pelo próprio
+# bash (`set -C`): quem perde a marca espera como quem perde o `mkdir` (DM-334).
 LOCK_DIR=""
 libera_lock() {
-  [ -z "$LOCK_DIR" ] || rmdir "$LOCK_DIR" 2>/dev/null || :
+  [ -z "$LOCK_DIR" ] || { rm -f -- "$LOCK_DIR/.dono"; rmdir "$LOCK_DIR" 2>/dev/null; } || :
 }
 case "$ACAO" in
   registrar-merge|completar-base|registrar-pr|abrir-sprint|retomar-planejamento)
     LOCK_DIR="$ENTREGA.lock"
     tentativas=0
-    until mkdir "$LOCK_DIR" 2>/dev/null; do
+    until { mkdir "$LOCK_DIR" && ( set -C; printf '%s\n' "$$" > "$LOCK_DIR/.dono" ); } 2>/dev/null; do
       tentativas=$((tentativas + 1))
       [ "$tentativas" -lt 100 ] || recusa "entrega ocupada ou lock órfão: $LOCK_DIR (verifique antes de removê-lo)"
       sleep 0.1

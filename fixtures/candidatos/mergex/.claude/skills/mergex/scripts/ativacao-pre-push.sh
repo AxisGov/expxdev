@@ -5,7 +5,8 @@
 # seção 13, item 6 (DM-184), e references/12-barreira-de-push.md.
 #
 # Uso:
-#   ativacao-pre-push.sh --instalar|--provar|--reverter --entrega <ENTREGA.md>
+#   ativacao-pre-push.sh --instalar|--provar --entrega <ENTREGA.md>
+#   ativacao-pre-push.sh --reverter [--entrega <ENTREGA.md>]
 #
 # <ENTREGA.md> é relativo à raiz da árvore de trabalho
 # (docs/entregas/<id>/ENTREGA.md); --reverter não o lê.
@@ -126,7 +127,7 @@ COMPOSICAO='o `pre-push` existente chama `portao-push.sh --pre-push "$@"`, repas
 
 uso() {
   [ -z "${1:-}" ] || printf 'ativacao-pre-push: %s\n' "$1" >&2
-  printf '%s\n' 'uso: ativacao-pre-push.sh --instalar|--provar|--reverter --entrega <ENTREGA.md>' >&2
+  printf '%s\n' 'uso: ativacao-pre-push.sh --instalar|--provar --entrega <ENTREGA.md> | --reverter [--entrega <ENTREGA.md>]' >&2
   exit 64
 }
 
@@ -140,12 +141,15 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 [ -n "$MODO" ] || uso 'falta o modo'
-case "$ENTREGA" in ./*) ENTREGA="${ENTREGA#./}" ;; esac
-case "$ENTREGA" in
-  docs/entregas/*/ENTREGA.md) ;;
-  *) uso '--entrega deve ser docs/entregas/<id>/ENTREGA.md, relativo à raiz' ;;
-esac
-case "/$ENTREGA/" in */../*|*/./*|*//*) uso '--entrega com componente . ou .. ou vazio' ;; esac
+# o --reverter não lê a entrega (cabeçalho): sem --entrega ele roda igual; dada, ela é conferida
+if [ "$MODO" != reverter ] || [ -n "$ENTREGA" ]; then
+  case "$ENTREGA" in ./*) ENTREGA="${ENTREGA#./}" ;; esac
+  case "$ENTREGA" in
+    docs/entregas/*/ENTREGA.md) ;;
+    *) uso '--entrega deve ser docs/entregas/<id>/ENTREGA.md, relativo à raiz' ;;
+  esac
+  case "/$ENTREGA/" in */../*|*/./*|*//*) uso '--entrega com componente . ou .. ou vazio' ;; esac
+fi
 
 diz() { printf 'ativacao-pre-push: %s\n' "$1"; }
 erro() { printf 'ativacao-pre-push: %s\n' "$1" >&2; }
@@ -511,13 +515,18 @@ reprovada() {
 # Instalação do chamador gerenciado (só quando não existe pre-push)
 # ---------------------------------------------------------------------------
 instala() {
-  local rel linha
+  local rel linha rfis pfis
   [ -r "$MODELO" ] && grep -Fxq -- "$MARCADOR" "$MODELO" || pre_requisito "modelo do chamador gerenciado ausente ou sem o marcador: $MODELO"
   # validador da skill dentro da árvore: relativo à raiz, resolvido quando o
   # Git roda o hook (vale em worktree vinculada e pelo Git for Windows);
-  # fora dela, o caminho absoluto
-  case "$PORTAO_PUSH" in
-    "$RAIZ"/*) rel="${PORTAO_PUSH#"$RAIZ"/}"; linha="MERGEX_PORTAO_PUSH=\"\$MERGEX_RAIZ\"/$(printf '%q' "$rel")" ;;
+  # fora dela, o caminho absoluto. A comparação é entre os caminhos físicos: no
+  # Git Bash o Git devolve `F:/x` e o `pwd` do script `/f/x`, e por um link a
+  # raiz aparece com outro nome. Sem isso, o chamador guardava o caminho
+  # absoluto da worktree e o push parava quando ela saía (login, depois do #96)
+  rfis="$(cd -P -- "$RAIZ" 2>/dev/null && pwd -P)" || rfis="$RAIZ"
+  pfis="$(cd -P -- "${PORTAO_PUSH%/*}" 2>/dev/null && pwd -P)" && pfis="$pfis/${PORTAO_PUSH##*/}" || pfis="$PORTAO_PUSH"
+  case "$pfis" in
+    "$rfis"/*) rel="${pfis#"$rfis"/}"; linha="MERGEX_PORTAO_PUSH=\"\$MERGEX_RAIZ\"/$(printf '%q' "$rel")" ;;
     *) linha="MERGEX_PORTAO_PUSH=$(printf '%q' "$PORTAO_PUSH")" ;;
   esac
   # só cria quando falta (o `mkdir -p` do Git Bash falha sobre //servidor/...)
