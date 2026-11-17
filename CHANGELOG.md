@@ -9,6 +9,13 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.11 — a worktree entregue sai com o build
+
+Instale por PR, como a 0.14.10. Só certifica a mergex (AxisGov/mergex#100, merge 9685028, DM-331). O CLI, o núcleo de revisão, os eventos, o painel e o `expx sessao` seguem como na 0.14.10, e as outras oito skills, nos mesmos commits.
+
+- **MergeX, `worktrees-entregues.sh --remover` (DM-331).** No login, depois do merge do #95, a remoção parou com `PARADO: ignorado`, e os ignorados eram só `dist/` do build dos testes e `node_modules/`. Agora `dist/` e `coverage/`, em qualquer nível, saem junto, como as dependências: o HEAD já está na base e o build se refaz do commit. O status usa `--ignored=matching`, que mostra `packages/p/dist/` em vez da pasta inteira. Parado por `ignorado`, o `--remover` lista cada caminho que se perderia. O rastro (`docs/eventos/`) segue bloqueando.
+- **Não exercitado:** a remoção na worktree real do login (a suíte usa um repositório descartável).
+
 ## 0.14.10 — menos burocracia e os achados do login#95
 
 Instale por PR, como a 0.14.9. Só certifica a mergex (AxisGov/mergex#98 e #99, merge 07e4e54, DM-330), a sprintx (AxisGov/sprintx#84 e #85, merge d248ba5, DS-226 e DS-227) e a runx (AxisGov/runx#28 e #29, merge 5ff9d23, DR-121). O CLI, o núcleo de revisão, os eventos, o painel e o `expx sessao` seguem como na 0.14.9, e as outras seis skills, nos mesmos commits.

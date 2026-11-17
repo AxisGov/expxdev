@@ -264,9 +264,11 @@ bash .claude/skills/mergex/scripts/worktrees-entregues.sh --remover <caminho-da-
 ```
 
 Ela só sai com branch, sem trava, sem submódulo, com o HEAD ancestral da base remota, sem alteração
-visível ou oculta e sem arquivo ignorado que não seja dependência. A branch fica. Se o script parar, relate o motivo e
-deixe a worktree: rastro ignorado (`docs/eventos/`) é decisão humana. Nunca force a remoção nem
-apague a pasta à mão.
+visível ou oculta e sem arquivo ignorado que não se refaça sozinho. Dependência (`node_modules/`),
+cache de Python e saída de build ou de cobertura (`dist/`, `coverage/`) saem junto (DM-331). A
+branch fica. Se o script parar por `ignorado`, ele lista cada caminho que se perderia: relate a
+lista e deixe a worktree, porque o rastro ignorado (`docs/eventos/`) é decisão humana. Nunca force
+a remoção nem apague a pasta à mão.
 
 Para ver todas as sobras e o motivo de cada uma: `worktrees-entregues.sh --listar`. A listagem não
 remove nada, e é ela que alcança o trabalho mergeado fora do E9.
