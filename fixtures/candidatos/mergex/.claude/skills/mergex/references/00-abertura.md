@@ -173,9 +173,11 @@ retomada de um arquivo sem a chave), com o modo que o mesmo `--modo-efetivo` dis
    com o PR da N `merged` — sem o registro do merge, o E0 recusa e manda rodar o E9, que o lê no
    serviço. **O PR de planejamento é opcional** (DM-330, que substitui a recusa da DM-329): sem
    ele (o plano feito fora da F5, `prs` sem o item de planejamento), a sprint 01 abre direto, com
-   um aviso de uma linha, e o plano vai junto no PR dela. Quem separa o plano grande é o limite do
-   PR no E7 (L3, os 100 arquivos que o app de revisão conta): estourado, o E7 recusa e o plano vai
-   num PR de planejamento (E0 `--planejamento`). Sem `ENTREGA.md`, o E0 cria o arquivo pelo caso 1
+   um aviso de uma linha, e o plano vai junto no PR dela. A escolha é feita **antes** do E0
+   `--sprint 01`: se o plano e a sprint 01 vão passar do limite do PR no E7 (L3, os 100 arquivos
+   que o app de revisão conta), abra antes o PR de planejamento (E0 `--planejamento`). Depois que
+   a sprint tem commits, o `--planejamento` recusa e o PR acima do L3 fica parado no E7, com a
+   divisão como decisão humana (DM-332, DM-333). Sem `ENTREGA.md`, o E0 cria o arquivo pelo caso 1
    do passo 5 (sem `--planejamento`: `sprint_atual: null` e `prs: []`) e repete este bloco;
 2. a sprint pedida é a seguinte à última de `prs`: fora de sequência, recusa;
 3. o `merge_sha` do último PR fechado é ancestral da base buscada, e a base buscada é ancestral do

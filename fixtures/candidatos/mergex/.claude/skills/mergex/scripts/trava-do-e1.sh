@@ -131,6 +131,18 @@ adquirir() {
   # `$$` distingue processos concorrentes; o resto só ajuda quem lê. O token
   # não é segredo e não é o mecanismo: o mecanismo é o diretório.
   token="e1-$$-$(date -u +%Y%m%d%H%M%S)-${RANDOM}${RANDOM}"
+  # O `mkdir` nem sempre exclui: o do uutils coreutils (Ubuntu 26.04) sai 0 nos dois processos
+  # que criam a mesma pasta no mesmo instante. Quem decide a corrida é o `dono`, criado vazio com
+  # O_EXCL pelo próprio bash (`set -C`): só um o cria, e o outro vê a trava com dono (DM-334).
+  if ! ( set -C; : > "$trava/dono" ) 2>/dev/null; then
+    if [ -e "$trava/dono" ]; then
+      ERRO="o E1 deste índice já tem dono"
+      return 2
+    fi
+    rmdir "$trava" 2>/dev/null || true
+    ERRO="não foi possível criar o diagnóstico da trava em $trava"
+    return 1
+  fi
   {
     printf 'token=%s\n' "$token"
     printf 'task=%s\n' "$task"

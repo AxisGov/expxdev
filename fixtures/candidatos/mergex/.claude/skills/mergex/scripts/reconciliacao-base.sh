@@ -1656,6 +1656,9 @@ PROXIMO="$(sed -n 1p "$TMP_DIR/merges")"
 if [ "$PROXIMO" != "$M" ]; then
   # o que trava a fila é um merge que não é de integração da base: nomeá-lo
   if [ -n "$PROXIMO" ] && ! motivo_contrato="$(bash "$CONTRATO_SH" --validar-integracao --trabalho "$TRABALHO" --commit "$PROXIMO" 2>&1 >/dev/null)"; then
+    # o motivo pode citar um trailer do commit: sem caracteres de controle, nenhum escape de
+    # terminal chega a quem le (CodeAnt no conselhos-municipais#350)
+    motivo_contrato="$(printf '%s' "$motivo_contrato" | tr '\n\t' '  ' | tr -d '\000-\037\177')"
     para 5 "ordem: o merge $PROXIMO, anterior a M $M na linha de primeiro pai de HEAD, não é um commit de integração da base (Trabalho:/Integra-base:); ele precisa ser registrado ou resolvido antes de M. O contrato diz: ${motivo_contrato#contrato-de-commit: }" # guarda:ORDEM
   fi
   para 5 "ordem: M $M não é o merge mais antigo ainda não registrado na linha de primeiro pai de HEAD (o próximo é ${PROXIMO:-nenhum}); registre os merges um por vez, do mais antigo, com --merge" # guarda:ORDEM

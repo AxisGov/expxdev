@@ -265,7 +265,10 @@ bash .claude/skills/mergex/scripts/worktrees-entregues.sh --remover <caminho-da-
 
 Ela só sai com branch, sem trava, sem submódulo, com o HEAD ancestral da base remota, sem alteração
 visível ou oculta e sem arquivo ignorado que não se refaça sozinho. Dependência (`node_modules/`),
-cache de Python e saída de build ou de cobertura (`dist/`, `coverage/`) saem junto (DM-331). A
+cache de Python (`__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`) e saída de
+build ou de cobertura (`dist/`, `coverage/`, só quando a pasta-mãe tem `package.json`,
+`pyproject.toml`, `setup.py` ou `setup.cfg`) saem junto (DM-331, DM-333), e também a pasta ignorada
+que só tem `.gitignore`, como o `docs/eventos/` sem rastro, só com o `*` que o hook grava. A
 branch fica. Se o script parar por `ignorado`, ele lista cada caminho que se perderia: relate a
 lista e deixe a worktree, porque o rastro ignorado (`docs/eventos/`) é decisão humana. Nunca force
 a remoção nem apague a pasta à mão.
