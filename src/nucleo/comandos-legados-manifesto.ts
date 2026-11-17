@@ -5,11 +5,11 @@ import type { ManifestoDeComandos } from "./comandos-legados.js";
 export const MANIFESTO_DE_COMANDOS: ManifestoDeComandos = {
   versao: 1,
   fontes: [
-    { skill: "sprintx", commit: "d248ba599f90f80ab949cc441fdad48b75507cc4", papel: "certificado" },
+    { skill: "sprintx", commit: "924fabfcdcaf5ee1e6c4bc920a3ec587d4f1e4f5", papel: "certificado" },
     { skill: "runx", commit: "5ff9d231616b0c4aafa81a037f45a90042b547c2", papel: "certificado" },
     { skill: "legadox", commit: "a6a4629c47dc0fdfab75de0f6246ce6609088970", papel: "certificado" },
     { skill: "stackx", commit: "03ff770d7bc257cf2271ff08e77904e351e80d5a", papel: "certificado" },
-    { skill: "mergex", commit: "96850285e14b59b9cc20d35f95960ee43adc5c85", papel: "certificado" },
+    { skill: "mergex", commit: "aaef17df7b323fbd4099a3ebd4c3d253e74f9239", papel: "certificado" },
     { skill: "memox", commit: "db64a04ff3c9bd7f7c1b8e0685c3a5ece4773f1d", papel: "certificado" },
     { skill: "prodx", commit: "06ce57a42db8eaae3f98ea60fc3895f1536383c5", papel: "certificado" },
     { skill: "buildx", commit: "235cf01a6a364c03314cf7dade31ee5cd629b1da", papel: "certificado" },
@@ -113,9 +113,11 @@ export const MANIFESTO_DE_COMANDOS: ManifestoDeComandos = {
       "7adaf2c206d6512fa52d213a1b0a65b832619c9f561b5cb57a9ba436b5693bfb",
       "87989ba0757ecf93dc7e2a7fd8014685d861a311f4a07d27ad2fa6809592b4e7",
       "8aeded39f756358fd9fa5431c1329fc02cb4649e15e1cb080c96630d73fcb63a",
+      "a5d431fb9446c1160e494b92580d37be7568872aefe4464f144ad2f20a395c5b",
       "a9f281fab66643f4372b69dc8f38f57ff9480ebb0f8e10cd94f41916ef061e1b",
       "b43d4cee2d4ef3298168a4567f28398a12a491869971626548878638588f83ae",
       "b4ed98ba156a9c07b18ccd99eab26d77c0c035073707bc166c9f5da784e9a431",
+      "b7b39ce5566fad9faf01229c120c321417f3a95b0bc0c95e107d969c0dddc796",
       "ce1d2d19870fabdbcc279db1a7c14c25f0a6be5c516ee64091ed9934ad57e947",
     ],
     "mergex-pr.md": [

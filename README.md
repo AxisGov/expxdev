@@ -554,23 +554,23 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.14.11 -R AxisGov/expxdev -D ~/expx-cli/v0.14.11 &&
+gh release download v0.14.12 -R AxisGov/expxdev -D ~/expx-cli/v0.14.12 &&
 (
-  cd ~/expx-cli/v0.14.11 || exit 1
+  cd ~/expx-cli/v0.14.12 || exit 1
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.14.11.tgz.sha256
+    sha256sum -c expxdev-0.14.12.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.14.11.tgz.sha256
+    shasum -a 256 -c expxdev-0.14.12.tgz.sha256
   fi
 ) &&
-npm install -g ~/expx-cli/v0.14.11/expxdev-0.14.11.tgz &&
+npm install -g ~/expx-cli/v0.14.12/expxdev-0.14.12.tgz &&
 expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 O `npm install -g` do pacote conferido põe o `expx` no PATH, e é ele que os exemplos deste README
 e das skills usam (`expx init`, `expx update`, `expx doctor`). Para rodar uma vez, sem instalar,
 troque as duas últimas linhas por
-`npx --yes --package ~/expx-cli/v0.14.11/expxdev-0.14.11.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes`.
+`npx --yes --package ~/expx-cli/v0.14.12/expxdev-0.14.12.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes`.
 Atualizar o CLI é baixar a release nova e repetir o `npm install -g`.
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -584,7 +584,7 @@ Atualizar o CLI é baixar a release nova e repetir o `npm install -g`.
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.14.11 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.14.12 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -756,6 +756,8 @@ Atualizar o CLI é baixar a release nova e repetir o `npm install -g`.
   (escopo por link, base `~`, recusa terminal relida sob a trava, comandos com caminho).
 - `0.14.11` certifica a MergeX com a remoção da worktree entregue que só tem `dist/` e `coverage/` ignorados, e a
   parada que lista o que se perderia (login).
+- `0.14.12` certifica a MergeX e a SprintX com os achados do CodeAnt no conselhos#346 (pre-push no
+  dispositivo nulo, e0-abertura sem ENTREGA.md em HEAD, trava da F6 que não se monta, links simbólicos nos hooks).
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

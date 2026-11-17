@@ -9,6 +9,20 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.12 — os achados do conselhos#346
+
+Instale por PR, como a 0.14.11. Certifica a mergex (AxisGov/mergex#101, merge aaef17d, DM-332) e a sprintx (AxisGov/sprintx#86, merge 924fabf, DS-228). O CLI, o núcleo de revisão, os eventos, o painel e o `expx sessao` seguem como na 0.14.11, e as outras sete skills, nos mesmos commits.
+
+Dos 13 achados do CodeAnt no conselhos-municipais#346, 10 foram confirmados e corrigidos; N3, N4 e N5 foram rejeitados com o motivo no DM-332 e no DS-228.
+
+- **MergeX, `ativacao-pre-push.sh`.** `core.hooksPath` apontando para o dispositivo nulo é reconhecido em qualquer caixa e em qualquer segmento do caminho (`NUL`, `nul`, `sub/nul/hooks`).
+- **MergeX, `persistir-metodo.sh --prova e0-abertura`.** Sem o `ENTREGA.md` em HEAD, reconstrói o caso 1 e compara. Recusa quando o arquivo está no índice ou a sprint não é a 01.
+- **MergeX, instruções do E0 e do E2.** O comando de instalação do pre-push vem completo, com o caminho do script e `--entrega`. A escolha do PR de planejamento é feita antes do E0 `--sprint 01`.
+- **SprintX, `bloqueios.sh`.** A trava da F6 que não se monta num repositório recusa e não grava. O repositório é reconhecido pela pasta `.git`, mesmo quando o Git o recusa por dono diferente.
+- **SprintX, `planejamento.sh`.** A recusa durável relê o planejamento sob a trava e não sobrescreve uma autorização tardia. A costura de teste só escreve no git dir.
+- **SprintX, hooks de escopo e de TDD.** Caminho por link simbólico, na raiz, numa pasta ou no próprio arquivo, conta como do projeto, com o caminho relativo resolvido.
+- **Não exercitado:** o caso `g-ciclo-completo-sem-expxdev` da bancada da sprintx falha numa máquina com o `expxdev` instalado globalmente. O caso exige que ele esteja ausente; os outros 1404 passaram.
+
 ## 0.14.11 — a worktree entregue sai com o build
 
 Instale por PR, como a 0.14.10. Só certifica a mergex (AxisGov/mergex#100, merge 9685028, DM-331). O CLI, o núcleo de revisão, os eventos, o painel e o `expx sessao` seguem como na 0.14.10, e as outras oito skills, nos mesmos commits.
