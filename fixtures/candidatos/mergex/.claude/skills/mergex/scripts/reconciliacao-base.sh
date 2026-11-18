@@ -1645,9 +1645,27 @@ g rev-list --first-parent --merges --reverse "$LIMITE..HEAD" > "$TMP_DIR/merges"
 # da primeira sprint) já está em B0: sai da fila, e não se registra (DM-323). O
 # próprio M nunca sai: com B1 na base validada, quem fala é a estrutura
 if [ "$N_CAD" = 0 ]; then
+  # O merge anterior à abertura do E0 também sai: quando ele entrou, a base ainda
+  # não estava gravada, e o que ele trouxe (o plano de outra branch, por exemplo) é
+  # conteúdo da feature, que o portão confere como tal. Não é reconciliação.
+  # A abertura é o commit mais antigo da linha de primeiro pai de P1 a partir do
+  # qual o ENTREGA.md tem sempre esta base gravada pelo E0 (conselhos-municipais#359).
+  ABERTURA=""
+  if [ "$ORIGEM_BASE" = registrada_e0 ]; then
+    while IFS= read -r c; do
+      g cat-file blob "$c:$ENTREGA" > "$TMP_DIR/entrega-abertura.md" 2>/dev/null || break
+      [ "$(catalogo_fm "$TMP_DIR/entrega-abertura.md" origem_base)" = registrada_e0 ] || break
+      b_c="$(catalogo_fm "$TMP_DIR/entrega-abertura.md" base_validada_sha)"
+      b_c="$(g rev-parse -q --verify "${b_c:-x}^{commit}" 2>/dev/null)" || break
+      [ "$b_c" = "$(g rev-parse -q --verify "$B0^{commit}" 2>/dev/null)" ] || break
+      ABERTURA="$c"
+    done < <(g rev-list --first-parent "$M^1" -- "$ENTREGA" 2>/dev/null)
+  fi
   while IFS= read -r q; do
     pula=""
     { [ "$q" != "$M" ] && ja_na_base "$q" "$B0"; } && pula=1 # guarda:FILABASE
+    { [ "$q" != "$M" ] && [ -n "$ABERTURA" ] && [ "$q" != "$ABERTURA" ] \
+      && g merge-base --is-ancestor "$q" "$ABERTURA" 2>/dev/null; } && pula=1
     [ -n "$pula" ] || printf '%s\n' "$q"
   done < "$TMP_DIR/merges" > "$TMP_DIR/merges.fila"
   mv "$TMP_DIR/merges.fila" "$TMP_DIR/merges"
