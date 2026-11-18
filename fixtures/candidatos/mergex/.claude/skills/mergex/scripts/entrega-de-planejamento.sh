@@ -165,7 +165,11 @@ case "$ACAO" in
     while :; do
       [ -z "$SINAL_PENDENTE" ] || exit "$SINAL_PENDENTE"
       if mkdir "$LOCK_DIR" 2>/dev/null; then
-        if ( set -C; : > "$LOCK_DIR/.dono" ) 2>/dev/null; then
+        # a marca nasce neste shell, não num subshell: o subshell não herda o trap
+        # que anota o sinal e morreria antes da posse (CodeAnt no conselhos-municipais#365)
+        marca_rc=0
+        set -C; { : > "$LOCK_DIR/.dono"; } 2>/dev/null || marca_rc=$?; set +C
+        if [ "$marca_rc" = 0 ]; then
           if printf '%s\n' "$$" >| "$LOCK_DIR/.dono" 2>/dev/null; then
             CRIEI=1
             break
@@ -473,6 +477,10 @@ trap 'exit 143' TERM
 # novas seguem o da primeira. BINMODE=3: o gawk do Git para Windows (MSYS) tira o CR
 # na leitura sem ele; os outros awk o ignoram.
 grava() {
+  # O temporário nasce com O_EXCL (`set -C` só nesta escrita): um link deixado no nome
+  # previsível não é seguido, e a escrita falha em vez de truncar outro arquivo
+  # (CodeAnt no conselhos-municipais#365)
+  set -C
   awk -v BINMODE=3 -v alvo="$1" -v itemsets="$2" -v topsets="$3" -v novo="$4" '
     function troca(l, chave, valor,   cr, ind) {
       cr = ""; if (l ~ /\r$/) { cr = "\r"; sub(/\r$/, "", l) }
@@ -526,7 +534,8 @@ grava() {
       if (k in iv) { print troca($0, k, iv[k]); next }
     }
     { print }
-  ' "$ENTREGA" > "$tmp" || { rm -f "$tmp"; ilegivel "não consegui gravar $ENTREGA"; }
+  ' "$ENTREGA" > "$tmp" || { set +C; rm -f "$tmp"; ilegivel "não consegui gravar $ENTREGA"; }
+  set +C
 }
 # confere <linha esperada>... — o temporário relido pelo leitor tem as linhas; então troca
 confere_e_troca() {

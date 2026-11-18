@@ -52,7 +52,9 @@ gitignore_do_hook() {
 *
 '
   [ -f "$1" ] && [ ! -L "$1" ] || return 1
-  conteudo="$(tr -d '\r' < "$1" 2>/dev/null; printf .)" || return 1
+  # só o CR do fim da linha sai: um CR dentro do padrão muda o que o Git ignora
+  # (CodeAnt no conselhos-municipais#365)
+  conteudo="$(sed "s/$(printf '\r')\$//" < "$1" 2>/dev/null; printf .)" || return 1
   [ "$conteudo" = "${esperado}." ]
 }
 # so_gitignores_do_hook <lista> — 0 quando cada caminho da lista (um por linha) e `.gitignore` do hook
@@ -121,17 +123,27 @@ dona_do_pre_push() {
   local c="$1" hook hookfis hp v cfis vd vfis
   hook="$(git -C "$c" rev-parse --path-format=absolute --git-path hooks/pre-push 2>/dev/null)" || return 1
   [ -f "$hook" ] || return 1
+  # Relativo, o core.hooksPath vale para cada checkout por si: o hook lido aqui é só
+  # desta worktree, e removê-la não tira o de ninguém (CodeAnt no mergex#107 e no
+  # conselhos-municipais#365).
+  hp="$(git -C "$c" config --get core.hooksPath 2>/dev/null)" || hp=""
+  # Com `..`, o relativo pode levar todos os checkouts à mesma pasta dentro de uma
+  # worktree (`../dona/.githooks`): esse segue para as conferências abaixo (CodeAnt no
+  # mergex#109).
+  case "$hp" in
+    ''|/*|[A-Za-z]:/*|'~'*) ;;
+    *) case "/$hp/" in */../*) ;; *) return 1 ;; esac ;;
+  esac
   cfis="$(cd -P -- "$c" 2>/dev/null && pwd -P)" || cfis="$c"
   hookfis="$(cd -P -- "${hook%/*}" 2>/dev/null && pwd -P)" || hookfis="${hook%/*}"
   # core.hooksPath é compartilhado pelas worktrees: se o próprio chamador mora
   # nesta worktree, removê-la apagaria o hook de todos, qualquer que seja o
-  # caminho que ele registra para o validador.
+  # caminho que ele registra para o validador. O pre-push que é link para dentro
+  # dela também cai aqui: o --git-path do Git devolve o caminho com o link resolvido.
   case "$hookfis/" in "$cfis"/*) return 0 ;; esac
   # O caminho configurado conta tanto quanto o fisico: um link na worktree para uma
   # pasta de fora some com ela, e o core.hooksPath de todos passa a apontar para o
-  # nada. O Git resolve o link no --git-path, entao o valor vem da config. Relativo,
-  # ele vale para cada checkout por si e nao e de ninguem (CodeAnt no mergex#107).
-  hp="$(git -C "$c" config --get core.hooksPath 2>/dev/null)" || hp=""
+  # nada. O Git resolve o link no --git-path, entao o valor vem da config.
   case "$hp" in
     /*|[A-Za-z]:/*) case "${hp%/}/" in "$c"/*|"$cfis"/*) return 0 ;; esac ;;
   esac

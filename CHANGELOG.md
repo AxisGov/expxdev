@@ -9,6 +9,18 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.18 — o merge do plano antes do E0 não trava o registro da reconciliação
+
+Instale por PR, como a 0.14.17. Certifica a mergex (AxisGov/mergex#108 e #109, merge f16fda8, DM-339 e DM-340) e a sprintx (AxisGov/sprintx#92, merge 5e9bf5f, DS-234). O CLI, o núcleo, os eventos, o painel, o `expx sessao` e as outras sete skills seguem como na 0.14.17.
+
+Relato do conselhos-municipais#359 e achados do CodeAnt no conselhos-municipais#365 (8: 5 confirmados, 1 corrigido em parte, 2 rejeitados), no mergex#109 e no sprintx#92 (1 cada, confirmados).
+
+- **MergeX, `reconciliacao-base.sh --registrar`.** O primeiro registro recusava com rc 5 (`ordem`) quando a linha de primeiro pai trazia o merge da branch do plano, feito antes de o E0 gravar a base. Sem o registro, a V9 acusava os arquivos que vieram da main. A fila agora deixa de fora o merge anterior à abertura do E0: o conteúdo dele é da feature, e o portão o confere como tal.
+- **MergeX, `worktrees-entregues.sh --remover`.** O `core.hooksPath` relativo, sem `..`, é de cada checkout e já não prende a worktree. Com `..`, como `../dona/.githooks`, ele pode ser comum e continua prendendo. Do `.gitignore` do hook sai só o CR do fim da linha.
+- **MergeX, `entrega-de-planejamento.sh`.** O temporário do ENTREGA.md nasce com O_EXCL e não segue um link deixado no nome previsível. A marca `.dono` da trava nasce no próprio shell, que anota o sinal.
+- **SprintX, trava da F6.** A pasta é lida uma vez só por tentativa. A dona que soltava entre duas leituras fazia a F6 devolver `ambiente` sem tentar de novo.
+- **Rejeitados:** o pre-push de fora que é link para dentro da worktree, que o `--git-path` do Git já resolve, e a trava do `predecessores.sh` que só falha com o PID e a limpeza falhando juntos.
+
 ## 0.14.17 — o hook que mora na worktree não sai com ela
 
 Instale por PR, como a 0.14.16. Certifica a mergex (AxisGov/mergex#107, merge 9a8f255, DM-338) e a sprintx (AxisGov/sprintx#91, merge 53f1818, DS-233). O CLI, o núcleo, os eventos, o painel, o `expx sessao` e as outras sete skills seguem como na 0.14.16.
