@@ -9,7 +9,7 @@ export const MANIFESTO_DE_COMANDOS: ManifestoDeComandos = {
     { skill: "runx", commit: "5ff9d231616b0c4aafa81a037f45a90042b547c2", papel: "certificado" },
     { skill: "legadox", commit: "a6a4629c47dc0fdfab75de0f6246ce6609088970", papel: "certificado" },
     { skill: "stackx", commit: "03ff770d7bc257cf2271ff08e77904e351e80d5a", papel: "certificado" },
-    { skill: "mergex", commit: "833a8139c6ac6800b33c0a32697e369a4c76f82c", papel: "certificado" },
+    { skill: "mergex", commit: "b55913d8dac0056b7b548d37a1dec15d51debf1d", papel: "certificado" },
     { skill: "memox", commit: "db64a04ff3c9bd7f7c1b8e0685c3a5ece4773f1d", papel: "certificado" },
     { skill: "prodx", commit: "06ce57a42db8eaae3f98ea60fc3895f1536383c5", papel: "certificado" },
     { skill: "buildx", commit: "235cf01a6a364c03314cf7dade31ee5cd629b1da", papel: "certificado" },

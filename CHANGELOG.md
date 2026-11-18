@@ -9,6 +9,14 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.16 — a worktree removida sai inteira do disco no Windows
+
+Instale por PR, como a 0.14.15. Certifica a mergex (AxisGov/mergex#105, merge b55913d, DM-337). O CLI, o núcleo, os eventos, o painel, o `expx sessao` e as outras oito skills seguem como na 0.14.15.
+
+- **MergeX, `worktrees-entregues.sh --remover`.** No Git for Windows, o `git worktree remove` tira a worktree do registro e deixa a pasta com as junctions do `node_modules` dos workspaces npm, pendentes porque o destino era a própria worktree. O `--remover` dizia "removida", e as cascas acumulavam (relato do login, com 4 delas). Agora, se a pasta continua no disco sem nenhum arquivo comum, os links saem sem ser seguidos e depois as pastas vazias. Com qualquer arquivo comum, nada é apagado: o `--remover` para e lista os caminhos. Ele só diz "removida" quando a pasta saiu inteira.
+- **Não muda:** a casca deixada por uma versão anterior continua dando "worktree inexistente", porque a pasta já não é worktree. Apague cada junction sem segui-la e depois a pasta.
+- **Não exercitado:** o `--remover` de ponta a ponta numa worktree real com `npm install` no Windows. O comportamento do `find` e do `rm` com junctions reais foi conferido à parte no Git Bash, e o caminho inteiro foi testado no WSL com links simbólicos.
+
 ## 0.14.15 — o rastro real que sai com a worktree e a trava que não fica órfã
 
 Instale por PR, como a 0.14.14. Certifica a mergex (AxisGov/mergex#104, merge 833a813, DM-336) e a sprintx (AxisGov/sprintx#89, merge e3fa0b9, DS-231). O CLI, o núcleo, os eventos, o painel e o `expx sessao` seguem como na 0.14.14, e as outras sete skills, nos mesmos commits.

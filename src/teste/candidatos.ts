@@ -23,7 +23,7 @@ export const BINARIO = join(RAIZ_DO_REPO, "dist", "cli", "expx-bin.js");
  */
 export const CANDIDATOS = {
   sprintx: { pasta: "SprintX", sha: "e3fa0b9e1256685fd9905efeaa52cebc9dfd1aac" },
-  mergex: { pasta: "MergeX", sha: "833a8139c6ac6800b33c0a32697e369a4c76f82c" },
+  mergex: { pasta: "MergeX", sha: "b55913d8dac0056b7b548d37a1dec15d51debf1d" },
 } as const;
 
 export type NomeCandidato = keyof typeof CANDIDATOS;

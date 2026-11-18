@@ -194,13 +194,39 @@ listar() {
 
 if [ "$ACAO" = listar ]; then listar; exit $?; fi
 
+# casca_da_worktree <caminho> — depois do `git worktree remove`: o Git for Windows tira a worktree do
+# registro e deixa a pasta com as junctions do `node_modules` dos workspaces npm, pendentes porque o
+# destino era a propria worktree (login, depois da 0.14.13). Sem nenhum arquivo comum, os links saem
+# sem ser seguidos (o `find` nao segue link, e o Git Bash ve a junction como link) e depois as pastas
+# vazias; com qualquer arquivo, a pasta fica e o caminho aparece. 0 quando nao sobrou nada.
+casca_da_worktree() {
+  local c="$1" comuns
+  [ -e "$c" ] || [ -L "$c" ] || return 0
+  if [ -L "$c" ] || [ ! -d "$c" ]; then
+    echo "PARADO: o Git tirou a worktree do registro, mas $c continua no disco e nao e pasta" >&2; return 1
+  fi
+  comuns="$(find "$c" ! -type d ! -type l -print 2>/dev/null)" \
+    || { echo "PARADO: o Git tirou a worktree do registro, mas nao consegui ler o que sobrou em $c" >&2; return 1; }
+  if [ -n "$comuns" ]; then
+    echo "PARADO: o Git tirou a worktree do registro, mas sobraram arquivos em $c (nada foi apagado):" >&2
+    printf '%s\n' "$comuns" | sed 's/^/  /' >&2
+    return 1
+  fi
+  find "$c" -type l -exec rm -f -- {} + 2>/dev/null
+  find "$c" -depth -type d -empty -delete 2>/dev/null
+  [ ! -e "$c" ] && [ ! -L "$c" ] && return 0
+  echo "PARADO: o Git tirou a worktree do registro, mas $c nao saiu inteira; confira o que restou" >&2
+  return 1
+}
+
 ALVO_GIT="$(git -C "$ALVO" rev-parse --show-toplevel 2>/dev/null)" || { echo "worktree inexistente: $ALVO" >&2; exit 1; }
 [ "$(git rev-parse --show-toplevel 2>/dev/null)" != "$ALVO_GIT" ] || { echo "PARADO: rodando dentro da worktree: $ALVO" >&2; exit 1; }
 TODAS="$(listar)" || exit 1
 LINHA="$(awk -F '\t' -v a="$ALVO_GIT" '$3 == a' <<<"$TODAS")"
 [ -n "$LINHA" ] || { echo "PARADO: nao e worktree deste repositorio: $ALVO" >&2; exit 1; }
 case "$LINHA" in
-  removivel*) git worktree remove "$ALVO_GIT" || exit 1; echo "removida: $ALVO_GIT" ;;
+  removivel*) git worktree remove "$ALVO_GIT" || exit 1; casca_da_worktree "$ALVO_GIT" || exit 1
+    echo "removida: $ALVO_GIT" ;;
   *)
     MOTIVO="$(cut -f2 <<<"$LINHA")"
     echo "PARADO: $MOTIVO: $ALVO_GIT" >&2
