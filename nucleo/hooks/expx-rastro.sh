@@ -689,13 +689,21 @@ expx_rastro_grava() {
     # processos que criam a mesma pasta no mesmo instante. A posse e a marca `.dono`, criada
     # com O_EXCL pelo proprio bash (`set -C`): so um a cria. A marca que nao se cria, sem outra
     # na pasta, tira a pasta, para nao virar trava orfa; com outra marca, a trava e de outro.
+    # A posse e so a criacao da marca vazia (`: >`, que so falha na criacao); o PID vem depois,
+    # com `>|` contra o noclobber herdado, e o PID que nao se escreve tira a marca e a pasta
+    # (CodeAnt no conselhos-municipais#360, o mesmo padrao da DS-231 da sprintx).
     if [ -f "$arq" ]; then
       local tam trava="$dir/.$tid.rotacao"
       tam=$(wc -c < "$arq" 2>/dev/null | tr -d ' ')
       if [ -n "$tam" ] && [ "$tam" -gt 5242880 ] 2>/dev/null; then
         if ( mkdir "$trava" 2>/dev/null || exit 1
-             ( set -C; printf '%s\n' "$$" > "$trava/.dono" ) 2>/dev/null && exit 0
-             [ -e "$trava/.dono" ] || rmdir "$trava" 2>/dev/null
+             ( set -C; : > "$trava/.dono" ) 2>/dev/null || {
+               [ -e "$trava/.dono" ] || rmdir "$trava" 2>/dev/null
+               exit 1
+             }
+             printf '%s\n' "$$" >| "$trava/.dono" 2>/dev/null && exit 0
+             rm -f "$trava/.dono" 2>/dev/null
+             rmdir "$trava" 2>/dev/null
              exit 1 ); then
           tam=$(wc -c < "$arq" 2>/dev/null | tr -d ' ')
           if [ -n "$tam" ] && [ "$tam" -gt 5242880 ] 2>/dev/null; then
