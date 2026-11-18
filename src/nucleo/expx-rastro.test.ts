@@ -894,6 +894,14 @@ describe("rotação do rastro", () => {
     expect(readFileSync(join(raiz, "docs", "eventos", "t.1.jsonl"), "utf8")).toBe("antigo\n");
   });
 
+  it("funcional: o PID que não se escreve na marca tira a marca e a trava, sem rotacionar (conselhos#360)", () => {
+    const raiz = comArquivoGrande();
+    const falhaPid = `printf() { if [ "$1" = '%s\\n' ] && [ "$2" = "$$" ]; then return 1; fi; builtin printf "$@"; }\n`;
+    roda(raiz, `${falhaPid}expx_rastro_grava "$PWD" acao_permitida hook permitido x`, { EXPX_TRABALHO_ID: "t" });
+    expect(readFileSync(join(raiz, "docs", "eventos", "t.1.jsonl"), "utf8")).toBe("antigo\n");
+    expect(readdirSync(join(raiz, "docs", "eventos")).filter((f) => f.startsWith("."))).toEqual([]);
+  });
+
   it("funcional: com a trava de outro gravador, não rotaciona e o .1.jsonl fica intacto", () => {
     const raiz = comArquivoGrande();
     mkdirSync(join(raiz, "docs", "eventos", ".t.rotacao"));

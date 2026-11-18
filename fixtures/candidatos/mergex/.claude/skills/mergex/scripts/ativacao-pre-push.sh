@@ -148,6 +148,9 @@ if [ "$MODO" != reverter ] || [ -n "$ENTREGA" ]; then
     docs/entregas/*/ENTREGA.md) ;;
     *) uso '--entrega deve ser docs/entregas/<id>/ENTREGA.md, relativo à raiz' ;;
   esac
+  # no `case`, o `*` casa `/`: o <id> é um diretório só (CodeAnt no conselhos-municipais#360)
+  id_entrega="${ENTREGA#docs/entregas/}"; id_entrega="${id_entrega%/ENTREGA.md}"
+  case "$id_entrega" in ''|*/*) uso '--entrega deve ser docs/entregas/<id>/ENTREGA.md, com o <id> num diretório só' ;; esac
   case "/$ENTREGA/" in */../*|*/./*|*//*) uso '--entrega com componente . ou .. ou vazio' ;; esac
 fi
 
