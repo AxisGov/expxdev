@@ -118,9 +118,23 @@ ignorados_com_valor() {
 # repositorio para com "validador ausente" (login, depois do #96). O chamador relativo a raiz
 # (`"$MERGEX_RAIZ"/...`) nao prende worktree nenhuma.
 dona_do_pre_push() {
-  local c="$1" hook v cfis vd vfis
+  local c="$1" hook hookfis hp v cfis vd vfis
   hook="$(git -C "$c" rev-parse --path-format=absolute --git-path hooks/pre-push 2>/dev/null)" || return 1
   [ -f "$hook" ] || return 1
+  cfis="$(cd -P -- "$c" 2>/dev/null && pwd -P)" || cfis="$c"
+  hookfis="$(cd -P -- "${hook%/*}" 2>/dev/null && pwd -P)" || hookfis="${hook%/*}"
+  # core.hooksPath é compartilhado pelas worktrees: se o próprio chamador mora
+  # nesta worktree, removê-la apagaria o hook de todos, qualquer que seja o
+  # caminho que ele registra para o validador.
+  case "$hookfis/" in "$cfis"/*) return 0 ;; esac
+  # O caminho configurado conta tanto quanto o fisico: um link na worktree para uma
+  # pasta de fora some com ela, e o core.hooksPath de todos passa a apontar para o
+  # nada. O Git resolve o link no --git-path, entao o valor vem da config. Relativo,
+  # ele vale para cada checkout por si e nao e de ninguem (CodeAnt no mergex#107).
+  hp="$(git -C "$c" config --get core.hooksPath 2>/dev/null)" || hp=""
+  case "$hp" in
+    /*|[A-Za-z]:/*) case "${hp%/}/" in "$c"/*|"$cfis"/*) return 0 ;; esac ;;
+  esac
   v="$(awk 'index($0, "MERGEX_PORTAO_PUSH=") == 1 { print substr($0, 20); exit }' "$hook" 2>/dev/null)"
   case "$v" in ''|'"$MERGEX_RAIZ"'*) return 1 ;; esac
   # o `--instalar` grava o caminho com `printf '%q'`: cada `\x` vale `x`. A forma `$'...'` (quebra
@@ -136,7 +150,6 @@ dona_do_pre_push() {
     esac
   done
   v="$d"
-  cfis="$(cd -P -- "$c" 2>/dev/null && pwd -P)" || cfis="$c"
   vd="${v%/*}"; vfis="$(cd -P -- "$vd" 2>/dev/null && pwd -P)" || vfis="$vd"
   case "$v/" in "$c"/*) return 0 ;; esac
   case "$vfis/" in "$cfis"/*) return 0 ;; esac

@@ -143,18 +143,31 @@ esac
 # O `mkdir` nem sempre exclui: o do uutils coreutils (Ubuntu 26.04) sai 0 nos dois processos que
 # criam a mesma pasta no mesmo instante. A posse é a marca `.dono`, criada com O_EXCL pelo próprio
 # bash (`set -C`): quem perde a marca espera como quem perde o `mkdir` (DM-334).
-LOCK_DIR=""
+LOCK_DIR=""; CRIEI=0; SINAL_PENDENTE=""
+# Solta só a trava cuja marca tem o PID desta execução: nunca a de outra (DM-338).
 libera_lock() {
-  [ -z "$LOCK_DIR" ] || { rm -f -- "$LOCK_DIR/.dono"; rmdir "$LOCK_DIR" 2>/dev/null; } || :
+  [ "$CRIEI" = 1 ] && [ "$(cat "$LOCK_DIR/.dono" 2>/dev/null)" = "$$" ] || return 0
+  rm -f -- "$LOCK_DIR/.dono"
+  rmdir "$LOCK_DIR" 2>/dev/null || :
+  CRIEI=0
 }
 case "$ACAO" in
   registrar-merge|completar-base|registrar-pr|abrir-sprint|retomar-planejamento)
     LOCK_DIR="$ENTREGA.lock"
+    # Um sinal entre o `mkdir` e a marca com o PID deixaria a trava órfã (CodeAnt no
+    # conselhos-municipais#361, DM-338). Durante a aquisição o sinal só fica anotado; ele vale
+    # quando a posse está decidida, e a saída solta a trava pelo trap de EXIT.
+    trap 'libera_lock' EXIT
+    trap 'SINAL_PENDENTE=129' HUP
+    trap 'SINAL_PENDENTE=130' INT
+    trap 'SINAL_PENDENTE=143' TERM
     tentativas=0
     while :; do
+      [ -z "$SINAL_PENDENTE" ] || exit "$SINAL_PENDENTE"
       if mkdir "$LOCK_DIR" 2>/dev/null; then
         if ( set -C; : > "$LOCK_DIR/.dono" ) 2>/dev/null; then
           if printf '%s\n' "$$" >| "$LOCK_DIR/.dono" 2>/dev/null; then
+            CRIEI=1
             break
           fi
           rm -f -- "$LOCK_DIR/.dono"
@@ -171,10 +184,10 @@ case "$ACAO" in
       [ "$tentativas" -lt 100 ] || recusa "entrega ocupada ou lock órfão: $LOCK_DIR (verifique antes de removê-lo)"
       sleep 0.1
     done
-    trap 'libera_lock' EXIT
     trap 'exit 129' HUP
     trap 'exit 130' INT
-    trap 'exit 143' TERM ;;
+    trap 'exit 143' TERM
+    [ -z "$SINAL_PENDENTE" ] || exit "$SINAL_PENDENTE" ;;
 esac
 
 # antes de ler: um link quebrado também é link, e a recusa é a mesma
