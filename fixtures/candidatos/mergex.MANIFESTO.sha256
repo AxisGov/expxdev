@@ -30,7 +30,7 @@ d0b219ee94132d44c0c968e1737c6aba044721d0e8a1701ff4f6a920f2ab5a18  .claude/skills
 8a78434435e46c72e7fadf995e1c6299c1776c5659dc03ece97e6d68165210e9  .claude/skills/mergex/assets/ci/mergex-portao.yml
 69ffdc28ccc180b34a5bef2a3cc2252263628f5989589e0f076f3cfbd6af4b95  .claude/skills/mergex/assets/pre-push-gerenciado.sh
 d5af359692ed5da01c566d5cf37b25e221bf66b9fb69a7b154fe454b9876ac2c  .claude/skills/mergex/decisoes/anteriores-ao-p02.md
-4962e1e0bc7af4d893be44dd0767ca5d14aefaf08905662e495cf74e91da650a  .claude/skills/mergex/decisoes/endurecimento-conselhos-208-210.md
+2e616920ff87bae59ef2fcaee21633979f076422820dd03c6382a4ecc5a7704f  .claude/skills/mergex/decisoes/endurecimento-conselhos-208-210.md
 7e047167485cae65e521815148225f0880c7e0f71c79c7851311937bf5b6a7b1  .claude/skills/mergex/decisoes/revisao-por-task-e-entrega-por-sprint.md
 18cdf17927d72b5aa28be820f17962c2198b53e0222d74fcb2b8c1f2479ec4d9  .claude/skills/mergex/references/00-abertura.md
 860b926d351e7694d0d6707552bfb59553b01d88cf3ecbd7463d35a9ddfacec6  .claude/skills/mergex/references/00-schema.md
@@ -57,7 +57,7 @@ b1d3db5264220493b6d849793c570b12e48610a6f6e4369d05dbdfd365010b61  .claude/skills
 32728071c96aab872a0f1a1f11a91f98b513157d65af2668a9202b9f95b2153c  .claude/skills/mergex/scripts/causa-do-portao.sh
 88336121671a5fb29e52e0c290b03cbe1370fe28b94838c6744ccd5273c89f05  .claude/skills/mergex/scripts/classificar-atencao.sh
 d91f1c4b890ff28d891d9d0089a512e3a9571af90c7382834c6e3741f4f5d11e  .claude/skills/mergex/scripts/contrato-de-commit.sh
-1b7d6487945db19b030794e2545bc46d80790def380427de2796e643b6226ea9  .claude/skills/mergex/scripts/entrega-de-planejamento.sh
+9f70fbdd937c3e771af7880411f93ecb7972d65a022ff4a5fcf1072e598267b2  .claude/skills/mergex/scripts/entrega-de-planejamento.sh
 e1c5df88441d9e4fa0eeabc4559848f584d1ec672d575ea540ad673f163bfdc7  .claude/skills/mergex/scripts/fatiamento-da-pr.sh
 6f7037c2ee6889bcc48a7bed78e060d24e374fa82e9fb5581be705fd48a0d723  .claude/skills/mergex/scripts/fechamento-do-e1.sh
 53450fe95797df8d570911885c076951bdeafc3b53e2667f53fc3ab7efceca24  .claude/skills/mergex/scripts/fechamento-pos-merge.sh
@@ -81,7 +81,7 @@ e9e7b0d80e6df22e3d5ef9e50e226d6a4196be27a7aae48755f9650b1bff5567  .claude/skills
 5d2e1b04f003ccc94d53ab2b466052d2cac6d131b1023dbdf5457fbb750d2283  .claude/skills/mergex/scripts/sequencia-de-commits.sh
 8fb7edf185aa12ec870a81b4b8d3dbcfdb946538ae6b8d95fff260c78ca3f52b  .claude/skills/mergex/scripts/trava-do-e1.sh
 b628cae770e42b2130aac4b35f32c3c4aabd1e8e5cca530010a4ccd499039cc9  .claude/skills/mergex/scripts/validade-do-portao.sh
-e859f44222f7f9dbf5c8c790959302becdf2cb57b06f73178094c48877bd6a75  .claude/skills/mergex/scripts/worktrees-entregues.sh
+eafccbd1be1e7321bea23a940d864252a38c14e0404cb2d63505b74234936231  .claude/skills/mergex/scripts/worktrees-entregues.sh
 32159b62054824e7f2545b07e6abeda0f2995c9266df0c30d7110c88c5c12d79  .expx/hooks.json
 8a03ba7a3fc0541da256ba85caffc7f883437d9363c897353efcd1b2d2d59973  AGENTS.md
 63654fe664cb9918161c28f77e3c85c05c61f9f3efb2273cf9e1ed68d4b83ffa  LICENSE

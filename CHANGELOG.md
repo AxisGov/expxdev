@@ -9,6 +9,17 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.15 — o rastro real que sai com a worktree e a trava que não fica órfã
+
+Instale por PR, como a 0.14.14. Certifica a mergex (AxisGov/mergex#104, merge 833a813, DM-336) e a sprintx (AxisGov/sprintx#89, merge e3fa0b9, DS-231). O CLI, o núcleo, os eventos, o painel e o `expx sessao` seguem como na 0.14.14, e as outras sete skills, nos mesmos commits.
+
+Achados do CodeAnt no conselhos-municipais#356 (5, todos confirmados), no sprintx#89 (2) e no login#101 (3), todos corrigidos.
+
+- **MergeX, `worktrees-entregues.sh`.** O hook do rastro grava em `docs/eventos/.gitignore` um comentário e depois `*`, mas a comparação da 0.14.14 exigia só `*`. Por isso um `docs/eventos/` real nunca saía junto com a worktree. Agora a comparação é com o texto exato do hook, e um `*` sozinho bloqueia. O caminho do validador gravado com `printf '%q'` se desfaz de verdade: um `\` literal não some mais, e a forma `$'...'` bloqueia na dúvida. Nome com quebra de linha numa pasta ignorada bloqueia.
+- **MergeX, trava do `ENTREGA.md`.** A posse é a criação exclusiva da marca vazia. A marca que não se cria, sem outra marca na pasta, não deixa a pasta órfã. O PID que não se escreve tira a marca e a pasta e recusa como falha de ambiente. O `noclobber` herdado não quebra mais a escrita.
+- **SprintX, travas dos predecessores e da F6.** As mesmas regras: o PID que não se escreve tira a própria marca e a pasta, nunca vira trava ocupada, e o `noclobber` herdado não impede a escrita.
+- **Não exercitado:** uma falha real de disco na escrita do PID (os testes simulam com `ulimit -f 0`, permissão e `printf` que falha) e a bancada inteira da sprintx, que não coube na memória da máquina. A seção das travas da F6 rodou com o mesmo ambiente da bancada.
+
 ## 0.14.14 — o pre-push que sobrevive à worktree e as travas restantes
 
 Instale por PR, como a 0.14.13. Certifica a mergex (AxisGov/mergex#103, merge 8e02853, DM-335) e a sprintx (AxisGov/sprintx#88, merge 8b93764, DS-230), e muda a trava da rotação do rastro no núcleo. O CLI, o núcleo de revisão, os eventos, o painel e o `expx sessao` seguem como na 0.14.13, e as outras sete skills, nos mesmos commits.

@@ -44,9 +44,16 @@ BASE="refs/remotes/origin/$BASE"
 # build quando a pasta-mae tem um manifesto de build: uma pasta qualquer com esse nome pode
 # guardar dado que nao se refaz (CodeAnt no conselhos-municipais#350).
 # descartavel <caminho-ignorado> <worktree>
-# gitignore_do_hook <arquivo> — 0 quando e um arquivo comum cujo conteudo e so `*`
+# gitignore_do_hook <arquivo> — 0 quando e o marcador exato que o hook grava.
+# CRLF e aceito porque o rastro pode passar por checkout que normaliza linhas.
 gitignore_do_hook() {
-  [ -f "$1" ] && [ ! -L "$1" ] && [ "$(tr -d '\r' < "$1" 2>/dev/null)" = '*' ]
+  local esperado conteudo
+  esperado='# Rastro de eventos expx: local da maquina, nao versionado.
+*
+'
+  [ -f "$1" ] && [ ! -L "$1" ] || return 1
+  conteudo="$(tr -d '\r' < "$1" 2>/dev/null; printf .)" || return 1
+  [ "$conteudo" = "${esperado}." ]
 }
 # so_gitignores_do_hook <lista> — 0 quando cada caminho da lista (um por linha) e `.gitignore` do hook
 so_gitignores_do_hook() {
@@ -59,20 +66,23 @@ so_gitignores_do_hook() {
 }
 
 descartavel() {
-  local resto="$1" c="$2" pre="" comp m lista
+  local resto="$1" c="$2" pre="" comp m lista quebra NL=$'\n'
   case "$1" in
     node_modules/*|*/node_modules/*|__pycache__/*|*/__pycache__/*|.pytest_cache/*|*/.pytest_cache/*) return 0 ;;
     .mypy_cache/*|*/.mypy_cache/*|.ruff_cache/*|*/.ruff_cache/*) return 0 ;;
   esac
   # a pasta ignorada que so tem `.gitignore` (o `*` que o hook do rastro grava em docs/eventos/)
   # nao guarda nada: sem nenhum outro arquivo, sai junto (login, depois do DM-331)
-  # So vale o `.gitignore` que e exatamente o do hook (`*`): outro conteudo foi escrito por alguem
+  # So vale o `.gitignore` que e exatamente o do hook: outro conteudo foi escrito por alguem
   # e bloqueia. O `find` que falha numa parte da pasta nao a declara vazia (CodeAnt no
   # conselhos-municipais#354).
   case "$1" in
     # sem a pasta no .gitignore da raiz, o Git mostra o proprio `.gitignore` que se ignora
     .gitignore|*/.gitignore) gitignore_do_hook "$c/$1" && return 0 ;;
-    */) if [ -d "$c/$1" ] && lista="$(find "$c/$1" ! -type d -print 2>/dev/null)"; then
+    # a lista e um caminho por linha: um nome com quebra de linha viraria varios caminhos, e cada
+    # pedaco poderia ser um `.gitignore` do hook que existe. Nome assim bloqueia (CodeAnt no login#101)
+    */) if [ -d "$c/$1" ] && lista="$(find "$c/$1" ! -type d -print 2>/dev/null)" \
+          && quebra="$(find "$c/$1" -path "*$NL*" -print 2>/dev/null)" && [ -z "$quebra" ]; then
           so_gitignores_do_hook "$lista" && return 0
         fi ;;
   esac
@@ -113,7 +123,19 @@ dona_do_pre_push() {
   [ -f "$hook" ] || return 1
   v="$(awk 'index($0, "MERGEX_PORTAO_PUSH=") == 1 { print substr($0, 20); exit }' "$hook" 2>/dev/null)"
   case "$v" in ''|'"$MERGEX_RAIZ"'*) return 1 ;; esac
-  v="${v#\"}"; v="${v%\"}"; v="${v//\\/}"
+  # o `--instalar` grava o caminho com `printf '%q'`: cada `\x` vale `x`. A forma `$'...'` (quebra
+  # de linha, caractere de controle) nao se desfaz aqui, e na duvida a worktree e dona: bloqueia
+  # (CodeAnt no login#101, DM-336). Apagar toda barra invertida perdia o `\` literal do caminho.
+  case "$v" in "\$'"*) return 0 ;; esac
+  v="${v#\"}"; v="${v%\"}"
+  local d=""
+  while [ -n "$v" ]; do
+    case "$v" in
+      '\'?*) d="$d${v:1:1}"; v="${v:2}" ;;
+      *) d="$d${v:0:1}"; v="${v:1}" ;;
+    esac
+  done
+  v="$d"
   cfis="$(cd -P -- "$c" 2>/dev/null && pwd -P)" || cfis="$c"
   vd="${v%/*}"; vfis="$(cd -P -- "$vd" 2>/dev/null && pwd -P)" || vfis="$vd"
   case "$v/" in "$c"/*) return 0 ;; esac
