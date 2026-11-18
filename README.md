@@ -764,8 +764,9 @@ Atualizar o CLI é baixar a release nova e repetir o `npm install -g`.
   guardava o caminho absoluto da worktree e as travas restantes com dono exclusivo.
 - `0.14.15` certifica a MergeX e a SprintX com os achados do conselhos#356, do sprintx#89 e do login#101:
   a trava que não fica órfã quando o PID não se escreve e o `docs/eventos/` real que sai junto com a worktree.
-- `0.14.16` certifica a MergeX com o `--remover` que tira a casca de junctions que o Git for Windows deixa
-  depois de remover a worktree (relato do login).
+- `0.14.16` certifica a MergeX e a SprintX com o `--remover` que tira a casca de junctions que o Git for
+  Windows deixa depois de remover a worktree (relato do login) e os achados do conselhos#360, entre eles a
+  trava da rotação do rastro no núcleo.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

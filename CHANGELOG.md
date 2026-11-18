@@ -11,9 +11,14 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 ## 0.14.16 — a worktree removida sai inteira do disco no Windows
 
-Instale por PR, como a 0.14.15. Certifica a mergex (AxisGov/mergex#105, merge b55913d, DM-337). O CLI, o núcleo, os eventos, o painel, o `expx sessao` e as outras oito skills seguem como na 0.14.15.
+Instale por PR, como a 0.14.15. Certifica a mergex (AxisGov/mergex#105 e #106, merge 1907042, DM-337) e a sprintx (AxisGov/sprintx#90, merge 9f3157e, DS-232), e muda a trava da rotação do rastro no núcleo. O CLI, os eventos, o painel, o `expx sessao` e as outras sete skills seguem como na 0.14.15.
+
+Relato do login e achados do CodeAnt no conselhos-municipais#360 (3, todos confirmados).
 
 - **MergeX, `worktrees-entregues.sh --remover`.** No Git for Windows, o `git worktree remove` tira a worktree do registro e deixa a pasta com as junctions do `node_modules` dos workspaces npm, pendentes porque o destino era a própria worktree. O `--remover` dizia "removida", e as cascas acumulavam (relato do login, com 4 delas). Agora, se a pasta continua no disco sem nenhum arquivo comum, os links saem sem ser seguidos e depois as pastas vazias. Com qualquer arquivo comum, nada é apagado: o `--remover` para e lista os caminhos. Ele só diz "removida" quando a pasta saiu inteira.
+- **MergeX, `ativacao-pre-push.sh`.** No `case`, o `*` casava `/`, e `--entrega docs/entregas/a/b/ENTREGA.md` passava. O `<id>` vazio ou com `/` agora sai como uso, antes de instalar qualquer coisa.
+- **SprintX, trava da F6.** Quando a escrita do PID e a limpeza da marca e da pasta falham juntas, o motivo é `ambiente`, não `existente`, mesmo com a pasta que sobrou.
+- **Núcleo, `expx-rastro.sh`.** A trava da rotação do rastro tinha o padrão que a DS-231 corrigiu na sprintx: o PID que não se escrevia deixava a marca e a trava, e as rotações seguintes paravam. A posse é a criação da marca vazia, o PID vem com `>|`, e o PID que não se escreve tira a marca e a pasta.
 - **Não muda:** a casca deixada por uma versão anterior continua dando "worktree inexistente", porque a pasta já não é worktree. Apague cada junction sem segui-la e depois a pasta.
 - **Não exercitado:** o `--remover` de ponta a ponta numa worktree real com `npm install` no Windows. O comportamento do `find` e do `rm` com junctions reais foi conferido à parte no Git Bash, e o caminho inteiro foi testado no WSL com links simbólicos.
 

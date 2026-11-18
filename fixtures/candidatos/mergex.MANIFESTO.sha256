@@ -52,7 +52,7 @@ b1d3db5264220493b6d849793c570b12e48610a6f6e4369d05dbdfd365010b61  .claude/skills
 82df1d54fba6b8614fd52a175c73e63cf61223aad4543fd8949c59d13fdb4c13  .claude/skills/mergex/references/integracao/runx.md
 925c1a9cf7e00af7545c99f728b45620f3b11934967842d9af0901c130bfd552  .claude/skills/mergex/references/integracao/sprintx.md
 4e49d081c67e9f98f2e0712424a57fd6ac9462154336b6239c150002c0576cb1  .claude/skills/mergex/references/integracao/stackx.md
-557af4e26337e02b55155faf5281f0f58604acfd68e120313fd0e0533a5b521e  .claude/skills/mergex/scripts/ativacao-pre-push.sh
+18b4c872526f75e2dcd3a989b6152242ecb37f007b732156bb5ed44e15aa5ecd  .claude/skills/mergex/scripts/ativacao-pre-push.sh
 5cc0432ee27cbaaa742ffadca5d760958ec76a56a9e9841cd6995c5313d33643  .claude/skills/mergex/scripts/catalogo-de-metodo.sh
 32728071c96aab872a0f1a1f11a91f98b513157d65af2668a9202b9f95b2153c  .claude/skills/mergex/scripts/causa-do-portao.sh
 88336121671a5fb29e52e0c290b03cbe1370fe28b94838c6744ccd5273c89f05  .claude/skills/mergex/scripts/classificar-atencao.sh
