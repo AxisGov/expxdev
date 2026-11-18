@@ -9,6 +9,17 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.17 — o hook que mora na worktree não sai com ela
+
+Instale por PR, como a 0.14.16. Certifica a mergex (AxisGov/mergex#107, merge 9a8f255, DM-338) e a sprintx (AxisGov/sprintx#91, merge 53f1818, DS-233). O CLI, o núcleo, os eventos, o painel, o `expx sessao` e as outras sete skills seguem como na 0.14.16.
+
+Achados do CodeAnt no conselhos-municipais#361 (7: 3 confirmados, 1 duplicado, 3 rejeitados) e 1 no mergex#107.
+
+- **MergeX, `worktrees-entregues.sh --remover`.** Com o `core.hooksPath` dentro de uma worktree, direto ou por um link para uma pasta de fora, o chamador relativo a `$MERGEX_RAIZ` parecia externo. O `--remover` tirava a worktree, e o pre-push de todos os checkouts sumia ou passava a apontar para o nada. Agora ela é dona do pre-push e a remoção para com `validador_do_pre_push`.
+- **MergeX, `entrega-de-planejamento.sh`.** Um HUP, INT ou TERM entre o `mkdir` da trava e a marca com o PID deixava a trava órfã, e as gravações seguintes paravam até alguém tirá-la à mão. Durante a aquisição o sinal só fica anotado. Ele vale depois que a posse está decidida, e a saída solta só a trava com o próprio PID.
+- **SprintX, trava da F6.** Se a dona soltava a trava entre o `mkdir` que falhou e o teste da pasta, a F6 saía com `ambiente` em vez de tentar de novo. Agora tenta até três vezes.
+- **Rejeitados:** o link no temporário da entrega (exige escrita na pasta da entrega, e quem escreve ali já altera a entrega) e duas travas que só falham com o PID e a limpeza falhando juntos.
+
 ## 0.14.16 — a worktree removida sai inteira do disco no Windows
 
 Instale por PR, como a 0.14.15. Certifica a mergex (AxisGov/mergex#105 e #106, merge 1907042, DM-337) e a sprintx (AxisGov/sprintx#90, merge 9f3157e, DS-232), e muda a trava da rotação do rastro no núcleo. O CLI, os eventos, o painel, o `expx sessao` e as outras sete skills seguem como na 0.14.15.
