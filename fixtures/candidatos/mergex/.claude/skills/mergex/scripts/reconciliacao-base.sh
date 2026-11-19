@@ -1653,7 +1653,17 @@ if [ "$N_CAD" = 0 ]; then
   ABERTURA=""
   if [ "$ORIGEM_BASE" = registrada_e0 ]; then
     while IFS= read -r c; do
-      g cat-file blob "$c:$ENTREGA" > "$TMP_DIR/entrega-abertura.md" 2>/dev/null || break
+      if ! g cat-file blob "$c:$ENTREGA" > "$TMP_DIR/entrega-abertura.md" 2>/dev/null; then
+        # sem o arquivo na árvore, a busca acabou; com ele e o blob ilegível (clone
+        # parcial sem rede, objeto perdido), a abertura não se prova e nada sai da
+        # fila por ela (CodeAnt no conselhos-municipais#371, DM-342). O tipo vem da
+        # árvore, sem ler o blob: uma pasta com o mesmo nome também encerra a busca
+        # (CodeAnt no mergex#111)
+        case "$(g ls-tree "$c" -- "$ENTREGA" 2>/dev/null)" in
+          [0-9]*' blob '*) estrutura ordem "ENTREGA.md ilegível em $c: a abertura do E0 não se prova" ;;
+        esac
+        break
+      fi
       # a base gravada pelo E0 ou reancorada na abertura da sprint (DM-261, DM-341)
       case "$(catalogo_fm "$TMP_DIR/entrega-abertura.md" origem_base)" in
         registrada_e0|registrada_sprint) ;;

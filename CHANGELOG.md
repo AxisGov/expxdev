@@ -9,6 +9,18 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.20 — a V9 desconta o merge que só repete o PR fechado
+
+Instale por PR, como a 0.14.19. Certifica a mergex (AxisGov/mergex#111, merge d761784, DM-342 e DM-343) e a sprintx (AxisGov/sprintx#93, merge 9fa036b, DS-235). O CLI, o núcleo, os eventos, o painel, o `expx sessao` e as outras sete skills seguem como na 0.14.19.
+
+Relato do conselhos-municipais#367 e achados do CodeAnt no conselhos-municipais#371 (5: 3 confirmados, 2 rejeitados), no mergex#111 e no sprintx#93 (1 cada, confirmados).
+
+- **MergeX, `portao-v9.sh`.** Numa entrega por sprint reconciliada com a main, a V9 dava `v9_sem_prova` ("a base contém o trabalho") quando a base trazia o merge da main numa branch lateral, feito depois do merge da sprint fechada. O merge agora é descontado quando a pasta e a entrega dele são as de um pai que descende do PR fechado (ou do planejamento) sem tê-las mudado desde ele.
+- **MergeX, `reconciliacao-base.sh --registrar`.** Na busca da abertura do E0, o ENTREGA.md que está na árvore e cujo blob não se lê (clone parcial sem rede, objeto perdido) para o registro em `estrutura[ordem]`. Antes, a busca acabava ali como fim normal, e merges saíam da fila sem prova. Uma pasta com o mesmo nome encerra a busca como o arquivo ausente.
+- **SprintX, `predecessores.sh`.** Um HUP, INT ou TERM durante o registro sai com 129, 130 ou 143. Antes podia sair 0 sem gravar o manifesto.
+- **SprintX, hooks.** O `cd` que resolve a pasta física ignora o CDPATH herdado. Com a raiz relativa, o arquivo do projeto parecia de fora e os hooks de aviso o ignoravam.
+- **Rejeitados:** o `rm` do temporário com O_EXCL (já rejeitado no #368) e o pre-push que é link para dentro da worktree (o `--git-path` absoluto do Git resolve o link, e o teste do #365 cobre o caso).
+
 ## 0.14.19 — o registro da reconciliação acha a abertura reancorada na sprint
 
 Instale por PR, como a 0.14.18. Certifica a mergex (AxisGov/mergex#110, merge 4024598, DM-341). A sprintx segue em 5e9bf5f. O CLI, o núcleo, os eventos, o painel, o `expx sessao` e as outras sete skills seguem como na 0.14.18.
