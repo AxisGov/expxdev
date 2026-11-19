@@ -9,6 +9,15 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.19 — o registro da reconciliação acha a abertura reancorada na sprint
+
+Instale por PR, como a 0.14.18. Certifica a mergex (AxisGov/mergex#110, merge 4024598, DM-341). A sprintx segue em 5e9bf5f. O CLI, o núcleo, os eventos, o painel, o `expx sessao` e as outras sete skills seguem como na 0.14.18.
+
+Achados do CodeAnt no conselhos-municipais#368 (3: 1 confirmado, 2 rejeitados).
+
+- **MergeX, `reconciliacao-base.sh --registrar`.** Na primeira sprint reancorada depois do PR de planejamento, o ENTREGA.md grava `origem_base: registrada_sprint` (DM-261). A busca da abertura só aceitava `registrada_e0` e ficava vazia, o merge anterior a ela voltava à fila e o registro do 001 recusava com rc 5, como no conselhos-municipais#359. A busca agora aceita as duas origens, sempre com a base igual à B0 do registro.
+- **Rejeitados:** o `>|` na `.dono` e o `rm` do temporário. Os dois só se exploram por quem já escreve na pasta da trava ou da entrega com o mesmo usuário, que já pode reescrever o ENTREGA.md.
+
 ## 0.14.18 — o merge do plano antes do E0 não trava o registro da reconciliação
 
 Instale por PR, como a 0.14.17. Certifica a mergex (AxisGov/mergex#108 e #109, merge f16fda8, DM-339 e DM-340) e a sprintx (AxisGov/sprintx#92, merge 5e9bf5f, DS-234). O CLI, o núcleo, os eventos, o painel, o `expx sessao` e as outras sete skills seguem como na 0.14.17.

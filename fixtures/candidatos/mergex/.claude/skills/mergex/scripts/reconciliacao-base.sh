@@ -1654,7 +1654,11 @@ if [ "$N_CAD" = 0 ]; then
   if [ "$ORIGEM_BASE" = registrada_e0 ]; then
     while IFS= read -r c; do
       g cat-file blob "$c:$ENTREGA" > "$TMP_DIR/entrega-abertura.md" 2>/dev/null || break
-      [ "$(catalogo_fm "$TMP_DIR/entrega-abertura.md" origem_base)" = registrada_e0 ] || break
+      # a base gravada pelo E0 ou reancorada na abertura da sprint (DM-261, DM-341)
+      case "$(catalogo_fm "$TMP_DIR/entrega-abertura.md" origem_base)" in
+        registrada_e0|registrada_sprint) ;;
+        *) break ;;
+      esac
       b_c="$(catalogo_fm "$TMP_DIR/entrega-abertura.md" base_validada_sha)"
       b_c="$(g rev-parse -q --verify "${b_c:-x}^{commit}" 2>/dev/null)" || break
       [ "$b_c" = "$(g rev-parse -q --verify "$B0^{commit}" 2>/dev/null)" ] || break
