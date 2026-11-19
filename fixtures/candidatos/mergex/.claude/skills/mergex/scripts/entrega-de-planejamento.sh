@@ -164,7 +164,10 @@ case "$ACAO" in
     tentativas=0
     while :; do
       [ -z "$SINAL_PENDENTE" ] || exit "$SINAL_PENDENTE"
-      if mkdir "$LOCK_DIR" 2>/dev/null; then
+      # o `mkdir` roda com os sinais ignorados: morto depois de criar a pasta e antes de sair, ele
+      # devolveria erro e a pasta sem marca ficaria órfã, barrando toda escrita seguinte. Ignorado,
+      # o sinal chega a este shell, que só o anota (CodeAnt no conselhos-municipais#373, DM-344)
+      if ( trap '' HUP INT TERM; exec mkdir "$LOCK_DIR" ) 2>/dev/null; then
         # a marca nasce neste shell, não num subshell: o subshell não herda o trap
         # que anota o sinal e morreria antes da posse (CodeAnt no conselhos-municipais#365)
         marca_rc=0

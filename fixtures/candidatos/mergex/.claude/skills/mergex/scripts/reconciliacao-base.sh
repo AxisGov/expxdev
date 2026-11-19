@@ -1652,6 +1652,10 @@ if [ "$N_CAD" = 0 ]; then
   # qual o ENTREGA.md tem sempre esta base gravada pelo E0 (conselhos-municipais#359).
   ABERTURA=""
   if [ "$ORIGEM_BASE" = registrada_e0 ]; then
+    # a lista inteira antes da busca: o rev-list que falha no meio deixaria a busca parar num
+    # commit mais novo, e merges que precisam de registro sairiam da fila (CodeAnt no
+    # conselhos-municipais#373, DM-344)
+    g rev-list --first-parent "$M^1" -- "$ENTREGA" > "$TMP_DIR/abertura-candidatos" 2>/dev/null       || estrutura ordem "histórico do ENTREGA.md ilegível na linha de primeiro pai de $M^1: a abertura do E0 não se prova"
     while IFS= read -r c; do
       if ! g cat-file blob "$c:$ENTREGA" > "$TMP_DIR/entrega-abertura.md" 2>/dev/null; then
         # sem o arquivo na árvore, a busca acabou; com ele e o blob ilegível (clone
@@ -1673,7 +1677,7 @@ if [ "$N_CAD" = 0 ]; then
       b_c="$(g rev-parse -q --verify "${b_c:-x}^{commit}" 2>/dev/null)" || break
       [ "$b_c" = "$(g rev-parse -q --verify "$B0^{commit}" 2>/dev/null)" ] || break
       ABERTURA="$c"
-    done < <(g rev-list --first-parent "$M^1" -- "$ENTREGA" 2>/dev/null)
+    done < "$TMP_DIR/abertura-candidatos"
   fi
   while IFS= read -r q; do
     pula=""
