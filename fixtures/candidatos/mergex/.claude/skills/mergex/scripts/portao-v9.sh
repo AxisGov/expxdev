@@ -539,8 +539,14 @@ merge_descontado() { # <commit> — 0 se é merge com a pasta e a entrega de um 
   [ "$#" -ge 3 ] || return 1
   shift
   for p in "$@"; do
-    g merge-base --is-ancestor "$p" "${EXCL#^}" 2>/dev/null || continue
-    g diff --quiet --no-renames --ignore-submodules=none "$p" "$m" -- "$PASTA" "$DIR_E" >/dev/null 2>&1 && return 0
+    g diff --quiet --no-renames --ignore-submodules=none "$p" "$m" -- "$PASTA" "$DIR_E" >/dev/null 2>&1 || continue
+    g merge-base --is-ancestor "$p" "${EXCL#^}" 2>/dev/null && return 0
+    # O pai que já tem o descontado (a main depois do merge da sprint fechada) e
+    # não mudou a pasta nem a entrega desde ele: o merge só repete o descontado
+    # (conselhos-municipais#367, DM-343)
+    g merge-base --is-ancestor "${EXCL#^}" "$p" 2>/dev/null \
+      && g diff --quiet --no-renames --ignore-submodules=none "${EXCL#^}" "$p" -- "$PASTA" "$DIR_E" >/dev/null 2>&1 \
+      && return 0
   done
   return 1
 }

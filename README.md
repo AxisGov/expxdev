@@ -554,23 +554,23 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.14.19 -R AxisGov/expxdev -D ~/expx-cli/v0.14.19 &&
+gh release download v0.14.20 -R AxisGov/expxdev -D ~/expx-cli/v0.14.20 &&
 (
-  cd ~/expx-cli/v0.14.19 || exit 1
+  cd ~/expx-cli/v0.14.20 || exit 1
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.14.19.tgz.sha256
+    sha256sum -c expxdev-0.14.20.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.14.19.tgz.sha256
+    shasum -a 256 -c expxdev-0.14.20.tgz.sha256
   fi
 ) &&
-npm install -g ~/expx-cli/v0.14.19/expxdev-0.14.19.tgz &&
+npm install -g ~/expx-cli/v0.14.20/expxdev-0.14.20.tgz &&
 expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 O `npm install -g` do pacote conferido põe o `expx` no PATH, e é ele que os exemplos deste README
 e das skills usam (`expx init`, `expx update`, `expx doctor`). Para rodar uma vez, sem instalar,
 troque as duas últimas linhas por
-`npx --yes --package ~/expx-cli/v0.14.19/expxdev-0.14.19.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes`.
+`npx --yes --package ~/expx-cli/v0.14.20/expxdev-0.14.20.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes`.
 Atualizar o CLI é baixar a release nova e repetir o `npm install -g`.
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -584,7 +584,7 @@ Atualizar o CLI é baixar a release nova e repetir o `npm install -g`.
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.14.19 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.14.20 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -773,6 +773,9 @@ Atualizar o CLI é baixar a release nova e repetir o `npm install -g`.
   não trava o registro da reconciliação) e os achados do conselhos#365.
 - `0.14.19` certifica a MergeX com o achado do conselhos#368: o registro da reconciliação também acha a
   abertura da primeira sprint reancorada depois do PR de planejamento.
+- `0.14.20` certifica a MergeX e a SprintX com os achados do conselhos#371 e o relato do conselhos#367:
+  a V9 desconta o merge da main que só repete o PR fechado, e um sinal no registro de predecessores
+  nunca sai como sucesso.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 
