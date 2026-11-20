@@ -131,7 +131,10 @@ Arquivo reconciliado só com as quatro provas e o inventário completo do merge;
 parcial e sem bypass (DM-179). A evidência de revisão de uma task deste trabalho,
 `docs/entregas/<trabalho>/revisao/<T-NN.MM>.json` (ou o legado `<T-N>.json`) em arquivo comum, não
 é produto e passa pelo inventário sem ser listada; qualquer outro nome sob `revisao/`, link ou
-remoção reprova (DM-291).
+remoção reprova (DM-291). Arquivo comum da pasta do próprio trabalho que o merge só trouxe da
+feature (em `M`, o mesmo blob e o mesmo modo que em `P1`, e a base não o tocou entre `B0` e `B1`) também passa sem ser listado, como na V9:
+o `00-INDICE.md` da raiz de um plano legado, por exemplo. O que o merge criou, alterou ou removeu na
+pasta, link e a pasta de outro trabalho continuam reprovando (DM-345).
 
 ## O artefato `RECONCILIACAO-BASE-NNN.md`
 

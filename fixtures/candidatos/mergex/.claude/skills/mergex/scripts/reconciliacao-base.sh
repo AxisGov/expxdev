@@ -628,9 +628,27 @@ artefato_da_entrega() {
   return 1
 }
 
+# metodo_da_pasta <B0> <B1> <M> <caminho> — arquivo da pasta do próprio
+# trabalho que o merge só trouxe da feature: a base não o tocou entre B0 e B1
+# (senão ficar com o lado da feature descartaria a mudança da base sem revisão;
+# erro do git não aprova) e ele é arquivo comum em M, com o mesmo blob e o
+# mesmo modo que em P1. A V9 já isenta a pasta inteira (portao-v9.sh); o
+# inventário isenta só o que o merge não alterou. O que o merge criou, mudou ou
+# removeu na pasta, link e submódulo continuam reprovando (DM-345).
+metodo_da_pasta() {
+  local b0="$1" b1="$2" m="$3" p="$4" mm
+  case "$p" in "$PASTA"/*) ;; *) return 1 ;; esac
+  g diff --quiet --no-renames --ignore-submodules=none "$b0" "$b1" -- "$p" >/dev/null 2>&1 || return 1
+  mm="$(modo_em "$m" "$p")"
+  case "$mm" in 100644|100755) ;; *) return 1 ;; esac
+  [ "$mm" = "$(modo_em "$P1" "$p")" ] || return 1
+  [ "$(g rev-parse --verify -q "$m:$p" 2>/dev/null)" = "$(g rev-parse --verify -q "$P1:$p" 2>/dev/null)" ]
+}
+
 # inventario <B0> <B1> <M> <lista> <anteriores> — todo caminho que o merge
 # alterou em relação a B1 está na união, no catálogo, na lista, é artefato de
-# reconciliação da entrega, ou foi só herdado de uma reconciliação anterior da
+# reconciliação da entrega, é da pasta do trabalho e veio de P1 sem mudança
+# (metodo_da_pasta), ou foi só herdado de uma reconciliação anterior da
 # cadeia (herdado_da_cadeia). Fora disso, tem de estar na lista e passar nas
 # quatro provas. Não existe registro parcial.
 inventario() {
@@ -645,7 +663,7 @@ inventario() {
       contem "$UNIAO" "$p" || reprova "inventário: $p: submódulo (gitlink) alterado pelo merge e não declarado em task" inventario # guarda:SUB
       continue
     fi
-    contem "$UNIAO" "$p" || contem "$CATALOGO" "$p" || contem "$lista" "$p" || artefato_da_entrega "$m" "$p" || herdado_da_cadeia "$b0" "$b1" "$m" "$p" "$anteriores" || reprova "inventário: $p: alterado pelo merge e não declarado" inventario # guarda:INV
+    contem "$UNIAO" "$p" || contem "$CATALOGO" "$p" || contem "$lista" "$p" || artefato_da_entrega "$m" "$p" || metodo_da_pasta "$b0" "$b1" "$m" "$p" || herdado_da_cadeia "$b0" "$b1" "$m" "$p" "$anteriores" || reprova "inventário: $p: alterado pelo merge e não declarado" inventario # guarda:INV
   done 3< "$INVENTARIO"
 }
 
