@@ -80,8 +80,17 @@ reconcilia a resposta com a task e grava a evidência v2 em
 (`incompleta` é FALHA em qualquer modo, e a evidência tem de cobrir os arquivos
 que o commit da task altera); `rejeitar` registra a rejeição de um
 achado pelo desenvolvedor; `listar` devolve, em JSON, os achados rejeitados, as
-rejeições e os removidos da evidência que o `conferir` aceita. Qualquer `FATIA_*` no ambiente sai 64. A sprintx
+rejeições e os removidos da evidência que o `conferir` aceita. Qualquer `FATIA_*` no ambiente sai 64.
+`revisar --retroativa --commits <sha1,sha2,...>` revisa agora, sobre o HEAD, uma task
+commitada sem evidência: os arquivos são a união dos diffs de cada commit contra o
+1º pai (sem merge na lista, que sai 64, como `--arquivos` ou `--base-commit` junto),
+a base é o 1º pai do 1º commit, e a evidência (modo `retroativa`, com
+`commits_da_task`) vai num commit só de evidências. O `conferir` desse modo cobra que
+o diff do HEAD revisado até o commit da task só toca evidências
+(`retroativa-produto`), que os commits são ancestrais e não merge
+(`retroativa-commits`) e a cobertura pelos commits da task. A sprintx
 (passo de revisão da F6) e a mergex (E2, V12) passam a chamá-lo nos planos delas.
+No Windows, a escala para o Codex repassa `-c windows.sandbox="v"` lido só dessa chave do `config.toml` do usuário (`CODEX_HOME` ou `~/.codex`), que o `--ignore-user-config` descartaria; "blocked by policy" sem resposta útil vira `indisponivel:<motivo>+codex-sandbox-bloqueado`.
 
 ## Por que existe
 

@@ -20,6 +20,8 @@ export interface CfgCodex {
   dorme?: number;
   /** No `exec`, acrescenta uma linha ao próprio arquivo (o binário trocado durante a revisão). */
   alteraSiMesmo?: boolean;
+  /** Texto que o `exec` escreve no stderr (como o "blocked by policy" do sandbox do Windows). */
+  stderr?: string;
 }
 
 /** No POSIX, o shebang: o `node` absoluto (padrão) ou `#!/usr/bin/env node`, que entrega o interpretador ao PATH. */
@@ -55,6 +57,7 @@ const stdin = fs.readFileSync(0, "utf8");
 fs.appendFileSync(path.join(dir, "chamadas.jsonl"), JSON.stringify({ args: a, cwd: process.cwd(), stdin, nodeOptions: process.env.NODE_OPTIONS ?? null,
   ambiente: Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(LD_|DYLD_|GIT_|NPM_CONFIG_|YARN_|PYTHON|PERL|RUBY|JAVA|_JAVA_OPTIONS$|JDK_JAVA_OPTIONS$|DOTNET_STARTUP_HOOKS$|CORECLR_|LUA_INIT|NODE_OPTIONS$|NODE_PATH$|GCONV_PATH$|BASH_ENV$|ENV$|HTTPS_PROXY$)/i.test(k))) }) + "\\n");
 if (cfg.alteraSiMesmo) fs.appendFileSync(__filename, "\\n// trocado durante a revisao\\n");
+if (cfg.stderr) process.stderr.write(cfg.stderr);
 if (cfg.dorme) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, cfg.dorme);
 if (cfg.saida) process.exit(cfg.saida);
 const o = a[a.indexOf("-o") + 1];

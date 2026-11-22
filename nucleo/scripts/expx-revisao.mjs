@@ -1,5 +1,6 @@
 // Revisão por task pela CLI do CodeAnt (contrato expx-revisao), cópia do expxdev.
 //   node expx-revisao.mjs revisar --trabalho <slug> --task <T-NN.MM> --arquivos <a,b,...> [--base-commit <sha>] [--raiz <dir>]
+//   node expx-revisao.mjs revisar --trabalho <slug> --task <T-NN.MM> --retroativa --commits <sha1,sha2,...> [--raiz <dir>]
 //   node expx-revisao.mjs conferir --trabalho <slug> --modo <obrigatoria|se_disponivel|desligada> --task <T-NN.MM>=<sha> [...]
 //   node expx-revisao.mjs rejeitar --trabalho <slug> --task <T-NN.MM> --identidade <hex> --motivo <texto>
 //   node expx-revisao.mjs listar --trabalho <slug> --task <T-NN.MM>=<sha> [...]
@@ -11,13 +12,20 @@
 // `FATIA_*` no ambiente: 64. Evidência travada: 75. Erro interno (exceção não tratada), em qualquer subcomando: 70. Uma chamada só da CLI (sem lotes), pelo arquivo do pacote conferido; a
 // resposta é reconciliada com a task (contrato expx-revisao v2); a evidência guarda as `issues` cruas, e o
 // `conferir` deriva delas os achados. Nunca lê credencial da CLI.
+// --retroativa (task commitada sem evidência): `--commits` na ordem do ENTREGA.commits da task, cada um ancestral de HEAD e
+// não merge (sem `--arquivos` nem `--base-commit`). Os arquivos são a união dos diffs de cada commit contra o 1o pai, menos os
+// não revisáveis e os excluídos (núcleo e `excluir_da_revisao` do HEAD); a base é o 1o pai do 1o commit; revisa como o
+// `--base-commit` (base..HEAD, blobs do HEAD). A evidência (modo `retroativa`, `commits_da_task`) vai num commit só de
+// evidências sobre o HEAD revisado: o `conferir` cobra que nada de produto mudou depois dele e a cobertura pelos commits.
+// No Windows, o Codex da escala recebe `-c windows.sandbox="v"` lido só dessa chave do config.toml do usuário (CODEX_HOME ou
+// ~/.codex), porque o `--ignore-user-config` a descarta; "blocked by policy" sem resposta útil vira `codex-sandbox-bloqueado`.
 // EXPX_REVISAO_TESTE_PAUSA é só para teste: um diretório em que o `revisar` cria `pronto` e espera
 // `continuar` entre a releitura e a gravação.
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { chmodSync, closeSync, existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statSync,
   writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, posix, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { conferirIntegridade, excluido, EXCLUIDOS_DO_NUCLEO, fatiaNoAmbiente, homologadas, localizarPacote, medir, mensagemFatia,
@@ -38,15 +46,25 @@ if (fatia.length > 0) {
 if (!Object.hasOwn(OBRIGATORIOS, cmd ?? "")) uso(`subcomando desconhecido: ${cmd ?? "(nenhum)"}`);
 const op = { raiz: process.cwd(), tasks: [] };
 for (let i = 0; i < args.length; i += 2) {
-  if (!/^--(raiz|trabalho|task|arquivos|modo|identidade|motivo|base-commit)$/.test(args[i])) uso(`argumento desconhecido: ${args[i]}`);
+  // `--retroativa` é a única chave sem valor
+  if (args[i] === "--retroativa") {
+    if (cmd !== "revisar") uso("--retroativa so no revisar");
+    op.retroativa = true;
+    i--;
+    continue;
+  }
+  if (!/^--(raiz|trabalho|task|arquivos|modo|identidade|motivo|base-commit|commits)$/.test(args[i])) uso(`argumento desconhecido: ${args[i]}`);
   if (args[i + 1] === undefined) uso(`${args[i]} exige valor`);
   op[args[i].slice(2)] = args[i + 1];
   if (args[i] === "--task") op.tasks.push(args[i + 1]);
   // o `listar` não depende do modo nem grava nada: só `--trabalho`, `--task` e `--raiz`
   if (cmd === "listar" && !/^--(raiz|trabalho|task)$/.test(args[i])) uso(`${args[i]} nao vale no listar`);
 }
+if (op.commits !== undefined && !op.retroativa) uso("--commits so com --retroativa");
+if (op.retroativa && op.arquivos !== undefined) uso("--retroativa nao aceita --arquivos (vem dos --commits)");
+if (op.retroativa && op["base-commit"] !== undefined) uso("--retroativa nao aceita --base-commit (vem dos --commits)");
 // `--arquivos` não é aparado: espaço é parte do nome
-for (const k of ["trabalho", ...OBRIGATORIOS[cmd]]) if (!(k === "arquivos" ? op[k] : op[k]?.trim())) uso(`--${k} obrigatorio`);
+for (const k of ["trabalho", ...(op.retroativa ? ["task", "commits"] : OBRIGATORIOS[cmd])]) if (!(k === "arquivos" ? op[k] : op[k]?.trim())) uso(`--${k} obrigatorio`);
 if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(op.trabalho)) uso(`trabalho invalido: ${op.trabalho}`);
 // id `T-NN.MM` da sprintx/runx (sprint.task) ou o legado `T-<dígitos>` (como antes); vira nome de arquivo, então nada além disso
 const TASK = ["conferir", "listar"].includes(cmd) ? /^T-(\d+|\d{2}\.\d{2})=[^\s:]+$/ : /^T-(\d+|\d{2}\.\d{2})$/;
@@ -315,7 +333,7 @@ function cliConferida() {
 const ESCALAVEIS = ["cli-ausente", "versao", "integridade", "acesso-negado", "tempo-esgotado", "erro"];
 const MODELO_CODEX = "gpt-5.6-terra";
 // os dois fora: `<motivo da CodeAnt>+<um destes>`, e só estes
-const MOTIVOS_CODEX = ["codex-ausente", "codex-sem-login", "codex-erro", "codex-tempo-esgotado", "codex-saida-invalida"];
+const MOTIVOS_CODEX = ["codex-ausente", "codex-sem-login", "codex-erro", "codex-tempo-esgotado", "codex-saida-invalida", "codex-sandbox-bloqueado"];
 // 2 (0.14.2): a mensagem entra na identidade (login#81); a 1 (0.14.0 e 0.14.1) continua conferida pela regra dela
 const FORMATO_CODEX = 2;
 // a severidade é só informação: todo achado em linha alterada conta, como na CodeAnt
@@ -338,7 +356,9 @@ function pedidoAoCodex(base, arquivos) {
     "Responda só com o JSON do schema: `arquivos_revisados` com exatamente os arquivos da lista que você revisou, e `issues` com um item por defeito: `arquivo` (um da lista), `linha` (o número da linha no arquivo como está agora), `severidade` (critica, alta, media ou baixa) e `mensagem` (o defeito e o porquê, em uma ou duas frases). Sem defeito, `issues` vazia.",
   ].join("\n");
 }
-const baseDoPedido = (ev) => (ev.modo === "base-commit" ? ev.base_commit : ev.head ? "HEAD" : null);
+/** O modo revisa desde `base_commit` (o `--base-commit` e o `--retroativa`), não desde o HEAD. */
+const comBase = (ev) => ev.modo === "base-commit" || ev.modo === "retroativa";
+const baseDoPedido = (ev) => (comBase(ev) ? ev.base_commit : ev.head ? "HEAD" : null);
 /** A resposta do Codex na forma do schema, ou undefined: texto livre e campo a mais ou a menos nunca passam. */
 function respostaDoCodex(r) {
   const chaves = (o, k) => Object.keys(o).sort().join() === k;
@@ -414,8 +434,37 @@ function sha256DoArquivo(f) {
     return h.digest("hex");
   } catch { return undefined; } finally { if (fd !== undefined) closeSync(fd); }
 }
-/** O Codex revisa o snapshot: `{motivo}` (`codex-*`, nada revisado) ou `{versao, pedido, bruto, resposta}`, com
- *  `resposta` undefined se a saída não é o JSON do schema. Uma tentativa só, no prazo da CLI. */
+// EXPX_REVISAO_TESTE_PLATAFORMA é só para teste: a plataforma no lugar de process.platform, só para ler o sandbox do Codex.
+/** No Windows, só a chave `windows.sandbox` do config.toml do usuário (o `--ignore-user-config` a descarta, e o sandbox
+ *  padrão do Windows recusa todo processo): o valor, se casa /^[a-z][a-z-]*$/, ou undefined. Aceita a tabela `[windows]`
+ *  com `sandbox = "v"` e `windows.sandbox = "v"` no topo, sem comentários `#`. Fora do Windows, nunca lê o arquivo. */
+function sandboxDoWindows(plataforma, arquivo) {
+  if (plataforma !== "win32") return undefined;
+  let texto;
+  try { texto = readFileSync(arquivo, "utf8"); } catch { return undefined; }
+  let tabela = "";
+  for (const bruta of texto.split(/\r?\n/)) {
+    const linha = bruta.replace(/#.*$/, "").trim();
+    if (linha === "") continue;
+    // `[[x]]` (vetor de tabelas) nunca é a tabela `[windows]`
+    if (linha.startsWith("[")) { tabela = linha.startsWith("[[") ? "\0" : linha.slice(1, linha.lastIndexOf("]")).replace(/\s+/g, ""); continue; }
+    const m = /^([\w.\s-]+?)\s*=\s*(["'])([^"'\\]*)\2$/.exec(linha);
+    if (!m) continue;
+    const chave = m[1].replace(/\s+/g, "");
+    if ((tabela === "windows" && chave === "sandbox") || (tabela === "" && chave === "windows.sandbox")) return /^[a-z][a-z-]*$/.test(m[3]) ? m[3] : undefined;
+  }
+  return undefined;
+}
+/** O `-c windows.sandbox="v"` que devolve ao Codex o sandbox do usuário no Windows, ou nada. */
+function sandboxDoUsuario(env) {
+  const plataforma = process.env.EXPX_REVISAO_TESTE_PLATAFORMA || process.platform;
+  if (plataforma !== "win32") return [];
+  const v = sandboxDoWindows(plataforma, join(env.CODEX_HOME || join(homedir(), ".codex"), "config.toml"));
+  return v ? ["-c", `windows.sandbox="${v}"`] : [];
+}
+/** O Codex revisa o snapshot: `{motivo}` (`codex-*`, nada revisado) ou `{versao, pedido, bruto, resposta, bloqueado}`, com
+ *  `resposta` undefined se a saída não é o JSON do schema e `bloqueado` se o sandbox recusou processos ("blocked by
+ *  policy" no stdout ou no stderr). Uma tentativa só, no prazo da CLI. */
 function codexRevisa(raiz, base, enviados) {
   const loc = localizarCodex();
   if (!loc) return { motivo: "codex-ausente" };
@@ -436,7 +485,7 @@ function codexRevisa(raiz, base, enviados) {
     writeFileSync(schema, JSON.stringify(SCHEMA_CODEX));
     const pedido = pedidoAoCodex(base, enviados);
     const r = codexRoda(["exec", "--ephemeral", "--ignore-user-config", "-s", "read-only", "-m", MODELO_CODEX, "-c", "model_reasoning_effort=\"high\"",
-      "-C", raiz, "--output-schema", schema, "-o", saida, "-"], { cwd: raiz, input: pedido, maxBuffer: 64 << 20, timeout: TEMPO_DA_CLI, killSignal: "SIGKILL" });
+      ...sandboxDoUsuario(env), "-C", raiz, "--output-schema", schema, "-o", saida, "-"], { cwd: raiz, input: pedido, maxBuffer: 64 << 20, timeout: TEMPO_DA_CLI, killSignal: "SIGKILL" });
     if (r.error?.code === "ETIMEDOUT") return { motivo: "codex-tempo-esgotado" };
     if (r.error || r.status !== 0) {
       process.stderr.write(`expx-revisao: codex saiu ${r.status ?? r.error?.code}: ${String(r.stderr ?? "").slice(-2000)}\n`);
@@ -448,11 +497,12 @@ function codexRevisa(raiz, base, enviados) {
       process.stderr.write(`expx-revisao: o executavel do codex mudou durante a revisao: ${loc.caminho}\n`);
       return { motivo: "codex-erro" };
     }
+    const bloqueado = /blocked by policy/.test(`${String(r.stdout ?? "")}\n${String(r.stderr ?? "")}`);
     let bruto;
-    try { bruto = readFileSync(saida); } catch { return { motivo: "codex-saida-invalida" }; }
+    try { bruto = readFileSync(saida); } catch { return { motivo: bloqueado ? "codex-sandbox-bloqueado" : "codex-saida-invalida" }; }
     let resposta;
     try { resposta = respostaDoCodex(JSON.parse(bruto.toString("utf8"))); } catch { /* texto livre */ }
-    return { versao: v, executavel, pedido, bruto, resposta };
+    return { versao: v, executavel, pedido, bruto, resposta, bloqueado };
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 /** O JSON da CLI: do primeiro `{` que dá JSON até o último `}` (o npm pode avisar antes e depois). */
@@ -679,7 +729,58 @@ function reconciliar(I, meta, plataforma = process.platform) {
   for (const f of I) if (!revisados.has(f)) return `faltante:${f}`;
 }
 
+const OPCOES_DIFF = ["--no-ext-diff", "--no-renames", "--ignore-submodules=all", "--name-only", "-z"];
+/** `a` é ancestral de `b` (ou igual). */
+const ancestral = (a, b) => git("merge-base", "--is-ancestor", a, b).status === 0;
+/** Os pais do commit, pelo cabeçalho (num clone raso o pai existe mas pode não ter sido baixado), ou undefined. */
+function paisDe(sha) {
+  const r = git("cat-file", "commit", sha);
+  if (r.status !== 0) return undefined;
+  return [...r.stdout.split(/\r?\n\r?\n/)[0].matchAll(/^parent ([0-9a-f]+)$/gm)].map((m) => m[1]);
+}
+/** Os arquivos que os commits tocam, cada um contra o 1o pai (a raiz contra a árvore vazia), sem renomeação nem submódulo,
+ *  na ordem e sem repetição; undefined se algum diff falha. A mesma conta no `revisar --retroativa` e no `conferir`. */
+function tocadosPelos(commits) {
+  const tocados = new Set();
+  for (const c of commits) {
+    const pais = paisDe(c);
+    if (!pais) return undefined;
+    const d = pais.length > 0 ? git("diff", ...OPCOES_DIFF, pais[0], c) : git("diff-tree", "--root", "-r", "--no-commit-id", ...OPCOES_DIFF, c);
+    if (d.status !== 0) return undefined;
+    for (const f of d.stdout.split("\0")) if (f !== "") tocados.add(f);
+  }
+  return [...tocados];
+}
+/** `--retroativa`: resolve os `--commits` e põe no `op` os arquivos da task, a base (1o pai do 1o commit) e os commits. */
+function prepararRetroativa() {
+  const pedidos = op.commits.split(",").map((c) => c.trim()).filter(Boolean);
+  if (pedidos.length === 0) uso("--commits sem nenhum commit");
+  const commits = [];
+  for (const c of pedidos) {
+    const sha = idDe("rev-parse", "--verify", "-q", `${c}^{commit}`);
+    if (!sha) uso(`commit inexistente: ${c}`);
+    if (commits.includes(sha)) uso(`commit repetido: ${c}`);
+    if (!ancestral(sha, "HEAD")) uso(`commit nao ancestral de HEAD: ${c}`);
+    const pais = paisDe(sha);
+    if (!pais) uso(`commit ilegivel: ${c}`);
+    if (pais.length > 1) uso(`commit de merge na lista: ${c}`);
+    commits.push(sha);
+  }
+  const base = paisDe(commits[0])[0];
+  if (!base) uso(`o primeiro commit da lista nao tem pai: ${pedidos[0]}`);
+  const tocados = tocadosPelos(commits);
+  if (!tocados) throw new Error("diff dos --commits falhou");
+  // o leitor que falha não filtra nada aqui: o `revisar` dá `indisponivel:fatiamento-invalido` adiante
+  const exclusoes = exclusoesDoProjeto("HEAD") ?? [];
+  // o não revisável fica, como no `--arquivos` do fluxo normal: entra como `nao-revisavel`, sem a CLI (a task que só
+  // toca um `manual.pdf` ganha evidência, em vez de uso 64)
+  const arquivos = tocados.filter((f) => !excluido(f, EXCLUIDOS_DO_NUCLEO) && !excluido(f, exclusoes));
+  if (arquivos.length === 0) uso("--commits nao tocam nenhum arquivo fora das exclusoes");
+  Object.assign(op, { arquivos: arquivos.join(","), "base-commit": base, commitsDaTask: commits });
+}
+
 function revisar() {
+  if (op.retroativa) prepararRetroativa();
   // sem aparar: espaço na ponta é parte do nome, e aparado o caminho seria outro arquivo (ou nenhum)
   // a lambda, não `map(caminho)`: o índice do `map` cairia na plataforma, e no Windows o `\` ficaria (expxdev#171)
   const arquivos = op.arquivos.split(",").map((f) => caminho(f)).filter(Boolean);
@@ -699,7 +800,8 @@ function revisar() {
   const anterior = le(caminhoEv(op.task));
   // o HEAD da revisão: sem `--base-commit`, as linhas alteradas são as do checkout desde ele (o `conferir` as refaz até o commit)
   const headDaRevisao = idDe("rev-parse", "--verify", "-q", "HEAD^{commit}") ?? null;
-  const ev = { expx_revisao: 2, derivacao: 3, trabalho: op.trabalho, task: op.task, modo: base ? "base-commit" : "uncommitted", base_commit: base, head: headDaRevisao, cli: null,
+  const ev = { expx_revisao: 2, derivacao: 3, trabalho: op.trabalho, task: op.task, modo: op.retroativa ? "retroativa" : base ? "base-commit" : "uncommitted", base_commit: base, head: headDaRevisao,
+    ...(op.retroativa ? { commits_da_task: op.commitsDaTask } : {}), cli: null,
     plataforma: process.platform, executada_em: new Date().toISOString(), arquivos: {}, chamada: null, resultado: "ok", achados: [],
     rejeicoes: Array.isArray(anterior?.rejeicoes) ? anterior.rejeicoes : [], removidos_sem_revisao: [] };
   const fim = (resultado, motivo) => Object.assign(ev, { resultado, motivo });
@@ -770,14 +872,15 @@ function revisar() {
     // texto livre, fora do schema, sem a task inteira ou com issue fora dela (nunca se lê um caminho que o modelo inventou,
     // como `../../dev/zero`): nada revisado
     if (!cx.resposta || !mesmosArquivos(cx.resposta.arquivos_revisados, enviados) || !issuesNaTask(cx.resposta.issues, enviados)) {
-      return fim("indisponivel", `${motivo}+codex-saida-invalida`);
+      return fim("indisponivel", `${motivo}+${cx.bloqueado ? "codex-sandbox-bloqueado" : "codex-saida-invalida"}`);
     }
     return concluir(issuesDoCodex(cx.resposta.issues), versaoDoRevisor(ev.revisor), extraDoCodex(FORMATO_CODEX));
   };
   try { (() => {
     // 1. o pedido não se revisa como está
     if (virgula) return fim("indisponivel", "caminho-com-virgula");
-    const inexistente = removidos.find((f) => !existe(f));
+    // na retroativa, o arquivo que os commits tocaram e hoje não existe (criado e apagado na task) é removido, não inexistente
+    const inexistente = op.retroativa ? undefined : removidos.find((f) => !existe(f));
     if (inexistente !== undefined) return fim("indisponivel", `arquivo-inexistente:${inexistente}`);
     if (exclusoes === null) return fim("indisponivel", "fatiamento-invalido");
     const semMedida = presentes.find((f) => !medidas[f]);
@@ -907,7 +1010,7 @@ function semSinalDaCli(ev, sha) {
   const homologado = perfilCli(homologadas().at(-1));
   // `sem-alteracao` só com o blob do commit igual ao da partida (`base_commit`, ou o `head` da revisão), refeito aqui;
   // `enviado` também vale para o igual (a CLI o revisou, e a reconciliação abaixo o cobra)
-  const de = ev.modo === "base-commit" ? ev.base_commit : ev.head;
+  const de = comBase(ev) ? ev.base_commit : ev.head;
   // `de` tem de ser commit: o SHA de uma árvore também resolve `<de>:<arquivo>`, e sem `enviado` nada mais confere o `head`
   const igual = (f) => { const p = ehCommit(de) ? blobEm(de, f) : undefined; return p !== undefined && p === blobEm(sha, f); };
   const esperada = (f) => (excluido(f, EXCLUIDOS_DO_NUCLEO) ? "excluido" : !revisavel(f, homologado) ? "nao-revisavel" : igual(f) ? "sem-alteracao" : "enviado");
@@ -970,7 +1073,17 @@ function semSinalDoCodex(ev, sha, enviados, perfil) {
  *  revisável pelo predicado do perfil, as exclusões do núcleo (a própria evidência entre elas) e as de `excluir_da_revisao`
  *  do `.expx/fatiamento.json` do commit (leitor que falha: nenhuma, nunca menos conta). */
 function naoCoberto(ev, sha) {
-  const opcoes = ["--no-ext-diff", "--no-renames", "--ignore-submodules=all", "--name-only", "-z"];
+  // retroativa: os alterados são a união dos diffs dos `commits_da_task` (nunca base..sha nem sha^..sha: o commit da
+  // evidência não é o da task), pelo mesmo filtro
+  if (ev.modo === "retroativa") {
+    const commits = ev.commits_da_task;
+    const tocados = Array.isArray(commits) && commits.length > 0 && commits.every(ehCommit) ? tocadosPelos(commits) : undefined;
+    if (!tocados) return "";
+    const homologado = perfilCli(homologadas().at(-1));
+    const exclusoes = exclusoesDoProjeto(sha) ?? [];
+    return tocados.find((f) => revisavel(f, homologado) && !excluido(f, EXCLUIDOS_DO_NUCLEO) && !excluido(f, exclusoes) && !Object.hasOwn(ev.arquivos, f));
+  }
+  const opcoes = OPCOES_DIFF;
   // o pai pelo cabeçalho do commit, não por `<sha>^1`: num clone raso o pai existe mas não foi baixado, e o diff falha
   // (não verificável), em vez de o commit passar por raiz e cobrar a árvore inteira
   const cabecalho = git("cat-file", "commit", sha);
@@ -985,6 +1098,22 @@ function naoCoberto(ev, sha) {
   const exclusoes = exclusoesDoProjeto(sha) ?? [];
   const contam = (f) => revisavel(f, homologado) && !excluido(f, EXCLUIDOS_DO_NUCLEO) && !excluido(f, exclusoes);
   return diffs.flatMap((d) => d.stdout.split("\0")).find((f) => f !== "" && contam(f) && !Object.hasOwn(ev.arquivos, f));
+}
+
+/** Na evidência retroativa, o que não prova que o commit `sha` só acrescenta evidências ao HEAD revisado, ou undefined:
+ *  `retroativa-produto[:<arquivo>]` (`head` não é commit ancestral de `sha`, ou ev.head..sha toca arquivo fora das
+ *  exclusões do núcleo) e `retroativa-commits` (`commits_da_task` vazio, repetido, com commit que não é ancestral de `head`
+ *  ou é merge, ou `base_commit` que não é o 1o pai do 1o commit). */
+function semRetroativa(ev, sha) {
+  if (!ehCommit(ev.head) || !ancestral(ev.head, sha)) return "retroativa-produto";
+  const d = git("diff", ...OPCOES_DIFF, ev.head, sha);
+  if (d.status !== 0) return "retroativa-produto";
+  const produto = d.stdout.split("\0").find((f) => f !== "" && !excluido(f, EXCLUIDOS_DO_NUCLEO));
+  if (produto !== undefined) return `retroativa-produto:${produto}`;
+  const commits = ev.commits_da_task;
+  if (!Array.isArray(commits) || commits.length === 0 || new Set(commits).size !== commits.length
+    || !commits.every((c) => ehCommit(c) && ancestral(c, ev.head) && (paisDe(c)?.length ?? 2) <= 1)
+    || paisDe(commits[0])?.[0] !== ev.base_commit) return "retroativa-commits";
 }
 
 /** `rejeicoes` ou `removidos_sem_revisao` fora da forma que o `listar` devolve (o nome do campo), ou undefined:
@@ -1036,6 +1165,8 @@ function avaliar(task, sha) {
     const r = git("rev-parse", "--verify", "-q", `${sha}:./${f}`);
     if ((r.status === 0 ? r.stdout.trim() : null) !== (a === null ? null : a.blob)) return falha(`evidencia-nao-bate:${f}`);
   }
+  const retroativa = ev.modo === "retroativa" ? semRetroativa(ev, sha) : undefined;
+  if (retroativa) return falha(`evidencia-invalida:${retroativa}`);
   const descoberto = naoCoberto(ev, sha);
   if (descoberto !== undefined) return falha(`evidencia-invalida:cobertura${descoberto ? `:${descoberto}` : ""}`);
   // indisponivel e incompleta: nada da CLI a conferir (o `veredito` as reprova ou avisa pelo motivo)
@@ -1089,8 +1220,8 @@ function achadosDivergem(ev, sha) {
   let derivados = [];
   if (enviados) {
     if (ev.head !== null && !ehCommit(ev.head)) return "head";
-    if (ev.modo === "base-commit" ? !ehCommit(ev.base_commit) : ev.modo !== "uncommitted" || ev.base_commit !== null) return "base_commit";
-    const de = ev.modo === "base-commit" ? ev.base_commit : ev.head;
+    if (comBase(ev) ? !ehCommit(ev.base_commit) : ev.modo !== "uncommitted" || ev.base_commit !== null) return "base_commit";
+    const de = comBase(ev) ? ev.base_commit : ev.head;
     const texto = (f) => (blobGit(`${sha}:./${f}`) ?? Buffer.alloc(0)).toString("utf8");
     // a regra da evidência, não a deste script: sem `derivacao`, a 1 (o diff por arquivo, sem trecho movido)
     const alt = ev.derivacao >= 2 ? movidasPor(Object.keys(ev.arquivos), (f) => blobEm(de, f), (f) => blobEm(sha, f)) : (f) => alteradas(f, de, sha);
