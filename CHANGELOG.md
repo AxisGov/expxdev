@@ -9,6 +9,14 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.24 — a cobertura da reconciliação termina quando o caminho volta à base
+
+Instale por PR, como a 0.14.23. Certifica a mergex (AxisGov/mergex#115, merge f782655, DM-347). O CLI, o núcleo, os eventos, o painel, o `expx sessao` e as outras oito skills seguem como na 0.14.23.
+
+Relato da Onda 5 do conselhos-municipais (onda-5-documentos-evidencias): a RECONCILIACAO-BASE-004 cobriu um ajuste num arquivo, a main mudou o mesmo arquivo depois, e o merge do registro 007 ficou com a versão da main. O `--verificar` exigia em HEAD o `blob_m` do 004, e a V9 dava `v9_sem_prova` sem saída.
+
+- **MergeX, `reconciliacao-base.sh --verificar`.** Quando o caminho em HEAD é igual, em conteúdo e modo, ao do `b1_sha` da reconciliação mais recente da cadeia (ou está ausente nos dois), a cobertura dele termina: não sai como `coberto` e não reprova. Conteúdo diferente da base, ou só o modo diferente, segue a comparação estrita com o `blob_m`.
+
 ## 0.14.23 — revisão retroativa das tasks fechadas sem a V12
 
 Instale por PR, como a 0.14.22. Muda o núcleo (`expx-revisao.mjs`, expxdev#189, merge d455cff) e certifica a mergex (AxisGov/mergex#114, merge 705e999, DM-346). O CLI, os eventos, o painel, o `expx sessao` e as outras oito skills seguem como na 0.14.22.

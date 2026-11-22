@@ -260,7 +260,10 @@ Só leitura: nunca grava e nunca adquire a trava. Para toda a cadeia `001..NNN`:
 - condições estruturais e as quatro provas recalculadas sobre o histórico atual;
 - para cada caminho coberto: o conteúdo em `HEAD` é o `blob_m` da reconciliação mais recente que o
   lista. Arquivo reconciliado alterado depois de `M` deixa de estar coberto, e a verificação
-  reprova.
+  reprova. A cobertura termina sem reprovar quando o caminho em `HEAD` é igual, em conteúdo e
+  modo, ao do `b1_sha` da reconciliação mais recente da cadeia (ou está ausente nos dois): um merge
+  de base posterior trouxe a versão da base e o trabalho não muda mais o caminho, que então não
+  sai como `coberto` (DM-347). Só o conteúdo igual com o modo diferente continua reprovando.
 
 Saída: `ok=true` e uma linha `coberto\t<caminho>\t<NNN>` por arquivo; ou `ok=false` e uma linha
 `motivo\t<código>\t<detalhe>` por falha. Nenhum campo do artefato é aceito sem recálculo.
