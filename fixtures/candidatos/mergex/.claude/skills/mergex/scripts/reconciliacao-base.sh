@@ -977,13 +977,23 @@ cadeia_coerencia() {
 
 # cadeia_cobertura — por caminho, a reconciliação mais recente que o lista; o
 # conteúdo em HEAD tem de ser o blob_m dela, com o mesmo modo que em M.
+# A cobertura termina quando o caminho em HEAD voltou a ser o da base atual (o
+# b1_sha da última reconciliação da cadeia), em conteúdo e modo, ou ausente nos
+# dois: o trabalho não muda mais o caminho, que não sai como coberto (DM-347).
 # Grava $TMP_DIR/cobertos.
 cadeia_cobertura() {
-  local f nnn bm mm h
+  local f nnn bm mm h b1u=""
   awk -F'\t' '{ if (!($1 in u)) o[++k] = $1; u[$1] = $0 } END { for (i = 1; i <= k; i++) print u[o[i]] }' \
     "$TMP_DIR/cobertura" > "$TMP_DIR/cobertura.ultima"
   : > "$TMP_DIR/cobertos"
+  if [ "$CAD_N" -gt 0 ] && [ -f "$TMP_DIR/r$CAD_N.lido" ]; then
+    b1u="$(_r "$CAD_N" b1_sha)"
+    g rev-parse --verify -q "$b1u^{commit}" >/dev/null 2>&1 || b1u=""
+  fi
   while IFS="$TAB" read -r f nnn bm mm <&3; do
+    if [ -n "$b1u" ] && g diff --quiet --no-renames --no-ext-diff --no-textconv "$b1u" HEAD -- "$f" >/dev/null 2>&1; then
+      continue
+    fi
     h="$(g rev-parse --verify -q "HEAD:$f" 2>/dev/null)" || h=""
     [ "$h" = "$bm" ] || { motivo 4 cobertura "$f: o conteúdo em HEAD (${h:-ausente}) não é o blob_m de RECONCILIACAO-BASE-$nnn.md ($bm)"; continue; } # guarda:BLOBM
     [ "$(modo_em HEAD "$f")" = "$(modo_em "$mm" "$f")" ] || { motivo 4 cobertura "$f: o modo em HEAD ($(modo_em HEAD "$f")) não é o de M em RECONCILIACAO-BASE-$nnn.md ($(modo_em "$mm" "$f"))"; continue; } # guarda:BLOBM
