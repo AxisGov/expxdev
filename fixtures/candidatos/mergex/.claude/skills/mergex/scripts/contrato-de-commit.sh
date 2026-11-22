@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# contrato-de-commit — gramática mecânica das três classes de commit da mergex.
+# contrato-de-commit — gramática mecânica das quatro classes de commit da mergex.
 #
 # E1:     exatamente um Task e um Trabalho; nenhum Metodo.
 # método: exatamente um Trabalho e um Metodo; nenhum Task.
@@ -8,9 +8,13 @@
 #         SHA-256); nenhum Task, nenhum Metodo. Com --commit, o commit tem
 #         exatamente dois pais e o segundo é o Integra-base.
 #
+# revisão retroativa (DM-346): exatamente um Trabalho e um Revisao-retroativa (lista
+#         não vazia de ids de task, separados por espaço); nenhum Task, Metodo ou
+#         Integra-base. Com --tasks, a lista é exatamente a informada, na ordem.
+#
 # --arquivo valida só a gramática da mensagem; as checagens de pais exigem --commit.
 #
-# Outros trailers descritivos continuam permitidos. As quatro chaves de controle
+# Outros trailers descritivos continuam permitidos. As cinco chaves de controle
 # acima são case-sensitive e nunca podem formar uma classe híbrida.
 
 set -uo pipefail
@@ -20,7 +24,7 @@ invalido() { printf 'contrato-de-commit: %s\n' "$1" >&2; exit 2; }
 
 ACAO="${1:-}"
 case "$ACAO" in
-  --validar-e1|--validar-metodo|--validar-integracao) shift ;;
+  --validar-e1|--validar-metodo|--validar-integracao|--validar-retroativa) shift ;;
   *) uso "ação desconhecida: ${ACAO:-<nenhuma>}" ;;
 esac
 
@@ -29,9 +33,11 @@ TASK=""
 CHECKPOINT=""
 ARQUIVO=""
 COMMIT=""
+TASKS=""; TEM_TASKS=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --tasks)      [ "$#" -ge 2 ] || uso '--tasks precisa de valor'; TASKS="$2"; TEM_TASKS=1; shift 2 ;;
     --trabalho)   [ "$#" -ge 2 ] || uso '--trabalho precisa de valor'; TRABALHO="$2"; shift 2 ;;
     --task)       [ "$#" -ge 2 ] || uso '--task precisa de valor'; TASK="$2"; shift 2 ;;
     --checkpoint) [ "$#" -ge 2 ] || uso '--checkpoint precisa de valor'; CHECKPOINT="$2"; shift 2 ;;
@@ -68,6 +74,13 @@ V_TASK="$(printf '%s\n' "$TRAILERS" | sed -n 's/^Task:[[:space:]]*//p')"
 V_TRABALHO="$(printf '%s\n' "$TRAILERS" | sed -n 's/^Trabalho:[[:space:]]*//p')"
 V_METODO="$(printf '%s\n' "$TRAILERS" | sed -n 's/^Metodo:[[:space:]]*//p')"
 V_INTEGRA="$(printf '%s\n' "$TRAILERS" | sed -n 's/^Integra-base:[[:space:]]*//p')"
+Q_RETRO="$(printf '%s\n' "$TRAILERS" | grep -Ec '^Revisao-retroativa:[[:space:]]*')"
+V_RETRO="$(printf '%s\n' "$TRAILERS" | sed -n 's/^Revisao-retroativa:[[:space:]]*//p')"
+[ "$TEM_TASKS" = 0 ] || [ "$ACAO" = --validar-retroativa ] || uso "$ACAO não recebe --tasks"
+case "$ACAO" in
+  --validar-retroativa) ;;
+  *) [ "$Q_RETRO" = 0 ] || invalido "só a revisão retroativa aceita Revisao-retroativa; encontrou $Q_RETRO" ;;
+esac
 
 # fora_do_bloco <chave>... — uma chave exigida pela classe que não é trailer, mas
 # aparece como linha da mensagem: está num parágrafo anterior ao último, que é o
@@ -140,5 +153,27 @@ case "$ACAO" in
     fi
     printf 'classe=integracao_base\n'
     printf 'b1=%s\n' "$V_INTEGRA"
+    ;;
+  --validar-retroativa)
+    [ -z "$TASK" ] || uso '--validar-retroativa não recebe --task'
+    [ -z "$CHECKPOINT" ] || uso '--validar-retroativa não recebe --checkpoint'
+    fora_do_bloco Trabalho Revisao-retroativa
+    [ "$Q_TASK" = 0 ] || invalido "revisão retroativa não aceita Task; encontrou $Q_TASK"
+    [ "$Q_METODO" = 0 ] || invalido "revisão retroativa não aceita Metodo; encontrou $Q_METODO"
+    [ "$Q_INTEGRA" = 0 ] || invalido "revisão retroativa não aceita Integra-base; encontrou $Q_INTEGRA"
+    [ "$Q_TRABALHO" = 1 ] || invalido "revisão retroativa exige exatamente um Trabalho; encontrou $Q_TRABALHO"
+    [ "$Q_RETRO" = 1 ] || invalido "revisão retroativa exige exatamente um Revisao-retroativa; encontrou $Q_RETRO"
+    [ "$V_TRABALHO" = "$TRABALHO" ] \
+      || invalido "Trabalho divergente: mensagem=$V_TRABALHO contexto=$TRABALHO"
+    # a lista normalizada: um espaço entre os ids, nenhum nas pontas
+    LISTA="$(awk '{ $1 = $1; print }' <<<"$V_RETRO")"
+    [ -n "$LISTA" ] || invalido 'Revisao-retroativa sem nenhuma task'
+    if [ "$TEM_TASKS" = 1 ]; then
+      ESPERADA="$(awk '{ $1 = $1; print }' <<<"$TASKS")"
+      [ "$LISTA" = "$ESPERADA" ] \
+        || invalido "Revisao-retroativa divergente: mensagem=$LISTA contexto=$ESPERADA"
+    fi
+    printf 'classe=revisao_retroativa\n'
+    printf 'tasks=%s\n' "$LISTA"
     ;;
 esac

@@ -9,7 +9,7 @@ export const MANIFESTO_DE_COMANDOS: ManifestoDeComandos = {
     { skill: "runx", commit: "5ff9d231616b0c4aafa81a037f45a90042b547c2", papel: "certificado" },
     { skill: "legadox", commit: "a6a4629c47dc0fdfab75de0f6246ce6609088970", papel: "certificado" },
     { skill: "stackx", commit: "03ff770d7bc257cf2271ff08e77904e351e80d5a", papel: "certificado" },
-    { skill: "mergex", commit: "9708ed80df87e9381a177044e772220b65ab6360", papel: "certificado" },
+    { skill: "mergex", commit: "705e99973c768d63002cb8aaa8b2e881f9e8ad45", papel: "certificado" },
     { skill: "memox", commit: "db64a04ff3c9bd7f7c1b8e0685c3a5ece4773f1d", papel: "certificado" },
     { skill: "prodx", commit: "06ce57a42db8eaae3f98ea60fc3895f1536383c5", papel: "certificado" },
     { skill: "buildx", commit: "235cf01a6a364c03314cf7dade31ee5cd629b1da", papel: "certificado" },
@@ -132,6 +132,9 @@ export const MANIFESTO_DE_COMANDOS: ManifestoDeComandos = {
     "mergex-retomar-v9.md": [
       "9d73520020bc434ddc64a98c42b512a0f389eec0b68ff0702be4c983f993b029",
       "ee4f94629f7ee9c3e3ed773056cc90fded776021ba045f4f9d654b1aec56dfa0",
+    ],
+    "mergex-revisao-retroativa.md": [
+      "b9118eaddfcac2cee7ddc22188e4b433cadff1603db6cfc3f3583fe194d131ca",
     ],
     "mergex-revisar.md": [
       "64b3df1fa06b6ca8aaeea6f4a2029dd61a8e4c7591e0e8e86c91ecdbdae4021f",

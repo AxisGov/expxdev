@@ -9,6 +9,18 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.23 — revisão retroativa das tasks fechadas sem a V12
+
+Instale por PR, como a 0.14.22. Muda o núcleo (`expx-revisao.mjs`, expxdev#189, merge d455cff) e certifica a mergex (AxisGov/mergex#114, merge 705e999, DM-346). O CLI, os eventos, o painel, o `expx sessao` e as outras oito skills seguem como na 0.14.22.
+
+Pedido da Onda 4 do conselhos-municipais: 16 tasks foram commitadas antes do E0 e o E1 delas ficou sem revisão aprovada. Achados do CodeAnt no expxdev#189 (1, confirmado) e no mergex#114 (5: 4 confirmados, 1 rejeitado).
+
+- **Núcleo, `revisar --retroativa --commits <sha,...>`.** Revisa os commits já registrados de uma task contra o pai do primeiro, sem exigir árvore suja. A evidência leva `modo: "retroativa"` e `commits_da_task`, e o `conferir` recusa se o HEAD andou com produto depois deles ou se a lista não bate com a base. Arquivo não revisável da task fica registrado como `nao-revisavel`, sem erro de uso.
+- **Núcleo, Codex no Windows.** O `--ignore-user-config` descartava o `windows.sandbox` do usuário, e todo comando do Codex saía "blocked by policy". Agora o valor do `config.toml` vai por `-c windows.sandbox=...`, e o bloqueio aparece como `codex-sandbox-bloqueado`.
+- **MergeX, `revisao-retroativa.sh` (`--listar`, `--verificar`, `--aplicar`).** Vale para a task cujo último item tem `revisao` `null` ou `invalida`. Prova num commit simulado que o `conferir` dá `ok` a todas, e só então faz um commit só de evidências com os trailers `Trabalho:` e `Revisao-retroativa:`, sob a trava C5, e acrescenta um item `ok` por task. Antes do commit, prova também a sequência de commits, a escrita do ENTREGA.md e que o índice é a árvore aprovada.
+- **MergeX, V12.** O commit com `Revisao-retroativa` só vale se a evidência dele tiver os commits dos itens anteriores da task; senão `<task> FALHA retroativa-divergente`, inclusive em `se_disponivel` sem o núcleo.
+- **MergeX, gramática do `revisao`.** Aceita a classe composta da escala para o Codex (`indisponivel:cli-ausente+codex-ausente`), que antes virava `invalida`.
+
 ## 0.14.20 — a V9 desconta o merge que só repete o PR fechado
 
 Instale por PR, como a 0.14.19. Certifica a mergex (AxisGov/mergex#111, merge d761784, DM-342 e DM-343) e a sprintx (AxisGov/sprintx#93, merge 9fa036b, DS-235). O CLI, o núcleo, os eventos, o painel, o `expx sessao` e as outras sete skills seguem como na 0.14.19.

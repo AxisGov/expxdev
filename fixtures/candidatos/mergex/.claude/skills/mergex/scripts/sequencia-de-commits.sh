@@ -50,6 +50,12 @@
 #       A leitura (`--ler`, `--validar`, `prova-de-commit.sh`) ignora a chave.
 #   sequencia-de-commits.sh --revisao <valor>
 #       o valor como `--acrescentar` o gravaria, ou 1 quando está fora da gramática.
+#   sequencia-de-commits.sh --revisoes <ENTREGA.md|->
+#       `ordem_efetiva<TAB>task<TAB>revisao` (`null` quando o item não tem), na ordem do
+#       arquivo; a revisão retroativa (DM-346) lê dali o `revisao` do último item da task.
+#   sequencia-de-commits.sh --commits-da-task <ENTREGA.md> <task> [--anteriores]
+#       os commits dos itens da task, SHA completo, sem repetição, separados por vírgula;
+#       com `--anteriores`, sem o último item da task (DM-346).
 #
 # Códigos: 0 ok; 1 contrato inválido ou arquivo ilegível; 64 opção inválida.
 #
@@ -194,7 +200,7 @@ sha_valido() { # <valor> [dir]
 # As chaves podem vir em qualquer ordem dentro do item.
 # ---------------------------------------------------------------------------
 itens_de() {
-  local arq="$1" b
+  local arq="$1" com_revisao="${2:-}" b
   legivel "$arq" || return 1
   b="$(bloco "$arq" commits)"
   confere_bloco "$b" || return 1
@@ -207,7 +213,9 @@ itens_de() {
     $'\001'*)
       [[ "$primeira" =~ $vazia ]] || { ERRO="commits não é lista de itens: ${primeira#?}"; return 1; } ;;
   esac
-  printf '%s\n' "$b" | awk '
+  # Com `com_revisao` (o modo `--revisoes`, DM-346), um quinto campo: o `revisao` do item,
+  # `null` quando ausente. Sem ele, os quatro de sempre (`campos` funde o resto no quarto).
+  printf '%s\n' "$b" | awk -v com_revisao="$com_revisao" '
     function chave(l,   k, v) {
       sub(/^[[:space:]]+/, "", l)
       if (l !~ /^[A-Za-z_][A-Za-z0-9_]*:/) return
@@ -217,13 +225,19 @@ itens_de() {
       if (k == "seq") s = v
       else if (k == "task") t = v
       else if (k == "commit") c = v
+      else if (k == "revisao") r = v
     }
-    function emite() { if (aberto) { n++; printf "%d\t%s\t%s\t%s\n", n, s, t, c } }
+    function emite() {
+      if (!aberto) return
+      n++
+      if (com_revisao != "") printf "%d\t%s\t%s\t%s\t%s\n", n, s, t, c, (r == "" ? "null" : r)
+      else printf "%d\t%s\t%s\t%s\n", n, s, t, c
+    }
     /^\001/ { next }
     { sub(/\r$/, "") }
     /^[[:space:]]*-/ {
       emite()
-      s = ""; t = ""; c = ""; aberto = 1
+      s = ""; t = ""; c = ""; r = ""; aberto = 1
       linha = $0; sub(/^[[:space:]]*-[[:space:]]*/, "", linha)
       chave(linha)
       next
@@ -253,6 +267,53 @@ ler() {
   done <<EOF
 $its
 EOF
+}
+
+# revisoes <ENTREGA.md> — `ordem_efetiva<TAB>task<TAB>revisao`, um item por linha, na ordem do
+# arquivo (DM-346). O mesmo awk de `itens_de`: não é um segundo parser.
+revisoes() {
+  local arq="$1" its linha r
+  its="$(itens_de "$arq" com_revisao)" || { erro_de_itens "$arq"; return 1; }
+  [ -n "$its" ] || return 0
+  while IFS= read -r linha; do
+    [ -n "$linha" ] || continue
+    campos "$linha"; r="${CAMPO4#*$TAB}"
+    printf '%s\t%s\t%s\n' "$CAMPO1" "$CAMPO3" "$r"
+  done <<EOF
+$its
+EOF
+}
+
+# commits_da_task <ENTREGA.md> <task> <dir> [anteriores] — os commits dos itens da task, na ordem
+# de `ler`, como SHA completo resolvido no repositório de <dir>, sem repetição e separados por
+# vírgula (DM-346). Com `anteriores`, sem o último item da task: é a lista que a revisão
+# retroativa registrada no último item tem de repetir. Item sem commit que o Git resolva: 1.
+commits_da_task() {
+  local arq="$1" task="$2" dir="$3" its linha brutos="" c sha saida="" vistos=" "
+  its="$(ler "$arq")" || return 1
+  while IFS= read -r linha; do
+    [ -n "$linha" ] || continue
+    campos "$linha"
+    [ "$(limpa "$CAMPO3")" = "$task" ] || continue
+    brutos="$brutos$(limpa "$CAMPO4")
+"
+  done <<EOF
+$its
+EOF
+  [ -n "$brutos" ] || { ERRO="a task $task não tem item em commits"; return 1; }
+  [ "${4:-}" != anteriores ] || brutos="$(printf '%s' "$brutos" | sed '$d')"
+  [ -n "$brutos" ] || { ERRO="a task $task não tem item anterior ao último"; return 1; }
+  while IFS= read -r c; do
+    [ -n "$c" ] || continue
+    sha_valido "$c" "$dir" || { ERRO="item da task $task sem commit válido: $c"; return 1; }
+    sha="$(git -C "$dir" rev-parse --verify -q "$c^{commit}" 2>/dev/null)" \
+      || { ERRO="commit da task $task não existe no repositório: $c"; return 1; }
+    case "$vistos" in *" $sha "*) continue ;; esac
+    vistos="$vistos$sha "; saida="$saida${saida:+,}$sha"
+  done <<EOF
+$brutos
+EOF
+  printf '%s\n' "$saida"
 }
 
 inteiro_positivo() { # <valor>
@@ -337,10 +398,16 @@ revisao_do_item() { # <valor>
     *) ERRO="revisao fora da gramática: ${v:-<vazio>}"; return 1 ;;
   esac
   tipo="${v%%:*}"; classe="${v#*:}"; classe="${classe%%:*}"
-  case "$classe" in
-    ''|[!$CLASSE_OK]*|*[!$CLASSE_OK-]*)
-      ERRO="revisao fora da gramática: $v"; return 1 ;;
-  esac
+  # a escala para o Codex junta os dois motivos com `+` (`cli-ausente+codex-ausente`): cada
+  # parte segue a gramática da classe, e nenhuma vazia
+  local parte resto="$classe+"
+  while [ -n "$resto" ]; do
+    parte="${resto%%+*}"; resto="${resto#*+}"
+    case "$parte" in
+      ''|[!$CLASSE_OK]*|*[!$CLASSE_OK-]*)
+        ERRO="revisao fora da gramática: $v"; return 1 ;;
+    esac
+  done
   printf '%s:%s\n' "$tipo" "$classe"
 }
 
@@ -419,6 +486,15 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       { [ "$#" -eq 4 ] || [ "$#" -eq 5 ]; } \
         || { printf 'sequencia-de-commits: --acrescentar <ENTREGA.md> <task> <commit> [<revisao>]\n' >&2; exit 64; }
       acrescentar "$2" "$3" "$4" "${5-null}" && exit 0
+      printf 'sequencia-de-commits: %s\n' "$ERRO" >&2; exit 1 ;;
+    --revisoes)
+      [ "$#" -eq 2 ] || { printf 'sequencia-de-commits: --revisoes <ENTREGA.md|->\n' >&2; exit 64; }
+      revisoes "$2" && exit 0
+      printf 'sequencia-de-commits: %s\n' "$ERRO" >&2; exit 1 ;;
+    --commits-da-task)
+      { [ "$#" -eq 3 ] || { [ "$#" -eq 4 ] && [ "$4" = --anteriores ]; }; } \
+        || { printf 'sequencia-de-commits: --commits-da-task <ENTREGA.md> <task> [--anteriores]\n' >&2; exit 64; }
+      commits_da_task "$2" "$3" "$(dirname "$2")" "${4:+anteriores}" && exit 0
       printf 'sequencia-de-commits: %s\n' "$ERRO" >&2; exit 1 ;;
     --revisao)
       [ "$#" -eq 2 ] || { printf 'sequencia-de-commits: --revisao <valor>\n' >&2; exit 64; }
