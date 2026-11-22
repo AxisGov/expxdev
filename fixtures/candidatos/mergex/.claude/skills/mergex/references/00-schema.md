@@ -394,7 +394,9 @@ commits:
 - A **classe** é o texto do motivo antes do segundo `:`, como veio, com
   `[A-Za-z0-9][A-Za-z0-9-]*` (`incompleta:L1:41` → `incompleta:L1`;
   `indisponivel:arquivo-inexistente:src/a.ts` → `indisponivel:arquivo-inexistente`). O resto do
-  motivo — um caminho, um número — nunca entra no YAML.
+  motivo — um caminho, um número — nunca entra no YAML. A escala para o Codex junta os dois
+  motivos com `+`, cada parte nessa mesma gramática (`indisponivel:cli-ausente+codex-ausente`;
+  DM-346).
 - Valor fora dessa gramática: o `--acrescentar` não grava nada (código 1). O E1 passa o valor
   pelo `--revisao` antes e grava `invalida` no lugar de um que não cabe.
 - É **registro**, não prova: a V12 nunca lê esta chave (DM-239) e pergunta de novo ao `conferir`.

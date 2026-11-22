@@ -554,23 +554,23 @@ A MergeX usa Git 2.36 ou mais novo para listar e remover worktrees, e `perl` com
 a dispensa por hash. Sem eles, nada quebra: a worktree fica, e a varredura de segredo roda completa.
 
 ```bash
-gh release download v0.14.22 -R AxisGov/expxdev -D ~/expx-cli/v0.14.22 &&
+gh release download v0.14.23 -R AxisGov/expxdev -D ~/expx-cli/v0.14.23 &&
 (
-  cd ~/expx-cli/v0.14.22 || exit 1
+  cd ~/expx-cli/v0.14.23 || exit 1
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c expxdev-0.14.22.tgz.sha256
+    sha256sum -c expxdev-0.14.23.tgz.sha256
   else
-    shasum -a 256 -c expxdev-0.14.22.tgz.sha256
+    shasum -a 256 -c expxdev-0.14.23.tgz.sha256
   fi
 ) &&
-npm install -g ~/expx-cli/v0.14.22/expxdev-0.14.22.tgz &&
+npm install -g ~/expx-cli/v0.14.23/expxdev-0.14.23.tgz &&
 expx init --skills buildx,mergex,sprintx --harness claude --yes
 ```
 
 O `npm install -g` do pacote conferido põe o `expx` no PATH, e é ele que os exemplos deste README
 e das skills usam (`expx init`, `expx update`, `expx doctor`). Para rodar uma vez, sem instalar,
 troque as duas últimas linhas por
-`npx --yes --package ~/expx-cli/v0.14.22/expxdev-0.14.22.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes`.
+`npx --yes --package ~/expx-cli/v0.14.23/expxdev-0.14.23.tgz expx init --skills buildx,mergex,sprintx --harness claude --yes`.
 Atualizar o CLI é baixar a release nova e repetir o `npm install -g`.
 
 - Merge ou push comum em `main` apenas valida testes e build; não publica.
@@ -584,7 +584,7 @@ Atualizar o CLI é baixar a release nova e repetir o `npm install -g`.
   certificado está na `main` da skill (`scripts/ci/test-certificados.sh`) e que o `init`
   instala exatamente esses commits (`scripts/ci/test-distribuicao-sem-segredo.sh`).
 - Para disparar o workflow explícito pela CLI, rode
-  `bash scripts/liberar-versao.sh 0.14.22 <sha-completo>`. O script não cria tag local e não
+  `bash scripts/liberar-versao.sh 0.14.23 <sha-completo>`. O script não cria tag local e não
   publica no npm.
 
 ### Histórico de versões
@@ -780,6 +780,10 @@ Atualizar o CLI é baixar a release nova e repetir o `npm install -g`.
   trava do ENTREGA.md órfã, e o histórico truncado na busca da abertura para o registro.
 - `0.14.22` certifica a MergeX com o relato da Onda 5 do conselhos: o registro de um merge aceita o
   arquivo da pasta do próprio trabalho que veio da feature sem mudança e que a base não tocou (DM-345).
+- `0.14.23` traz a revisão retroativa pedida pela Onda 4 do conselhos: o núcleo revisa, depois do
+  fechamento, os commits já registrados de uma task (`revisar --retroativa --commits`), e a MergeX
+  grava essa revisão num commit só de evidências que a V12 confere (DM-346). No Windows, o Codex da
+  revisão passa a receber o `windows.sandbox` da configuração do usuário.
 
 Consulte [`CHANGELOG.md`](CHANGELOG.md).
 

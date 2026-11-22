@@ -270,6 +270,7 @@ Os caminhos são relativos à raiz desta skill. O detalhe operacional de cada et
 | reconciliação de base pós-E8 | `references/11-reconciliacao-base.md` | — |
 | barreira de push (E0, E2, E6, E7) | `references/12-barreira-de-push.md` | `assets/pre-push-gerenciado.sh`, `assets/ci/mergex-portao.yml` |
 | predecessores SprintX e retomada estreita da V9 | `references/13-predecessores-sprintx.md` | — |
+| revisão retroativa de task fechada sem revisão aprovada (`/mergex-revisao-retroativa`) | `references/14-revisao-retroativa.md` | — |
 | E9 REVISÃO (manual) | `references/09-revisao.md` | `assets/TEMPLATE-revisao.md` |
 
 ## Integração com as skills irmãs
