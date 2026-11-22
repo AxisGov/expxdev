@@ -90,6 +90,7 @@ o diff do HEAD revisado até o commit da task só toca evidências
 (`retroativa-produto`), que os commits são ancestrais e não merge
 (`retroativa-commits`) e a cobertura pelos commits da task. A sprintx
 (passo de revisão da F6) e a mergex (E2, V12) passam a chamá-lo nos planos delas.
+No Windows, a escala para o Codex repassa `-c windows.sandbox="v"` lido só dessa chave do `config.toml` do usuário (`CODEX_HOME` ou `~/.codex`), que o `--ignore-user-config` descartaria; "blocked by policy" sem resposta útil vira `indisponivel:<motivo>+codex-sandbox-bloqueado`.
 
 ## Por que existe
 

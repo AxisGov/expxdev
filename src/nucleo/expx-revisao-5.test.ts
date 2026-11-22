@@ -4,11 +4,12 @@
 // Parte 5; o apoio compartilhado está em src/teste/expx-revisao-apoio.ts.
 import { afterEach, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync } from "node:fs";
-import { delimiter, join } from "node:path";
-import { ambienteCom } from "../teste/candidatos.js";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { delimiter, dirname, join } from "node:path";
+import { ambienteCom, noPath } from "../teste/candidatos.js";
 import { chamadasDa } from "../teste/codeant-falsa.js";
-import { criados, git, escreve, cenario, PATH, revisar, altera3, conferir, EV, evidencia, commita, type Cenario, type Ev } from "../teste/expx-revisao-apoio.js";
+import { chamadasDoCodex, instalarCodexFalso, type CfgCodex } from "../teste/codex-falso.js";
+import { criados, temp, git, escreve, cenario, PATH, revisar, altera3, conferir, EV, evidencia, commita, type Cenario, type Ev } from "../teste/expx-revisao-apoio.js";
 
 afterEach(() => { for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true }); });
 
@@ -123,5 +124,55 @@ describe("expx-revisao.mjs revisar --retroativa", () => {
     expect(semBase).toMatchObject({ rc: 0, ev: { modo: "uncommitted", base_commit: null } });
     expect(semBase.ev).not.toHaveProperty("commits_da_task");
     expect(conferir(c.raiz, "obrigatoria", `T-03=${commita(c.raiz)}`)).toMatchObject({ rc: 0, out: "T-03 ok" });
+  });
+});
+
+describe("expx-revisao.mjs: o sandbox do Codex no Windows", () => {
+  const SEM_CODEANT = dirname(noPath("git") ?? "");
+  /** A escala com o Codex falso (`cfg`), sem a CodeAnt no PATH, e o CODEX_HOME com o `config.toml` dado (null: sem arquivo). */
+  function escalaComConfig(cfg: CfgCodex, config: string | null, plataforma = "win32") {
+    const c = cenario();
+    const codex = instalarCodexFalso(temp("expx-codex-"), cfg);
+    const home = temp("expx-codex-home-");
+    if (config !== null) writeFileSync(join(home, "config.toml"), config);
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js", "T-01", `${codex.path}${delimiter}${SEM_CODEANT}`, { CODEX_HOME: home, EXPX_REVISAO_TESTE_PLATAFORMA: plataforma });
+    const args = chamadasDoCodex(codex)[0]?.args ?? [];
+    return { r, sandbox:args.filter((a, i) => args[i - 1] === "-c" && a.startsWith("windows.sandbox")) };
+  }
+  const vazia = { resposta: { arquivos_revisados: [], issues: [] } };
+
+  it.each<[string, string | null, string, string[]]>([
+    ["tabela [windows] com comentário", '[windows]\nsandbox = "elevated" # o padrão recusa processos\n[outra]\nx = "y"\n', "win32", ['windows.sandbox="elevated"']],
+    ["chave pontuada no topo", 'model = "o3"\nwindows.sandbox = "unelevated"\n', "win32", ['windows.sandbox="unelevated"']],
+    ["chave só comentada ou em outra tabela", '# windows.sandbox = "elevated"\n[outra]\nsandbox = "elevated"\n[windows.mais]\nsandbox = "elevated"\n', "win32", []],
+    ["valor inválido", '[windows]\nsandbox = "Elevated; x"\n', "win32", []],
+    ["config ausente", null, "win32", []],
+    ["fora do Windows", '[windows]\nsandbox = "elevated"\n', "linux", []],
+  ])("funcional: %s → -c windows.sandbox repassado só quando a chave é válida no Windows", (_n, config, plataforma, esperado) => {
+    const { r, sandbox } = escalaComConfig({ resposta: { arquivos_revisados: ["src/a.js"], issues: [] } }, config, plataforma);
+    expect(r).toMatchObject({ rc: 0, ev: { expx_revisao: 3, resultado: "ok" } });
+    expect(sandbox).toEqual(esperado);
+  });
+
+  it("funcional: \"blocked by policy\" e resposta vazia → indisponivel:<CodeAnt>+codex-sandbox-bloqueado, que o conferir aceita", () => {
+    const c = cenario();
+    const codex = instalarCodexFalso(temp("expx-codex-"), { ...vazia, stderr: "exec_command failed: CreateProcess rejected: blocked by policy\n" });
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js", "T-01", `${codex.path}${delimiter}${SEM_CODEANT}`, { CODEX_HOME: temp("expx-codex-home-") });
+    expect(r.rc).toBe(2);
+    expect(r.out.trim()).toBe("T-01 indisponivel:cli-ausente+codex-sandbox-bloqueado");
+    expect(r.ev).toMatchObject({ expx_revisao: 3, resultado: "indisponivel", motivo: "cli-ausente+codex-sandbox-bloqueado", escala: { de: "codeant", motivo: "cli-ausente" } });
+    const sha = commita(c.raiz);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 1, out: "T-01 FALHA indisponivel:cli-ausente+codex-sandbox-bloqueado" });
+    expect(conferir(c.raiz, "se_disponivel", `T-01=${sha}`)).toMatchObject({ rc: 3, out: "T-01 AVISO indisponivel:cli-ausente+codex-sandbox-bloqueado" });
+  });
+
+  it("funcional: resposta vazia sem \"blocked by policy\" continua codex-saida-invalida", () => {
+    const c = cenario();
+    const codex = instalarCodexFalso(temp("expx-codex-"), vazia);
+    altera3(c.raiz);
+    const r = revisar(c, "src/a.js", "T-01", `${codex.path}${delimiter}${SEM_CODEANT}`, { CODEX_HOME: temp("expx-codex-home-") });
+    expect(r).toMatchObject({ rc: 2, ev: { motivo: "cli-ausente+codex-saida-invalida" } });
   });
 });

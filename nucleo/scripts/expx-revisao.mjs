@@ -17,13 +17,15 @@
 // não revisáveis e os excluídos (núcleo e `excluir_da_revisao` do HEAD); a base é o 1o pai do 1o commit; revisa como o
 // `--base-commit` (base..HEAD, blobs do HEAD). A evidência (modo `retroativa`, `commits_da_task`) vai num commit só de
 // evidências sobre o HEAD revisado: o `conferir` cobra que nada de produto mudou depois dele e a cobertura pelos commits.
+// No Windows, o Codex da escala recebe `-c windows.sandbox="v"` lido só dessa chave do config.toml do usuário (CODEX_HOME ou
+// ~/.codex), porque o `--ignore-user-config` a descarta; "blocked by policy" sem resposta útil vira `codex-sandbox-bloqueado`.
 // EXPX_REVISAO_TESTE_PAUSA é só para teste: um diretório em que o `revisar` cria `pronto` e espera
 // `continuar` entre a releitura e a gravação.
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { chmodSync, closeSync, existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statSync,
   writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, posix, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { conferirIntegridade, excluido, EXCLUIDOS_DO_NUCLEO, fatiaNoAmbiente, homologadas, localizarPacote, medir, mensagemFatia,
@@ -331,7 +333,7 @@ function cliConferida() {
 const ESCALAVEIS = ["cli-ausente", "versao", "integridade", "acesso-negado", "tempo-esgotado", "erro"];
 const MODELO_CODEX = "gpt-5.6-terra";
 // os dois fora: `<motivo da CodeAnt>+<um destes>`, e só estes
-const MOTIVOS_CODEX = ["codex-ausente", "codex-sem-login", "codex-erro", "codex-tempo-esgotado", "codex-saida-invalida"];
+const MOTIVOS_CODEX = ["codex-ausente", "codex-sem-login", "codex-erro", "codex-tempo-esgotado", "codex-saida-invalida", "codex-sandbox-bloqueado"];
 // 2 (0.14.2): a mensagem entra na identidade (login#81); a 1 (0.14.0 e 0.14.1) continua conferida pela regra dela
 const FORMATO_CODEX = 2;
 // a severidade é só informação: todo achado em linha alterada conta, como na CodeAnt
@@ -432,8 +434,37 @@ function sha256DoArquivo(f) {
     return h.digest("hex");
   } catch { return undefined; } finally { if (fd !== undefined) closeSync(fd); }
 }
-/** O Codex revisa o snapshot: `{motivo}` (`codex-*`, nada revisado) ou `{versao, pedido, bruto, resposta}`, com
- *  `resposta` undefined se a saída não é o JSON do schema. Uma tentativa só, no prazo da CLI. */
+// EXPX_REVISAO_TESTE_PLATAFORMA é só para teste: a plataforma no lugar de process.platform, só para ler o sandbox do Codex.
+/** No Windows, só a chave `windows.sandbox` do config.toml do usuário (o `--ignore-user-config` a descarta, e o sandbox
+ *  padrão do Windows recusa todo processo): o valor, se casa /^[a-z][a-z-]*$/, ou undefined. Aceita a tabela `[windows]`
+ *  com `sandbox = "v"` e `windows.sandbox = "v"` no topo, sem comentários `#`. Fora do Windows, nunca lê o arquivo. */
+function sandboxDoWindows(plataforma, arquivo) {
+  if (plataforma !== "win32") return undefined;
+  let texto;
+  try { texto = readFileSync(arquivo, "utf8"); } catch { return undefined; }
+  let tabela = "";
+  for (const bruta of texto.split(/\r?\n/)) {
+    const linha = bruta.replace(/#.*$/, "").trim();
+    if (linha === "") continue;
+    // `[[x]]` (vetor de tabelas) nunca é a tabela `[windows]`
+    if (linha.startsWith("[")) { tabela = linha.startsWith("[[") ? "\0" : linha.slice(1, linha.lastIndexOf("]")).replace(/\s+/g, ""); continue; }
+    const m = /^([\w.\s-]+?)\s*=\s*(["'])([^"'\\]*)\2$/.exec(linha);
+    if (!m) continue;
+    const chave = m[1].replace(/\s+/g, "");
+    if ((tabela === "windows" && chave === "sandbox") || (tabela === "" && chave === "windows.sandbox")) return /^[a-z][a-z-]*$/.test(m[3]) ? m[3] : undefined;
+  }
+  return undefined;
+}
+/** O `-c windows.sandbox="v"` que devolve ao Codex o sandbox do usuário no Windows, ou nada. */
+function sandboxDoUsuario(env) {
+  const plataforma = process.env.EXPX_REVISAO_TESTE_PLATAFORMA || process.platform;
+  if (plataforma !== "win32") return [];
+  const v = sandboxDoWindows(plataforma, join(env.CODEX_HOME || join(homedir(), ".codex"), "config.toml"));
+  return v ? ["-c", `windows.sandbox="${v}"`] : [];
+}
+/** O Codex revisa o snapshot: `{motivo}` (`codex-*`, nada revisado) ou `{versao, pedido, bruto, resposta, bloqueado}`, com
+ *  `resposta` undefined se a saída não é o JSON do schema e `bloqueado` se o sandbox recusou processos ("blocked by
+ *  policy" no stdout ou no stderr). Uma tentativa só, no prazo da CLI. */
 function codexRevisa(raiz, base, enviados) {
   const loc = localizarCodex();
   if (!loc) return { motivo: "codex-ausente" };
@@ -454,7 +485,7 @@ function codexRevisa(raiz, base, enviados) {
     writeFileSync(schema, JSON.stringify(SCHEMA_CODEX));
     const pedido = pedidoAoCodex(base, enviados);
     const r = codexRoda(["exec", "--ephemeral", "--ignore-user-config", "-s", "read-only", "-m", MODELO_CODEX, "-c", "model_reasoning_effort=\"high\"",
-      "-C", raiz, "--output-schema", schema, "-o", saida, "-"], { cwd: raiz, input: pedido, maxBuffer: 64 << 20, timeout: TEMPO_DA_CLI, killSignal: "SIGKILL" });
+      ...sandboxDoUsuario(env), "-C", raiz, "--output-schema", schema, "-o", saida, "-"], { cwd: raiz, input: pedido, maxBuffer: 64 << 20, timeout: TEMPO_DA_CLI, killSignal: "SIGKILL" });
     if (r.error?.code === "ETIMEDOUT") return { motivo: "codex-tempo-esgotado" };
     if (r.error || r.status !== 0) {
       process.stderr.write(`expx-revisao: codex saiu ${r.status ?? r.error?.code}: ${String(r.stderr ?? "").slice(-2000)}\n`);
@@ -466,11 +497,12 @@ function codexRevisa(raiz, base, enviados) {
       process.stderr.write(`expx-revisao: o executavel do codex mudou durante a revisao: ${loc.caminho}\n`);
       return { motivo: "codex-erro" };
     }
+    const bloqueado = /blocked by policy/.test(`${String(r.stdout ?? "")}\n${String(r.stderr ?? "")}`);
     let bruto;
-    try { bruto = readFileSync(saida); } catch { return { motivo: "codex-saida-invalida" }; }
+    try { bruto = readFileSync(saida); } catch { return { motivo: bloqueado ? "codex-sandbox-bloqueado" : "codex-saida-invalida" }; }
     let resposta;
     try { resposta = respostaDoCodex(JSON.parse(bruto.toString("utf8"))); } catch { /* texto livre */ }
-    return { versao: v, executavel, pedido, bruto, resposta };
+    return { versao: v, executavel, pedido, bruto, resposta, bloqueado };
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 /** O JSON da CLI: do primeiro `{` que dá JSON até o último `}` (o npm pode avisar antes e depois). */
@@ -839,7 +871,7 @@ function revisar() {
     // texto livre, fora do schema, sem a task inteira ou com issue fora dela (nunca se lê um caminho que o modelo inventou,
     // como `../../dev/zero`): nada revisado
     if (!cx.resposta || !mesmosArquivos(cx.resposta.arquivos_revisados, enviados) || !issuesNaTask(cx.resposta.issues, enviados)) {
-      return fim("indisponivel", `${motivo}+codex-saida-invalida`);
+      return fim("indisponivel", `${motivo}+${cx.bloqueado ? "codex-sandbox-bloqueado" : "codex-saida-invalida"}`);
     }
     return concluir(issuesDoCodex(cx.resposta.issues), versaoDoRevisor(ev.revisor), extraDoCodex(FORMATO_CODEX));
   };
