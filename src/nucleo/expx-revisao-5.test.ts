@@ -57,6 +57,19 @@ describe("expx-revisao.mjs revisar --retroativa", () => {
     expect(review[review.indexOf("--base-commit") + 1]).toBe(base);
   });
 
+  it("funcional: task que só toca arquivo não revisável (manual.pdf) ganha evidência sem a CLI e confere, em vez de uso 64", () => {
+    const c = cenario();
+    escreve(c.raiz, "docs/manual.pdf", "%PDF-1.4\n");
+    const c1 = commit(c.raiz, "pdf");
+    const r = retro(c, c1);
+    expect(r.rc).toBe(0);
+    expect(Object.keys(r.ev.arquivos)).toEqual(["docs/manual.pdf"]);
+    expect(r.ev.arquivos["docs/manual.pdf"]?.revisao).toBe("nao-revisavel");
+    expect(r.chamadas.some((a) => a[0] === "review")).toBe(false);
+    const sha = commita(c.raiz, true);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
   it("funcional: conferir e listar aceitam a evidência num commit só de evidência sobre o HEAD revisado", () => {
     const { c, c1, c2 } = tarefa();
     expect(retro(c, `${c1},${c2}`).rc).toBe(0);

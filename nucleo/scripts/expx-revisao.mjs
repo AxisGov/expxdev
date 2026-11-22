@@ -770,11 +770,12 @@ function prepararRetroativa() {
   if (!base) uso(`o primeiro commit da lista nao tem pai: ${pedidos[0]}`);
   const tocados = tocadosPelos(commits);
   if (!tocados) throw new Error("diff dos --commits falhou");
-  const perfil = perfilCli(homologadas().at(-1));
   // o leitor que falha não filtra nada aqui: o `revisar` dá `indisponivel:fatiamento-invalido` adiante
   const exclusoes = exclusoesDoProjeto("HEAD") ?? [];
-  const arquivos = tocados.filter((f) => revisavel(f, perfil) && !excluido(f, EXCLUIDOS_DO_NUCLEO) && !excluido(f, exclusoes));
-  if (arquivos.length === 0) uso("--commits nao tocam nenhum arquivo revisavel");
+  // o não revisável fica, como no `--arquivos` do fluxo normal: entra como `nao-revisavel`, sem a CLI (a task que só
+  // toca um `manual.pdf` ganha evidência, em vez de uso 64)
+  const arquivos = tocados.filter((f) => !excluido(f, EXCLUIDOS_DO_NUCLEO) && !excluido(f, exclusoes));
+  if (arquivos.length === 0) uso("--commits nao tocam nenhum arquivo fora das exclusoes");
   Object.assign(op, { arquivos: arquivos.join(","), "base-commit": base, commitsDaTask: commits });
 }
 
