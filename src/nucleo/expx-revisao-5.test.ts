@@ -45,13 +45,14 @@ const reescreve = (raiz: string, muda: (ev: Record<string, any>) => void) => {
 };
 
 describe("expx-revisao.mjs revisar --retroativa", () => {
-  it("funcional: grava modo retroativa, commits_da_task (sha completo, na ordem dada), base_commit (1o pai do 1o) e head; arquivos = união dos diffs menos os excluídos", () => {
+  it("funcional: grava modo retroativa, commits_da_task (sha completo, na ordem dada), base_commit (1o pai do 1o) e head; arquivos = união dos diffs, o excluído como `excluido`", () => {
     const { c, base, c1, c2 } = tarefa();
     const r = retro(c, `${c1.slice(0, 10)},${c2}`);
     expect(r.rc).toBe(0);
     expect(r.out.trim()).toBe("T-01 ok");
     expect(r.ev).toMatchObject({ modo: "retroativa", commits_da_task: [c1, c2], base_commit: base, head: c2, resultado: "ok" });
-    expect(Object.keys(r.ev.arquivos).sort()).toEqual(["src/a.js", "src/b.js"]);
+    expect(Object.keys(r.ev.arquivos).sort()).toEqual(["docs/entregas/w/notas.md", "src/a.js", "src/b.js"]);
+    expect(r.ev.arquivos["docs/entregas/w/notas.md"]?.revisao).toBe("excluido");
     expect(r.ev.arquivos["src/b.js"]?.blob).toBe(git(c.raiz, "rev-parse", `${c2}:src/b.js`));
     const review = r.chamadas.find((a) => a[0] === "review") ?? [];
     expect(review[review.indexOf("--base-commit") + 1]).toBe(base);
@@ -68,6 +69,28 @@ describe("expx-revisao.mjs revisar --retroativa", () => {
     expect(r.chamadas.some((a) => a[0] === "review")).toBe(false);
     const sha = commita(c.raiz, true);
     expect(conferir(c.raiz, "obrigatoria", `T-01=${sha}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it("funcional: task que só toca caminho excluído (docs/sprintx) ganha evidência sem a CLI e confere, em vez de uso 64", () => {
+    const c = cenario();
+    escreve(c.raiz, "docs/sprintx/w/plano.md", "p\n");
+    const c1 = commit(c.raiz, "plano");
+    const r = retro(c, c1);
+    expect(r.rc).toBe(0);
+    expect(r.ev.arquivos["docs/sprintx/w/plano.md"]?.revisao).toBe("excluido");
+    expect(r.chamadas.some((a) => a[0] === "review")).toBe(false);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it("funcional: duas tasks no mesmo commit de evidências conferem; o commit que também muda o ENTREGA.md → FALHA retroativa-produto", () => {
+    const { c, c1, c2 } = tarefa();
+    expect(retro(c, `${c1},${c2}`).rc).toBe(0);
+    expect(retro(c, `${c1},${c2}`, [], "T-02").rc).toBe(0);
+    const juntas = commita(c.raiz, true);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${juntas}`, `T-02=${juntas}`)).toMatchObject({ rc: 0, out: "T-01 ok\nT-02 ok" });
+    escreve(c.raiz, "docs/entregas/w/ENTREGA.md", "---\nkind: entrega\n---\n");
+    const comEntrega = commit(c.raiz, "entrega junto", "docs");
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${comEntrega}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:retroativa-produto:docs/entregas/w/ENTREGA.md" });
   });
 
   it("funcional: conferir e listar aceitam a evidência num commit só de evidência sobre o HEAD revisado", () => {
