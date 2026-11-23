@@ -13,8 +13,8 @@
 // resposta é reconciliada com a task (contrato expx-revisao v2); a evidência guarda as `issues` cruas, e o
 // `conferir` deriva delas os achados. Nunca lê credencial da CLI.
 // --retroativa (task commitada sem evidência): `--commits` na ordem do ENTREGA.commits da task, cada um ancestral de HEAD e
-// não merge (sem `--arquivos` nem `--base-commit`). Os arquivos são a união dos diffs de cada commit contra o 1o pai, menos os
-// não revisáveis e os excluídos (núcleo e `excluir_da_revisao` do HEAD); a base é o 1o pai do 1o commit; revisa como o
+// não merge (sem `--arquivos` nem `--base-commit`). Os arquivos são a união dos diffs de cada commit contra o 1o pai; os
+// não revisáveis e os excluídos (núcleo e `excluir_da_revisao` do HEAD) também entram na evidência, sem ir à CLI; a base é o 1o pai do 1o commit; revisa como o
 // `--base-commit` (base..HEAD, blobs do HEAD). A evidência (modo `retroativa`, `commits_da_task`) vai num commit só de
 // evidências sobre o HEAD revisado: o `conferir` cobra que nada de produto mudou depois dele e a cobertura pelos commits.
 // No Windows, o Codex da escala recebe `-c windows.sandbox="v"` lido só dessa chave do config.toml do usuário (CODEX_HOME ou
@@ -770,12 +770,12 @@ function prepararRetroativa() {
   if (!base) uso(`o primeiro commit da lista nao tem pai: ${pedidos[0]}`);
   const tocados = tocadosPelos(commits);
   if (!tocados) throw new Error("diff dos --commits falhou");
-  // o leitor que falha não filtra nada aqui: o `revisar` dá `indisponivel:fatiamento-invalido` adiante
+  // Como no `--arquivos` do fluxo normal, não se filtra aqui: arquivo não revisável, exclusão do núcleo e exclusão declarada
+  // ficam na evidência com o estado próprio; assim a task que só os toca não termina em uso 64 sem evidência. O excluído
+  // com vírgula no nome sai (a cobertura não o cobra): no `--arquivos` ele viraria `caminho-com-virgula` e nada seria gravado
   const exclusoes = exclusoesDoProjeto("HEAD") ?? [];
-  // o não revisável fica, como no `--arquivos` do fluxo normal: entra como `nao-revisavel`, sem a CLI (a task que só
-  // toca um `manual.pdf` ganha evidência, em vez de uso 64)
-  const arquivos = tocados.filter((f) => !excluido(f, EXCLUIDOS_DO_NUCLEO) && !excluido(f, exclusoes));
-  if (arquivos.length === 0) uso("--commits nao tocam nenhum arquivo fora das exclusoes");
+  const arquivos = tocados.filter((f) => !f.includes(",") || !(excluido(f, EXCLUIDOS_DO_NUCLEO) || excluido(f, exclusoes)));
+  if (arquivos.length === 0) uso("--commits nao tocam nenhum arquivo");
   Object.assign(op, { arquivos: arquivos.join(","), "base-commit": base, commitsDaTask: commits });
 }
 
@@ -1101,14 +1101,28 @@ function naoCoberto(ev, sha) {
 }
 
 /** Na evidência retroativa, o que não prova que o commit `sha` só acrescenta evidências ao HEAD revisado, ou undefined:
- *  `retroativa-produto[:<arquivo>]` (`head` não é commit ancestral de `sha`, ou ev.head..sha toca arquivo fora das
- *  exclusões do núcleo) e `retroativa-commits` (`commits_da_task` vazio, repetido, com commit que não é ancestral de `head`
+ *  `retroativa-produto[:<arquivo>]` (`head` não é commit ancestral de `sha`, ou ev.head..sha toca arquivo fora dos
+ *  arquivos de evidência da pasta de revisão) e `retroativa-commits` (`commits_da_task` vazio, repetido, com commit que não é ancestral de `head`
  *  ou é merge, ou `base_commit` que não é o 1o pai do 1o commit). */
 function semRetroativa(ev, sha) {
   if (!ehCommit(ev.head) || !ancestral(ev.head, sha)) return "retroativa-produto";
   const d = git("diff", ...OPCOES_DIFF, ev.head, sha);
   if (d.status !== 0) return "retroativa-produto";
-  const produto = d.stdout.split("\0").find((f) => f !== "" && !excluido(f, EXCLUIDOS_DO_NUCLEO));
+  // só evidências retroativas do mesmo HEAD revisado entram no commit: as tasks que dividem o commit levam a sua junto
+  // (`<pasta de revisão>/<task>.json`, modo retroativa, `head` igual); o ENTREGA.md, outra nota de docs/entregas ou um
+  // `backup.json` ficam de fora
+  const dirEv = `${relative(op.raiz, pasta).replaceAll("\\", "/")}/`;
+  const ehEvidencia = (f) => {
+    const nome = f.slice(dirEv.length);
+    if (!f.startsWith(dirEv) || !nome.endsWith(".json") || nome.includes("/")) return false;
+    if (nome === `${ev.task}.json`) return true;
+    const s = git("show", `${sha}:./${f}`);
+    try {
+      const irma = JSON.parse(s.stdout.replace(/^﻿/, ""));
+      return s.status === 0 && irma?.modo === "retroativa" && irma.task === nome.slice(0, -5) && irma.head === ev.head;
+    } catch { return false; }
+  };
+  const produto = d.stdout.split("\0").find((f) => f !== "" && !ehEvidencia(f));
   if (produto !== undefined) return `retroativa-produto:${produto}`;
   const commits = ev.commits_da_task;
   if (!Array.isArray(commits) || commits.length === 0 || new Set(commits).size !== commits.length
