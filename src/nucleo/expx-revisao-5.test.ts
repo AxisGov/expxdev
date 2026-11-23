@@ -88,9 +88,23 @@ describe("expx-revisao.mjs revisar --retroativa", () => {
     expect(retro(c, `${c1},${c2}`, [], "T-02").rc).toBe(0);
     const juntas = commita(c.raiz, true);
     expect(conferir(c.raiz, "obrigatoria", `T-01=${juntas}`, `T-02=${juntas}`)).toMatchObject({ rc: 0, out: "T-01 ok\nT-02 ok" });
+    escreve(c.raiz, "docs/entregas/w/revisao/backup.json", "{}\n");
+    const comBackup = commit(c.raiz, "backup junto", "docs");
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${comBackup}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:retroativa-produto:docs/entregas/w/revisao/backup.json" });
     escreve(c.raiz, "docs/entregas/w/ENTREGA.md", "---\nkind: entrega\n---\n");
     const comEntrega = commit(c.raiz, "entrega junto", "docs");
-    expect(conferir(c.raiz, "obrigatoria", `T-01=${comEntrega}`)).toMatchObject({ rc: 1, out: "T-01 FALHA evidencia-invalida:retroativa-produto:docs/entregas/w/ENTREGA.md" });
+    expect(conferir(c.raiz, "obrigatoria", `T-02=${comEntrega}`)).toMatchObject({ rc: 1, out: expect.stringMatching(/^T-02 FALHA evidencia-invalida:retroativa-produto:docs\/entregas\/w\//) });
+  });
+
+  it("funcional: excluído com vírgula no nome fica fora da evidência e não impede a retroativa", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    escreve(c.raiz, "docs/sprintx/w/a,b.md", "p\n");
+    const c1 = commit(c.raiz, "c1");
+    const r = retro(c, c1);
+    expect(r.rc).toBe(0);
+    expect(Object.keys(r.ev.arquivos)).not.toContain("docs/sprintx/w/a,b.md");
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
   });
 
   it("funcional: conferir e listar aceitam a evidência num commit só de evidência sobre o HEAD revisado", () => {

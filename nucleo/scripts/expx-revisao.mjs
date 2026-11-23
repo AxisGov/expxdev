@@ -771,8 +771,10 @@ function prepararRetroativa() {
   const tocados = tocadosPelos(commits);
   if (!tocados) throw new Error("diff dos --commits falhou");
   // Como no `--arquivos` do fluxo normal, não se filtra aqui: arquivo não revisável, exclusão do núcleo e exclusão declarada
-  // ficam na evidência com o estado próprio; assim a task que só os toca não termina em uso 64 sem evidência.
-  const arquivos = tocados;
+  // ficam na evidência com o estado próprio; assim a task que só os toca não termina em uso 64 sem evidência. O excluído
+  // com vírgula no nome sai (a cobertura não o cobra): no `--arquivos` ele viraria `caminho-com-virgula` e nada seria gravado
+  const exclusoes = exclusoesDoProjeto("HEAD") ?? [];
+  const arquivos = tocados.filter((f) => !f.includes(",") || !(excluido(f, EXCLUIDOS_DO_NUCLEO) || excluido(f, exclusoes)));
   if (arquivos.length === 0) uso("--commits nao tocam nenhum arquivo");
   Object.assign(op, { arquivos: arquivos.join(","), "base-commit": base, commitsDaTask: commits });
 }
@@ -1106,10 +1108,20 @@ function semRetroativa(ev, sha) {
   if (!ehCommit(ev.head) || !ancestral(ev.head, sha)) return "retroativa-produto";
   const d = git("diff", ...OPCOES_DIFF, ev.head, sha);
   if (d.status !== 0) return "retroativa-produto";
-  // só evidências (`<pasta de revisão>/<task>.json`) entram no commit: as tasks que dividem o commit levam a sua junto,
-  // e o ENTREGA.md ou outra nota de docs/entregas fica de fora
+  // só evidências retroativas do mesmo HEAD revisado entram no commit: as tasks que dividem o commit levam a sua junto
+  // (`<pasta de revisão>/<task>.json`, modo retroativa, `head` igual); o ENTREGA.md, outra nota de docs/entregas ou um
+  // `backup.json` ficam de fora
   const dirEv = `${relative(op.raiz, pasta).replaceAll("\\", "/")}/`;
-  const ehEvidencia = (f) => f.startsWith(dirEv) && f.endsWith(".json") && !f.slice(dirEv.length).includes("/");
+  const ehEvidencia = (f) => {
+    const nome = f.slice(dirEv.length);
+    if (!f.startsWith(dirEv) || !nome.endsWith(".json") || nome.includes("/")) return false;
+    if (nome === `${ev.task}.json`) return true;
+    const s = git("show", `${sha}:./${f}`);
+    try {
+      const irma = JSON.parse(s.stdout.replace(/^﻿/, ""));
+      return s.status === 0 && irma?.modo === "retroativa" && irma.task === nome.slice(0, -5) && irma.head === ev.head;
+    } catch { return false; }
+  };
   const produto = d.stdout.split("\0").find((f) => f !== "" && !ehEvidencia(f));
   if (produto !== undefined) return `retroativa-produto:${produto}`;
   const commits = ev.commits_da_task;
