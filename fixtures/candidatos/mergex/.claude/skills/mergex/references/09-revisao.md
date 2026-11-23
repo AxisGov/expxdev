@@ -94,6 +94,10 @@ com o item dela ainda não `merged` (`atual_estado=`) e a URL desse item preench
 nunca o `pr_url` do topo, que fica `null` na entrega por sprint), o E9 lê esse PR no
 serviço e, se ele já foi mergeado, grava o registro com `merge_sha` = o commit de merge:
 
+Quando o planejamento histórico entrou por fora do método, o E9 só o registra na entrega
+`por_trabalho` com a lista `prs:` vazia e `sprint_atual: null`, mesmo que o PR do trabalho já esteja aberto (o `pr_url` e o `pr_estado` do topo ficam intactos; o item gravado tem `url: null`):
+`bash .claude/skills/mergex/scripts/entrega-de-planejamento.sh --registrar-planejamento-externo --entrega <ENTREGA.md> --merge-sha <commit de merge> --base-sha <primeiro pai>`. A V9 confirma depois que esse commit é ancestral da base e só traz artefatos de método (DM-348).
+
 ```bash
 # E9: o merge do PR de planejamento ou da sprint do trabalho atual (DM-260, DM-264)
 entrega="docs/entregas/<trabalho_id>/ENTREGA.md"

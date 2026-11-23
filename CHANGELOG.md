@@ -9,6 +9,16 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.25 — revisão retroativa mais estrita e planejamento externo na entrega por trabalho
+
+Instale por PR, como a 0.14.24. Muda o núcleo (`expx-revisao.mjs`, expxdev#192, merge 6f38917) e certifica a mergex (AxisGov/mergex#116, merge 9fe6933, e AxisGov/mergex#117, merge beb16d8, DM-348). O CLI, os eventos, o painel, o `expx sessao` e as outras oito skills seguem como na 0.14.24.
+
+Achados do CodeAnt no conselhos-municipais#386 (Onda 5, três itens) e o caso da V9 da Onda 4.
+
+- **MergeX, `revisao-retroativa.sh`.** Depois de criar o commit de evidências, confere que a árvore dele é a árvore provada no `--verificar`. Um hook que mexe no índice durante o commit faz a gravação recusar, sem tocar o `ENTREGA.md`.
+- **Núcleo, `revisar --retroativa`.** A task cujos commits só tocam caminhos excluídos da revisão (`docs/sprintx`, `docs/entregas`, `docs/eventos` e as exclusões do projeto) recebe a evidência, em vez de sair com erro de uso. O commit retroativo só pode trazer evidências: a da própria task ou a de outra task do mesmo `HEAD` revisado, na pasta de evidências da entrega.
+- **MergeX, `entrega-de-planejamento.sh --registrar-planejamento-externo` (DM-348).** Registra, numa entrega `por_trabalho` com `sprint_atual: null` e a lista `prs:` vazia, o merge histórico de um planejamento que entrou por fora do método. O `base_sha` tem de ser o 1º pai do merge, e o `pr_url` do trabalho fica intacto. Com o registro, a V9 desconta o planejamento da base como desconta o PR de planejamento do método.
+
 ## 0.14.24 — a cobertura da reconciliação termina quando o caminho volta à base
 
 Instale por PR, como a 0.14.23. Certifica a mergex (AxisGov/mergex#115, merge f782655, DM-347). O CLI, o núcleo, os eventos, o painel, o `expx sessao` e as outras oito skills seguem como na 0.14.23.

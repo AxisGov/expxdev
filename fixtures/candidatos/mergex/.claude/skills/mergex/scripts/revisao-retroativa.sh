@@ -224,6 +224,9 @@ real="$(git write-tree 2>/dev/null)" || { git reset -q -- $RET_PERMITIDOS; recus
 git commit -q -F "$MENSAGEM" || { git reset -q -- $RET_PERMITIDOS; recusa 'commit da revisao retroativa falhou' 1; }
 NOVO="$(git rev-parse --verify -q 'HEAD^{commit}')" || recusa 'HEAD ilegivel depois do commit' 1
 [ "$(git rev-parse --verify -q 'HEAD^')" = "$RET_HEAD" ] || recusa 'o commit nao saiu sobre o HEAD provado' 1
+# um hook pode mexer no índice entre o write-tree e o commit: o que vale é a árvore do commit criado
+[ "$(git rev-parse --verify -q "$NOVO^{tree}")" = "$RET_TREE" ] \
+  || recusa "o commit $NOVO nao saiu com a arvore provada; desfaca-o e rode --verificar de novo" 1
 bash "$CONTRATO_SH" --validar-retroativa --trabalho "$TRABALHO" --tasks "$TASKS" --commit "$NOVO" >/dev/null \
   || recusa "commit $NOVO fora do contrato da revisao retroativa" 1
 
