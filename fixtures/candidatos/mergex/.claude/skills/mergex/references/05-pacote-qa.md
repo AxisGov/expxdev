@@ -102,7 +102,7 @@ Antes de gravar, verifique linha a linha:
 
 ## Critério de saída
 
-`docs/entregas/<trabalho_id>/QA-PACOTE.md` existe, com as sete seções, e passa no teste de legibilidade. Registre no `ENTREGA.md` que o pacote existe. Siga para o E6.
+`docs/entregas/<trabalho_id>/QA-PACOTE.md` existe, com as sete seções, e passa no teste de legibilidade. O próprio `QA-PACOTE.md` é o registro: ele aparece em `Onde está o quê` do `ENTREGA.md` e o checkpoint `pre-e6` o persiste, sem campo no frontmatter. Siga para o E6.
 
 O pacote de QA é **pré-requisito do push** (E6): a branch não sobe sem ele.
 

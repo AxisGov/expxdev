@@ -779,7 +779,7 @@ esac
 
 # DM-311: o e9-merge persiste só o registro do merge que o E9 grava
 # (entrega-de-planejamento.sh --registrar-merge, ou --completar-base no item
-# histórico), para ele entrar na branch antes do merge de integração: sem isso, o
+# histórico, ou --registrar-planejamento-externo na entrega por trabalho, DM-349), para ele entrar na branch antes do merge de integração: sem isso, o
 # `reconciliacao-base.sh --registrar` recusa o ENTREGA.md sujo, e o E0 da sprint
 # seguinte exige a reconciliação. A prova é refazer a escrita: a mesma ação, com o
 # merge_sha e a base_sha do único item de `prs` que mudou, sobre o ENTREGA.md de
@@ -822,18 +822,23 @@ prova_e9_merge() {
   [ "$est" = merged ] || { rm -rf "$t"; para "e9-merge: o item $s de prs não está merged ($est)"; }
   # a data com ou sem CR no fim: num ENTREGA.md CRLF, o E9 de ontem e o replay de hoje diferem só nela
   sed -E 's/^atualizado_em: [0-9]{4}-[0-9]{2}-[0-9]{2}(\r?)$/atualizado_em: -\1/' "$t/provado.md" > "$t/disco"
-  for acao in registrar-merge completar-base; do
+  # DM-349: o --registrar-planejamento-externo (DM-348) grava o item novo de prs na
+  # entrega por trabalho sem PRs e com sprint_atual null; a prova refaz também ele
+  for acao in registrar-merge completar-base registrar-planejamento-externo; do
     cp "$t/ENTREGA.md" "$t/refeito.md"
-    if [ "$acao" = registrar-merge ]; then
-      bash "$PLANEJAMENTO_SH" --registrar-merge --merge-sha "$sha" --base-sha "$base" --entrega "$t/refeito.md" >/dev/null 2>&1 || continue
-    else
-      bash "$PLANEJAMENTO_SH" --completar-base "$s" --merge-sha "$sha" --base-sha "$base" --entrega "$t/refeito.md" >/dev/null 2>&1 || continue
-    fi
+    case "$acao" in
+      registrar-merge)
+        bash "$PLANEJAMENTO_SH" --registrar-merge --merge-sha "$sha" --base-sha "$base" --entrega "$t/refeito.md" >/dev/null 2>&1 || continue ;;
+      completar-base)
+        bash "$PLANEJAMENTO_SH" --completar-base "$s" --merge-sha "$sha" --base-sha "$base" --entrega "$t/refeito.md" >/dev/null 2>&1 || continue ;;
+      *)
+        bash "$PLANEJAMENTO_SH" --registrar-planejamento-externo --merge-sha "$sha" --base-sha "$base" --entrega "$t/refeito.md" >/dev/null 2>&1 || continue ;;
+    esac
     sed -E 's/^atualizado_em: [0-9]{4}-[0-9]{2}-[0-9]{2}(\r?)$/atualizado_em: -\1/' "$t/refeito.md" > "$t/refeito"
     if cmp -s "$t/refeito" "$t/disco"; then rm -rf "$t"; return 0; fi
   done
   rm -rf "$t"
-  para "e9-merge: $ENTREGA muda além do registro do merge pelo E9 (só pr_estado, o item $s de prs e atualizado_em mudam, como o --registrar-merge ou o --completar-base gravam)" # guarda:E9MERGE
+  para "e9-merge: $ENTREGA muda além do registro do merge pelo E9 (só pr_estado, o item $s de prs e atualizado_em mudam, como o --registrar-merge, o --completar-base ou o --registrar-planejamento-externo gravam)" # guarda:E9MERGE
 }
 prova_e9_merge
 

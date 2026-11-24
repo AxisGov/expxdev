@@ -9,6 +9,19 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.26 — o e9-merge aceita o planejamento externo e o E3 grava a atenção
+
+Instale por PR, como a 0.14.25. Certifica a mergex (AxisGov/mergex#118, merge ba1e184, DM-349, e AxisGov/mergex#119, merge 3a45969, DM-350). O CLI, o núcleo, os eventos, o painel, o `expx sessao` e as outras oito skills seguem como na 0.14.25.
+
+Lacunas relatadas pela Onda 4 do conselhos-municipais depois da 0.14.25.
+
+- **MergeX, checkpoint `e9-merge` (DM-349).** A prova do `persistir-metodo.sh` refaz também o `--registrar-planejamento-externo` da DM-348. O registro externo feito pelo script vira o commit `Metodo: e9-merge`, em vez de ser recusado como "além do registro do E9".
+- **MergeX, `registrar-atencao.sh` (DM-350).** O E3 tem agora o script que grava no `ENTREGA.md` as contagens `atencao`, a `faixa_atencao` por arquivo e o `arquivos_alterados` do diff `<branch_base>...HEAD`. O mesmo script acrescenta o `veredito_emitido` ao rastro.
+  - Recusa, sem gravar nada, quando um arquivo do diff ficou sem faixa ou quando o `ATENCAO.md` cita um caminho fora do diff.
+  - Em `por_sprint`, mescla as faixas pelo caminho e acumula `arquivos_alterados`.
+  - Preserva CRLF e grava com trava de escritor único.
+  - O pacote de QA não ganha campo no frontmatter: o registro é o próprio `QA-PACOTE.md`, persistido no `pre-e6`.
+
 ## 0.14.25 — revisão retroativa mais estrita e planejamento externo na entrega por trabalho
 
 Instale por PR, como a 0.14.24. Muda o núcleo (`expx-revisao.mjs`, expxdev#192, merge 6f38917) e certifica a mergex (AxisGov/mergex#116, merge 9fe6933, e AxisGov/mergex#117, merge beb16d8, DM-348). O CLI, os eventos, o painel, o `expx sessao` e as outras oito skills seguem como na 0.14.24.

@@ -429,7 +429,7 @@ Trabalho: <trabalho_id>
 Metodo: retomar-v9-predecessores
 ```
 
-**7. `e9-merge`, logo depois de o E9 registrar o merge de um PR de planejamento ou de sprint.** Persiste somente `docs/entregas/<trabalho_id>/ENTREGA.md`, e só a transição que `entrega-de-planejamento.sh --registrar-merge` (ou `--completar-base`) grava (DM-311). O commit leva o conteúdo que a prova leu: se o `ENTREGA.md` mudar entre a prova e o `git add`, o executor para sem commitar e preserva o stage (DM-314):
+**7. `e9-merge`, logo depois de o E9 registrar o merge de um PR de planejamento ou de sprint.** Persiste somente `docs/entregas/<trabalho_id>/ENTREGA.md`, e só a transição que `entrega-de-planejamento.sh --registrar-merge` (ou `--completar-base`, ou `--registrar-planejamento-externo` na entrega por trabalho, DM-349) grava (DM-311). O commit leva o conteúdo que a prova leu: se o `ENTREGA.md` mudar entre a prova e o `git add`, o executor para sem commitar e preserva o stage (DM-314):
 
 ```
 chore(mergex): persiste metodo e9-merge
