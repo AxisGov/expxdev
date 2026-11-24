@@ -496,9 +496,19 @@ Estrutura:
 2. As três seções, cada arquivo com caminho, tipo de mudança, tamanho e a justificativa com o critério.
 3. **Fontes consultadas e fontes ausentes** — o revisor precisa saber que dimensão não foi avaliada.
 
-Registre no `ENTREGA.md` a contagem por faixa (`atencao.olho_obrigatorio`,
+Depois de gravar o `ATENCAO.md`, rode:
+
+```bash
+bash .claude/skills/mergex/scripts/registrar-atencao.sh --entrega docs/entregas/<trabalho_id>/ENTREGA.md
+```
+
+O script registra no `ENTREGA.md` a contagem por faixa (`atencao.olho_obrigatorio`,
 `atencao.leitura_rapida`, `atencao.dispensavel`) **e a faixa por arquivo** em `faixa_atencao`,
-com o vocabulário do índice (`alta` \| `media` \| `baixa`) e não o nome da faixa em prosa.
+com o vocabulário do índice (`alta` \| `media` \| `baixa`) e não o nome da faixa em prosa, e
+grava `arquivos_alterados` a partir do diff `<branch_base>...HEAD` (em `por_sprint`, a união com o
+valor já gravado). Ele recusa, sem mexer no registro, quando um arquivo do diff ficou sem faixa
+(no renomeado, basta a ponta nova) ou quando o `ATENCAO.md` cita um caminho fora do diff. Também
+acrescenta o `veredito_emitido` abaixo ao rastro.
 O mapeamento e as regras do campo estão em `references/00-schema.md`.
 
 É `faixa_atencao` que fecha o ciclo com o memox: um arquivo que entra repetidamente em
@@ -528,7 +538,7 @@ Esta saída vai inteira para a seção **"Onde eu quero seu olho"** da descriç�
 - [ ] Nenhuma justificativa é baseada em tamanho de diff.
 - [ ] Arquivos sem evidência suficiente estão em OLHO OBRIGATÓRIO, com a razão declarada.
 - [ ] As fontes ausentes estão listadas.
-- [ ] `ATENCAO.md` gravado; as contagens e a `faixa_atencao` por arquivo estão no `ENTREGA.md`.
+- [ ] `ATENCAO.md` gravado; rode `bash .claude/skills/mergex/scripts/registrar-atencao.sh --entrega docs/entregas/<trabalho_id>/ENTREGA.md` para gravar as contagens e a `faixa_atencao` por arquivo no `ENTREGA.md`.
 - [ ] Toda subida por O9 cita trabalho, data e artefato (`ver:`).
 - [ ] Nenhum arquivo desceu de faixa por causa do memox.
 - [ ] Nenhuma subida foi motivada por `coincidencias_arquivo`.
