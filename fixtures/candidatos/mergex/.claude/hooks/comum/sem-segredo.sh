@@ -49,7 +49,7 @@ case "$FERRAMENTA" in
     # antes de varrer (revisão do Codex no lote do conselhos#210).
     # O argumento pode vir entre aspas, com espaço (`git -C 'repo x' commit`), e o
     # padrão não pode parar nele (CodeAnt no mergex#54).
-    GIT_ANTES='(^|[;&|[:space:]])git([[:space:]]+(-C|-c|--git-dir|--work-tree|--namespace|--config-env|--exec-path|--super-prefix)[[:space:]]+("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:]]+)|[[:space:]]+-[^[:space:]]+)*[[:space:]]+'
+    GIT_ANTES='(^|[;&|[:space:]])git([[:space:]]+(-C|-c|--git-dir|--work-tree|--namespace|--config-env|--exec-path|--super-prefix)[[:space:]]+("[^"]*"|'"'"'[^'"'"']*'"'"'|([^[:space:]\]|\\.)+)|[[:space:]]+-[^[:space:]]+)*[[:space:]]+'
     printf '%s' "$CMD" | grep -E "${GIT_ANTES}commit([[:space:]]|\$)" >/dev/null || exit 0
     NL='
 '
@@ -69,6 +69,10 @@ case "$FERRAMENTA" in
       if [ "$aspas" = 0 ]; then
         case "$t" in '~') t="$HOME" ;; '~/'*) t="$HOME/${t#\~/}" ;; '~'*) t="" ;; esac
       fi
+      case "$t" in
+        [A-Za-z]:/*) case "$t" in *"\\"*) [ "$aspas" = 0 ] || t="$(expx_caminho_local "$t")" ;; *) t="$(expx_caminho_local "$t")" ;; esac ;;
+        [A-Za-z]:\\*) [ "$aspas" = 0 ] || t="$(expx_caminho_local "$t")" ;;
+      esac
       case "$t" in ''|-|*'$'*|*'`'*|*\\*)
         MSG_NAO_VARRIDA="${MSG_NAO_VARRIDA}  - diretório que não se resolve: ${1}
 "; return ;;
@@ -171,9 +175,20 @@ $CMD"
       arq_f="${arg_f#--file=}"; arq_f="${arq_f#--file}"
       case "$arq_f" in -*F*) arq_f="${arq_f#*F}" ;; esac
       arq_f="${arq_f#"${arq_f%%[![:space:]]*}"}"
-      case "$arq_f" in \"*\") arq_f="${arq_f#\"}"; arq_f="${arq_f%\"}" ;; \'*\') arq_f="${arq_f#\'}"; arq_f="${arq_f%\'}" ;; esac
+      aspas_f=0
+      case "$arq_f" in \"*\") arq_f="${arq_f#\"}"; arq_f="${arq_f%\"}"; aspas_f=1 ;; \'*\') arq_f="${arq_f#\'}"; arq_f="${arq_f%\'}"; aspas_f=1 ;; esac
       case "$arq_f" in ''|-) MSG_NAO_VARRIDA="${MSG_NAO_VARRIDA}  - ${arg_f}
 "; continue ;; esac
+      # Sem aspas, a barra invertida é escape do shell: o Git abre outro nome (`a\b`
+      # é `ab`), e o hook leria `a\b`. Na dúvida, barra (t-14).
+      case "$aspas_f:$arq_f" in 0:*\\*) MSG_NAO_VARRIDA="${MSG_NAO_VARRIDA}  - ${arg_f}
+"; continue ;; esac
+      # `F:/...` também é absoluto (Windows). Com barra invertida, só entre aspas:
+      # sem elas o shell come a barra, e o Git abriria outro arquivo (`F:/a\ b`).
+      case "$arq_f" in
+        [A-Za-z]:/*) case "$arq_f" in *"\\"*) [ "$aspas_f" = 0 ] || arq_f="$(expx_caminho_local "$arq_f")" ;; *) arq_f="$(expx_caminho_local "$arq_f")" ;; esac ;;
+        [A-Za-z]:\\*) [ "$aspas_f" = 0 ] || arq_f="$(expx_caminho_local "$arq_f")" ;;
+      esac
       lido_f=0
       while IFS= read -r base_f; do
         [ -n "$base_f" ] || continue

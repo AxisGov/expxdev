@@ -22,7 +22,8 @@
 # `--pr <url>` (só no registro) informa o PR quando o E7 não o gravou: o
 # ENTREGA.md com `pr_url: null`, de PR aberto fora do fluxo. A prova é a mesma:
 # o PR tem de ser da branch e da base do ENTREGA.md, mesclado, com o merge na
-# base, e o merge tem de ter trazido o ENTREGA.md que está na base. Com `pr_url` gravado, `--pr` diferente dá rc 6. O registro anota de onde
+# base, e o merge tem de ter trazido o ENTREGA.md que está na base (no rebase
+# merge, um dos commits do PR, DM-353). PR de fork não passa, nos dois modos. Com `pr_url` gravado, `--pr` diferente dá rc 6. O registro anota de onde
 # veio o PR em `pr_url_de` (`entrega` ou `argumento`).
 #
 # Sem efeito até a última conferência: consulta o serviço, confere que o PR é o
@@ -93,6 +94,8 @@ esac
 case "$BRANCH_ENTREGA:$BASE" in :*|*:|null:*|*:null) para 3 "ENTREGA.md sem branch ou branch_base" ;; esac
 [[ "$PR_URL" =~ ^https://([^/]+)/([^/]+/[^/]+)/pull/[0-9]+$ ]] || para 3 "pr_url fora da forma esperada: $PR_URL"
 REPO_PR="$(printf '%s/%s' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" | tr '[:upper:]' '[:lower:]')"
+# Para a API do serviço: o host à parte, e `dono/repositório` no caminho.
+HOST_PR="${BASH_REMATCH[1]}"; DONO_REPO_PR="${BASH_REMATCH[2]}"
 if [ "$MODO" = registro ]; then
   # Esses valores vão para o frontmatter do registro: só o alfabeto que o YAML lê sem aspas.
   [[ "$PR_URL" =~ ^https://[A-Za-z0-9.-]+/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+/pull/[0-9]+$ ]] \
@@ -124,13 +127,17 @@ done <<<"$(g remote 2>/dev/null)"
 
 command -v gh >/dev/null 2>&1 || para 5 "sem a ferramenta gh: o merge não foi provado"
 command -v jq >/dev/null 2>&1 || para 5 "sem jq: a resposta do serviço não se lê"
-RESP="$(gh pr view "$PR_URL" --json url,state,mergeCommit,headRefName,baseRefName 2>/dev/null)" \
+RESP="$(gh pr view "$PR_URL" --json url,state,mergeCommit,headRefName,baseRefName,isCrossRepository 2>/dev/null)" \
   || para 5 "o serviço não respondeu sobre $PR_URL"
 campo() { printf '%s' "$RESP" | jq -r "$1 // empty" 2>/dev/null; }
 ESTADO="$(campo .state)"
 [ -n "$ESTADO" ] || para 5 "resposta ilegível do serviço sobre $PR_URL"
 [ "$(campo .url)" = "$PR_URL" ] || para 6 "o serviço devolveu outro PR: $(campo .url)"
 [ "$(campo .headRefName)" = "$BRANCH_ENTREGA" ] || para 6 "o PR é da branch $(campo .headRefName), e a entrega é de $BRANCH_ENTREGA"
+# O nome da branch só identifica a entrega dentro do próprio repositório: um fork
+# pode ter uma branch com o mesmo nome. Sem o campo, também recusa.
+[ "$(printf '%s' "$RESP" | jq -r '.isCrossRepository' 2>/dev/null)" = false ] \
+  || para 6 "o PR $PR_URL não vem de uma branch deste repositório (fork, ou o serviço não disse): a branch $BRANCH_ENTREGA não o liga à entrega"
 # `branch_base` é a base efetiva do E0: nome, ref do remoto ou SHA. O PR só diz o nome.
 BASE_PR="$(campo .baseRefName)"
 BASE_SHA=""
@@ -178,8 +185,23 @@ if [ "$PR_URL_DE" = argumento ]; then
   NO_MERGE="$(g rev-parse -q --verify "$MERGE:$EM" 2>/dev/null)"
   [ -n "$NO_MERGE" ] && [ "$NO_MERGE" = "$(g rev-parse -q --verify "$REF_BASE:$EM" 2>/dev/null)" ] \
     || para 6 "o merge de --pr $PR_URL não traz o $EM que está na base: o PR não é o desta entrega"
-  [ "$NO_MERGE" != "$(g rev-parse -q --verify "$MERGE^1:$EM" 2>/dev/null)" ] \
-    || para 6 "o merge de --pr $PR_URL não muda o $EM: o PR não é o que trouxe esta entrega (num rebase merge, o último commit tem de tocá-lo)"
+  # Quem trouxe: o último commit da linha principal que mudou o arquivo. No merge
+  # commit e no squash é o próprio merge. No rebase merge pode ser um commit
+  # anterior do PR, se o último não toca o ENTREGA.md: então o merge tem um pai só
+  # e o serviço tem de dizer que esse commit entrou na base por este PR
+  # (commits/<sha>/pulls). Título e data não bastam: a branch reaproveitada leva
+  # os commits originais de um PR anterior para o seguinte (DM-353).
+  TROUXE="$(g log -1 --first-parent --format=%H "$MERGE" -- "$EM" 2>/dev/null)"
+  [ -n "$TROUXE" ] && [ "$NO_MERGE" != "$(g rev-parse -q --verify "$TROUXE^1:$EM" 2>/dev/null)" ] \
+    || para 6 "o merge de --pr $PR_URL não muda o $EM: o PR não é o que trouxe esta entrega"
+  if [ "$TROUXE" != "$MERGE" ]; then
+    [ "$(g rev-list --parents -n 1 "$MERGE" 2>/dev/null | wc -w | tr -d ' ')" = 2 ] \
+      || para 6 "o merge de --pr $PR_URL não muda o $EM, e o commit que o mudou ($TROUXE) veio por outro caminho: o PR não é o que trouxe esta entrega"
+    PRS_DO_COMMIT="$(gh api --hostname "$HOST_PR" "repos/$DONO_REPO_PR/commits/$TROUXE/pulls" 2>/dev/null | jq -r '.[].number' 2>/dev/null)" \
+      || para 5 "o serviço não disse por qual PR o commit $TROUXE entrou na base"
+    grep -qxF -- "${PR_URL##*/}" <<<"$PRS_DO_COMMIT" \
+      || para 6 "o merge de --pr $PR_URL não muda o $EM, e o commit que o mudou ($TROUXE) não entrou na base por este PR: o PR não é o que trouxe esta entrega"
+  fi
 fi
 
 if [ "$MODO" = fechamento ]; then SUFIXO="$OC-fechamento"; CHAVE=expxFechamento

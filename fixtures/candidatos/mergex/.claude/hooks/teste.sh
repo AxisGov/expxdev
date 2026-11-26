@@ -383,6 +383,38 @@ printf 'mensagem com %s\n' "$SK" > "$SEG_T/msg.txt"
 caso "git -C . commit -F msg.txt: barra"          comum/sem-segredo.sh "$(bash_json 'git -C . commit -F msg.txt')" 2
 caso "git -c user.name=x commit -F msg.txt: barra" comum/sem-segredo.sh "$(bash_json 'git -c user.name=x commit -F msg.txt')" 2
 rm -f "$SEG_T/msg.txt"
+# Caminho de unidade do Windows é absoluto (conselhos, depois da 0.14.29): `-F F:/...`
+# era lido como relativo, não se achava, e o commit limpo era barrado. O `cygpath`
+# do Git Bash é simulado: `F:/x` e `F:\x` viram `$SEG_T/unidade-f/x`.
+UNI_BIN="$(mktemp -d)"; mkdir -p "$SEG_T/unidade-f/limpo"; git -C "$SEG_T/unidade-f/limpo" init -q -b feature/uni
+cat > "$UNI_BIN/cygpath" <<'CYG'
+#!/usr/bin/env bash
+[ "$1" = -u ] && shift; [ "$1" = -- ] && shift
+c="${1//\\//}"; d="${c%%:*}"
+printf '%s/unidade-%s%s' "$UNI_RAIZ" "$(printf %s "$d" | tr A-Z a-z)" "${c#?:}"
+CYG
+export UNI_RAIZ="$SEG_T"; chmod +x "$UNI_BIN/cygpath"; PATH_SEM_UNI="$PATH"; PATH="$UNI_BIN:$PATH"
+printf 'mensagem comum\n' > "$SEG_T/unidade-f/msg.txt"
+caso "-F F:/msg.txt limpo: passa"                comum/sem-segredo.sh "$(bash_json 'git commit -F F:/msg.txt')" 0
+caso "-F \"F:\\msg.txt\" limpo (aspas): passa"   comum/sem-segredo.sh "$(bash_json 'git commit -F "F:\msg.txt"')" 0
+caso "-F F:\\msg.txt sem aspas: barra"           comum/sem-segredo.sh "$(bash_json 'git commit -F F:\msg.txt')" 2
+caso "cd F:/limpo && git commit: passa"          comum/sem-segredo.sh "$(bash_json 'cd F:/limpo && git commit -m x')" 0
+# Sem aspas, a barra invertida é escape do shell: `F:/limpo\ x` é `F:/limpo x` para o
+# Git, e convertê-la em separador varreria `F:/limpo` (t-13, B1). Barra.
+caso "git -C F:/limpo\\ x commit sem aspas: barra" comum/sem-segredo.sh "$(bash_json 'git -C F:/limpo\ x commit -m x')" 2
+mkdir -p "$SEG_T/unidade-f/m"; printf 'mensagem comum\n' > "$SEG_T/unidade-f/m/sg.txt"
+caso "-F F:/m\\sg.txt sem aspas: barra"           comum/sem-segredo.sh "$(bash_json 'git commit -F F:/m\sg.txt')" 2
+# A leitura do -F dos hooks de commit (integracao-da-mensagem) segue a mesma regra.
+for par in 'git commit -F F:/msg.txt|/unidade-f/msg.txt' 'git commit -F "F:\msg.txt"|/unidade-f/msg.txt' \
+           "git commit --file='F:/msg.txt'|/unidade-f/msg.txt" 'git commit -F F:\msg.txt|/raiz/F:\msg.txt'; do
+  obtido="$(. "$H/comum/base.sh" && . "$H/comum/integracao-da-mensagem.sh" && RAIZ=/raiz && integracao_arquivo_do_comando "${par%|*}")"
+  esperado="${par#*|}"; case "$esperado" in /unidade-f/*) esperado="$SEG_T$esperado" ;; esac
+  if [ "$obtido" = "$esperado" ]; then OK=$((OK+1)); printf '  ok    %s\n' "integracao: ${par%|*}"
+  else FALHOU=$((FALHOU+1)); printf '  FALHA %s (esperava %s, obteve %s)\n' "integracao: ${par%|*}" "$esperado" "$obtido"; fi
+done
+printf 'mensagem com %s\n' "$SK" > "$SEG_T/unidade-f/msg.txt"
+caso "-F F:/msg.txt com segredo: barra"          comum/sem-segredo.sh "$(bash_json 'git commit -F F:/msg.txt')" 2
+PATH="$PATH_SEM_UNI"; rm -rf "$UNI_BIN" "$SEG_T/unidade-f"
 printf 'antes\n%s\ndepois\n' "$SK" > "$SEG_T/chave.pem"; seg_git add chave.pem
 caso "git --git-dir=.git -c a=b commit com segredo preparado: barra" comum/sem-segredo.sh "$(bash_json 'git --git-dir=.git -c a=b commit -m x')" 2
 caso "git -C . commit com segredo preparado: barra" comum/sem-segredo.sh "$(bash_json 'git -C . commit -m x')" 2
@@ -455,6 +487,12 @@ rm -rf "$OUTRO_T"
 printf 'mensagem comum\n' > "$SEG_T/msg.txt"; printf 'mensagem com %s\n' "$SK" > "$SEG_T/a b/msg.txt"
 caso "cd sub && git commit -F msg.txt (o do sub): barra" comum/sem-segredo.sh "$(bash_json "cd 'a b' && git commit -F msg.txt")" 2
 caso "git -C sub commit -F msg.txt (o do sub): barra"    comum/sem-segredo.sh "$(bash_json "git -C 'a b' commit -F msg.txt")" 2
+# Espaço escapado no argumento de opção global: antes, `git -C a\ b commit` nem era
+# reconhecido como commit, e o hook saía 0 sem varrer (t-13, achado na revisão).
+caso "git -C a\\ b commit (espaço escapado): barra"      comum/sem-segredo.sh "$(bash_json 'git -C a\ b commit -F msg.txt')" 2
+printf 'mensagem comum\n' > "$SEG_T/msg.txt"; mkdir -p "$SEG_T/m"; printf 'mensagem comum\n' > "$SEG_T/m/sg.txt"; printf 'mensagem comum\n' > "$SEG_T/m\\sg.txt"
+caso "-F m\\sg.txt sem aspas (o Git abre msg.txt): barra" comum/sem-segredo.sh "$(bash_json 'git commit -F m\sg.txt')" 2
+rm -f "$SEG_T/m/sg.txt" "$SEG_T/m\\sg.txt"; rmdir "$SEG_T/m"
 rm -f "$SEG_T/msg.txt" "$SEG_T/a b/msg.txt"; rmdir "$SEG_T/a b"
 # O link nao e seguido, mas o texto do alvo vira o blob: e varrido.
 ln -s "CHAVE=$SK" "$SEG_T/link-alvo"
