@@ -44,6 +44,10 @@ Quando o E5 roda, a branch da entrega já foi integrada. O caminho é `scripts/f
 
 **Limite assumido:** fora do harness, ou com o hook em aviso, alguém pode abrir o mesmo PR sem o script, e o CI não barra, porque barrar exigiria uma exceção no portão. Quem revisa vê a falta dos trailers.
 
+### O registro do merge de entrega que não é da runx (DM-351)
+
+O mesmo script registra o merge de uma entrega da sprintx ou de outro trabalho que não é ocorrência: `scripts/fechamento-pos-merge.sh --trabalho <id>`. Com o merge provado do mesmo jeito, ele abre `docs/<id>-registro-pos-merge` e já grava o commit com `docs/entregas/<id>/POS-MERGE.md` (`kind: registro_pos_merge`) e os trailers `Registro-pos-merge-de: <pr_url>` e `Merge: <sha>`. A saída traz também `commit=`. O `ENTREGA.md` não muda: editá-lo reabriria a entrega no portão. Push e PR do registro ficam com quem roda, e o merge desse PR é humano.
+
 ### O nome da branch depende do tipo da ocorrência
 
 | `tipo` da ocorrência | Prefixo |
