@@ -9,6 +9,14 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.29 — registro do merge com --pr, e textos da sprintx e da runx
+
+Instale por PR, como a 0.14.28. Certifica a mergex (AxisGov/mergex#121, merge ef59228, DM-352), a sprintx (AxisGov/sprintx#95, merge 8a42dc8) e a runx (AxisGov/runx#30, merge bee0af8). O núcleo, o CLI, os eventos, o painel, o `expx sessao` e as outras seis skills seguem como na 0.14.28. Relatos do conselhos-municipais (Onda 4, #399, #400 e #402).
+
+- **MergeX, `fechamento-pos-merge.sh --pr <url>`.** O registro parava com rc 3 quando o PR foi aberto fora do fluxo e o `ENTREGA.md` ficou com `pr_url: null`. Agora o `--pr` informa o PR, que passa pela prova de sempre (branch e base da entrega, mesclado, merge na base) e por mais uma: o merge tem de ter trazido o `ENTREGA.md` que está na base. `--pr` diferente do `pr_url` gravado dá rc 6, e `sprint_atual: planejamento` dá rc 3. O `POS-MERGE.md` ganha `pr_url_de` e grava os valores de texto entre aspas, porque um id como `null` ou `1e5` mudava de tipo no YAML.
+- **SprintX, textos.** O passo 1 da `06-execucao.md` segue a tabela do `08-rastro.md` pelo código recebido, e a linha do código 5 diz que `sessao_ambigua` só barra em `bloqueio` (DS-236).
+- **RunX, `TEMPLATE-relatorio-tecnico.md`.** `palavras_chave` e `regressao_de` são copiados da causa raiz sem recalcular: o valor de lá se repete aqui, inclusive `null`.
+
 ## 0.14.28 — registro do merge de entrega que não é da runx
 
 Instale por PR, como a 0.14.27. Certifica a mergex (AxisGov/mergex#120, merge 1fad177, DM-351). O núcleo, o CLI, os eventos, o painel, o `expx sessao`, a sprintx (9f56e92) e as outras seis skills seguem como na 0.14.27. Item 4 da OC-2026-0026 do conselhos-municipais.

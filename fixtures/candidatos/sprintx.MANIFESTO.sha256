@@ -33,7 +33,7 @@ b2b9f7b6b8c6349316092989a7babefd495ee6c9ff89bcf2c6dc6ba76d66ac8d  .claude/hooks/
 663d621222f04de02a84b2d79c9d3982dd4825d2696dcbb6f9b393e0d09cd9a7  .claude/hooks/testes/bancada-pipefail.sh
 ef4f4d46ebdecbdf9d7df03bfc9fae80c1858caf1f53fa3c8b045df66383ddc0  .claude/hooks/testes/bancada-plano-legado.sh
 554f5eb46c2ed6d54614d1d30076d8f5b91e470d0092a2b3b58d839e49c07d42  .claude/hooks/testes/bancada-plano-so-frontmatter.sh
-3a4fbcb5f76679a37873a2cf5c984cbd6e40bea717c64074daea5b9a7f14d436  .claude/hooks/testes/bancada-rastro-suite.sh
+04b88105fae7d40d8f7bbfd149eb2c4993e360e94d86dcb6a1c9bdabb4a398b2  .claude/hooks/testes/bancada-rastro-suite.sh
 bcbf0b68aeb24b233ebcba264be7fe30edf49cce08d0c78c373947cf624e2f35  .claude/hooks/testes/bancada-runx-na-mesma-arvore.sh
 c4585b4985bc6187d61677ddf68430d51183c3b5a4ad4a6c295d76b523b79d85  .claude/hooks/testes/bancada-segredo-limite.sh
 f7174dee86fb586fc35fa09a029ba2438d25095351309c14a64b060961d085f6  .claude/hooks/testes/bancada-segredo-sem-git.sh
@@ -64,9 +64,9 @@ a4102c98bdd79bd6adb347ae31550e2c3f159a116dfe877650d19953fb6833e0  .claude/skills
 ea4f7911c1c4fdd412313c64566275b80b00f39d97e10ee69efd7c86cdd77642  .claude/skills/sprintx/references/03-plano.md
 81fc160be05bde218ab4e187eba2f84f9c565ff4de1126749ac041bd4ea1ca2e  .claude/skills/sprintx/references/04-orquestrador.md
 dee6609e9cb22c467a775a6a94372e4f3c9ff7ab968ff4d1d4332d195e744f5b  .claude/skills/sprintx/references/05-auditoria.md
-c791672dad138bb19ba70a761219876eaededd480a5069f72cddc22291ec9c24  .claude/skills/sprintx/references/06-execucao.md
+0fbfa642848613deb6e97197940ab034e283a50895fc9dbabebd354ac917ebc9  .claude/skills/sprintx/references/06-execucao.md
 7470ee3c03e137f825555b7f57f79aa529b54e0ecd5663b0bf9d095752fb90cf  .claude/skills/sprintx/references/07-estimativa.md
-4756ea089649e254688fdd188c537753ee0a9bee7446acc5e5731f636ce40e02  .claude/skills/sprintx/references/08-rastro.md
+a73696631bd8f2abcc1955da1b7eff3daec2e610c13dec1c1647b8c4c86a70d8  .claude/skills/sprintx/references/08-rastro.md
 c4267a0df409dfc4f06c668640c7e135cdf7237ebbea0c8d88278ac792ec9129  .claude/skills/sprintx/references/09-diagrama.md
 ddad9ed6cc45e9ddb885698d7f49cf45898c21deb70f6686993fc85f47982040  .claude/skills/sprintx/references/09-estado.md
 93b99115ee2a1fe966529bacdb97aa3df9429399d72290a2d982f7d6d5f6498d  .claude/skills/sprintx/scripts/bloqueios.sh

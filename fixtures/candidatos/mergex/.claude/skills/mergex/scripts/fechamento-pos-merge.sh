@@ -19,6 +19,12 @@
 # ENTREGA.md, e o PR do registro passa como ref_nao_aplicavel. Push e PR ficam
 # com quem roda. A saída ganha commit=.
 #
+# `--pr <url>` (só no registro) informa o PR quando o E7 não o gravou: o
+# ENTREGA.md com `pr_url: null`, de PR aberto fora do fluxo. A prova é a mesma:
+# o PR tem de ser da branch e da base do ENTREGA.md, mesclado, com o merge na
+# base, e o merge tem de ter trazido o ENTREGA.md que está na base. Com `pr_url` gravado, `--pr` diferente dá rc 6. O registro anota de onde
+# veio o PR em `pr_url_de` (`entrega` ou `argumento`).
+#
 # Sem efeito até a última conferência: consulta o serviço, confere que o PR é o
 # desta entrega e que o merge está na base, e só então cria a branch, o worktree
 # e a marca `branch.<branch>.expxFechamento`, que o hook arquivo-fora-do-plano
@@ -37,15 +43,16 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 para() { printf 'fechamento-pos-merge: %s\n' "$2" >&2; exit "$1"; }
 
-TRABALHO=""; RAIZ_ARG=""
+TRABALHO=""; RAIZ_ARG=""; PR_ARG=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --trabalho) [ "$#" -ge 2 ] || para 64 "--trabalho pede um valor"; TRABALHO="$2"; shift 2 ;;
     --raiz) [ "$#" -ge 2 ] || para 64 "--raiz pede um valor"; RAIZ_ARG="$2"; shift 2 ;;
+    --pr) [ "$#" -ge 2 ] && [ -n "$2" ] || para 64 "--pr pede um valor"; PR_ARG="$2"; shift 2 ;;
     *) para 64 "opção desconhecida: $1" ;;
   esac
 done
-[ -n "$TRABALHO" ] || para 64 "uso: fechamento-pos-merge.sh --trabalho <pasta em docs/entregas> [--raiz <dir>]"
+[ -n "$TRABALHO" ] || para 64 "uso: fechamento-pos-merge.sh --trabalho <pasta em docs/entregas> [--pr <url>] [--raiz <dir>]"
 if [[ "$TRABALHO" =~ ^OC-[0-9]{4}-[0-9]{4}(-[A-Za-z0-9._-]+)?$ ]]; then
   MODO=fechamento
   OC="$(printf '%s' "$TRABALHO" | sed -E 's/^(OC-[0-9]{4}-[0-9]{4}).*/\1/')"
@@ -70,7 +77,19 @@ ENTREGA="$RAIZ/docs/entregas/$TRABALHO/ENTREGA.md"
 PR_URL="$(catalogo_fm "$ENTREGA" pr_url)"
 BRANCH_ENTREGA="$(catalogo_fm "$ENTREGA" branch)"
 BASE="$(catalogo_fm "$ENTREGA" branch_base)"
-case "$PR_URL" in ''|null) para 3 "ENTREGA.md sem pr_url: não há PR para provar o merge" ;; esac
+PR_URL_DE=entrega
+if [ -n "$PR_ARG" ]; then
+  [ "$MODO" = registro ] || para 64 "--pr é só do registro de entrega que não é ocorrência: a ocorrência usa o pr_url do ENTREGA.md"
+  case "$PR_URL" in
+    ''|null) PR_URL="$PR_ARG"; PR_URL_DE=argumento ;;
+    "$PR_ARG") ;;
+    *) para 6 "--pr $PR_ARG diverge do pr_url do ENTREGA.md, $PR_URL" ;;
+  esac
+fi
+case "$PR_URL" in ''|null)
+  if [ "$MODO" = registro ]; then para 3 "ENTREGA.md sem pr_url: informe o PR com --pr <url>, e ele será conferido contra a branch e a base da entrega"
+  else para 3 "ENTREGA.md sem pr_url: não há PR para provar o merge"; fi ;;
+esac
 case "$BRANCH_ENTREGA:$BASE" in :*|*:|null:*|*:null) para 3 "ENTREGA.md sem branch ou branch_base" ;; esac
 [[ "$PR_URL" =~ ^https://([^/]+)/([^/]+/[^/]+)/pull/[0-9]+$ ]] || para 3 "pr_url fora da forma esperada: $PR_URL"
 REPO_PR="$(printf '%s/%s' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" | tr '[:upper:]' '[:lower:]')"
@@ -82,6 +101,9 @@ if [ "$MODO" = registro ]; then
   # Por sprint, o merge de cada PR já se registra no E9 (e9-merge): o registro é de entrega por trabalho.
   [ "$(catalogo_fm "$ENTREGA" entrega)" != por_sprint ] \
     || para 3 "entrega por_sprint: o merge de cada sprint se registra no E9 (--checkpoint e9-merge), não aqui"
+  # Com o planejamento ainda corrente, o merge que existe é o do planejamento, não o da entrega.
+  [ "$(catalogo_fm "$ENTREGA" sprint_atual)" != planejamento ] \
+    || para 3 "sprint_atual: planejamento: o código desta entrega ainda não foi mesclado, e o merge do planejamento não a fecha"
 fi
 
 # O PR tem de ser deste repositório: um pr_url de outro lugar provaria o merge errado.
@@ -148,6 +170,17 @@ g merge-base --is-ancestor "$MERGE" "$REF_BASE" 2>/dev/null \
   || para 7 "o merge $MERGE não está em $REMOTO/$BASE_PR"
 [ -z "$BASE_SHA" ] || g merge-base --is-ancestor "$BASE_SHA" "$REF_BASE" 2>/dev/null \
   || para 6 "a base da entrega, $BASE_SHA, não está em $REMOTO/$BASE_PR"
+if [ "$PR_URL_DE" = argumento ]; then
+  # O PR do argumento só se liga à entrega pelo nome da branch, que se reaproveita
+  # (o PR de planejamento sai da mesma branch). O merge tem de ter trazido o
+  # ENTREGA.md que está na base: igual ao da base e diferente do pai da base.
+  EM="docs/entregas/$TRABALHO/ENTREGA.md"
+  NO_MERGE="$(g rev-parse -q --verify "$MERGE:$EM" 2>/dev/null)"
+  [ -n "$NO_MERGE" ] && [ "$NO_MERGE" = "$(g rev-parse -q --verify "$REF_BASE:$EM" 2>/dev/null)" ] \
+    || para 6 "o merge de --pr $PR_URL não traz o $EM que está na base: o PR não é o desta entrega"
+  [ "$NO_MERGE" != "$(g rev-parse -q --verify "$MERGE^1:$EM" 2>/dev/null)" ] \
+    || para 6 "o merge de --pr $PR_URL não muda o $EM: o PR não é o que trouxe esta entrega (num rebase merge, o último commit tem de tocá-lo)"
+fi
 
 if [ "$MODO" = fechamento ]; then SUFIXO="$OC-fechamento"; CHAVE=expxFechamento
 else SUFIXO="$TRABALHO-registro-pos-merge"; CHAVE=expxRegistroPosMerge; fi
@@ -231,8 +264,10 @@ else
   QUANDO="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   {
     printf -- '---\nexpx_schema: 1\nexpx_tool: mergex\nkind: registro_pos_merge\n'
-    printf 'trabalho_id: %s\npr_url: %s\npr_estado: merged\nmerge: %s\nbranch: %s\nbranch_base: %s\nregistrado_em: %s\n---\n\n' \
-      "$TRABALHO" "$PR_URL" "$MERGE" "$BRANCH_ENTREGA" "$BASE_PR" "$QUANDO"
+    # Entre aspas: um id como `null`, `true` ou `1e5` seria lido como outro tipo. Os
+    # valores já passaram por alfabetos sem aspa nem barra invertida.
+    printf 'trabalho_id: "%s"\npr_url: "%s"\npr_url_de: %s\npr_estado: merged\nmerge: "%s"\nbranch: "%s"\nbranch_base: "%s"\nregistrado_em: "%s"\n---\n\n' \
+      "$TRABALHO" "$PR_URL" "$PR_URL_DE" "$MERGE" "$BRANCH_ENTREGA" "$BASE_PR" "$QUANDO"
     printf '# Registro do merge de %s\n\n' "$TRABALHO"
     printf 'O PR %s foi mesclado em `%s` pelo commit `%s`. O serviço e a base foram conferidos por `fechamento-pos-merge.sh` em %s.\n\n' \
       "$PR_URL" "$BASE_PR" "$MERGE" "$QUANDO"

@@ -703,8 +703,8 @@ contrato completo, com as quatro provas e o diff canônico de `diff_b1_m_sha256`
 
 Gravado só pelo `scripts/fechamento-pos-merge.sh --trabalho <id>`, para entrega que não é
 ocorrência da runx, depois de provar o merge no serviço e na base (DM-351). Campos:
-`trabalho_id`, `pr_url`, `pr_estado: merged`, `merge` (SHA completo), `branch`, `branch_base`
-(o nome que o PR mira) e `registrado_em` (UTC). O `ENTREGA.md` ao lado continua o retrato do E7
+`trabalho_id`, `pr_url`, `pr_url_de` (`entrega`, ou `argumento` quando veio do `--pr`, DM-352), `pr_estado: merged`, `merge` (SHA completo), `branch`, `branch_base`
+(o nome que o PR mira) e `registrado_em` (UTC), os de texto entre aspas. O `ENTREGA.md` ao lado continua o retrato do E7
 (DM-317); quem quer o estado final da entrega lê este arquivo quando ele existe. O portão não
 seleciona este kind. O painel ainda não o lê.
 
