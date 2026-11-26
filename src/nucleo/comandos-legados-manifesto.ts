@@ -5,7 +5,7 @@ import type { ManifestoDeComandos } from "./comandos-legados.js";
 export const MANIFESTO_DE_COMANDOS: ManifestoDeComandos = {
   versao: 1,
   fontes: [
-    { skill: "sprintx", commit: "9fa036b7814735f6d2faef4a9bc1765f06e38b6a", papel: "certificado" },
+    { skill: "sprintx", commit: "9f56e927898ed44f46f694afe45857fc785720bc", papel: "certificado" },
     { skill: "runx", commit: "5ff9d231616b0c4aafa81a037f45a90042b547c2", papel: "certificado" },
     { skill: "legadox", commit: "a6a4629c47dc0fdfab75de0f6246ce6609088970", papel: "certificado" },
     { skill: "stackx", commit: "03ff770d7bc257cf2271ff08e77904e351e80d5a", papel: "certificado" },
