@@ -198,7 +198,7 @@ só lê `achados` na saída 1 **com** a última linha `<T-NN.MM> achados`: um er
 despacho (módulo que não carrega) ainda sai 1 pelo Node, e a saída 1 sem a linha é outra
 saída (para a sprintx e a runx, como a 2).
 
-- **Exclusões:** as do núcleo (`^docs/sprintx/`, `^docs/entregas/`, `^docs/eventos/`)
+- **Exclusões:** as do núcleo (`^docs/sprintx/`, `^docs/entregas/`, `^docs/eventos/`, `^docs/manutencao/`)
   mais os `padrao` de `excluir_da_revisao` do projeto, lidos pelo leitor irmão
   (`node <pasta do script>/expx-fatiamento.mjs --formato json --raiz <raiz>`), nunca do
   ambiente. Com `--base-commit`, o arquivo lido é o `.expx/fatiamento.json` do `HEAD`

@@ -774,7 +774,12 @@ function prepararRetroativa() {
   // ficam na evidência com o estado próprio; assim a task que só os toca não termina em uso 64 sem evidência. O excluído
   // com vírgula no nome sai (a cobertura não o cobra): no `--arquivos` ele viraria `caminho-com-virgula` e nada seria gravado
   const exclusoes = exclusoesDoProjeto("HEAD") ?? [];
-  const arquivos = tocados.filter((f) => !f.includes(",") || !(excluido(f, EXCLUIDOS_DO_NUCLEO) || excluido(f, exclusoes)));
+  // A evidência da própria task (e qualquer `*.json` direto da pasta de revisão, os mesmos que `semRetroativa` aceita no
+  // commit de evidências) também sai: um commit da task que já levou a evidência antiga a deixaria em `arquivos` com o blob
+  // anterior à gravação, e o `conferir` acusaria `evidencia-nao-bate` (e o `rejeitar`, `evidencia desatualizada`)
+  const dirEv = `${relative(op.raiz, pasta).replaceAll("\\", "/")}/`;
+  const ehEvidencia = (f) => f.startsWith(dirEv) && f.endsWith(".json") && !f.slice(dirEv.length).includes("/");
+  const arquivos = tocados.filter((f) => !ehEvidencia(f) && (!f.includes(",") || !(excluido(f, EXCLUIDOS_DO_NUCLEO) || excluido(f, exclusoes))));
   if (arquivos.length === 0) uso("--commits nao tocam nenhum arquivo");
   Object.assign(op, { arquivos: arquivos.join(","), "base-commit": base, commitsDaTask: commits });
 }

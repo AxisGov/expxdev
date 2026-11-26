@@ -9,7 +9,7 @@ import { delimiter, dirname, join } from "node:path";
 import { ambienteCom, noPath } from "../teste/candidatos.js";
 import { chamadasDa } from "../teste/codeant-falsa.js";
 import { chamadasDoCodex, instalarCodexFalso, type CfgCodex } from "../teste/codex-falso.js";
-import { criados, temp, git, escreve, cenario, PATH, revisar, altera3, conferir, EV, evidencia, commita, type Cenario, type Ev } from "../teste/expx-revisao-apoio.js";
+import { criados, temp, git, escreve, cenario, PATH, revisar, altera3, achado, roda, conferir, EV, evidencia, commita, type Cenario, type Ev } from "../teste/expx-revisao-apoio.js";
 
 afterEach(() => { for (const c of criados.splice(0)) rmSync(c, { recursive: true, force: true }); });
 
@@ -80,6 +80,28 @@ describe("expx-revisao.mjs revisar --retroativa", () => {
     expect(r.ev.arquivos["docs/sprintx/w/plano.md"]?.revisao).toBe("excluido");
     expect(r.chamadas.some((a) => a[0] === "review")).toBe(false);
     expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it("funcional: commit da task que já leva a evidência antiga (docs/entregas/w/revisao/T-01.json) não a põe em arquivos; rejeitar sai 0 e conferir dá ok", () => {
+    const c = cenario({ issues: [achado("src/a.js", 3)] });
+    altera3(c.raiz);
+    escreve(c.raiz, EV, JSON.stringify({ expx_revisao: 1, achados: [], rejeicoes: [] }));
+    escreve(c.raiz, "docs/entregas/w/revisao/T-02.json", "{}\n");
+    const c1 = commit(c.raiz, "c1");
+    const r = retro(c, c1);
+    expect(r).toMatchObject({ rc: 1, out: "T-01 achados\n" });
+    expect(Object.keys(r.ev.arquivos)).toEqual(["src/a.js"]);
+    const id = (r.ev.achados as Array<{ identidade: string }>)[0]?.identidade ?? "";
+    expect(roda(c.raiz, "rejeitar", "--task", "T-01", "--identidade", id, "--motivo", "fp").rc).toBe(0);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz, true)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
+  });
+
+  it("funcional: commit da task com docs/manutencao/<OC>/sprint-01/tasks.md (artefato de método da runx) confere com a revisão só de src/a.js", () => {
+    const c = cenario();
+    altera3(c.raiz);
+    escreve(c.raiz, "docs/manutencao/OC-2026-0001-x/sprint-01/tasks.md", "---\nkind: plano\n---\n");
+    expect(revisar(c, "src/a.js").rc).toBe(0);
+    expect(conferir(c.raiz, "obrigatoria", `T-01=${commita(c.raiz)}`)).toMatchObject({ rc: 0, out: "T-01 ok" });
   });
 
   it("funcional: duas tasks no mesmo commit de evidências conferem; o commit que também muda o ENTREGA.md → FALHA retroativa-produto", () => {

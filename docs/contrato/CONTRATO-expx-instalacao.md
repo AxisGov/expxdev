@@ -250,7 +250,7 @@ Cada item de `excluir_da_revisao` obedece a estas seis regras:
    fora das tasks.
 
 As exclusões do projeto somam às do núcleo: `^docs/sprintx/`,
-`^docs/entregas/` e `^docs/eventos/`. O projeto não as declara. Os blocos A1 a
+`^docs/entregas/`, `^docs/eventos/` e `^docs/manutencao/`. O projeto não as declara. Os blocos A1 a
 A3 entregam a leitura, a validação e o diagnóstico dessa configuração. O bloco
 B entrega as medidas e o verificador; o bloco C aplicará as exclusões e os
 portões na revisão. Nessa integração, o método testará o prefixo literal antes
