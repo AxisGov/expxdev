@@ -13,7 +13,7 @@ MAX_BYTES=204800
 NOMES_EXCLUIDOS=(package-lock.json yarn.lock pnpm-lock.yaml composer.lock Gemfile.lock Cargo.lock poetry.lock Pipfile.lock go.sum .DS_Store Thumbs.db)
 EXTENSOES_EXCLUIDAS=(.png .jpg .jpeg .gif .bmp .ico .svg .webp .avif .woff .woff2 .ttf .eot .otf .exe .dll .so .dylib .bin .o .a .class .pyc .pyo .wasm .jar .war .ear .zip .tar .gz .bz2 .7z .rar .mp3 .mp4 .wav .avi .mov .flv .wmv .ogg .webm .min.js .min.css .map .pb .proto.bin .pdf .doc .docx .xls .xlsx .ppt .pptx .csv .tsv .parquet .avro .ndjson .sqlite .db)
 SUFIXOS_EXCLUIDOS=(.min.js .min.css)
-EXCLUIDOS_DO_NUCLEO=(docs/sprintx/ docs/entregas/ docs/eventos/)
+EXCLUIDOS_DO_NUCLEO=(docs/sprintx/ docs/entregas/ docs/eventos/ docs/manutencao/)
 
 uso() {
   echo "uso: ${0##*/} [--planejamento] [--excluir-da-revisao <padrao>]... <base> <head>" >&2

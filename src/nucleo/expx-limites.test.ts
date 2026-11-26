@@ -52,7 +52,7 @@ describe("expx-limites.mjs", () => {
     });
 
   it("funcional: exclusões do núcleo são as pastas de método, por prefixo literal", () => {
-    expect(m.EXCLUIDOS_DO_NUCLEO).toEqual(["^docs/sprintx/", "^docs/entregas/", "^docs/eventos/"]);
+    expect(m.EXCLUIDOS_DO_NUCLEO).toEqual(["^docs/sprintx/", "^docs/entregas/", "^docs/eventos/", "^docs/manutencao/"]);
     for (const p of m.EXCLUIDOS_DO_NUCLEO) expect(m.prefixoDe(p)).not.toBeNull();
     expect(m.excluido("docs/eventos/x.jsonl", m.EXCLUIDOS_DO_NUCLEO)).toBe(true);
     expect(m.excluido("docs/sprintx/s1/plano.md", m.EXCLUIDOS_DO_NUCLEO)).toBe(true);

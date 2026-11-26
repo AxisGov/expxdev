@@ -9,6 +9,11 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## [Unreleased]
+
+- **Núcleo, `revisar --retroativa`.** A evidência da própria task e qualquer `*.json` da pasta de revisão da entrega que os commits tocam deixam de entrar em `arquivos`: a evidência antiga, com o blob anterior à gravação, fazia o `rejeitar` acusar `evidencia desatualizada` e o `conferir` dar `evidencia-nao-bate`.
+- **Núcleo, exclusões.** `^docs/manutencao/` entra em `EXCLUIDOS_DO_NUCLEO` (e no `verificar-fatiamento.sh`): `tasks.md`, causa-raiz e QA da runx são artefatos de método, e o commit E1 que os leva dava `evidencia-invalida:cobertura`.
+
 ## 0.14.26 — o e9-merge aceita o planejamento externo e o E3 grava a atenção
 
 Instale por PR, como a 0.14.25. Certifica a mergex (AxisGov/mergex#118, merge ba1e184, DM-349, e AxisGov/mergex#119, merge 3a45969, DM-350). O CLI, o núcleo, os eventos, o painel, o `expx sessao` e as outras oito skills seguem como na 0.14.25.

@@ -87,8 +87,8 @@ Existe um único predicado, derivado do perfil homologado e implementado em
 5. o caminho não pode estar sob as exclusões do núcleo nem sob um item válido de
    `excluir_da_revisao`.
 
-As exclusões do núcleo são `^docs/sprintx/`, `^docs/entregas/` e
-`^docs/eventos/`. Markdown e extensão desconhecida continuam revisáveis. A lista
+As exclusões do núcleo são `^docs/sprintx/`, `^docs/entregas/`,
+`^docs/eventos/` e `^docs/manutencao/`. Markdown e extensão desconhecida continuam revisáveis. A lista
 completa de nomes, extensões e sufixos fica no perfil; não se mantém uma segunda
 lista em prosa.
 
@@ -138,8 +138,8 @@ Há duas classes:
 
 - **artefato gerado:** snapshot ou fixture regenerado por script, em commit
   separado do código que o motivou, com o comando gerador no corpo da PR;
-- **artefato de método:** conteúdo sob `docs/sprintx/`, `docs/entregas/` e
-  `docs/eventos/`, conferido pelos portões das próprias skills.
+- **artefato de método:** conteúdo sob `docs/sprintx/`, `docs/entregas/`,
+  `docs/eventos/` e `docs/manutencao/`, conferido pelos portões das próprias skills.
 
 Esses arquivos podem sair de L1 e L2 e da revisão por task conforme o predicado,
 mas continuam contando integralmente em L3. O painel do CodeAnt deve espelhar as

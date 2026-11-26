@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { accessSync, constants, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, extname, join, posix, resolve } from "node:path";
 
-export const EXCLUIDOS_DO_NUCLEO = Object.freeze(["^docs/sprintx/", "^docs/entregas/", "^docs/eventos/"]);
+export const EXCLUIDOS_DO_NUCLEO = Object.freeze(["^docs/sprintx/", "^docs/entregas/", "^docs/eventos/", "^docs/manutencao/"]);
 /** Primeiro segmento que é código-fonte: `excluir_da_revisao` nunca começa nele (regra 5 da §5). */
 export const RAIZES_DE_CODIGO = Object.freeze(["src", "lib", "app", "apps", "packages", "pkg", "cmd", "internal", "server",
   "client", "web", "api", "test", "tests", "spec", "scripts", ".github", ".claude", ".opencode", ".expx"]);
