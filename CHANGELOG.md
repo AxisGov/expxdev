@@ -9,6 +9,13 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.28 — registro do merge de entrega que não é da runx
+
+Instale por PR, como a 0.14.27. Certifica a mergex (AxisGov/mergex#120, merge 1fad177, DM-351). O núcleo, o CLI, os eventos, o painel, o `expx sessao`, a sprintx (9f56e92) e as outras seis skills seguem como na 0.14.27. Item 4 da OC-2026-0026 do conselhos-municipais.
+
+- **MergeX, `fechamento-pos-merge.sh --trabalho <id>`.** Antes, só a ocorrência da runx tinha caminho depois do merge. Uma entrega da sprintx mesclada com o `ENTREGA.md` em `portao: bloqueado` ou `pr_estado: rascunho` não tinha como registrar o merge: o `e9-merge` recusa a entrega por trabalho, e editar o `ENTREGA.md` reabre a entrega no portão. Agora, com o merge provado no serviço e na base, o script abre `docs/<id>-registro-pos-merge` e grava um commit só com `docs/entregas/<id>/POS-MERGE.md` (`kind: registro_pos_merge`) e os trailers `Registro-pos-merge-de:` e `Merge:`. O `ENTREGA.md` continua o retrato do E7, e o PR do registro passa no pre-push e no CI como `ref_nao_aplicavel`. Push e PR ficam com quem roda.
+- **Recusas antes de qualquer efeito.** `ENTREGA.md` local diferente do da base dá rc 6, base sem a entrega dá rc 7, base que já traz o registro dá rc 8 e entrega `por_sprint` dá rc 3 (o E9 já registra cada merge).
+
 ## 0.14.27 — retroativa sem a evidência antiga, runx fora da revisão e escopo-da-task que só avisa
 
 Instale por PR, como a 0.14.26. Muda o núcleo (AxisGov/expxdev#195, merge ff75a67) e certifica a sprintx (AxisGov/sprintx#94, merge 9f56e92, DS-236). A mergex segue em 3a45969. O CLI, os eventos, o painel, o `expx sessao` e as outras sete skills seguem como na 0.14.26. Lacunas relatadas pelo conselhos-municipais na OC-2026-0026.

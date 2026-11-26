@@ -13,8 +13,9 @@ O painel apenas LÊ. Esta skill continua sendo a única a escrever `docs/entrega
 
 O `expx-schema v1` é compartilhado com a [`sprintx`](https://github.com/AxisGov/sprintx)
 (Build, F1–F6) e a [`runx`](https://github.com/AxisGov/runx) (Run, E1–E5). A mergex
-não tem kind compartilhado: ela produz dois kinds, exclusivos dela — o `entrega` e o
-`reconciliacao_base` (DM-178, ver "O kind da reconciliação de base").
+não tem kind compartilhado: ela produz três kinds, exclusivos dela — o `entrega`, o
+`reconciliacao_base` (DM-178, ver "O kind da reconciliação de base") e o
+`registro_pos_merge` (DM-351, ver "O kind do registro depois do merge").
 
 O que **é** compartilhado são os **nomes dos campos de indexação**. `modulo_afetado`,
 `arquivos_alterados` e `palavras_chave` existem nas três skills com **exatamente estes nomes**
@@ -695,6 +696,17 @@ Abaixo do frontmatter, a prosa tem um parágrafo com a base integrada e o merge,
 arquivo (caminho, status na base, motivo); nenhum frontmatter extra, nenhuma cópia de diff. O
 contrato completo, com as quatro provas e o diff canônico de `diff_b1_m_sha256`, está em
 `references/11-reconciliacao-base.md`. O painel ainda não lê este kind (fora de escopo).
+
+## O kind do registro depois do merge
+
+### `docs/entregas/<trabalho_id>/POS-MERGE.md` → `kind: registro_pos_merge`
+
+Gravado só pelo `scripts/fechamento-pos-merge.sh --trabalho <id>`, para entrega que não é
+ocorrência da runx, depois de provar o merge no serviço e na base (DM-351). Campos:
+`trabalho_id`, `pr_url`, `pr_estado: merged`, `merge` (SHA completo), `branch`, `branch_base`
+(o nome que o PR mira) e `registrado_em` (UTC). O `ENTREGA.md` ao lado continua o retrato do E7
+(DM-317); quem quer o estado final da entrega lê este arquivo quando ele existe. O portão não
+seleciona este kind. O painel ainda não o lê.
 
 ## Arquivos SEM frontmatter
 
