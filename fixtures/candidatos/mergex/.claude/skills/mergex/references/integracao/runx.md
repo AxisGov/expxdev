@@ -46,7 +46,7 @@ Quando o E5 roda, a branch da entrega já foi integrada. O caminho é `scripts/f
 
 ### O registro do merge de entrega que não é da runx (DM-351)
 
-O mesmo script registra o merge de uma entrega da sprintx ou de outro trabalho que não é ocorrência: `scripts/fechamento-pos-merge.sh --trabalho <id>`. Com o merge provado do mesmo jeito, ele abre `docs/<id>-registro-pos-merge` e já grava o commit com `docs/entregas/<id>/POS-MERGE.md` (`kind: registro_pos_merge`) e os trailers `Registro-pos-merge-de: <pr_url>` e `Merge: <sha>`. A saída traz também `commit=`. O `ENTREGA.md` não muda: editá-lo reabriria a entrega no portão. Push e PR do registro ficam com quem roda, e o merge desse PR é humano.
+O mesmo script registra o merge de uma entrega da sprintx ou de outro trabalho que não é ocorrência: `scripts/fechamento-pos-merge.sh --trabalho <id>`. Com o merge provado do mesmo jeito, ele abre `docs/<id>-registro-pos-merge` e já grava o commit com `docs/entregas/<id>/POS-MERGE.md` (`kind: registro_pos_merge`) e os trailers `Registro-pos-merge-de: <pr_url>` e `Merge: <sha>`. A saída traz também `commit=`. Se o PR foi aberto fora do fluxo e o `ENTREGA.md` ficou com `pr_url: null`, informe-o com `--pr <url>`: ele passa pela mesma prova contra a branch e a base da entrega e, além dela, o merge tem de ter trazido o `ENTREGA.md` que está na base (DM-352). Com `sprint_atual: planejamento`, o registro recusa. O `ENTREGA.md` não muda: editá-lo reabriria a entrega no portão. Push e PR do registro ficam com quem roda, e o merge desse PR é humano.
 
 ### O nome da branch depende do tipo da ocorrência
 

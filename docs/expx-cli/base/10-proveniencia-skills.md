@@ -15,11 +15,11 @@ Commits certificados (confirmados na organização AxisGov em 2026-11-16; a troc
 
 | Repositório | Commit certificado |
 |---|---|
-| `AxisGov/runx` | `5ff9d231616b0c4aafa81a037f45a90042b547c2` |
+| `AxisGov/runx` | `bee0af84ddce5c3183812038b861643cf3948b4b` |
 | `AxisGov/legadox` | `a6a4629c47dc0fdfab75de0f6246ce6609088970` |
 | `AxisGov/stackx` | `03ff770d7bc257cf2271ff08e77904e351e80d5a` |
-| `AxisGov/mergex` | `1fad177b00664afd1c85d28f723cb6bba8bef3ea` |
-| `AxisGov/sprintx` | `9f56e927898ed44f46f694afe45857fc785720bc` |
+| `AxisGov/mergex` | `ef59228fbda03ce77172ac528ccc352643a95db2` |
+| `AxisGov/sprintx` | `8a42dc82829540b3f7fdc64b24e9d2f2a3d5ae60` |
 | `AxisGov/MemoX` | `db64a04ff3c9bd7f7c1b8e0685c3a5ece4773f1d` |
 | `AxisGov/prodx` | `06ce57a42db8eaae3f98ea60fc3895f1536383c5` |
 | `AxisGov/buildx` | `235cf01a6a364c03314cf7dade31ee5cd629b1da` |
