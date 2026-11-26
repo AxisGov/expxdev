@@ -9,6 +9,15 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.30 — registro com rebase merge, PR de fork recusado e caminho F:/ no sem-segredo
+
+Instale por PR, como a 0.14.29. Certifica a mergex (AxisGov/mergex#122, merge 149af27, DM-353 e DM-354) e a sprintx (AxisGov/sprintx#96, merge a12e46c). O núcleo, o CLI, os eventos, o painel, o `expx sessao` e as outras sete skills seguem como na 0.14.29. Relatos do conselhos-municipais depois da 0.14.29 (CodeAnt no conselhos#403).
+
+- **MergeX, `--pr` com rebase merge.** A prova olhava só o pai do merge, e um rebase cujo último commit não toca o `ENTREGA.md` era recusado com rc 6. Agora vale o último commit da linha principal que mudou o arquivo. Se não for o próprio merge, o merge tem de ter um pai só, e o serviço tem de dizer que o commit entrou na base por este PR (`gh api repos/<dono>/<repo>/commits/<sha>/pulls`). Sem resposta do serviço, rc 5. Título e data não bastam, porque a branch reaproveitada leva os commits de um PR anterior para o seguinte.
+- **MergeX, PR de fork.** O `gh pr view` pede `isCrossRepository`, e só `false` passa, no fechamento da runx e no registro.
+- **MergeX, `sem-segredo` no Windows.** `git commit -F F:/.../msg` era lido como relativo e barrado com "conteúdo do commit não varrido". `F:/x` e `F:\x` entre aspas viram o caminho que o shell abre (`cygpath -u`, ou `/mnt/f` no WSL), também em `cd`, `git -C` e no `-F` da `integracao-da-mensagem`. Sem aspas, a barra invertida continua barrando. E `git -C a\ b commit`, com espaço escapado, passa a ser reconhecido como commit: antes o hook saía 0 sem varrer.
+- **SprintX, código 5 do rastro.** O texto diz que uma escrita que falha no meio pode deixar uma linha incompleta no `.jsonl`, que não se apaga nem se completa à mão.
+
 ## 0.14.29 — registro do merge com --pr, e textos da sprintx e da runx
 
 Instale por PR, como a 0.14.28. Certifica a mergex (AxisGov/mergex#121, merge ef59228, DM-352), a sprintx (AxisGov/sprintx#95, merge 8a42dc8) e a runx (AxisGov/runx#30, merge bee0af8). O núcleo, o CLI, os eventos, o painel, o `expx sessao` e as outras seis skills seguem como na 0.14.28. Relatos do conselhos-municipais (Onda 4, #399, #400 e #402).

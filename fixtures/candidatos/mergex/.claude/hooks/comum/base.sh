@@ -213,6 +213,27 @@ expx_sem_aspas() {
   printf '%s' "$v"
 }
 
+# expx_caminho_local <caminho> — o caminho de unidade do Windows (`F:/x`, `F:\x`)
+# na forma que o shell do hook abre: o `cygpath -u` do Git Bash (`/f/x`); no WSL,
+# `/mnt/f/x`. Fora dessa forma, ou sem como converter, devolve o caminho como veio.
+# Quem chama trata como absoluto o resultado que começa com `/` (conselhos, depois
+# da 0.14.29: `git commit -F F:/.../msg` era lido como relativo e barrado).
+expx_caminho_local() {
+  local c="$1" u d
+  case "$c" in
+    [A-Za-z]:/*|[A-Za-z]:\\*)
+      if command -v cygpath >/dev/null 2>&1 && u="$(cygpath -u -- "$c" 2>/dev/null)" && [ -n "$u" ]; then
+        printf '%s' "$u"; return 0
+      fi
+      d="$(printf '%s' "${c%%:*}" | tr '[:upper:]' '[:lower:]')"
+      if [ -d "/mnt/$d" ]; then
+        u="${c#?:}"; printf '/mnt/%s%s' "$d" "$(printf '%s' "$u" | tr '\\' '/')"; return 0
+      fi
+      ;;
+  esac
+  printf '%s' "$c"
+}
+
 # Programas que RODAM o que vem no argumento: é esta lista que separa EXECUTAR
 # (`bash -c "git push ..."`) de CITAR (`echo "git push ..."`). Compara-se o
 # NOME do programa, não o caminho: `/bin/sh` é o mesmo `sh`.

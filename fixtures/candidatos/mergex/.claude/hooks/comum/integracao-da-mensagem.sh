@@ -39,16 +39,26 @@ integracao_le_m() {
 # leitura do -F dos hooks: commit-por-task.sh e arquivo-fora-do-plano.sh usam
 # esta função, não um sed próprio.
 integracao_arquivo_do_comando() {
-  local arq
+  local arq aspas=1
   arq="$(printf '%s' "$1" | sed -n \
     -e 's/.*[[:space:]]-F[[:space:]]*"\([^"]*\)".*/\1/p' \
     -e "s/.*[[:space:]]-F[[:space:]]*'\([^']*\)'.*/\1/p" \
     -e 's/.*--file="\([^"]*\)".*/\1/p' \
-    -e "s/.*--file='\([^']*\)'.*/\1/p" \
-    -e 's/.*[[:space:]]-F[[:space:]]*\([^[:space:]]*\).*/\1/p' \
-    -e 's/.*--file=\([^[:space:]]*\).*/\1/p' | awk 'NR == 1')"
+    -e "s/.*--file='\([^']*\)'.*/\1/p" | awk 'NR == 1')"
+  if [ -z "$arq" ]; then
+    aspas=0
+    arq="$(printf '%s' "$1" | sed -n \
+      -e 's/.*[[:space:]]-F[[:space:]]*\([^[:space:]]*\).*/\1/p' \
+      -e 's/.*--file=\([^[:space:]]*\).*/\1/p' | awk 'NR == 1')"
+  fi
   [ -n "$arq" ] || return 0
   arq="$(printf '%s' "$arq" | sed "s/^['\"]//; s/['\"]$//")"
+  # Caminho de unidade do Windows é absoluto. Com barra invertida, só entre aspas:
+  # sem elas o shell come a barra, e o Git abre outro nome (DM-354).
+  case "$arq" in
+    [A-Za-z]:/*|[A-Za-z]:\\*)
+      case "$aspas:$arq" in 0:*\\*) ;; *) arq="$(expx_caminho_local "$arq")" ;; esac ;;
+  esac
   case "$arq" in /*) : ;; *) arq="$RAIZ/$arq" ;; esac
   printf '%s' "$arq"
 }
