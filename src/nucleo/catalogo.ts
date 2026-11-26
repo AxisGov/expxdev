@@ -35,7 +35,7 @@ export const CATALOGO: readonly Skill[] = [
     nome: "sprintx",
     repositorio: "https://github.com/AxisGov/sprintx",
     origensLegadas: ["https://github.com/bittencourtthulio/sprintx"],
-    certificado: "9fa036b7814735f6d2faef4a9bc1765f06e38b6a",
+    certificado: "9f56e927898ed44f46f694afe45857fc785720bc",
     papel: "planeja e executa features novas",
     camada: false,
   },

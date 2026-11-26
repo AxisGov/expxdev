@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { CATALOGO } from "../nucleo/catalogo.js";
 import { ambienteCom, bashDosHooks, comandoRegistrado, larIsolado, novoProduto, pathControlado, pathDosHooks, rodarExpx, temporarios } from "../teste/candidatos.js";
@@ -126,14 +126,22 @@ describe("composição SprintX e runx", () => {
       expect(r.saida, rel).not.toContain("sessao_ambigua");
     }
 
-    // Feature aberta na mesma árvore: a sessão sem reivindicação da SprintX continua barrada. O leitor
-    // da SprintX não vê a linha da runx de propósito (DS-196); se visse, daria plano_corrente_ausente.
+    // Feature aberta na mesma árvore: a sessão sem reivindicação da SprintX é avisada no modo padrão
+    // e barrada em bloqueio (DS-236). O leitor da SprintX não vê a linha da runx de propósito (DS-196);
+    // se visse, daria plano_corrente_ausente.
     const FEATURE = "docs/sprintx/features/fq";
     escreve(`${FEATURE}/ORQUESTRADOR.md`, "---\nexpx_schema: 1\nexpx_tool: sprintx\nkind: orquestrador\ntrabalho_id: fq\n---\n");
     escreve(`${FEATURE}/sprint-01/tasks.md`, "---\nkind: tasks\ntrabalho_id: fq\nsprint_id: sprint-01\ntasks:\n  - id: T-01.01\n    status: em_andamento\n    arquivos:\n      cria: [src/f.ts]\n      altera: []\n---\n");
+    const avisada = escopo("infra/a.sh");
+    expect(avisada.rc, avisada.saida).toBe(0);
+    expect(avisada.saida).toContain("sessao_ambigua");
+    const modoOriginal = existsSync(join(produto, ".expx/hooks.json")) ? readFileSync(join(produto, ".expx/hooks.json"), "utf8") : null;
+    writeFileSync(join(produto, ".expx/hooks.json"), JSON.stringify({ hooks: { "escopo-da-task": { modo: "bloqueio" } } }));
     const barrada = escopo("infra/a.sh");
     expect(barrada.rc, barrada.saida).toBe(2);
     expect(barrada.saida).toContain("sessao_ambigua");
+    if (modoOriginal === null) rmSync(join(produto, ".expx/hooks.json"));
+    else writeFileSync(join(produto, ".expx/hooks.json"), modoOriginal);
 
     // Com a task da feature reivindicada pelo escritor real da SprintX, ela edita o que é dela,
     // e não o que é da ocorrência, com o hook em bloqueio.
