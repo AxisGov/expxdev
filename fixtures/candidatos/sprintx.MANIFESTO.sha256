@@ -19,7 +19,7 @@ f6141772f1f0787198b225a9a039307258eeac057930fe4673362820b26f1136  .claude/hooks/
 af8642903f504cb832d59576686c23d374a982c27c7c20f119aa4eded7419703  .claude/hooks/sprintx/git-perigoso.sh
 fd6c820d88c191feaf72a5a61658ddcc8d59a064832e148c02d915803267dba6  .claude/hooks/sprintx/sem-placeholder-no-plano.sh
 2e1ca6b14efee0c531fc249815f19814f4777d86d39d5b8fc0d710cdcef8ad4b  .claude/hooks/sprintx/task-reivindicada.sh
-ab414111fc0bdf311b92cc789c7ebbfdd36e3d117686f513579f7b0d242e298c  .claude/hooks/sprintx/task-so-fecha-verde.sh
+02a291809fa3889353b9d7d1fd5ae9e5231a9021c3468694b302e6c9187e2102  .claude/hooks/sprintx/task-so-fecha-verde.sh
 bcfa893cc51469422e748f63b3aaeb19a5c096c51c400a86c1b8c60e55af2d5b  .claude/hooks/sprintx/tdd-teste-antes.sh
 c79f5061a97281b6b82f4593df8aded01adb631e356dae9d1594c5c0c6fd5da1  .claude/hooks/testes/agente-real-rastro.sh
 6e9593a1d64ca5878712a069b4b47443d67b2ac3ec001a95c7d8358ccc39edc4  .claude/hooks/testes/bancada-autorizacao-f6.sh
@@ -37,12 +37,12 @@ ef4f4d46ebdecbdf9d7df03bfc9fae80c1858caf1f53fa3c8b045df66383ddc0  .claude/hooks/
 bcbf0b68aeb24b233ebcba264be7fe30edf49cce08d0c78c373947cf624e2f35  .claude/hooks/testes/bancada-runx-na-mesma-arvore.sh
 c4585b4985bc6187d61677ddf68430d51183c3b5a4ad4a6c295d76b523b79d85  .claude/hooks/testes/bancada-segredo-limite.sh
 f7174dee86fb586fc35fa09a029ba2438d25095351309c14a64b060961d085f6  .claude/hooks/testes/bancada-segredo-sem-git.sh
-3f233ef724f603646b5c5602bef5740151c95227e09acc7c140bd0e7a351a80c  .claude/hooks/testes/bancada-suite-ambiente.sh
+4f39c7df56eb0151122ae5aff082ebb3f492a01700ea973b1af39ef78a71c5b8  .claude/hooks/testes/bancada-suite-ambiente.sh
 933022e6cefb99245b829c784752891cb1b982d07ab2da4477cb23e333bfada1  .claude/hooks/testes/bancada.sh
 d9370952ede36c379751835d4a711550bd37b95c16f127d841883a49e962d2a5  .claude/hooks/testes/fonte.sh
 00dc2c2d5319710f73f5f54616c5b652aa3f99879f8c75444c8002abeeb13483  .claude/hooks/testes/transcrito-agente.sh
 0354c304ed52b1d41becc8df83b36f4a3bf0b3543316bf0e569347ca719fe43d  .claude/settings.json
-59af2f4112c0651f8a1f013dfc9a3b1a09e95933570ad1da810df36280e8db38  .claude/skills/sprintx/DECISOES-DA-SKILL.md
+941af097c8ede473aa96b802e58d6c51563cd439ac173482225d026f07aabf98  .claude/skills/sprintx/DECISOES-DA-SKILL.md
 3927b7a499bc52d153135bf98b033bdf82d55824e24b4bcf8be558e87316ec72  .claude/skills/sprintx/SKILL.md
 296b12dd80970ea12c8ac42de6de82a7f34b98e257587d139c8db8d7a4041343  .claude/skills/sprintx/assets/TEMPLATE-BLOQUEIOS.md
 87e9ed363f1a083e60fc37d2c48cb3315513a3a47950858dd445d8d5bc780de3  .claude/skills/sprintx/assets/TEMPLATE-DECISOES.md
@@ -65,7 +65,7 @@ a4102c98bdd79bd6adb347ae31550e2c3f159a116dfe877650d19953fb6833e0  .claude/skills
 ea4f7911c1c4fdd412313c64566275b80b00f39d97e10ee69efd7c86cdd77642  .claude/skills/sprintx/references/03-plano.md
 81fc160be05bde218ab4e187eba2f84f9c565ff4de1126749ac041bd4ea1ca2e  .claude/skills/sprintx/references/04-orquestrador.md
 dee6609e9cb22c467a775a6a94372e4f3c9ff7ab968ff4d1d4332d195e744f5b  .claude/skills/sprintx/references/05-auditoria.md
-f80d76234a8a3dcc555f92df03604db8b3a3a4fcdc06a47244e0e468362464aa  .claude/skills/sprintx/references/06-execucao.md
+18b9b85865b02bf66fe035cb215aecee99c0470c32b4c4144a9af4d317efd71c  .claude/skills/sprintx/references/06-execucao.md
 7470ee3c03e137f825555b7f57f79aa529b54e0ecd5663b0bf9d095752fb90cf  .claude/skills/sprintx/references/07-estimativa.md
 5962b2aa6994a09dd7b7aa575b8611b818a07c467464b6bdccdc634ab409f3d1  .claude/skills/sprintx/references/08-rastro.md
 c4267a0df409dfc4f06c668640c7e135cdf7237ebbea0c8d88278ac792ec9129  .claude/skills/sprintx/references/09-diagrama.md
