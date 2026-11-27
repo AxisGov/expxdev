@@ -9,6 +9,13 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.32 — task sem arquivos na V11 e falhas de ambiente na V2
+
+- MergeX (DM-356): task concluída com `cria: []` e `altera: []` explícitos não gera commit no E1, e a V11 a dispensa quando nenhum commit desde a base tem `Task: <id>`. A `--verificacao` pedida roda e não pode alterar produto.
+- MergeX (DM-357): `portao-v2.sh`. Suíte `vermelha` vira AVISO quando todo arquivo de `suite_falhas` está em `.expx/falhas-de-ambiente.tsv` para a plataforma e nenhum está no diff; o `commit-por-task` segue a mesma regra. Timeout por máquina carregada fica fora da lista.
+- SprintX `48a119d` (DS-238): o contrato e o `task-so-fecha-verde` com as duas regras.
+- Núcleo (#201): o painel não acusa `concluida_sem_verde` quando a falha é só de ambiente listado.
+
 ## 0.14.31 — F:/ sem cygpath, rastro que desfaz a escrita parcial e instalação no site
 
 - MergeX `44f4edb` (DM-355): sem `cygpath`, o Git é o do Linux, que lê `F:/x` como relativo ao diretório atual. O `sem-segredo` e a leitura do `-F` dos hooks de commit passam a ler o mesmo arquivo, em vez de `/mnt/f/x`. Os dois casos de custo de 100 KB do `teste.sh` ganham limite de 6 s.

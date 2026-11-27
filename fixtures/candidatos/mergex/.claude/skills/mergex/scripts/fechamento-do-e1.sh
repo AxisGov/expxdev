@@ -81,6 +81,9 @@
 #
 # Códigos:
 #   0  seção crítica concluída (ou preparada, no `--preparar`)
+#      Na task sem arquivos (`cria: []` e `altera: []`, DM-356) sem produto
+#      alterado: `sem_arquivos=true`, nenhum commit, nenhum item, trava
+#      liberada. Só nela `--fechar` e `--preparar` dispensam `-- <caminho>...`.
 #   2  E1 OCUPADO — outra execução tem a seção crítica deste índice
 #   3  o índice já tinha conteúdo em stage na entrada
 #   4  verificação reprovou ANTES do commit — nenhum commit foi criado
@@ -769,6 +772,48 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# Task sem arquivos (DM-356). Quem diz que é uma é o ownership-da-task.sh.
+# ---------------------------------------------------------------------------
+task_sem_arquivos() { # <task>
+  [ -f "$OWNERSHIP_SH" ] \
+    && bash "$OWNERSHIP_SH" --task-sem-arquivos "$RAIZ" "$ORIGEM" "$TRABALHO" "$1" >/dev/null 2>&1
+}
+
+# Sem `-- <caminho>...`, só a task sem arquivos passa; o contexto é validado de
+# novo dentro da seção.
+exige_task_sem_arquivos() { # <ação>
+  ORIGEM="$(fm "$ENTREGA" expx_tool)"
+  TRABALHO="$(fm "$ENTREGA" trabalho_id)"
+  task_sem_arquivos "$TASK" || uso "$1 precisa de \`-- <caminho>...\`"
+}
+
+# Depois da árvore classificada (irmã e desvio já pararam): sem nada a commitar,
+# a task sem arquivos fecha aqui, sem commit. A trava sai pelo `encerrar`.
+encerra_sem_arquivos() { # <task>
+  [ -z "$STAGING" ] || return 0
+  task_sem_arquivos "$1" || return 0
+  # A verificacao pedida pelo chamador roda mesmo sem commit: a task sem
+  # arquivos existe justamente para rodar algo (CodeAnt no #124).
+  verifica "${VERIFICACAO:-}"
+  if [ -n "${VERIFICACAO:-}" ]; then
+    # A verificacao nao pode deixar produto alterado para tras: sem commit, a
+    # mudanca ficaria fora do historico e da ENTREGA (CodeAnt no #124).
+    inventaria_arvore
+    separa_metodo
+    separa_evidencia "$1"
+    [ -z "$PRODUTO" ] || para 4 'PARADO — a verificação alterou arquivos de produto' \
+      "Task sem arquivos: $1" \
+      'Arquivo(s) que mudaram durante a verificação:' \
+      "$(printf '%s\n' "$PRODUTO" | sed '/^$/d; s/^/  - /')" \
+      'Nenhum commit foi criado. Desfaça a mudança ou declare os arquivos na task.'
+  fi
+  printf 'sem_arquivos=true\n'
+  printf 'task=%s\n' "$1"
+  printf 'mergex E1: a task %s declara `cria: []` e `altera: []` e nenhum arquivo de produto mudou: nenhum commit foi criado e ENTREGA.commits não mudou.\n' "$1"
+  exit 0
+}
+
+# ---------------------------------------------------------------------------
 # A a C — staging, diff em stage e verificações aplicáveis, tudo sob a trava.
 # ---------------------------------------------------------------------------
 prepara() { # usa STAGING, a saída da classificação da árvore (M4)
@@ -928,13 +973,14 @@ case "$ACAO" in
   --fechar)
     [ -n "$ENTREGA" ] || uso 'falta --entrega'
     [ -n "$MENSAGEM" ] || uso 'falta --mensagem'
-    [ "$CAMINHOS_INICIO" = 1 ] && [ "$#" -gt 0 ] || uso '--fechar precisa de `-- <caminho>...`'
+    { [ "$CAMINHOS_INICIO" = 1 ] && [ "$#" -gt 0 ]; } || exige_task_sem_arquivos --fechar
     recusa_bloco "$@"
     abre_secao "$TASK"                 # 1 e 2
     confere_stage_de_entrada           # 3
     carrega_contexto "$ENTREGA"
     valida_mensagem
     classifica_arvore "$TASK" "$@"     # 4 (M4: árvore inteira + dados)
+    encerra_sem_arquivos "$TASK"       # task sem arquivos: nada a commitar (DM-356)
     prepara                            # 5 (A) e 6 (B)
     verifica "$VERIFICACAO"            # 7 (C)
     conclui "$ENTREGA" "$TASK" "$MENSAGEM"   # 8-11 (D a G)
@@ -943,7 +989,7 @@ case "$ACAO" in
   --preparar)
     [ -n "$ENTREGA" ] || uso 'falta --entrega'
     [ -n "$MENSAGEM" ] || uso 'falta --mensagem'
-    [ "$CAMINHOS_INICIO" = 1 ] && [ "$#" -gt 0 ] || uso '--preparar precisa de `-- <caminho>...`'
+    { [ "$CAMINHOS_INICIO" = 1 ] && [ "$#" -gt 0 ]; } || exige_task_sem_arquivos --preparar
     recusa_bloco "$@"
     abre_secao "$TASK"
     confere_stage_de_entrada
@@ -951,6 +997,7 @@ case "$ACAO" in
     valida_mensagem
     registra_contexto_preparado
     classifica_arvore "$TASK" "$@"
+    encerra_sem_arquivos "$TASK"
     prepara
     registra_indice_preparado
     # A seção continua aberta: quem preparou tem a trava até `--concluir`.

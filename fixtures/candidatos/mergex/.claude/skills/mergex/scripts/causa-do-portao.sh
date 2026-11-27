@@ -17,10 +17,17 @@
 #   3. `vN_sem_prova` é a verificação que não pôde rodar (FALHA por ausência de
 #      prova). Se ela aparece antes de qualquer falha provada, a causa é
 #      `indeterminada`: a mergex não sabe, e não inventa.
+#   4. AVISO não é falha e não entra em `falhas_portao`. Na V2, a suíte
+#      vermelha só de ambiente (`portao-v2.sh` dá `V2=AVISO`, DM-357) fica na
+#      seção de avisos; `--token v2 V2=AVISO` não imprime nada. Só `V2=FALHA`
+#      vira `v2`, e `V2=SEM_PROVA` vira `v2_sem_prova`.
 #
 # Uso:
 #   causa-do-portao.sh --derivar v7 v1            # imprime a causa (a ordem de entrada não importa)
 #   causa-do-portao.sh --lista v7 v1              # imprime `[v1, v7]`, a forma gravada em falhas_portao
+#   causa-do-portao.sh --token v2 V2=AVISO        # o item de falhas_portao de um resultado:
+#                                                 # FALHA -> vN, SEM_PROVA -> vN_sem_prova,
+#                                                 # OK, AVISO e n/a -> nada
 #   causa-do-portao.sh --validar <ENTREGA.md|->   # gravação nova: as duas chaves obrigatórias
 #   causa-do-portao.sh --validar-historico <ENTREGA.md|->
 #                                                 # leitura: aceita ENTREGA anterior às chaves
@@ -94,6 +101,24 @@ deriva() {
     done
   done
   ERRO="nenhuma falha reconhecida"; return 1
+}
+
+# token <vN> <resultado> — o item de falhas_portao de um resultado de verificação.
+# O resultado vem cru (`FALHA`) ou na primeira linha do script (`V2=FALHA`).
+# AVISO, OK e n/a não entram: imprime nada e sai 0.
+token() {
+  local v="$1" r="$2" n
+  n="$(numero "$v")"
+  case "$v" in *_sem_prova) n="" ;; esac
+  [ -n "$n" ] || { ERRO="verificação desconhecida: $v"; return 1; }
+  case "$r" in V*=*) r="${r#*=}" ;; esac
+  case "$r" in
+    FALHA)            printf '%s\n' "$v" ;;
+    SEM_PROVA)        printf '%s_sem_prova\n' "$v" ;;
+    OK|AVISO|n/a)     : ;;
+    *) ERRO="resultado desconhecido para $v: $2"; return 1 ;;
+  esac
+  return 0
 }
 
 # ---------------------------------------------------------------------------
@@ -192,6 +217,10 @@ ERRO=""
 case "${1:-}" in
   --ordem)  printf '%s\n' "$ORDEM"; exit 0 ;;
   --causas) printf '%s\n' "$CAUSAS"; printf '*|%s\n' "$INDETERMINADA"; exit 0 ;;
+  --token)
+    [ "$#" -eq 3 ] || { printf 'causa-do-portao: --token <vN> <resultado>\n' >&2; exit 64; }
+    token "$2" "$3" && exit 0
+    printf 'causa-do-portao: %s\n' "$ERRO" >&2; exit 1 ;;
   --derivar|--lista)
     modo="$1"; shift
     # A ordem de entrada não importa: a mesma evidência dá a mesma causa.

@@ -10,6 +10,13 @@
 # `vermelha` e `nao_executada` continuam barrando: commit sobre teste que não
 # passa põe no histórico um ponto em que quem bisecar depois cai.
 #
+# Exceção única (DM-357): `vermelha` cujo `suite_falhas` só tem testes da lista
+# versionada `.expx/falhas-de-ambiente.tsv` para esta plataforma, nenhum deles
+# tocado pelo índice nem por `<branch_base>...HEAD`, passa com aviso. Quem
+# decide é o `portao-v2.sh` da skill (a V2 do portão), chamado com `--staged`;
+# este hook não lê `suite_falhas` nem a lista. Sem `branch_base` que resolva,
+# ou sem o script, barra como sempre.
+#
 # É a regra que sustenta a qualidade do histórico — que, como a mergex não
 # previne colisão, é o principal ativo de quem for resolver um conflito depois.
 #
@@ -99,6 +106,7 @@ fi
 # segunda regra, só chama de novo a mesma classificação.
 OWNERSHIP="$DIR/../../skills/mergex/scripts/ownership-da-task.sh"
 CONTRATO_COMMIT="$DIR/../../skills/mergex/scripts/contrato-de-commit.sh"
+PORTAO_V2="$DIR/../../skills/mergex/scripts/portao-v2.sh"
 
 # A task que está sendo fechada é a que a mensagem DECLARA no rodapé `Task:`,
 # que o contrato do E1 já exige em todo commit de task. Nunca é adivinhada:
@@ -440,6 +448,39 @@ O que fazer:
 fi
 
 # --------------------------------------------------------------------------
+# A V2 com a lista de falhas de ambiente (DM-357)
+# --------------------------------------------------------------------------
+# v2_so_ambiente <task> — 0 quando o portao-v2.sh daria AVISO à task: suíte
+# vermelha só por testes da `.expx/falhas-de-ambiente.tsv` desta plataforma,
+# nenhum deles no índice nem em `<branch_base>...HEAD`. A regra e o leitor de
+# `suite_falhas` são só do script; aqui só se monta a chamada. Qualquer outra
+# resposta (FALHA, SEM_PROVA, script ausente, base que não resolve) é 1, e o
+# hook barra como antes. V2_SAIDA guarda a resposta para a mensagem.
+V2_SAIDA=""
+v2_so_ambiente() {
+  local task="$1" base arq
+  V2_SAIDA=""
+  [ -r "$PORTAO_V2" ] || return 1
+  base="$(expx_frontmatter_valor "${ENTREGA_ATUAL:-}" branch_base)"
+  [ -n "$base" ] || return 1
+  if ! git -C "$RAIZ" rev-parse -q --verify "$base^{commit}" >/dev/null 2>&1; then
+    git -C "$RAIZ" rev-parse -q --verify "origin/$base^{commit}" >/dev/null 2>&1 || return 1
+    base="origin/$base"
+  fi
+  set --
+  while IFS= read -r arq; do
+    [ -n "$arq" ] && set -- "$@" "$arq"
+  done <<< "$TASKS_ARQS"
+  [ "$#" -gt 0 ] || return 1
+  V2_SAIDA="$(bash "$PORTAO_V2" --verificar --raiz "$RAIZ" --base "$base" --staged \
+    --task "$task" -- "$@" 2>/dev/null)" || return 1
+  case "$V2_SAIDA" in
+    V2=AVISO*) return 0 ;;
+  esac
+  return 1
+}
+
+# --------------------------------------------------------------------------
 # 2. Task não concluída, ou com registro de suíte que não sustenta um commit
 # --------------------------------------------------------------------------
 for id in $TASKS_TOCADAS; do
@@ -470,6 +511,17 @@ O que fazer:
   case "${suite:-}" in
     ''|parcial|verde) ;;
     *)
+    if [ "$suite" = vermelha ] && v2_so_ambiente "$id"; then
+      printf '%s\n' "mergex/commit-por-task — aviso: task $id com suíte vermelha só por falha de ambiente
+
+$(awk 'NR == 2' <<<"$V2_SAIDA")
+
+Todos os testes de suite_falhas estão em .expx/falhas-de-ambiente.tsv para
+esta plataforma e nenhum deles foi tocado por este trabalho (índice e
+branch_base...HEAD). O commit segue; a suíte inteira continua cobrada no
+fechamento da sprint (DM-357)." >&2
+      continue
+    fi
     expx_barra "$MODO" "$RAIZ" "$HOOK" "task $id com suite $suite" \
 "mergex/commit-por-task — a task fechou sem teste passando
 
@@ -483,6 +535,9 @@ Registros válidos numa task concluída:
   parcial — os testes afetados pela task passaram (a suíte inteira é cobrada
             no fechamento da sprint)
   verde   — a suíte inteira passou
+  vermelha só de ambiente — todo teste de suite_falhas está em
+            .expx/falhas-de-ambiente.tsv para esta plataforma e nenhum foi
+            tocado pelo trabalho (DM-357)
 
 O que fazer:
   - Faça os testes da task passarem e atualize 'suite' no tasks.md."

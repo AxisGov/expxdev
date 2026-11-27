@@ -123,11 +123,23 @@ Para cada task `concluida` do escopo, leia o campo `suite`:
 | `parcial` | OK — os testes afetados pela task passaram |
 | `verde` | OK — a suíte inteira passou |
 | `vermelha` | **FALHA** |
+| `vermelha` com `suite_falhas` só de testes da lista desta plataforma, nenhum no diff | **AVISO** (DM-357) |
 | `nao_executada` | **FALHA** — `concluida` sem teste executado é inconsistência do registro |
 
 `parcial` e `verde` são registros válidos, e é assim que a skill de origem trabalha: na task roda o subconjunto afetado, e a suíte inteira é cobrada uma vez, ao fechar a sprint. Reprovar `parcial` aqui obrigaria a skill de origem a escrever `verde` onde ela não rodou a suíte inteira — o portão passaria a premiar registro falso, que é o oposto do que ele existe para fazer.
 
 `vermelha` e `nao_executada` são FALHA. Nomeie a task.
+
+**A única exceção é a falha de ambiente (DM-357).** A lista é do projeto e versionada, em `.expx/falhas-de-ambiente.tsv`: uma linha por teste, `caminho<TAB>plataforma<TAB>motivo<TAB>desde`. `#` comenta, linha com motivo vazio não vale e o caminho casa exato. A task `vermelha` é **AVISO** só quando `suite_falhas` existe e não é vazia, **todo** caminho dela está na lista para a plataforma atual (`EXPX_PLATAFORMA`, senão `uname -s`) e **nenhum** aparece em `git diff --name-only <branch_base>...HEAD`: teste tocado pelo trabalho perde a absolvição. Quem decide é o script, e a primeira linha da saída é o resultado:
+
+```bash
+bash .claude/skills/mergex/scripts/portao-v2.sh --verificar --base <branch_base> <tasks.md>...
+bash .claude/skills/mergex/scripts/causa-do-portao.sh --token v2 <primeira linha da saída>
+```
+
+`V2=FALHA` vira `v2`, `V2=SEM_PROVA` vira `v2_sem_prova`; `V2=OK`, `V2=AVISO` e `n/a` não imprimem nada. O AVISO vai para a seção de avisos, com a task e os testes, e **não entra em `falhas_portao`**. O hook `commit-por-task` chama o mesmo script com `--staged`, que soma o índice ao diff.
+
+**Timeout por máquina carregada NÃO entra na lista.** Reexecute o teste isolado; verde, registre `parcial`.
 
 **O trabalho inteiro continua precisando da suíte inteira.** Além do registro por task, procure a **evidência da suíte inteira no fechamento de cada sprint do escopo** (na entrega `por_sprint`, a da sprint do PR), onde a skill de origem a registra, com a saída da execução colada. **Onde procurar depende do formato da sprint:**
 
@@ -143,6 +155,8 @@ Para cada task `concluida` do escopo, leia o campo `suite`:
 | Sprint concluída com a execução registrada e verde | OK |
 | Sprint concluída com execução registrada vermelha | **FALHA** — nomeie a sprint |
 | Sprint concluída sem nenhum registro de execução | **AVISO**, nomeando a sprint e onde ele deveria estar |
+
+No fechamento, registro vermelho cujo `suite_falhas` só tem falha de ambiente é **AVISO**, pela mesma regra da task. Confira os caminhos dele com `bash .claude/skills/mergex/scripts/portao-v2.sh --conferir-falhas --base <branch_base> <caminho>...`; lista vazia ou `V2=FALHA` mantém a FALHA.
 
 **Nunca reescreva tasks `parcial` para `verde`** para satisfazer esta verificação, e nunca invente a evidência: o que falta nesses casos é a execução, não o registro.
 
@@ -277,11 +291,14 @@ esac
 
 `$escopo` e `$tasks_do_escopo` são os do bloco de "O escopo das tasks". No PR de planejamento a lista vem vazia, e o `prova-de-commit.sh` sem nenhum `tasks.md` responde `V11=SEM_PROVA` (`nenhum-tasks-md-informado`); por isso a guarda vem antes dele, e o resultado é `n/a` (seção "Entrega de planejamento"). Fora do planejamento, lista vazia continua `SEM_PROVA`.
 
-Falha: qualquer task `concluida` sem item que a prove. **Nomeie cada uma** (id e o `tasks.md` onde está). A saída do script é a lista, uma task por linha.
+Falha: qualquer task `concluida` sem item que a prove, exceto a task sem arquivos dispensada abaixo. **Nomeie cada uma** (id e o `tasks.md` onde está). A saída do script é a lista, uma task por linha.
 
 | Situação | Resultado |
 |---|---|
 | Toda task `concluida` tem item com `task` igual e `commit` válido | OK |
+| Task sem arquivos e sem item, sem trailer `Task:` no intervalo | Dispensada; `n/a` se todas forem dispensadas, senão `OK` ou `FALHA` pelas demais |
+| Task sem arquivos e sem item, com trailer `Task:` no intervalo | **FALHA** — o commit existe e falta o registro |
+| Base igual ao HEAD, fora da história ou Git ilegível | **FALHA**, registrada como `v11_sem_prova` |
 | Alguma task `concluida` sem item que a prove | **FALHA** — nomeie a(s) task(s) |
 | Nenhuma task `concluida` no plano | `n/a` — a V11 não tem alvo; a razão é da V1 |
 | `versionado: false` | `n/a` — sem versionador o schema já define `commits: []` |
@@ -293,7 +310,9 @@ Falha: qualquer task `concluida` sem item que a prove. **Nomeie cada uma** (id e
 
 **A V11 não lê `seq`.** Desde a chave de ordem (`references/00-schema.md`, "A ordem de registro"), a V11 continua respondendo exatamente a mesma pergunta, sobre os mesmos três tipos de lista: totalmente legada (sem `seq` em item nenhum), moderna e mista válida. Ela **não** exige `seq` em leitura histórica, **não** falha porque a sequência está quebrada — isso é violação de contrato do `ENTREGA.md`, não causa de negócio do portão — e **não** lê `seq` como quantidade de commits esperada para a task. Os dois scripts compartilham o mesmo leitor de `commits` justamente para que só exista uma interpretação da lista; o que a V11 usa dele é a leitura crua.
 
-**A V11 não audita o `git log`.** `ENTREGA.commits` é a evidência canônica do E1 neste contrato, e é sobre ela que a V11 decide. A lacuna que ela fecha é `tasks.md` ↔ `ENTREGA.commits`; provar que o SHA existe, que é ancestral do HEAD ou que pertence à branch é outra verificação, que nenhum ponto do contrato vigente exige.
+**A V11 não audita o `git log` para provar commit; a única leitura é a da task sem arquivos.** Uma task é sem arquivos quando seu frontmatter declara literalmente `cria: []` e `altera: []` no bloco `arquivos`. Sem item, ela é dispensada somente se nenhum trailer `Task: <id>` exato existir no intervalo `base..HEAD`. A base é `base_validada_sha` da entrega ou, na ausência da chave, o merge-base único com `branch_base`. Base igual ao HEAD, fora da história, clone raso ou Git ilegível resulta em `SEM_PROVA`. A saída inclui `sem_arquivos`, o id e o plano; se todas forem dispensadas, retorna `n/a` com `motivo=tasks-sem-arquivos`. Menções fora do bloco final e trailers anteriores à base não contam.
+
+`ENTREGA.commits` é a evidência canônica do E1. Provar que o SHA do item existe ou pertence à branch é outra verificação.
 
 Na recuperação, essas provas adicionais pertencem ao escritor `--registrar-existente`, não à leitura V11. O ciclo esperado é: antes do registro, V11 falha; após o append, passa na worktree; após `persistir-metodo pre-e2`, passa também ao ler `ENTREGA.md` de `git show HEAD`. A certificação terminal depende dessa última evidência durável.
 
@@ -469,7 +488,7 @@ O trabalho fica na branch, commitado até onde estava correto. Nada é desfeito,
 | `portao-v9.sh` devolve `v9_sem_prova` (código `3`) | `FALHA` em V9, registrada como `v9_sem_prova`, com os `motivo` do script. Raso: `git fetch --unshallow` e o E2 de novo |
 | Barreira `reconciliacao-base` reprovada | E2 não emite `PRONTO`; relate os `motivo`; persistência pendente se resolve com o checkpoint explícito `reconciliacao-base`, fora do portão |
 | Verificação impossível de rodar | Marque `FALHA`, nunca `OK`, e registre `vN_sem_prova` em `falhas_portao`. Ausência de prova não é prova |
-| Task `concluida` sem item em `ENTREGA.commits` | `FALHA` em V11. Sem commit existente: E1 tardio normal. Com commit existente e append perdido: `--registrar-existente`, nunca um segundo commit. |
+| Task `concluida` sem item em `ENTREGA.commits` | `FALHA` em V11, salvo a dispensa de task sem arquivos sem trailer. Sem commit existente: E1 tardio normal. Com commit existente e append perdido: `--registrar-existente`, nunca um segundo commit. |
 | `ENTREGA.md` sem a chave `commits`, ou ilegível | `FALHA` em V11, registrada como `v11_sem_prova` |
 | `portao-v12.sh` devolve `V12=FALHA` (código `1`) | `FALHA` em V12, com as linhas `T-… FALHA <motivo>` do `conferir`. `evidencia-ausente`: revisar a task e commitar a evidência com ela; `incompleta:L1`: dividir a task; `incompleta:L2`: uma task anterior divide o arquivo; `incompleta:<outro>` (`lote-falhou`, `perfil`, `pulado`…): revisar a task de novo, com a rota do contrato `expx-revisao`; `indisponivel:<motivo>`: a CLI de revisão não rodou, revisar de novo quando estiver disponível; `achados-abertos:<n>`: corrigir ou o desenvolvedor rejeitar cada achado; `evidencia-invalida:*`, `evidencia-nao-bate:*` ou `commit-inexistente:*`: a evidência no commit não prova a revisão daquele código, revisar a task de novo e registrar o commit novo (nunca editar a evidência à mão) |
 | `portao-v12.sh` devolve `V12=SEM_PROVA` (código `2`) | `FALHA` em V12, registrada como `v12_sem_prova`, com o `motivo=` do script (núcleo, node ou configuração que não lê; saída do `conferir` fora da forma) |
