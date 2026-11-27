@@ -379,9 +379,10 @@ while IFS= read -r f; do
         if (partes[i] != "") arquivos = arquivos " " partes[i]
       }
     }
-    /^[[:space:]]*-[[:space:]]+id:[[:space:]]*T-/ {
+    /^[[:space:]]*-[[:space:]]+id:[[:space:]]*["\047]?T-/ {
       despeja()
-      id = $0; sub(/^.*id:[[:space:]]*/, "", id); gsub(/[[:space:]"]+$/, "", id)
+      id = $0; sub(/^.*id:[[:space:]]*/, "", id); sub(/[[:space:]]+$/, "", id)
+      if (id ~ /^".*"$/ || id ~ /^\047.*\047$/) id = substr(id, 2, length(id) - 2)
       status = ""; suite = ""; arquivos = ""; dentro_arq = 0; next
     }
     /^[[:space:]]*status:/ { s = $0; sub(/^[^:]*:[[:space:]]*/, "", s); gsub(/[[:space:]"]+$/, "", s); status = s; next }

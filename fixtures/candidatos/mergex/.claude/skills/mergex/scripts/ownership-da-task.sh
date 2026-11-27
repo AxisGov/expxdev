@@ -121,6 +121,13 @@ plano_do_arquivo() { # <tasks.md>
       cria_vazia = 0; altera_vazia = 0; no_bloco = 0
     }
     function recuo(s) { match(s, /^[[:space:]]*/); return RLENGTH }
+    # O id pode vir entre aspas, duplas ou simples (DM-358): o par que o envolve
+    # sai. Aspa sem par fica no id, que não casa com task nenhuma.
+    function id_de(s) {
+      sub(/^.*id:[[:space:]]*/, "", s); sub(/[[:space:]]+$/, "", s)
+      if (s ~ /^".*"$/ || s ~ /^\047.*\047$/) s = substr(s, 2, length(s) - 2)
+      return s
+    }
     function coleta(s,   n, i, partes) {
       sub(/^[^:]*:[[:space:]]*/, "", s)
       gsub(/^\[|\]$/, "", s)
@@ -136,8 +143,8 @@ plano_do_arquivo() { # <tasks.md>
     # prosa do corpo nunca dispensa commit.
     NR == 1 && /^---[[:space:]]*$/ { frente = 1; next }
     frente && /^---[[:space:]]*$/ { fecha_task(); frente = 0; next }
-    frente && /^[[:space:]]*-[[:space:]]+id:[[:space:]]*T-/ {
-      fecha_task(); tid = $0; sub(/^.*id:[[:space:]]*/, "", tid); gsub(/[[:space:]"]+$/, "", tid)
+    frente && /^[[:space:]]*-[[:space:]]+id:[[:space:]]*["\047]?T-/ {
+      fecha_task(); tid = id_de($0)
     }
     frente && no_bloco && !/^[[:space:]]*(#.*)?$/ && recuo($0) <= recuo_arq { no_bloco = 0 }
     frente && no_bloco && /^[[:space:]]*cria:[[:space:]]*\[\][[:space:]]*$/ { cria_vazia = 1 }
@@ -145,8 +152,8 @@ plano_do_arquivo() { # <tasks.md>
     frente && /^[[:space:]]*arquivos:[[:space:]]*$/ { no_bloco = 1; recuo_arq = recuo($0) }
     # O reconhecimento de uma task nova vem ANTES do coletor em bloco: senão
     # a linha `- id: T-...` seria lida como caminho da task anterior.
-    /^[[:space:]]*-[[:space:]]+id:[[:space:]]*T-/ {
-      id = $0; sub(/^.*id:[[:space:]]*/, "", id); gsub(/[[:space:]"]+$/, "", id)
+    /^[[:space:]]*-[[:space:]]+id:[[:space:]]*["\047]?T-/ {
+      id = id_de($0)
       dentro = 0; next
     }
     /^[[:space:]]*arquivos:/ { dentro = 1; next }

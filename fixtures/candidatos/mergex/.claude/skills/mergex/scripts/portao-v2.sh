@@ -91,7 +91,8 @@ plataforma() {
 # tasks_de <tasks.md> — uma linha por task da chave `tasks`:
 #   id US status US suite US marca US caminhos(separados por RS)
 # marca: `ausente` (sem suite_falhas), `lista` (fluxo `[a, b]` ou bloco `- a`)
-# ou `invalida` (escalar). Mesmos dois formatos de lista do hook commit-por-task.
+# ou `invalida` (escalar, ou fluxo com aspas desbalanceadas). No fluxo, item
+# entre aspas guarda a vírgula (DM-358).
 # ---------------------------------------------------------------------------
 tasks_de() {
   local b
@@ -108,6 +109,30 @@ tasks_de() {
     function recuo(s) { match(s, /^ */); return RLENGTH }
     function junta(v) { v = limpo(v); if (v == "") return; itens = (itens == "" ? v : itens "\036" v) }
     function despeja() { if (id != "") printf "%s\037%s\037%s\037%s\037%s\n", id, st, su, marca, itens }
+    # fluxo(s) — o miolo de `[a, "b,c"]` (DM-358). A vírgula separa, menos
+    # dentro de item que COMEÇA com aspa; depois do fecho só cabe espaço. Aspa
+    # no meio de item sem aspas é literal. Par desbalanceado devolve 0.
+    function fluxo(s,   i, n, c, aspa, fechado, item) {
+      n = length(s); aspa = ""; fechado = 0; item = ""
+      for (i = 1; i <= n + 1; i++) {
+        c = (i <= n) ? substr(s, i, 1) : ","
+        if (aspa != "" && i <= n) {
+          item = item c
+          if (c == aspa) { aspa = ""; fechado = 1 }
+          continue
+        }
+        if (aspa != "") return 0
+        if (c == ",") {
+          if (!fechado && item ~ /["\047][[:space:]]*$/) return 0
+          junta(item); item = ""; fechado = 0
+          continue
+        }
+        if (fechado && c !~ /[[:space:]]/) return 0
+        if ((c == "\"" || c == "\047") && item ~ /^[[:space:]]*$/) aspa = c
+        item = item c
+      }
+      return 1
+    }
     /^\001/ { next }
     /^[[:space:]]*-[[:space:]]*id:/ {
       despeja()
@@ -130,13 +155,8 @@ tasks_de() {
       v = $0; sub(/^[^:]*:/, "", v); v = limpo(v)
       marca = "lista"; itens = ""
       if (v == "") { lista = 1; next }
-      if (v ~ /^\[.*\]$/) {
-        v = substr(v, 2, length(v) - 2)
-        n = split(v, partes, ",")
-        for (i = 1; i <= n; i++) junta(partes[i])
-        next
-      }
-      marca = "invalida"; next
+      if (v ~ /^\[.*\]$/ && fluxo(substr(v, 2, length(v) - 2))) next
+      marca = "invalida"; itens = ""; next
     }
     END { despeja() }
   '

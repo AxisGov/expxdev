@@ -139,6 +139,8 @@ bash .claude/skills/mergex/scripts/causa-do-portao.sh --token v2 <primeira linha
 
 `V2=FALHA` vira `v2`, `V2=SEM_PROVA` vira `v2_sem_prova`; `V2=OK`, `V2=AVISO` e `n/a` não imprimem nada. O AVISO vai para a seção de avisos, com a task e os testes, e **não entra em `falhas_portao`**. O hook `commit-por-task` chama o mesmo script com `--staged`, que soma o índice ao diff.
 
+**Aspas na lista e no id (DM-358).** `suite_falhas` vale em bloco (`- caminho`) ou em fluxo (`[a, b]`). No fluxo, a vírgula separa os itens; o caminho que tem vírgula vai entre aspas duplas ou simples (`["tests/a,b.test.ts", tests/c.test.ts]`), e as aspas saem do item. Aspa no meio de item sem aspas é literal. Par desbalanceado ou texto depois do fecho invalida a lista inteira (`suite_falhas-invalida`, FALHA). O `id` da task também vale entre aspas duplas ou simples (`- id: "T-01.01"`) e é lido sem elas.
+
 **Timeout por máquina carregada NÃO entra na lista.** Reexecute o teste isolado; verde, registre `parcial`.
 
 **O trabalho inteiro continua precisando da suíte inteira.** Além do registro por task, procure a **evidência da suíte inteira no fechamento de cada sprint do escopo** (na entrega `por_sprint`, a da sprint do PR), onde a skill de origem a registra, com a saída da execução colada. **Onde procurar depende do formato da sprint:**

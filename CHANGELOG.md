@@ -9,6 +9,12 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.33 — aspas no id e em suite_falhas, painel relê a lista de ambiente
+
+- MergeX (DM-358): `ownership-da-task.sh` e o hook `commit-por-task` leem `- id: "T-01.01"` e `'T-01.01'` sem as aspas. No fluxo de `suite_falhas`, a vírgula dentro das aspas fica no caminho; aspa sem par ou texto depois do fecho dá `suite_falhas-invalida`.
+- SprintX (DS-239): o `task-so-fecha-verde` segue o mesmo contrato, também na lista em bloco. Lista em fluxo sem `]`, escape dentro das aspas e aspa solta no fim do item invalidam a lista.
+- Núcleo (#204): o painel recomputa quando `.expx/falhas-de-ambiente.tsv` é criado, alterado ou apagado, e o filtro do watcher olha o caminho relativo à raiz.
+
 ## 0.14.32 — task sem arquivos na V11 e falhas de ambiente na V2
 
 - MergeX (DM-356): task concluída com `cria: []` e `altera: []` explícitos não gera commit no E1, e a V11 a dispensa quando nenhum commit desde a base tem `Task: <id>`. A `--verificacao` pedida roda e não pode alterar produto.
