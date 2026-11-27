@@ -9,6 +9,12 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.31 — F:/ sem cygpath, rastro que desfaz a escrita parcial e instalação no site
+
+- MergeX `44f4edb` (DM-355): sem `cygpath`, o Git é o do Linux, que lê `F:/x` como relativo ao diretório atual. O `sem-segredo` e a leitura do `-F` dos hooks de commit passam a ler o mesmo arquivo, em vez de `/mnt/f/x`. Os dois casos de custo de 100 KB do `teste.sh` ganham limite de 6 s.
+- SprintX `2846f73` (DS-237): a escrita do evento que falha no meio é desfeita no próprio arquivo, sem temporário e sem mudar permissões; o `ulimit -f` não mata mais o hook antes disso. O código 5 do `08-rastro.md` volta a dizer que o `.jsonl` fica como estava.
+- Site: a instalação diz que o `npx --package` roda uma vez e não deixa o `expx` no `PATH`, e mostra o `npm install -g` do tarball.
+
 ## 0.14.30 — registro com rebase merge, PR de fork recusado e caminho F:/ no sem-segredo
 
 Instale por PR, como a 0.14.29. Certifica a mergex (AxisGov/mergex#122, merge 149af27, DM-353 e DM-354) e a sprintx (AxisGov/sprintx#96, merge a12e46c). O núcleo, o CLI, os eventos, o painel, o `expx sessao` e as outras sete skills seguem como na 0.14.29. Relatos do conselhos-municipais depois da 0.14.29 (CodeAnt no conselhos#403).

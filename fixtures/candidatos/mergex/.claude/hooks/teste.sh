@@ -415,6 +415,33 @@ done
 printf 'mensagem com %s\n' "$SK" > "$SEG_T/unidade-f/msg.txt"
 caso "-F F:/msg.txt com segredo: barra"          comum/sem-segredo.sh "$(bash_json 'git commit -F F:/msg.txt')" 2
 PATH="$PATH_SEM_UNI"; rm -rf "$UNI_BIN" "$SEG_T/unidade-f"
+# Sem `cygpath` o Git é o do Linux (WSL inclusive), que lê `F:/x` como relativo ao
+# diretório atual: o hook tem de ler o mesmo arquivo, `<dir>/F:/x`, e não o
+# `/mnt/f/x` (DM-355). No Git Bash o `cygpath` é do sistema e o Git é o do Windows.
+if command -v cygpath >/dev/null 2>&1; then
+  nao_executado "-F F:/x sem cygpath: este ambiente tem cygpath; coberto no Linux e no WSL (4 casos)"
+else
+  mkdir -p "$SEG_T/F:/uni355"
+  printf 'mensagem comum\n' > "$SEG_T/F:/uni355/msg.txt"
+  caso "sem cygpath: -F F:/uni355/msg.txt limpo e lido no diretorio atual: passa" \
+    comum/sem-segredo.sh "$(bash_json 'git commit -F F:/uni355/msg.txt')" 0
+  caso "sem cygpath: cd F:/uni355 e relativo: passa" \
+    comum/sem-segredo.sh "$(bash_json 'cd F:/uni355 && git commit -F msg.txt')" 0
+  obtido="$(. "$H/comum/base.sh" && . "$H/comum/integracao-da-mensagem.sh" && RAIZ=/raiz && integracao_arquivo_do_comando 'git commit -F F:/uni355/msg.txt')"
+  if [ "$obtido" = /raiz/F:/uni355/msg.txt ]; then OK=$((OK+1)); printf '  ok    %s\n' "sem cygpath: integracao resolve F:/ contra a raiz"
+  else FALHOU=$((FALHOU+1)); printf '  FALHA %s (obteve %s)\n' "sem cygpath: integracao resolve F:/ contra a raiz" "$obtido"; fi
+  # Barrar por "não varrido" não prova a leitura: a saída tem de acusar o segredo.
+  printf 'mensagem com %s\n' "$SK" > "$SEG_T/F:/uni355/msg.txt"
+  if [ "$SEM_JQ" = 1 ]; then PULADOS=$((PULADOS+1)); printf '  pulado %s (sem jq)\n' "sem cygpath: segredo em ./F:/ barra"
+  else
+    saida="$(bash_json 'git commit -F F:/uni355/msg.txt' | bash "$H/comum/sem-segredo.sh" 2>&1)"; rc=$?
+    case "$rc:$saida" in
+      2:*"segredo encontrado"*) OK=$((OK+1)); printf '  ok    %s\n' "sem cygpath: segredo em ./F:/ barra" ;;
+      *) FALHOU=$((FALHOU+1)); printf '  FALHA %s (rc %s: %s)\n' "sem cygpath: segredo em ./F:/ barra" "$rc" "$saida" ;;
+    esac
+  fi
+  rm -f "$SEG_T/F:/uni355/msg.txt"; rmdir "$SEG_T/F:/uni355" "$SEG_T/F:"
+fi
 printf 'antes\n%s\ndepois\n' "$SK" > "$SEG_T/chave.pem"; seg_git add chave.pem
 caso "git --git-dir=.git -c a=b commit com segredo preparado: barra" comum/sem-segredo.sh "$(bash_json 'git --git-dir=.git -c a=b commit -m x')" 2
 caso "git -C . commit com segredo preparado: barra" comum/sem-segredo.sh "$(bash_json 'git -C . commit -m x')" 2
@@ -839,24 +866,30 @@ caso "FOO=\"a b\" git push na feature passa"       mergex/git-perigoso.sh "$(bas
 # (rodada 2 da revisao: a normalizacao O(n^2) antes do pre-filtro levava 0,5-3 s em 10 KB)
 echo "git-perigoso — custo em comando de 10 KB"
 GRANDE=""; while [ "${#GRANDE}" -lt 10240 ]; do GRANDE="${GRANDE}echo aaaa bbbb; x y z; "; done
-custo_ok() { # <desc> <json> <rc esperado> — rc certo e abaixo de LIMITE_MS
-  local desc="$1" json="$2" esperado="$3" ini fim rc ms
-  if [ "$SEM_JQ" = "1" ]; then PULADOS=$((PULADOS+1)); printf '  pulado %s (sem jq)\n' "$desc"; return 0; fi
+custo_mede() { # <json> — roda o git-perigoso e define CUSTO_RC e CUSTO_MS
+  local json="$1" ini fim
   # agora_ms, nao `date +%s%N`: sem o %N (macOS) o tempo virava 0 e o limite nunca reprovava
   ini="$(agora_ms)"
   # O limite de 30 s espelha o do harness: um caso que o estoura e morto (rc 124)
   # e falha, em vez de travar a suite por minutos (rodada 5 da revisao).
   if command -v timeout >/dev/null 2>&1; then
-    printf '%s' "$json" | timeout 30 bash "$H/mergex/git-perigoso.sh" >/dev/null 2>&1; rc=$?
+    printf '%s' "$json" | timeout 30 bash "$H/mergex/git-perigoso.sh" >/dev/null 2>&1; CUSTO_RC=$?
   else
-    printf '%s' "$json" | bash "$H/mergex/git-perigoso.sh" >/dev/null 2>&1; rc=$?
+    printf '%s' "$json" | bash "$H/mergex/git-perigoso.sh" >/dev/null 2>&1; CUSTO_RC=$?
   fi
   fim="$(agora_ms)"
-  ms=$(( fim - ini ))
-  if [ "$rc" = "$esperado" ] && [ "$ms" -lt "$LIMITE_MS" ]; then
-    OK=$((OK+1)); printf '  ok    %s (%s ms)\n' "$desc" "$ms"
+  CUSTO_MS=$(( fim - ini ))
+}
+# custo_ok <desc> <json> <rc esperado> [<limite ms>] — rc certo e abaixo do limite
+# (LIMITE_MS, se nao vier outro).
+custo_ok() {
+  local desc="$1" json="$2" esperado="$3" limite="${4:-$LIMITE_MS}"
+  if [ "$SEM_JQ" = "1" ]; then PULADOS=$((PULADOS+1)); printf '  pulado %s (sem jq)\n' "$desc"; return 0; fi
+  custo_mede "$json"
+  if [ "$CUSTO_RC" = "$esperado" ] && [ "$CUSTO_MS" -lt "$limite" ]; then
+    OK=$((OK+1)); printf '  ok    %s (%s ms)\n' "$desc" "$CUSTO_MS"
   else
-    FALHOU=$((FALHOU+1)); printf '  FALHA %s (rc %s, esperava %s; %s ms, limite %s)\n' "$desc" "$rc" "$esperado" "$ms" "$LIMITE_MS"
+    FALHOU=$((FALHOU+1)); printf '  FALHA %s (rc %s, esperava %s; %s ms, limite %s)\n' "$desc" "$CUSTO_RC" "$esperado" "$CUSTO_MS" "$limite"
   fi
 }
 custo_ok "10 KB sem git: passa em menos de $LIMITE_TXT"                     "$(bash_json "$GRANDE")" 0
@@ -865,12 +898,17 @@ custo_ok "10 KB com git push --force no fim: barra em menos de $LIMITE_TXT" "$(b
 # A normalizacao tem de ser linear no tamanho: em a8b63b8 custava 19 s e, com
 # 125 KB, estourava o timeout de 30 s do harness, que NAO bloqueia (falha aberta).
 # O JSON vai por stdin do jq: --arg nao aceita argumento desse tamanho.
+# O custo desses dois casos cresce com o tamanho (~1,4 s no WSL ocioso) e, com a
+# maquina carregada, passava dos 2 s sem regressao. O limite proprio, de 6 s (ou o
+# LIMITE_MS, se maior), ainda reprova a regressao de 19 s (DM-355).
+LIMITE_DENSO_MS=$(( LIMITE_MS > 6000 ? LIMITE_MS : 6000 ))
+if [ $((LIMITE_DENSO_MS % 1000)) = 0 ]; then LIMITE_DENSO_TXT="$((LIMITE_DENSO_MS / 1000)) s"; else LIMITE_DENSO_TXT="$LIMITE_DENSO_MS ms"; fi
 DENSO=""; while [ "${#DENSO}" -lt 102400 ]; do DENSO="${DENSO}git;git;git;git;git;git;git;git;git;git;git;git;git;git;git;git;"; done
-custo_ok "100 KB de git; + git push --force no fim: barra em menos de $LIMITE_TXT" \
-  "$(printf '%s' "${DENSO}git push --force origin feature/x" | jq -Rs --arg w "$HOOK_CWD" '{tool_name:"Bash",cwd:$w,tool_input:{command:.}}')" 2
+custo_ok "100 KB de git; + git push --force no fim: barra em menos de $LIMITE_DENSO_TXT" \
+  "$(printf '%s' "${DENSO}git push --force origin feature/x" | jq -Rs --arg w "$HOOK_CWD" '{tool_name:"Bash",cwd:$w,tool_input:{command:.}}')" 2 "$LIMITE_DENSO_MS"
 CONT=""; while [ "${#CONT}" -lt 102400 ]; do CONT="${CONT}"$'x \\\n x \\\n x \\\n x \\\n x \\\n x \\\n x \\\n x \\\n'; done
-custo_ok "100 KB de continuações + git clean -fd: barra em menos de $LIMITE_TXT" \
-  "$(printf '%s' "git status; ${CONT}true; git clean -fd" | jq -Rs --arg w "$HOOK_CWD" '{tool_name:"Bash",cwd:$w,tool_input:{command:.}}')" 2
+custo_ok "100 KB de continuações + git clean -fd: barra em menos de $LIMITE_DENSO_TXT" \
+  "$(printf '%s' "git status; ${CONT}true; git clean -fd" | jq -Rs --arg w "$HOOK_CWD" '{tool_name:"Bash",cwd:$w,tool_input:{command:.}}')" 2 "$LIMITE_DENSO_MS"
 # Teto que falha FECHADO: acima de GIT_TETO bytes (512 KB) com git, o hook nao
 # avalia e barra (um hook morto pelo timeout do harness nao bloqueia). Mesmo um
 # comando inofensivo (git status) barra ali; e o limite de tempo prova que ele
