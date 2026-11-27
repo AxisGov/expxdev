@@ -141,10 +141,11 @@ export async function observar(
   // mesma escrita traria de volta a realimentação que D-06 evitou.
   const watcher: FSWatcher = watch(raiz, {
     ...comum,
+    // relativo à raiz: um ancestral chamado `dist` ou `.expx` não exclui o projeto
     ignored: (caminho: string) => {
-      if (/(^|[/\\])(node_modules|\.git|dist)([/\\]|$)/.test(caminho)) return true;
-      if (!/(^|[/\\])\.expx([/\\]|$)/.test(caminho)) return false;
       const rel = relativo(caminho);
+      if (/(^|\/)(node_modules|\.git|dist)(\/|$)/.test(rel)) return true;
+      if (!/(^|\/)\.expx(\/|$)/.test(rel)) return false;
       return rel !== ".expx" && rel !== FALHAS_DE_AMBIENTE;
     },
   });
