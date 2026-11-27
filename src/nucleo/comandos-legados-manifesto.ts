@@ -119,6 +119,7 @@ export const MANIFESTO_DE_COMANDOS: ManifestoDeComandos = {
       "b4ed98ba156a9c07b18ccd99eab26d77c0c035073707bc166c9f5da784e9a431",
       "b7b39ce5566fad9faf01229c120c321417f3a95b0bc0c95e107d969c0dddc796",
       "ce1d2d19870fabdbcc279db1a7c14c25f0a6be5c516ee64091ed9934ad57e947",
+      "e46c8bbd9f50f276b88b8812be3db3a110e77c4b99fc1a11ee9e8b5cfd74acb8",
     ],
     "mergex-pr.md": [
       "0eaefb05d9d75237903ad145d0ae2babbf267ec55578f9f156f602635cc6cffc",
