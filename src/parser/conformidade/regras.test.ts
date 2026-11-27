@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { montarProjeto } from "../projeto/montar.js";
 import { verificarConformidade, TipoViolacao } from "./regras.js";
 import { interpretarFalhasDeAmbiente } from "./falhas-ambiente.js";
@@ -207,6 +210,37 @@ describe("suite vermelha só por falha de ambiente", () => {
 
   it("funcional: entrada com motivo vazio não vale", () => {
     expect(comFalhas(["src/a.test.ts"], "src/a.test.ts\twin32\t\t2026-11-20\n")).toHaveLength(1);
+  });
+
+  it("integração: vírgula dentro de aspas na lista de fluxo é um item só", () => {
+    // Passa pelo parser de verdade (YAML + esquema), não por objeto montado à mão.
+    const d = mkdtempSync(join(tmpdir(), "expx-falhas-"));
+    try {
+      cpSync("fixtures/projeto-ruim", d, { recursive: true });
+      const tasks = join(d, "docs/violacoes/sprint-01/tasks.md");
+      const texto = readFileSync(tasks, "utf8").replace(
+        /( {4}suite: vermelha)(\r?\n)/,
+        '$1$2    suite_falhas: ["tests/a,b.test.ts", tests/c.test.ts]$2',
+      );
+      writeFileSync(tasks, texto);
+
+      const p = montarProjeto(d);
+      const task = p.trabalhos
+        .flatMap((t) => t.sprints.flatMap((s) => s.tasks))
+        .find((t) => t.id === "T-01.01" && t.status === "concluida");
+      expect(task?.suite_falhas).toEqual(["tests/a,b.test.ts", "tests/c.test.ts"]);
+
+      const falhasDeAmbiente = interpretarFalhasDeAmbiente(
+        "tests/a,b.test.ts\twin32\tsymlink exige admin\t2026-11-27\ntests/c.test.ts\twin32\tsem wsl\t2026-11-27\n",
+        "win32",
+      );
+      const v = verificarConformidade(p, { hoje: HOJE, diasBloqueio: 7, falhasDeAmbiente }).filter(
+        (x) => x.tipo === TipoViolacao.ConcluidaSemVerde && x.alvo === "T-01.01",
+      );
+      expect(v).toEqual([]);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
   });
 });
 

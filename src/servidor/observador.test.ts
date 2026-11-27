@@ -1,8 +1,11 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, writeFileSync, rmSync, cpSync, mkdirSync, renameSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, cpSync, mkdirSync, renameSync, readFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { observar, type Observador } from "./observador.js";
+import { lerEstado } from "./estado.js";
+import { plataformaAtual } from "../parser/conformidade/falhas-ambiente.js";
+import { TipoViolacao } from "../parser/conformidade/regras.js";
 
 let obs: Observador | null = null;
 let dir: string | null = null;
@@ -173,5 +176,75 @@ describe.sequential("índice do memox que nasce com o painel no ar", () => {
 
     await new Promise((r) => setTimeout(r, 500));
     expect(memoria).toBeGreaterThan(inicial);
+  });
+});
+
+/**
+ * A lista de falhas de ambiente muda a conformidade, mas vive em `.expx`, que
+ * o watcher ignorava. Painel no ar e TSV gravado depois: a task vermelha só
+ * por ambiente seguia acusada de `concluida_sem_verde` até reiniciar.
+ */
+describe.sequential("lista de falhas de ambiente com o painel no ar", () => {
+  const TSV = ".expx/falhas-de-ambiente.tsv";
+
+  // T-01.01 da fixture ruim fecha com suite vermelha; aqui ela declara a falha.
+  function projetoVermelhoSoDeAmbiente(): string {
+    const d = mkdtempSync(join(tmpdir(), "expx-obs-"));
+    cpSync("fixtures/projeto-ruim", d, { recursive: true });
+    const tasks = join(d, "docs/violacoes/sprint-01/tasks.md");
+    const texto = readFileSync(tasks, "utf8").replace(
+      /( {4}suite: vermelha)(\r?\n)/,
+      "$1$2    suite_falhas: [src/a.test.ts]$2",
+    );
+    writeFileSync(tasks, texto);
+    return d;
+  }
+
+  function semVerde(raiz: string): boolean {
+    return lerEstado({ raiz, diasBloqueio: 7 }).violacoes.some(
+      (v) => v.tipo === TipoViolacao.ConcluidaSemVerde && v.alvo === "T-01.01",
+    );
+  }
+
+  it("integração: gravar e apagar o TSV recomputa concluida_sem_verde", async () => {
+    dir = projetoVermelhoSoDeAmbiente();
+    const raiz = dir;
+    let acusada = semVerde(raiz);
+    expect(acusada).toBe(true);
+    obs = await observar(raiz, { aoMudar: () => { acusada = semVerde(raiz); }, debounceMs: 80 });
+
+    mkdirSync(join(raiz, ".expx"), { recursive: true });
+    writeFileSync(join(raiz, TSV), `src/a.test.ts\t${plataformaAtual()}\tsymlink exige admin\t2026-11-27\n`);
+    await esperarAte(() => !acusada);
+    expect(acusada).toBe(false);
+
+    unlinkSync(join(raiz, TSV));
+    await esperarAte(() => acusada);
+    expect(acusada).toBe(true);
+  });
+
+  it("funcional: alterar o TSV já existente também recomputa", async () => {
+    dir = projetoVermelhoSoDeAmbiente();
+    const raiz = dir;
+    mkdirSync(join(raiz, ".expx"), { recursive: true });
+    writeFileSync(join(raiz, TSV), "# vazio por enquanto\n");
+    let acusada = semVerde(raiz);
+    expect(acusada).toBe(true);
+    obs = await observar(raiz, { aoMudar: () => { acusada = semVerde(raiz); }, debounceMs: 80 });
+
+    writeFileSync(join(raiz, TSV), `src/a.test.ts\t${plataformaAtual()}\tsem wsl\t2026-11-27\n`, { flag: "a" });
+    await esperarAte(() => !acusada);
+    expect(acusada).toBe(false);
+  });
+
+  it("funcional: outro arquivo de .expx segue sem disparar", async () => {
+    dir = projetoTemporario();
+    let disparos = 0;
+    obs = await observar(dir, { aoMudar: () => disparos++, debounceMs: 80 });
+
+    mkdirSync(join(dir, ".expx"), { recursive: true });
+    writeFileSync(join(dir, ".expx/estado.json"), "{}");
+    await new Promise((r) => setTimeout(r, 400));
+    expect(disparos).toBe(0);
   });
 });

@@ -1,6 +1,15 @@
 import { watch, type FSWatcher } from "chokidar";
 import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
+
+/**
+ * O único arquivo de `.expx` que o watcher principal vê. A lista de falhas de
+ * ambiente entra na conformidade (`concluida_sem_verde`), então mudar o arquivo
+ * muda as violações, e só uma releitura total as recomputa. O resto de `.expx`
+ * (`estado.json`, `memoria/`, travas) segue ignorado: é escrito pelas próprias
+ * skills e reabriria a realimentação que D-06 evitou.
+ */
+const FALHAS_DE_AMBIENTE = ".expx/falhas-de-ambiente.tsv";
 
 export type Observador = {
   parar: () => Promise<void>;
@@ -48,6 +57,9 @@ function debounce(fn: () => void, ms: number): { agendar: () => void; cancelar: 
  *
  *   `docs/`           releitura TOTAL do projeto (`aoMudar`).
  *   `.expx/memoria/`  releitura SÓ do índice (`aoMudarMemoria`).
+ *
+ * `.expx/falhas-de-ambiente.tsv` vai pelo watcher de `docs/`: entra na
+ * conformidade, então pede a mesma releitura total.
  *
  * D-06 proibiu observar `.expx` porque reindexar dispararia o watcher, que
  * recarregaria o estado, que releria `docs/` — e uma reindexação disparada por
@@ -119,16 +131,29 @@ export async function observar(
    */
   let armado = false;
 
-  // `.expx` continua FORA do watcher principal: quem cuida dele é o watcher
-  // dedicado abaixo, e deixar os dois verem a mesma escrita traria de volta
-  // exatamente a realimentação que D-06 evitou.
+  const base = resolve(raiz);
+  const relativo = (caminho: string): string => relative(base, resolve(caminho)).split(sep).join("/");
+
+  // `.expx` continua FORA do watcher principal, com uma exceção: a lista de
+  // falhas de ambiente (ver `FALHAS_DE_AMBIENTE`). A própria pasta passa pelo
+  // filtro só para o chokidar descer até o arquivo; o evento dela não dispara.
+  // `memoria/` segue com o watcher dedicado abaixo, e deixar os dois verem a
+  // mesma escrita traria de volta a realimentação que D-06 evitou.
   const watcher: FSWatcher = watch(raiz, {
     ...comum,
-    ignored: (caminho: string) => /(^|[/\\])(node_modules|\.git|dist|\.expx)([/\\]|$)/.test(caminho),
+    ignored: (caminho: string) => {
+      if (/(^|[/\\])(node_modules|\.git|dist)([/\\]|$)/.test(caminho)) return true;
+      if (!/(^|[/\\])\.expx([/\\]|$)/.test(caminho)) return false;
+      const rel = relativo(caminho);
+      return rel !== ".expx" && rel !== FALHAS_DE_AMBIENTE;
+    },
   });
 
   const eventos = ["add", "change", "unlink", "addDir", "unlinkDir"] as const;
-  for (const e of eventos) watcher.on(e, () => { if (armado) docs.agendar(); });
+  for (const e of eventos)
+    watcher.on(e, (caminho: string) => {
+      if (armado && relativo(caminho) !== ".expx") docs.agendar();
+    });
   // erro de observação (permissão, limite de watchers) não derruba o painel
   watcher.on("error", () => undefined);
 
