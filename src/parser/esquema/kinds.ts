@@ -65,6 +65,12 @@ export const Task = z.object({
   paralelizavel: z.boolean(),
   concluida_em: nulavel(DataIso),
   suite: Suite,
+  /**
+   * Arquivos de teste que falharam com `suite: vermelha`. Opcional: quando
+   * todos estão na lista de falhas de ambiente da plataforma, a task fecha
+   * sem violação de `concluida_sem_verde`.
+   */
+  suite_falhas: z.array(z.string()).optional(),
 });
 export type Task = z.infer<typeof Task>;
 

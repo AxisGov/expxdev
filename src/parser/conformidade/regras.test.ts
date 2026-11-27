@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { montarProjeto } from "../projeto/montar.js";
 import { verificarConformidade, TipoViolacao } from "./regras.js";
+import { interpretarFalhasDeAmbiente } from "./falhas-ambiente.js";
 
 const HOJE = new Date("2026-08-29T12:00:00Z");
 
@@ -163,6 +164,49 @@ describe("violacoes de referencia cruzada", () => {
     ];
     const v = verificarConformidade(p, { hoje: HOJE, diasBloqueio: 7 });
     expect(v.some((x) => x.tipo === TipoViolacao.CicloDependencia)).toBe(true);
+  });
+});
+
+describe("suite vermelha só por falha de ambiente", () => {
+  // T-01.01 da fixture ruim e concluida com suite vermelha.
+  function comFalhas(suite_falhas: string[] | undefined, falhasTsv: string, plataforma = "win32") {
+    const p = montarProjeto("fixtures/projeto-ruim");
+    for (const t of p.trabalhos)
+      for (const s of t.sprints)
+        for (const task of s.tasks) {
+          if (task.id !== "T-01.01") continue;
+          if (suite_falhas) task.suite_falhas = suite_falhas;
+          else delete task.suite_falhas;
+        }
+    const falhasDeAmbiente = interpretarFalhasDeAmbiente(falhasTsv, plataforma);
+    return verificarConformidade(p, { hoje: HOJE, diasBloqueio: 7, falhasDeAmbiente }).filter(
+      (x) =>
+        x.tipo === TipoViolacao.ConcluidaSemVerde &&
+        x.alvo === "T-01.01" &&
+        x.detalhe.endsWith("vermelha"),
+    );
+  }
+  const TSV = "src/a.test.ts\twin32\tsymlink exige admin\t2026-11-20\r\nsrc/b.test.ts\twin32\tsem wsl\t2026-11-20\r\n";
+
+  it("funcional: vermelha sem suite_falhas continua violação", () => {
+    expect(comFalhas(undefined, TSV)).toHaveLength(1);
+    expect(comFalhas([], TSV)).toHaveLength(1);
+  });
+
+  it("funcional: todas as falhas na lista da plataforma não geram violação", () => {
+    expect(comFalhas(["src/a.test.ts", "src/b.test.ts"], TSV)).toEqual([]);
+  });
+
+  it("funcional: uma falha fora da lista mantém a violação", () => {
+    expect(comFalhas(["src/a.test.ts", "src/c.test.ts"], TSV)).toHaveLength(1);
+  });
+
+  it("funcional: entrada de outra plataforma não vale", () => {
+    expect(comFalhas(["src/a.test.ts"], TSV, "linux")).toHaveLength(1);
+  });
+
+  it("funcional: entrada com motivo vazio não vale", () => {
+    expect(comFalhas(["src/a.test.ts"], "src/a.test.ts\twin32\t\t2026-11-20\n")).toHaveLength(1);
   });
 });
 
