@@ -44,6 +44,12 @@ export type OpcoesConformidade = {
   hoje: Date;
   /** Limite de dias para bloqueio antigo (decisão D-15). */
   diasBloqueio: number;
+  /**
+   * Caminhos de teste cuja falha é de ambiente na plataforma atual, lidos de
+   * `.expx/falhas-de-ambiente.tsv` por quem chama. Entra como parâmetro pelo
+   * mesmo motivo de `hoje`: regra que lê o disco não é testável.
+   */
+  falhasDeAmbiente?: ReadonlySet<string>;
 };
 
 const vazio = (v: unknown): boolean =>
@@ -61,7 +67,18 @@ function tasksDe(t: TrabalhoMontado): TaskSituada[] {
   return t.sprints.flatMap((s) => s.tasks);
 }
 
-function regrasDeTask(t: TrabalhoMontado, saida: Violacao[]): void {
+/**
+ * Vermelha só por ambiente: a task declara em `suite_falhas` os testes que
+ * falharam e todos estão na lista de falhas de ambiente da plataforma.
+ * Lista vazia ou ausente nunca absolve.
+ */
+function vermelhaSoDeAmbiente(task: TaskSituada, falhas: ReadonlySet<string> | undefined): boolean {
+  const declaradas = task.suite_falhas ?? [];
+  if (task.suite !== "vermelha" || !falhas || declaradas.length === 0) return false;
+  return declaradas.every((caminho) => falhas.has(caminho));
+}
+
+function regrasDeTask(t: TrabalhoMontado, saida: Violacao[], op: OpcoesConformidade): void {
   const tasks = tasksDe(t);
 
   for (const task of tasks) {
@@ -92,7 +109,15 @@ function regrasDeTask(t: TrabalhoMontado, saida: Violacao[]): void {
     // A suite inteira nao deixou de ser exigida: ela mudou de lugar. E cobrada
     // uma vez no portao — E4 na runx, fim de sprint na sprintx — em vez de uma
     // vez por task.
-    if (task.status === "concluida" && task.suite !== "verde" && task.suite !== "parcial") {
+    //
+    // Exceção: `vermelha` cujas falhas são todas de ambiente conhecido
+    // (`.expx/falhas-de-ambiente.tsv`) não reprova a task.
+    if (
+      task.status === "concluida" &&
+      task.suite !== "verde" &&
+      task.suite !== "parcial" &&
+      !vermelhaSoDeAmbiente(task, op.falhasDeAmbiente)
+    ) {
       saida.push({
         ...base,
         tipo: TipoViolacao.ConcluidaSemVerde,
@@ -266,7 +291,7 @@ function regrasDeChaveOmitida(projeto: Projeto, saida: Violacao[]): void {
 export function verificarConformidade(projeto: Projeto, op: OpcoesConformidade): Violacao[] {
   const saida: Violacao[] = [];
   for (const t of projeto.trabalhos) {
-    regrasDeTask(t, saida);
+    regrasDeTask(t, saida, op);
     regrasDeEstrutura(t, saida, op);
     regrasDeReferencia(t, saida);
   }

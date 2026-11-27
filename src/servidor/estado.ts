@@ -1,5 +1,6 @@
 import { montarProjeto, type Projeto } from "../parser/projeto/montar.js";
 import { verificarConformidade, type Violacao } from "../parser/conformidade/regras.js";
+import { lerFalhasDeAmbiente } from "../parser/conformidade/falhas-ambiente.js";
 import type { LinhaEvento } from "../parser/esquema/evento.js";
 import { lerRastro } from "../watch/fontes/rastro.js";
 import { lerConfiguracoesAgentes, type ConfiguracaoAgente } from "./agentes.js";
@@ -29,6 +30,7 @@ export function lerEstado(op: OpcoesEstado, agora: Date = new Date()): EstadoPai
   const violacoes = verificarConformidade(projeto, {
     hoje: agora,
     diasBloqueio: op.diasBloqueio,
+    falhasDeAmbiente: lerFalhasDeAmbiente(op.raiz),
   });
   // O rastro continua sendo escrito exclusivamente pelas skills. O painel só
   // projeta uma cauda limitada do contrato existente; não cria estado paralelo.
