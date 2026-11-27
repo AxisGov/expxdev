@@ -62,7 +62,7 @@ Rode **todas as doze verificações**, mesmo depois de a primeira falhar — o u
 
 **V10 roda sempre, mesmo quando todo o resto passou.**
 
-**V11 responde uma pergunta só:** cada task `concluida` tem pelo menos um item em `ENTREGA.commits` com `task` igual ao id dela e `commit` válido? Task não concluída não é alvo dela — isso é da V1. Rode com `scripts/prova-de-commit.sh --verificar <ENTREGA.md> <tasks.md>...`.
+**V11:** cada task `concluida` tem item válido em `ENTREGA.commits` ou é dispensada por ser sem arquivos? Com `cria: []` e `altera: []` explícitos, sem item, a dispensa exige que não haja trailer `Task: <id>` no intervalo desde a base validada. Trailer presente é FALHA; história ou base ilegível é `v11_sem_prova`. Task não concluída é da V1. Rode `scripts/prova-de-commit.sh --verificar <ENTREGA.md> <tasks.md>...`; detalhes em `references/02-prontidao.md`.
 
 **V12 é o resultado do script**, que só traduz o `conferir` do núcleo do expx, com o commit do último item de cada task `concluida` em `ENTREGA.commits`: `scripts/portao-v12.sh --verificar --entrega <ENTREGA.md> --trabalho <trabalho_id> -- <tasks.md>...`. `V12=OK` é `OK`; `V12=AVISO` é `AVISO`; `V12=n/a` (sem `.expx/fatiamento.json`, modo `desligada`, entrega de planejamento, `versionado: false`, nenhuma task concluída com commit) é `n/a`; `V12=FALHA` (código `1`; `incompleta` é FALHA nos dois modos) é `FALHA`; `V12=SEM_PROVA` (código `2`) é `FALHA` registrada como `v12_sem_prova`. A V12 não lê a evidência nem `revisao:` de `ENTREGA.commits` (`references/02-prontidao.md`, V12).
 

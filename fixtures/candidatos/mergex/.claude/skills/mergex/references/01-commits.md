@@ -187,7 +187,7 @@ Achou segredo entre os dois tempos: **não conclua**. Aborte como manda o passo 
 
 | Código | Desfecho |
 |---|---|
-| 0 | seção concluída: commit criado, item registrado, lista válida, trava liberada |
+| 0 | seção concluída: commit criado, item registrado, lista válida e trava liberada; ou task sem arquivos encerrada sem commit nem item |
 | 2 | **E1 OCUPADO** — outro E1 tem a seção crítica deste índice; o índice não foi tocado |
 | 3 | o índice já tinha conteúdo em stage na entrada; nada foi limpo |
 | 4 | verificação reprovou **antes** do commit; nenhum commit foi criado |
@@ -671,7 +671,18 @@ A regra é **um commit por fechamento de task em cada execução** — não "um 
 
 Isto não muda o schema e não cria campo: `references/00-schema.md` descreve `commits` como "um item por task commitada, na ordem em que fecharam" — uma lista ordenada, sem exigência de id único. **A chave `seq` não muda isso**: ela dá identidade à ordem, e continua não exigindo que cada `task` apareça uma vez só (`00-schema.md`, "A ordem de registro"). Quem lê a lista lê história de execução; quem quer o plano lê `tasks.md`, que é a fonte dele.
 
+### Task sem arquivos (DM-356)
+
+Quando o bloco `arquivos` da task declara literalmente `cria: []` e
+`altera: []` e não há produto alterado, `--fechar` encerra o E1 sem commit,
+sem `seq` e sem item em `ENTREGA.commits`. `--preparar` também encerra sem
+commit: não emite token e não há chamada a `--concluir`. A trava é liberada.
+O índice ocupado, desvio ou arquivo de task irmã continua bloqueando o E1.
+A V11 confere o intervalo de commits antes de dispensar a ausência do item.
+
 ### Dois tipos de lacuna E1
+
+Task sem arquivos dispensada pela DM-356 não é lacuna E1.
 
 **A. A task está concluída e nenhum commit de produto existe.** Rode o E1 tardio normal: ele cria o commit e registra seu SHA.
 

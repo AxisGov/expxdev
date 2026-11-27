@@ -38,6 +38,12 @@
 #       ausente ou ilegível → código 1, motivo no stderr. Origem n/a → código 1.
 #   ownership-da-task.sh --situacoes     # o enum fechado, `situacao|descrição`
 #   ownership-da-task.sh --condicao      # o nome da condição estruturada
+#   ownership-da-task.sh --sem-arquivos <tasks.md>...
+#       `id<TAB>arquivo` das tasks sem arquivos (DM-356): `cria: []` e
+#       `altera: []` presentes e literais. Plano ilegível → código 1.
+#   ownership-da-task.sh --task-sem-arquivos <raiz> <origem> <trabalho> <T-NN.MM>
+#       código 0 quando a task do plano corrente é sem arquivos; 1 em qualquer
+#       outro caso (inclusive plano que não se lê).
 #
 # Saída de --classificar, uma linha por arquivo, ordenada e estável:
 #   <situacao>\t<arquivo>\t<tasks que o declaram, ou `-`>
@@ -104,6 +110,56 @@ contexto() { # <raiz> <origem> <trabalho>
 # Lê SOMENTE `id` e `arquivos` (`cria`/`altera`). Título, objetivo, status,
 # suíte e a ordem em que as tasks aparecem não entram: a mesma evidência de
 # conjuntos tem que dar sempre a mesma classificação.
+#
+# A task SEM ARQUIVOS (DM-356) — no bloco `arquivos` do frontmatter, as duas
+# chaves presentes, `cria: []` e `altera: []`, literais — sai como
+# `id<TAB><TAB>sem_arquivos`. Chave ausente não é lista vazia: não gera linha.
+plano_do_arquivo() { # <tasks.md>
+  awk '
+    function fecha_task() {
+      if (tid != "" && cria_vazia && altera_vazia) print tid "\t\tsem_arquivos"
+      cria_vazia = 0; altera_vazia = 0; no_bloco = 0
+    }
+    function recuo(s) { match(s, /^[[:space:]]*/); return RLENGTH }
+    function coleta(s,   n, i, partes) {
+      sub(/^[^:]*:[[:space:]]*/, "", s)
+      gsub(/^\[|\]$/, "", s)
+      n = split(s, partes, /,[[:space:]]*/)
+      for (i = 1; i <= n; i++) {
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", partes[i])
+        gsub(/^["]|["]$/, "", partes[i])
+        if (partes[i] != "" && id != "") print id "\t" partes[i]
+      }
+    }
+    { sub(/\r$/, "") }
+    # A marca de task sem arquivos vale só no frontmatter, e só quando ele fecha:
+    # prosa do corpo nunca dispensa commit.
+    NR == 1 && /^---[[:space:]]*$/ { frente = 1; next }
+    frente && /^---[[:space:]]*$/ { fecha_task(); frente = 0; next }
+    frente && /^[[:space:]]*-[[:space:]]+id:[[:space:]]*T-/ {
+      fecha_task(); tid = $0; sub(/^.*id:[[:space:]]*/, "", tid); gsub(/[[:space:]"]+$/, "", tid)
+    }
+    frente && no_bloco && !/^[[:space:]]*(#.*)?$/ && recuo($0) <= recuo_arq { no_bloco = 0 }
+    frente && no_bloco && /^[[:space:]]*cria:[[:space:]]*\[\][[:space:]]*$/ { cria_vazia = 1 }
+    frente && no_bloco && /^[[:space:]]*altera:[[:space:]]*\[\][[:space:]]*$/ { altera_vazia = 1 }
+    frente && /^[[:space:]]*arquivos:[[:space:]]*$/ { no_bloco = 1; recuo_arq = recuo($0) }
+    # O reconhecimento de uma task nova vem ANTES do coletor em bloco: senão
+    # a linha `- id: T-...` seria lida como caminho da task anterior.
+    /^[[:space:]]*-[[:space:]]+id:[[:space:]]*T-/ {
+      id = $0; sub(/^.*id:[[:space:]]*/, "", id); gsub(/[[:space:]"]+$/, "", id)
+      dentro = 0; next
+    }
+    /^[[:space:]]*arquivos:/ { dentro = 1; next }
+    /^[[:space:]]*(cria|altera):/ { coleta($0); dentro = 1; next }
+    dentro && /^[[:space:]]*-[[:space:]]+[^[:space:]]+/ {
+      c = $0; sub(/^[[:space:]]*-[[:space:]]+/, "", c); gsub(/[[:space:]"]+$/, "", c)
+      if (c ~ /^[A-Za-z0-9_.\/-]+$/ && id != "") print id "\t" c
+      next
+    }
+    /^[[:space:]]*[a-z_]+:/ { if ($0 !~ /^[[:space:]]*(cria|altera|arquivos):/) dentro = 0 }
+  ' "$1" 2>/dev/null
+}
+
 plano() {
   local pasta="$1" f arqs find_rc
   arqs="$(find "$pasta" -name tasks.md -not -path '*/node_modules/*' 2>/dev/null)"
@@ -115,32 +171,7 @@ plano() {
     [ -n "$f" ] || continue
     [ -f "$f" ] && [ -r "$f" ] \
       || { printf '__ERRO__plano corrente ilegivel: %s\n' "$f"; return 1; }
-    awk '
-      function coleta(s,   n, i, partes) {
-        sub(/^[^:]*:[[:space:]]*/, "", s)
-        gsub(/^\[|\]$/, "", s)
-        n = split(s, partes, /,[[:space:]]*/)
-        for (i = 1; i <= n; i++) {
-          gsub(/^[[:space:]]+|[[:space:]]+$/, "", partes[i])
-          gsub(/^["]|["]$/, "", partes[i])
-          if (partes[i] != "" && id != "") print id "\t" partes[i]
-        }
-      }
-      # O reconhecimento de uma task nova vem ANTES do coletor em bloco: senão
-      # a linha `- id: T-...` seria lida como caminho da task anterior.
-      /^[[:space:]]*-[[:space:]]+id:[[:space:]]*T-/ {
-        id = $0; sub(/^.*id:[[:space:]]*/, "", id); gsub(/[[:space:]"]+$/, "", id)
-        dentro = 0; next
-      }
-      /^[[:space:]]*arquivos:/ { dentro = 1; next }
-      /^[[:space:]]*(cria|altera):/ { coleta($0); dentro = 1; next }
-      dentro && /^[[:space:]]*-[[:space:]]+[^[:space:]]+/ {
-        c = $0; sub(/^[[:space:]]*-[[:space:]]+/, "", c); gsub(/[[:space:]"]+$/, "", c)
-        if (c ~ /^[A-Za-z0-9_.\/-]+$/ && id != "") print id "\t" c
-        next
-      }
-      /^[[:space:]]*[a-z_]+:/ { if ($0 !~ /^[[:space:]]*(cria|altera|arquivos):/) dentro = 0 }
-    ' "$f" 2>/dev/null || { printf '__ERRO__plano corrente ilegivel: %s\n' "$f"; return 1; }
+    plano_do_arquivo "$f" || { printf '__ERRO__plano corrente ilegivel: %s\n' "$f"; return 1; }
   done <<EOF
 $arqs
 EOF
@@ -160,7 +191,37 @@ tasks_de() {
 
 # arquivos_de <task> — os caminhos que a task declara, ordenados.
 arquivos_de() {
-  printf '%s\n' "$PLANO" | awk -F'\t' -v t="$1" '$1 == t { print $2 }' | sort -u
+  printf '%s\n' "$PLANO" | awk -F'\t' -v t="$1" '$1 == t && $2 != "" { print $2 }' | sort -u
+}
+
+# sem_arquivos_no_plano <task> — 0 quando o plano a marca como sem arquivos e
+# nenhum caminho aparece para ela.
+sem_arquivos_no_plano() {
+  awk -F'\t' -v t="$1" '
+    $1 == t { if ($2 != "") caminho = 1; else if ($3 == "sem_arquivos") vazia = 1 }
+    END { exit !(vazia && !caminho) }
+  ' <<<"$PLANO"
+}
+
+# lista_sem_arquivos <tasks.md>... — `id<TAB>arquivo`, arquivo por arquivo.
+lista_sem_arquivos() {
+  local f linhas
+  for f in "$@"; do
+    [ -f "$f" ] && [ -r "$f" ] || { ERRO="plano ilegivel: $f"; return 1; }
+    linhas="$(plano_do_arquivo "$f")" || { ERRO="plano ilegivel: $f"; return 1; }
+    awk -F'\t' -v f="$f" '
+      $2 != "" { caminho[$1] = 1; next }
+      $3 == "sem_arquivos" { if (!($1 in vazia)) ordem[++n] = $1; vazia[$1] = 1 }
+      END { for (i = 1; i <= n; i++) if (!(ordem[i] in caminho)) print ordem[i] "\t" f }
+    ' <<<"$linhas" || { ERRO="plano ilegivel: $f"; return 1; }
+  done
+}
+
+# task_sem_arquivos <raiz> <origem> <trabalho> <T-NN.MM>
+task_sem_arquivos() {
+  contexto "$1" "$2" "$3" || return 1
+  PLANO="$(plano "$PASTA_TRABALHO")" || return 1
+  sem_arquivos_no_plano "$4"
 }
 
 # situacao_do <task atual> <arquivo que mudou> — `<chave de ordem>\t<situação>`.
@@ -203,7 +264,9 @@ classificar() {
 
   # A task atual precisa existir no plano com arquivos declarados. Sem isso o
   # ownership unitário não é determinável — e inferir pela prosa é proibido.
-  # Cair para "a primeira task do plano" aqui inventaria o dono.
+  # Cair para "a primeira task do plano" aqui inventaria o dono. A exceção é a
+  # task sem arquivos (`cria: []` e `altera: []` explícitos, DM-356).
+  sem_arquivos_no_plano "$atual" ||
   arquivos_de "$atual" | grep . >/dev/null || { ERRO="a task atual '$atual' nao declara arquivos no plano corrente de '$trabalho'"; return 1; }
 
   # Os arquivos que mudaram: argumentos, ou a entrada padrão.
@@ -264,7 +327,7 @@ uniao() {
   fi
   [ -n "$PLANO" ] || { ERRO="plano corrente ilegivel: nenhuma task com arquivos declarados em $PASTA_TRABALHO"; return 1; }
 
-  printf '%s\n' "$PLANO" | cut -f2 | LC_ALL=C sort -u
+  awk -F'\t' '$2 != "" { print $2 }' <<<"$PLANO" | LC_ALL=C sort -u
 }
 
 case "${1:-}" in
@@ -282,5 +345,15 @@ case "${1:-}" in
     uniao "$@"; rc=$?
     [ "$rc" = 0 ] || { printf 'ownership-da-task: %s\n' "$ERRO" >&2; exit 1; }
     exit 0 ;;
+  --sem-arquivos)
+    shift
+    [ "$#" -ge 1 ] || { printf 'ownership-da-task: --sem-arquivos <tasks.md>...\n' >&2; exit 64; }
+    lista_sem_arquivos "$@" && exit 0
+    printf 'ownership-da-task: %s\n' "$ERRO" >&2; exit 1 ;;
+  --task-sem-arquivos)
+    shift
+    [ "$#" -eq 4 ] || { printf 'ownership-da-task: --task-sem-arquivos <raiz> <origem> <trabalho> <T-NN.MM>\n' >&2; exit 64; }
+    task_sem_arquivos "$@" && exit 0
+    exit 1 ;;
   *) printf 'ownership-da-task: opção desconhecida: %s\n' "${1:-}" >&2; exit 64 ;;
 esac
