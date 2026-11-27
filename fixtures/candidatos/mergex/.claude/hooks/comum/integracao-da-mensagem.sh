@@ -53,8 +53,9 @@ integracao_arquivo_do_comando() {
   fi
   [ -n "$arq" ] || return 0
   arq="$(printf '%s' "$arq" | sed "s/^['\"]//; s/['\"]$//")"
-  # Caminho de unidade do Windows é absoluto. Com barra invertida, só entre aspas:
-  # sem elas o shell come a barra, e o Git abre outro nome (DM-354).
+  # Com `cygpath`, caminho de unidade do Windows é absoluto; sem ele, é relativo,
+  # como o Git do Linux o lê (DM-355). Com barra invertida, só entre aspas: sem
+  # elas o shell come a barra, e o Git abre outro nome (DM-354).
   case "$arq" in
     [A-Za-z]:/*|[A-Za-z]:\\*)
       case "$aspas:$arq" in 0:*\\*) ;; *) arq="$(expx_caminho_local "$arq")" ;; esac ;;

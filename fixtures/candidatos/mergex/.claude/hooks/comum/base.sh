@@ -214,20 +214,18 @@ expx_sem_aspas() {
 }
 
 # expx_caminho_local <caminho> — o caminho de unidade do Windows (`F:/x`, `F:\x`)
-# na forma que o shell do hook abre: o `cygpath -u` do Git Bash (`/f/x`); no WSL,
-# `/mnt/f/x`. Fora dessa forma, ou sem como converter, devolve o caminho como veio.
-# Quem chama trata como absoluto o resultado que começa com `/` (conselhos, depois
-# da 0.14.29: `git commit -F F:/.../msg` era lido como relativo e barrado).
+# na forma que o Git do shell do hook abre. Com `cygpath` (Git Bash), o
+# `cygpath -u` (`/f/x`). Sem ele o Git é o do Linux (WSL inclusive), que lê `F:/x`
+# como relativo ao diretório atual: o caminho volta como veio, para o hook ler o
+# mesmo arquivo que o Git (DM-355). Fora dessa forma, ou se o `cygpath` falhar,
+# também volta como veio. Quem chama trata como absoluto só o resultado que começa
+# com `/`, e resolve o resto como relativo.
 expx_caminho_local() {
-  local c="$1" u d
+  local c="$1" u
   case "$c" in
     [A-Za-z]:/*|[A-Za-z]:\\*)
       if command -v cygpath >/dev/null 2>&1 && u="$(cygpath -u -- "$c" 2>/dev/null)" && [ -n "$u" ]; then
         printf '%s' "$u"; return 0
-      fi
-      d="$(printf '%s' "${c%%:*}" | tr '[:upper:]' '[:lower:]')"
-      if [ -d "/mnt/$d" ]; then
-        u="${c#?:}"; printf '/mnt/%s%s' "$d" "$(printf '%s' "$u" | tr '\\' '/')"; return 0
       fi
       ;;
   esac

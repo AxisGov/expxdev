@@ -114,6 +114,15 @@ describe("identidade da release no docs-site", () => {
     expect(pagina).not.toMatch(new RegExp(`-D</span> ~/expx-cli/v${pacote.version.replace(/\./g, "\\.")}\n`));
   });
 
+  // `npx --package <tgz>` roda uma vez e não deixa o `expx` no PATH, mas o resto do
+  // site chama `expx update`, `expx doctor` e `expx --version` direto (CodeAnt).
+  it("funcional: a instalação do site diz que só o npm install -g põe o expx no PATH", () => {
+    const pagina = site.replace(/\r\n/g, "\n");
+    const instalacao = pagina.slice(pagina.indexOf('id="instalacao"'), pagina.indexOf('id="modo-interativo"'));
+    expect(instalacao).toContain(`npm</span> install <span class="tok-flag">-g</span> ~/expx-cli/v${pacote.version}/expxdev-${pacote.version}.tgz`);
+    expect(instalacao).toMatch(/não deixa o <code>expx<\/code> no <code>PATH<\/code>/);
+  });
+
   it("funcional: site e apresentação publicam a versão do package", () => {
     expect(site).toContain(`id="versao">v${pacote.version}</span>`);
     expect(site).toContain(`releases/tag/v${pacote.version}`);

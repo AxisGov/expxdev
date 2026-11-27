@@ -183,7 +183,8 @@ $CMD"
       # é `ab`), e o hook leria `a\b`. Na dúvida, barra (t-14).
       case "$aspas_f:$arq_f" in 0:*\\*) MSG_NAO_VARRIDA="${MSG_NAO_VARRIDA}  - ${arg_f}
 "; continue ;; esac
-      # `F:/...` também é absoluto (Windows). Com barra invertida, só entre aspas:
+      # Com `cygpath`, `F:/...` também é absoluto (Windows); sem ele, é relativo ao
+      # diretório do Git, e lido assim (DM-355). Com barra invertida, só entre aspas:
       # sem elas o shell come a barra, e o Git abriria outro arquivo (`F:/a\ b`).
       case "$arq_f" in
         [A-Za-z]:/*) case "$arq_f" in *"\\"*) [ "$aspas_f" = 0 ] || arq_f="$(expx_caminho_local "$arq_f")" ;; *) arq_f="$(expx_caminho_local "$arq_f")" ;; esac ;;
