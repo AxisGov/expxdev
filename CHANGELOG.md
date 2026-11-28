@@ -9,6 +9,12 @@ Instale por PR, como a 0.13.24. Muda o núcleo (`expx-revisao.mjs` e o contrato 
 
 # Changelog
 
+## 0.14.34 — triagem do conselhos#414
+
+- MergeX (DM-359): quando `.expx/falhas-de-ambiente.tsv` está no diff, as entradas novas que absolvem a vermelha aparecem no AVISO (`lista-alterada-na-entrega`). Plataforma desconhecida não absolve. O campo `desde` é registro.
+- MergeX (DM-360): o catálogo de método inclui `revisao/<T>.json` das tasks sem arquivos, e o commit `pre-e2` a leva para o histórico.
+- SprintX (DS-240): linha em branco ou comentário não encerra a lista em bloco de `suite_falhas`. Textos corrigidos: o hook avisa em modo aviso, quem confere a suíte no commit é o `commit-por-task` e a V2, e o destino da revisão da task sem arquivos.
+
 ## 0.14.33 — aspas no id e em suite_falhas, painel relê a lista de ambiente
 
 - MergeX (DM-358): `ownership-da-task.sh` e o hook `commit-por-task` leem `- id: "T-01.01"` e `'T-01.01'` sem as aspas. No fluxo de `suite_falhas`, a vírgula dentro das aspas fica no caminho; aspa sem par ou texto depois do fecho dá `suite_falhas-invalida`.
