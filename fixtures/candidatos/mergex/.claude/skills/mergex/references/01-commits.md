@@ -330,7 +330,7 @@ Nem tudo que muda durante o trabalho é produto. A skill de origem grava o plano
 | `docs/<trabalho_id>/` | sprintx (formato antigo) | feature-local |
 | `docs/manutencao/<trabalho_id>/` | runx | trabalho |
 | `docs/entregas/<trabalho_id>/` | mergex | entrega |
-| `docs/entregas/<trabalho_id>/revisao/<T-NN.MM>.json` | núcleo do expx (`revisar`) | **task** — a da task atual entra no commit dela (abaixo) |
+| `docs/entregas/<trabalho_id>/revisao/<T-NN.MM>.json` | núcleo do expx (`revisar`) | **task** — a da task atual entra no commit dela (abaixo); a de task sem arquivos (`cria: []` e `altera: []`, DM-356) é método e entra no `pre-e2`, `pre-e6` e `e8` (DM-360) |
 | `docs/sprintx/estimativas/HISTORICO.md` | sprintx | **global** — só quando a origem é a sprintx |
 
 ### O artefato global de método da sprintx

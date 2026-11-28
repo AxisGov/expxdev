@@ -170,6 +170,7 @@ carrega_lista() {
   [ "$LISTA_LIDA" = 0 ] || return "$LISTA_RC"
   LISTA_LIDA=1
   local tsv="$RAIZ/.expx/falhas-de-ambiente.tsv"
+  [ "$PLAT" != desconhecida ] || return 0
   # sem a lista, nada está listado: a vermelha é FALHA, provada
   [ -e "$tsv" ] || return 0
   if [ ! -f "$tsv" ] || [ ! -r "$tsv" ]; then LISTA_RC=1; return 1; fi
@@ -187,6 +188,20 @@ carrega_lista() {
     }
   ' "$tsv")" || { LISTA_RC=1; return 1; }
   return 0
+}
+
+# Caminhos de linhas válidas que não constavam literalmente na base. Falha de
+# leitura da base equivale a lista vazia, inclusive quando o arquivo não existe.
+entradas_novas() {
+  local anterior
+  anterior="$(git -C "$RAIZ" show "$BASE:.expx/falhas-de-ambiente.tsv" 2>/dev/null)" || anterior=""
+  awk -v plat="$PLAT" -v anterior="$anterior" '
+    BEGIN { FS = "\t"; n = split(anterior, linhas, "\n"); for (i = 1; i <= n; i++) { sub(/\r$/, "", linhas[i]); base[linhas[i]] = 1 } }
+    { sub(/\r$/, "") }
+    /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+    { p = $2; m = $3; gsub(/^[[:space:]]+|[[:space:]]+$/, "", p); gsub(/^[[:space:]]+|[[:space:]]+$/, "", m)
+      if ($1 != "" && p == plat && m != "" && !($0 in base)) print $1 }
+  ' "$RAIZ/.expx/falhas-de-ambiente.tsv"
 }
 
 DIFF_LIDO=0; DIFF_RC=0; DIFF_MOTIVO=""; TOCADOS=""
@@ -215,7 +230,7 @@ $saida"
 
 # confere_lista <marca> <caminho>... — a regra da vermelha. Grava V_RES e V_MOTIVO.
 confere_lista() {
-  local marca="$1" c fora="" tocados="" todos=""
+  local marca="$1" c fora="" tocados="" todos="" novas="" caminhos_novos=""
   shift
   case "$marca" in
     ausente)  V_RES=FALHA; V_MOTIVO="suite_falhas-ausente"; return 0 ;;
@@ -234,6 +249,13 @@ confere_lista() {
   done
   if [ -n "$tocados" ]; then V_RES=FALHA; V_MOTIVO="tocado-pelo-diff: $tocados"; return 0; fi
   V_RES=AVISO; V_MOTIVO="falha-de-ambiente($PLAT): $todos"
+  if grep -Fx -- '.expx/falhas-de-ambiente.tsv' <<<"$TOCADOS" >/dev/null; then
+    caminhos_novos="$(entradas_novas)" || caminhos_novos="$LISTADOS"
+    for c in "$@"; do
+      grep -Fx -- "$c" <<<"$caminhos_novos" >/dev/null && novas="${novas:+$novas,}$c"
+    done
+    [ -z "$novas" ] || V_MOTIVO="$V_MOTIVO; lista-alterada-na-entrega: $novas"
+  fi
   return 0
 }
 

@@ -10,7 +10,9 @@
 #
 # O catálogo é fechado: nomes literais por pasta do trabalho, sprints
 # `sprint-NN`, a base enumerada pelo próprio `00-INDICE.md`, a entrega do
-# trabalho e — só na sprintx — o `HISTORICO.md` global pelo caminho exato.
+# trabalho, a revisão `revisao/<T-NN.MM>.json` de cada task sem arquivos do plano
+# (DM-360, nos cumulativos) e — só na sprintx — o `HISTORICO.md` global pelo
+# caminho exato.
 # Nenhum glob de diretório (`docs/**`, pasta inteira) vira método: um produto
 # com nome parecido continua produto.
 #
@@ -45,6 +47,8 @@
 # Bash 3.2 (macOS): sem arrays associativos, mapfile ou recursos de Bash 4+.
 
 CATALOGO_ERRO=""
+# O ownership-da-task.sh mora ao lado: ele diz quais tasks são sem arquivos (DM-360).
+CATALOGO_AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 catalogo_fm() { # <arquivo> <chave>
   [ -r "$1" ] || return 0
@@ -168,6 +172,43 @@ catalogo_sprints() { # <raiz> <pasta>
   done
 }
 
+# catalogo_revisoes_sem_arquivos <raiz> <trabalho> <pasta> — a evidência de revisão
+# `docs/entregas/<trabalho>/revisao/<id>.json` de cada task sem arquivos (DM-356) do
+# plano do trabalho (DM-360). O E1 não commita essa task, então a revisão dela é método
+# e vai no checkpoint. Os tasks.md são os que catalogo_sprints reconhece; quem diz que a
+# task é sem arquivos é o ownership-da-task.sh. Só id `T-NN.MM` vira caminho, por nome
+# literal. Ownership ausente ou com erro falha fechado.
+catalogo_revisoes_sem_arquivos() {
+  local raiz="$1" trabalho="$2" pasta="$3" relativo saida rc linha id tab=$'\t'
+  set --
+  while IFS= read -r relativo; do
+    case "$relativo" in */tasks.md) ;; *) continue ;; esac
+    [ -f "$raiz/$relativo" ] && set -- "$@" "$raiz/$relativo"
+  done <<EOF
+$(catalogo_sprints "$raiz" "$pasta")
+EOF
+  [ "$#" -gt 0 ] || return 0
+  # Sem o ownership, ou com o plano ilegível para ele, a lista sai vazia: a revisão
+  # fica fora do método, como antes da DM-360, e o resto do catálogo não para.
+  # Incluir por engano um arquivo de produto seria pior do que deixar a revisão suja.
+  [ -r "$CATALOGO_AQUI/ownership-da-task.sh" ] || return 0
+  saida="$(bash "$CATALOGO_AQUI/ownership-da-task.sh" --sem-arquivos "$@" 2>/dev/null)"; rc=$?
+  [ "$rc" = 0 ] || return 0
+  while IFS= read -r linha; do
+    id="${linha%%"$tab"*}"
+    # o mesmo nome que o E1 aceita como evidência (`nome_de_evidencia`): T-NN.MM com dois
+    # dígitos em cada parte, ou o legado T-<dígitos>. `T-1.1` e `T-001.02` continuam produto.
+    case "$id" in # guarda:REVISAO-NOME-LITERAL
+      T-[0123456789][0123456789].[0123456789][0123456789]) ;;
+      T-*) case "${id#T-}" in ''|*[!0123456789]*) continue ;; esac ;;
+      *) continue ;;
+    esac
+    printf '%s\n' "docs/entregas/$trabalho/revisao/$id.json"
+  done <<EOF
+$saida
+EOF
+}
+
 catalogo_reconciliacoes_brutas() { # <ENTREGA.md> — `=<valor>` de cada `arquivo:` do bloco
   [ -r "$1" ] || return 0
   awk '
@@ -260,6 +301,8 @@ catalogo_metodo() { # <raiz> <origem> <trabalho> <pasta> <checkpoint>
   catalogo_base "$raiz" "$trabalho" "$pasta" || return 1
   [ "$origem" = sprintx ] && printf '%s\n' docs/sprintx/estimativas/HISTORICO.md
   printf '%s\n' "docs/entregas/$trabalho/ENTREGA.md"
+  # pre-e2, pre-e6 e e8: a revisão de cada task sem arquivos (DM-360)
+  catalogo_revisoes_sem_arquivos "$raiz" "$trabalho" "$pasta" || return 1 # guarda:CAT-REVISAO-SEM-ARQUIVOS
   case "$checkpoint" in
     pre-e6|e8)
       printf '%s\n' "docs/entregas/$trabalho/ATENCAO.md" \

@@ -132,6 +132,8 @@ Para cada task `concluida` do escopo, leia o campo `suite`:
 
 **A única exceção é a falha de ambiente (DM-357).** A lista é do projeto e versionada, em `.expx/falhas-de-ambiente.tsv`: uma linha por teste, `caminho<TAB>plataforma<TAB>motivo<TAB>desde`. `#` comenta, linha com motivo vazio não vale e o caminho casa exato. A task `vermelha` é **AVISO** só quando `suite_falhas` existe e não é vazia, **todo** caminho dela está na lista para a plataforma atual (`EXPX_PLATAFORMA`, senão `uname -s`) e **nenhum** aparece em `git diff --name-only <branch_base>...HEAD`: teste tocado pelo trabalho perde a absolvição. Quem decide é o script, e a primeira linha da saída é o resultado:
 
+O campo `desde` é registro e não invalida a linha; entre motivo e data, só o motivo vazio invalida (DM-357). Pela DM-359, plataforma `desconhecida` não absolve nenhuma falha, mesmo se houver linha com esse valor. Quando a lista foi tocada no diff ou no índice com `--staged`, o AVISO identifica os caminhos das entradas novas em relação à base com `lista-alterada-na-entrega`; lista ausente ou ilegível na base trata as entradas como novas.
+
 ```bash
 bash .claude/skills/mergex/scripts/portao-v2.sh --verificar --base <branch_base> <tasks.md>...
 bash .claude/skills/mergex/scripts/causa-do-portao.sh --token v2 <primeira linha da saída>
